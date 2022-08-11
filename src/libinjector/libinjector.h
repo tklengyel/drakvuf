@@ -244,8 +244,7 @@ bool inject_function_call(
     x86_registers_t* regs,
     struct argument args[],
     int nb_args,
-    addr_t function_addr,
-    addr_t* stack_pointer);
+    addr_t function_addr);
 
 injector_status_t injector_start_app(drakvuf_t drakvuf,
     vmi_pid_t pid,

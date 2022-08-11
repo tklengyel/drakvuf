@@ -145,6 +145,10 @@ AM_CXXFLAGS += -pg
 endif
 endif
 
+if LIBUSERMODE_USE_INJECTION
+AM_CXXFLAGS += -DLIBUSERMODE_USE_INJECTION
+endif
+
 noinst_LTLIBRARIES= libusermode.la
 libusermode_la_SOURCES= $(sources)
 libusermode_la_LIBADD = ../libdrakvuf/libdrakvuf.la

@@ -1109,7 +1109,35 @@ bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* re
     return xen_set_vcpu_ctx(drakvuf->xen, drakvuf->domID, vcpu, &ctx);
 }
 
-bool drakvuf_vmi_response_set_registers(
+// One could not restore all registers at once like this:
+//   memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t)),
+// because thus kernel structures could be affected.
+// For example on Windows 7 x64 GS BASE stores pointer to KPCR. If save
+// GS BASE on vCPU0 and start injections Windows scheduler could switch
+// thread to other vCPU1. After restoring all registers vCPU1's GS BASE
+// would point to KPCR of vCPU0.
+void drakvuf_copy_gpr_registers(x86_registers_t* dst, x86_registers_t* src)
+{
+    dst->rax = src->rax;
+    dst->rcx = src->rcx;
+    dst->rdx = src->rdx;
+    dst->rbx = src->rbx;
+    dst->rbp = src->rbp;
+    dst->rsp = src->rsp;
+    dst->rdi = src->rdi;
+    dst->rsi = src->rsi;
+    dst->r8  = src->r8;
+    dst->r9  = src->r9;
+    dst->r10 = src->r10;
+    dst->r11 = src->r11;
+    dst->r12 = src->r12;
+    dst->r13 = src->r13;
+    dst->r14 = src->r14;
+    dst->r15 = src->r15;
+    dst->rip = src->rip;
+}
+
+bool drakvuf_vmi_response_set_gpr_registers(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     x86_registers_t* regs,
@@ -1129,9 +1157,11 @@ bool drakvuf_vmi_response_set_registers(
     else
     {
         drakvuf->vmi_response_set_registers[info->vcpu] = true;
-        memcpy(&drakvuf->regs_modified[info->vcpu], regs, sizeof(x86_registers_t));
+        drakvuf_copy_gpr_registers(&drakvuf->regs_modified[info->vcpu], regs);
+
         if (immediate)
-            memcpy(info->regs, regs, sizeof(x86_registers_t));
+            drakvuf_copy_gpr_registers(info->regs, regs);
+
         res = true;
     }
     drakvuf_release_vmi(drakvuf);
