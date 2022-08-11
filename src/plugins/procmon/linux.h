@@ -108,28 +108,37 @@
 #include "plugins/plugins_ex.h"
 #include "plugins/private.h"
 
-class linux_procmon
+class linux_procmon : public pluginex
 {
 public:
     os_t os;
     addr_t kaslr;
-    output_format_t output;
 
-    drakvuf_trap_t trap[3] =
-    {
-        [0 ... 2] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 0,
-            .breakpoint.addr_type = ADDR_VA,
-            .breakpoint.module = "linux",
-            .type = BREAKPOINT,
-            .data = (void*)this,
-        }
-    };
+    /* Hooks */
+    std::unique_ptr<libhook::SyscallHook> exechook;
+    std::unique_ptr<libhook::SyscallHook> exithook;
+    std::unique_ptr<libhook::SyscallHook> signalhook;
+
+    /* Return hooks */
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+
+    /* Callbacks */
+    event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* Return callbacks */
+    event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* Helper functions */
+    uint64_t make_hook_id(drakvuf_trap_info_t* info);
+    void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     linux_procmon(drakvuf_t drakvuf, output_format_t output);
     linux_procmon(const linux_procmon&) = delete;
     linux_procmon& operator=(const linux_procmon&) = delete;
+
 };
 
 #endif

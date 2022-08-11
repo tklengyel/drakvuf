@@ -110,36 +110,66 @@
 namespace procmon
 {
 
-struct linux_wrapper
+struct execve_data : PluginResult
 {
-    vmi_pid_t pid = 0;
-    vmi_pid_t target_pid = 0;
+    execve_data()
+        : PluginResult()
+        , pid()
+        , tid()
+        , ppid()
+        , new_pid()
+        , new_tid()
+        , rsp()
+        , process_name()
+        , thread_name()
+        , image_path_name()
+        , command_line()
+        , envp()
+    {
+    }
 
-    uint32_t tid = 0;
-    uint32_t target_tid = 0;
-
-    vmi_pid_t ppid = 0;
-    vmi_pid_t target_ppid = 0;
-
-    vmi_pid_t new_pid = 0;
-    uint32_t new_tid = 0;
-
-    addr_t rsp = 0;
-    addr_t target_rsp = 0;
-
-    linux_procmon* procmon;
+    vmi_pid_t pid;
+    uint32_t tid;
+    vmi_pid_t ppid;
+    vmi_pid_t new_pid;
+    uint32_t new_tid;
+    addr_t rsp;
 
     std::string process_name;
-    std::string target_process_name;
-
     std::string thread_name;
-    std::string target_thread_name;
-
     std::string image_path_name;
     std::string command_line;
     std::map<std::string, std::string> envp;
+};
 
-    uint8_t exit_status;
+struct send_signal_data : PluginResult
+{
+    send_signal_data()
+        : PluginResult()
+        , pid()
+        , target_pid()
+        , tid()
+        , target_tid()
+        , target_ppid()
+        , rsp()
+        , target_process_name()
+        , thread_name()
+        , target_thread_name()
+        , signal()
+    {
+    }
+
+    vmi_pid_t pid;
+    vmi_pid_t target_pid;
+    uint32_t tid;
+    uint32_t target_tid;
+    vmi_pid_t target_ppid;
+    addr_t rsp;
+
+    std::string target_process_name;
+    std::string thread_name;
+    std::string target_thread_name;
+
     uint64_t signal;
 };
 
