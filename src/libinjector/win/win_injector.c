@@ -110,6 +110,7 @@
 #include "methods/win_createproc.h"
 #include "methods/win_shellexec.h"
 #include "methods/win_terminate.h"
+#include "methods/win_exitthread.h"
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
 {
@@ -422,6 +423,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             event = handle_win_terminate(drakvuf, info);
             break;
         }
+        case INJECT_METHOD_EXITTHREAD:
+        {
+            event = handle_win_exitthread(drakvuf, info);
+            break;
+        }
         default:
         {
             fprintf(stderr, "This method is not implemented for 64bit\n");
@@ -475,7 +481,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     if (!drakvuf_is_interrupted(drakvuf))
     {
 #ifdef DRAKVUF_DEBUG
-        const char* method = injector->method == INJECT_METHOD_TERMINATEPROC ? "termination" : "injection";
+        const char* method = injector->method == INJECT_METHOD_TERMINATEPROC ? "termination" : ( injector->method == INJECT_METHOD_EXITTHREAD ? "exitthread" : "injection");
 #endif
         PRINT_DEBUG("Starting %s loop\n", method);
         drakvuf_loop(drakvuf, is_interrupted, NULL);
@@ -529,6 +535,12 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
             injector->exit_process = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserProcess", injector->global_search);
             if (!injector->exit_process) return false;
             injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateRemoteThread", injector->global_search);
+            break;
+        }
+        case INJECT_METHOD_EXITTHREAD:
+        {
+            injector->exit_thread = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserThread", injector->global_search);
+            if (!injector->exit_thread) return false;
             break;
         }
         case INJECT_METHOD_SHELLEXEC:
@@ -742,6 +754,36 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     injector->target_tid = injection_tid;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->terminate_pid = pid;
+    injector->step_override = false;
+    injector->step = STEP1;
+
+    if (!initialize_injector_functions(drakvuf, injector, NULL))
+    {
+        PRINT_DEBUG("Unable to initialize injector functions\n");
+        free_injector(injector);
+        return;
+    }
+
+    inject(drakvuf, injector);
+    PRINT_DEBUG("Finished with termination. Ret: %i.\n", injector->rc);
+
+    free_injector(injector);
+}
+
+void injector_exitthread_on_win(drakvuf_t drakvuf,
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid)
+{
+    PRINT_DEBUG("Target PID %u to terminate TID %u\n", injection_pid, injection_tid);
+    drakvuf_interrupt(drakvuf, 0); // clean
+
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+
+    injector->method = INJECT_METHOD_EXITTHREAD;
+    injector->drakvuf = drakvuf;
+    injector->target_pid = injection_pid;
+    injector->target_tid = injection_tid;
+    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->step_override = false;
     injector->step = STEP1;
 

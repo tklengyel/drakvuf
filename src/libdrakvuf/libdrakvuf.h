@@ -601,6 +601,11 @@ bool drakvuf_is_process_suspended(drakvuf_t drakvuf,
     addr_t process,
     bool* status) NOEXCEPT;
 
+GHashTable* drakvuf_enum_threads(drakvuf_t drakvuf, addr_t process) NOEXCEPT;
+addr_t drakvuf_get_thread(drakvuf_t drakvuf,
+    addr_t process,
+    uint32_t tid) NOEXCEPT;
+
 bool drakvuf_find_process(drakvuf_t drakvuf,
     vmi_pid_t find_pid,
     const char* find_procname,

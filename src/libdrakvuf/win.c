@@ -545,6 +545,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_module_base_addr_ctx = win_get_module_base_addr_ctx;
     drakvuf->osi.is_process = win_is_eprocess;
     drakvuf->osi.is_process_suspended = win_is_process_suspended;
+    drakvuf->osi.enum_threads = win_enum_threads;
     drakvuf->osi.is_thread = win_is_ethread;
     drakvuf->osi.get_module_list = win_get_module_list;
     drakvuf->osi.get_module_list_wow = win_get_module_list_wow;
