@@ -264,6 +264,8 @@ typedef struct os_interface
     bool (*is_process_suspended)
     (drakvuf_t drakvuf, addr_t process, bool* status);
 
+    GHashTable* (*enum_threads)(drakvuf_t drakvuf, addr_t process);
+
     bool (*get_wow_context)
     (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
 

@@ -407,6 +407,11 @@ injector_status_t drakvuf_c::inject_cmd(
     return rc;
 }
 
+void drakvuf_c::exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid)
+{
+    injector_exitthread(drakvuf, injection_pid, injection_tid);
+}
+
 struct termination_info
 {
     std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> proc;
