@@ -170,7 +170,7 @@ static event_response_t ReturnNtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvu
                     ACCESS_CONTEXT(ctx,
                         .translate_mechanism = VMI_TM_PROCESS_DTB,
                         .dtb = info->regs->cr3,
-                        .addr = plugin->addr_WmiKmRequestOpenBlock_Handle,
+                        .addr = plugin->addr_WmiKmRequestOpenBlock_Handle
                     );
                     // Set fake handle value of WmiGuid
                     if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &plugin->FakeWmiGuidHandle))
