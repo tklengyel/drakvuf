@@ -291,7 +291,8 @@ static addr_t place_environ(injector_t injector, x86_registers_t* regs, GHashTab
 
     size_t envs_count = g_hash_table_size(environ);
     struct argument* envp = g_new0(struct argument, envs_count);
-    char** str_holder = g_new0(char*, envs_count);
+    // Allocate a NULL-terminated array of strings
+    char** str_holder = g_new0(char*, envs_count + 1);
 
     GHashTableIter iter;
     gpointer key, value;
