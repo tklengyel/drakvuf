@@ -159,7 +159,8 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
 
 void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
 {
-    if (!drakvuf_are_userhooks_supported(drakvuf))
+    bool is64bit = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
+    if (!is64bit || !drakvuf_are_userhooks_supported(drakvuf))
     {
         PRINT_DEBUG("[MEMDUMP] Usermode hooking not supported. Some features will be disabled.\n");
         return;
