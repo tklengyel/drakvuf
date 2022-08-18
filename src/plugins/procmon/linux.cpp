@@ -492,6 +492,21 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output) : plugin
     drakvuf_enumerate_processes(drakvuf, process_visitor, &ctx);
 
     exechook = createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb, "");
+    if (nullptr == exechook)
+    {
+        PRINT_DEBUG("[PROCMON] Method do_execveat_common not found. You are probably using an older kernel version below 5.9\n");
+        return;
+    }
     exithook = createSyscallHook("do_exit", &linux_procmon::do_exit_cb, "");
+    if (nullptr == exithook)
+    {
+        PRINT_DEBUG("[PROCMON] Method do_exit not found.\n");
+        return;
+    }
     signalhook = createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal");
+    if (nullptr == signalhook)
+    {
+        PRINT_DEBUG("[PROCMON] Method __send_signal not found.\n");
+        return;
+    }
 }
