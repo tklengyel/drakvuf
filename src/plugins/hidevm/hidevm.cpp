@@ -124,235 +124,231 @@ static uint64_t make_hook_id(drakvuf_trap_info_t* info)
     return (u64_pid << 32) | u64_tid;
 }
 
-static event_response_t NtClose_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t hidevm::NtClose_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    auto plugin = GetTrapPlugin<hidevm>(info);
-
     uint64_t hook_ID = make_hook_id(info);
 
     // We need to set our fake handle value with 0 to avoid invalid handle exception
-    if (plugin->NtClose_hook.count(hook_ID))
+    if (this->NtClose_hook.count(hook_ID))
     {
         uint64_t Handle = drakvuf_get_function_argument(drakvuf, info, 1);
-        if (Handle == plugin->FakeWmiGuidHandle)
+        if (Handle == this->FakeWmiGuidHandle)
         {
             if (VMI_FAILURE == vmi_set_vcpureg(vmi, 0, RCX, info->vcpu))
             {
                 PRINT_DEBUG("[HIDEVM] Breakpoint on NtClose: Failed to set RCX to 0\n");
             }
-            plugin->stage = 0;
-            plugin->query_stage = 0;
-            plugin->NtClose_hook.erase(hook_ID);
+            this->stage = 0;
+            this->query_stage = 0;
+            this->NtClose_hook.erase(hook_ID);
         }
     }
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t ReturnNtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    auto plugin = GetTrapPlugin<hidevm>(info);
     auto params = libhook::GetTrapParams(info);
 
     uint64_t hook_ID = make_hook_id(info);
 
     // Verify that hook for this thread was created
-    if (plugin->ret_hooks.count(hook_ID))
+    if (this->ret_hooks.count(hook_ID))
     {
         if (params->verifyResultCallParams(drakvuf, info))
         {
-            if (plugin->stage == STAGE_WMI_OPEN_BLOCK)
+            if (this->stage == STAGE_WMI_OPEN_BLOCK)
             {
                 if (info->regs->rax == STATUS_WMI_GUID_NOT_FOUND)
                 {
                     ACCESS_CONTEXT(ctx,
                         .translate_mechanism = VMI_TM_PROCESS_DTB,
                         .dtb = info->regs->cr3,
-                        .addr = plugin->addr_WmiKmRequestOpenBlock_Handle
+                        .addr = this->addr_WmiKmRequestOpenBlock_Handle
                     );
                     // Set fake handle value of WmiGuid
-                    if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &plugin->FakeWmiGuidHandle))
+                    if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &this->FakeWmiGuidHandle))
                     {
                         if (VMI_SUCCESS == vmi_set_vcpureg(vmi, STATUS_SUCCESS, RAX, info->vcpu))
                         {
-                            plugin->stage = STAGE_WMI_QUERY_GUID_INFORMATION;
+                            this->stage = STAGE_WMI_QUERY_GUID_INFORMATION;
                         }
                         else
                         {
-                            plugin->stage = 0;
+                            this->stage = 0;
                             PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK): Failed to set RAX to STATUS_SUCCESS\n");
                         }
                     }
                     else
                     {
-                        plugin->stage = 0;
+                        this->stage = 0;
                         PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK) Failed to write fake WmiGuid Handle\n");
                     }
                 }
-                plugin->ret_hooks.erase(hook_ID);
+                this->ret_hooks.erase(hook_ID);
             }
-            else if (plugin->stage == STAGE_WMI_QUERY_GUID_INFORMATION)
+            else if (this->stage == STAGE_WMI_QUERY_GUID_INFORMATION)
             {
                 ACCESS_CONTEXT(ctx,
                     .translate_mechanism = VMI_TM_PROCESS_DTB,
                     .dtb = info->regs->cr3,
-                    .addr = plugin->addr_InputBuffer_Status,
+                    .addr = this->addr_InputBuffer_Status
                 );
 
                 uint64_t InputBuffer_Status = 0;
                 if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &InputBuffer_Status))
                 {
-                    ctx.addr = plugin->addr_IoStatusBlock_Information;
+                    ctx.addr = this->addr_IoStatusBlock_Information;
                     uint64_t IoStatusBlock_Information = 0x10;
                     // IoStatusBlock.Information on return from NtDeviceIoControlFile with IOCTL_WMI_QUERY_GUID_INFORMATION should contain 0x10
                     if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &IoStatusBlock_Information))
                     {
                         if (VMI_SUCCESS == vmi_set_vcpureg(vmi, STATUS_SUCCESS, RAX, info->vcpu))
                         {
-                            plugin->stage = STAGE_WMI_QUERY_ALL_DATA;
+                            this->stage = STAGE_WMI_QUERY_ALL_DATA;
                         }
                         else
                         {
-                            plugin->stage = 0;
+                            this->stage = 0;
                             PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_GUID_INFORMATION): Failed to set RAX to STATUS_SUCCESS\n");
                         }
                     }
                     else
                     {
-                        plugin->stage = 0;
+                        this->stage = 0;
                         PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_GUID_INFORMATION): Failed to write InputBuffer.Status\n");
                     }
                 }
                 else
                 {
-                    plugin->stage = 0;
+                    this->stage = 0;
                     PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_GUID_INFORMATION): Failed to write InputBuffer.Status\n");
                 }
-                plugin->addr_InputBuffer_Status = 0;
-                plugin->addr_IoStatusBlock_Information = 0;
-                plugin->ret_hooks.erase(hook_ID);
+                this->addr_InputBuffer_Status = 0;
+                this->addr_IoStatusBlock_Information = 0;
+                this->ret_hooks.erase(hook_ID);
             }
-            else if (plugin->stage == STAGE_WMI_QUERY_ALL_DATA)
+            else if (this->stage == STAGE_WMI_QUERY_ALL_DATA)
             {
                 uint32_t out_WmiKmQueryData_Length = 0;
                 uint32_t out_WmiKmQueryData_Flags = 0;
                 uint32_t out_WmiKmQueryData_DataLen = 0;
                 uint64_t out_IoStatusBlock_Information = 0;
 
-                if (plugin->query_stage == 1)
+                if (this->query_stage == 1)
                 {
                     ACCESS_CONTEXT(ctx,
                         .translate_mechanism = VMI_TM_PROCESS_DTB,
                         .dtb = info->regs->cr3,
-                        .addr = plugin->addr_InputBuffer + WmiKmQueryData_Length,
+                        .addr = this->addr_InputBuffer + WmiKmQueryData_Length
                     );
                     // Prepare data on first return from NtDeviceIoControlFile with IOCTL_WMI_QUERY_ALL_DATA
                     out_WmiKmQueryData_Length = 0x38;
                     if (VMI_SUCCESS == vmi_write_32(vmi, &ctx, &out_WmiKmQueryData_Length))
                     {
-                        ctx.addr = plugin->addr_InputBuffer + WmiKmQueryData_Guid;
+                        ctx.addr = this->addr_InputBuffer + WmiKmQueryData_Guid;
                         if (VMI_SUCCESS == vmi_write(vmi, &ctx, sizeof(binThermalZoneGuid), (void*)binThermalZoneGuid, nullptr))
                         {
-                            ctx.addr = plugin->addr_InputBuffer + WmiKmQueryData_Flags;
+                            ctx.addr = this->addr_InputBuffer + WmiKmQueryData_Flags;
                             out_WmiKmQueryData_Flags = 0x20;
                             if (VMI_SUCCESS == vmi_write_32(vmi, &ctx, &out_WmiKmQueryData_Flags))
                             {
-                                ctx.addr = plugin->addr_InputBuffer + WmiKmQueryData_DataLen;
+                                ctx.addr = this->addr_InputBuffer + WmiKmQueryData_DataLen;
                                 out_WmiKmQueryData_DataLen = sizeof(WMI_data);
                                 if (VMI_SUCCESS == vmi_write_32(vmi, &ctx, &out_WmiKmQueryData_DataLen))
                                 {
-                                    ctx.addr = plugin->addr_IoStatusBlock_Information;
+                                    ctx.addr = this->addr_IoStatusBlock_Information;
                                     out_IoStatusBlock_Information = 0x38;
                                     if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &out_IoStatusBlock_Information))
                                     {
                                         if (VMI_SUCCESS == vmi_set_vcpureg(vmi, STATUS_SUCCESS, RAX, info->vcpu))
                                         {
-                                            plugin->addr_InputBuffer = 0;
-                                            plugin->addr_IoStatusBlock_Information = 0;
-                                            plugin->query_stage = 2;
+                                            this->addr_InputBuffer = 0;
+                                            this->addr_IoStatusBlock_Information = 0;
+                                            this->query_stage = 2;
                                         }
                                         else
                                         {
-                                            plugin->stage = 0;
+                                            this->stage = 0;
                                             PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 1: Failed to set RAX to STATUS_SUCCESS\n");
                                         }
                                     }
                                     else
                                     {
-                                        plugin->stage = 0;
+                                        this->stage = 0;
                                         PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 1: Failed to write IoStatusBlock.Information (Bytes returned)\n");
                                     }
                                 }
                                 else
                                 {
-                                    plugin->stage = 0;
+                                    this->stage = 0;
                                     PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 1: Failed to write InputBuffer.DataLen\n");
                                 }
                             }
                             else
                             {
-                                plugin->stage = 0;
+                                this->stage = 0;
                                 PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 1: Failed to write InputBuffer.Flags\n");
                             }
                         }
                         else
                         {
-                            plugin->stage = 0;
+                            this->stage = 0;
                             PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 1: Failed to write InputBuffer.Guid\n");
                         }
                     }
                     else
                     {
-                        plugin->stage = 0;
+                        this->stage = 0;
                         PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 1: Failed to write InputBuffer.Length\n");
                     }
                 }
-                else if (plugin->query_stage == 2)
+                else if (this->query_stage == 2)
                 {
                     ACCESS_CONTEXT(ctx,
                         .translate_mechanism = VMI_TM_PROCESS_DTB,
                         .dtb = info->regs->cr3,
-                        .addr = plugin->addr_InputBuffer,
+                        .addr = this->addr_InputBuffer
                     );
 
                     // Set fake data to OutputBuffer, that should be returned
                     if (VMI_SUCCESS == vmi_write(vmi, &ctx, sizeof(WMI_data), (void*)WMI_data, nullptr))
                     {
                         out_IoStatusBlock_Information = sizeof(WMI_data);
-                        ctx.addr = plugin->addr_IoStatusBlock_Information;
+                        ctx.addr = this->addr_IoStatusBlock_Information;
                         if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &out_IoStatusBlock_Information))
                         {
                             if (VMI_SUCCESS == vmi_set_vcpureg(vmi, STATUS_SUCCESS, RAX, info->vcpu))
                             {
-                                plugin->addr_InputBuffer_Status = 0;
-                                plugin->addr_IoStatusBlock_Information = 0;
-                                auto NtClose_hook = plugin->createSyscallHook("NtClose", &NtClose_cb, UNLIMITED_TTL);
-                                plugin->NtClose_hook[hook_ID] = std::move(NtClose_hook);
-                                fmt::print(plugin->format, "hidevm", drakvuf, info,
+                                this->addr_InputBuffer_Status = 0;
+                                this->addr_IoStatusBlock_Information = 0;
+                                this->NtClose_hook[hook_ID] = this->createSyscallHook("NtClose", &hidevm::NtClose_cb, UNLIMITED_TTL);
+                                fmt::print(this->format, "hidevm", drakvuf, info,
                                     keyval("Reason", fmt::Qstr("MSAcpi_ThermalZoneTemperature query spoofed"))
                                 );
                             }
                             else
                             {
-                                plugin->stage = 0;
+                                this->stage = 0;
                                 PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 2: Failed to write InputBuffer.Status\n");
                             }
                         }
                         else
                         {
-                            plugin->stage = 0;
+                            this->stage = 0;
                             PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 2: Failed to write IoStatusBlock.Information\n");
                         }
                     }
                     else
                     {
-                        plugin->stage = 0;
+                        this->stage = 0;
                         PRINT_DEBUG("[HIDEVM] Breakpoint on return NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA) Step 2: Failed to write WMI data buffer\n");
                     }
                 }
-                plugin->ret_hooks.erase(hook_ID);
+                this->ret_hooks.erase(hook_ID);
             }
         }
     }
@@ -372,11 +368,10 @@ static bool check_process_is_wmiprvse(drakvuf_trap_info_t* info)
     return (attached_process.find(wmiprvse_proc) != std::string::npos);
 }
 
-static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    auto plugin = GetTrapPlugin<hidevm>(info);
-
+    
     uint64_t IoControlCode = drakvuf_get_function_argument(drakvuf, info, 6) & 0xFFFFFFFF;
     // Hook ID is needed to validate, that syscall return hook is in the same context as our hook chain
     uint64_t hook_ID = make_hook_id(info);
@@ -386,7 +381,7 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
     {
         if (check_process_is_wmiprvse(info))
         {
-            if (plugin->stage != 0)
+            if (this->stage != 0)
                 return VMI_EVENT_RESPONSE_NONE;
             addr_t InputBuffer = 0;
             InputBuffer = drakvuf_get_function_argument(drakvuf, info, 7); // InputBuffer -> *WMI_KM_REQUEST_OPEN_BLOCK
@@ -405,7 +400,7 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
             ACCESS_CONTEXT(ctx,
                 .translate_mechanism = VMI_TM_PROCESS_DTB,
                 .dtb = info->regs->cr3,
-                .addr = InputBuffer + WmiKmRequestOpenBlock_ObjectAttributes,
+                .addr = InputBuffer + WmiKmRequestOpenBlock_ObjectAttributes
             );
             // We need to check that (*WMI_KM_REQUEST_OPEN_BLOCK)InputBuffer->GuidObjectAttributes->ObjectName contains thermal zone GUID
             if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &InputBuffer_GuidObjectAttributes))
@@ -414,7 +409,7 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
-            ctx.addr = InputBuffer_GuidObjectAttributes + plugin->objattr_length;
+            ctx.addr = InputBuffer_GuidObjectAttributes + this->objattr_length;
             if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &GuidObjectAttributes_Length))
             {
                 PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK): Failed to read GuidObjectAttributes.Length\n");
@@ -426,7 +421,7 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
-            ctx.addr = InputBuffer_GuidObjectAttributes + plugin->objattr_name;
+            ctx.addr = InputBuffer_GuidObjectAttributes + this->objattr_name;
             if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &GuidObjectAttributes_ObjectName))
             {
                 PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK): Failed to read GuidObjectAttributes.ObjectName\n");
@@ -454,13 +449,13 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK): GUID ObjectName: %s\n", guid_object_name_utf8.contents);
                     // We need to save address of Handle field, to write fake handle in syscall return hook
-                    plugin->addr_WmiKmRequestOpenBlock_Handle = InputBuffer + WmiKmRequestOpenBlock_Handle;
+                    this->addr_WmiKmRequestOpenBlock_Handle = InputBuffer + WmiKmRequestOpenBlock_Handle;
                     // After validating GUID value we set 1st stage hook
-                    plugin->stage = STAGE_WMI_OPEN_BLOCK;
-                    auto hook = plugin->createReturnHook(info, &ReturnNtDeviceIoControlFile_cb);
+                    this->stage = STAGE_WMI_OPEN_BLOCK;
+                    auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb);
                     // Save original PID and TID to validate that next steps are in the same chain
-                    plugin->pid_tid = hook_ID;
-                    plugin->ret_hooks[hook_ID] = std::move(hook);
+                    this->pid_tid = hook_ID;
+                    this->ret_hooks[hook_ID] = std::move(hook);
                 }
                 vmi_free_unicode_str(guid_object_name);
                 free(guid_object_name_utf8.contents);
@@ -468,11 +463,11 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
         }
     }
     // Second stage of getting data is checking the status of WmiGuid
-    else if (IoControlCode == IOCTL_WMI_QUERY_GUID_INFORMATION && hook_ID == plugin->pid_tid)
+    else if (IoControlCode == IOCTL_WMI_QUERY_GUID_INFORMATION && hook_ID == this->pid_tid)
     {
         if (check_process_is_wmiprvse(info))
         {
-            if (plugin->stage == STAGE_WMI_QUERY_GUID_INFORMATION)
+            if (this->stage == STAGE_WMI_QUERY_GUID_INFORMATION)
             {
                 addr_t InputBuffer = 0;
                 addr_t IoStatusBlock = 0;
@@ -484,46 +479,46 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
                 if (!InputBuffer)
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_GUID_INFORMATION): Failed to read InputBuffer\n");
-                    plugin->stage = 0;
+                    this->stage = 0;
                     return VMI_EVENT_RESPONSE_NONE;
                 }
                 if (!IoStatusBlock)
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_GUID_INFORMATION): Failed to read IoStatusBlock\n");
-                    plugin->stage = 0;
+                    this->stage = 0;
                     return VMI_EVENT_RESPONSE_NONE;
                 }
 
                 ACCESS_CONTEXT(ctx,
                     .translate_mechanism = VMI_TM_PROCESS_DTB,
                     .dtb = info->regs->cr3,
-                    .addr = InputBuffer + WmiKmRequestQueryGuidInfo_Handle,
+                    .addr = InputBuffer + WmiKmRequestQueryGuidInfo_Handle
                 );
                 if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &InputBuffer_Handle))
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_GUID_INFORMATION): Failed to read InputBuffer.Handle\n");
-                    plugin->stage = 0;
+                    this->stage = 0;
                     return VMI_EVENT_RESPONSE_NONE;
                 }
 
-                if (InputBuffer_Handle == plugin->FakeWmiGuidHandle)
+                if (InputBuffer_Handle == this->FakeWmiGuidHandle)
                 {
                     // Addresses of InputBuffer.Status and IoStatusBlock.Information are saved to spoof values in return hook
-                    plugin->addr_InputBuffer_Status = InputBuffer + WmiKmRequestQueryGuidInfo_Status;
-                    plugin->addr_IoStatusBlock_Information = IoStatusBlock + plugin->iostatusblock_information;
+                    this->addr_InputBuffer_Status = InputBuffer + WmiKmRequestQueryGuidInfo_Status;
+                    this->addr_IoStatusBlock_Information = IoStatusBlock + this->iostatusblock_information;
 
-                    auto hook = plugin->createReturnHook(info, &ReturnNtDeviceIoControlFile_cb);
-                    plugin->ret_hooks[hook_ID] = std::move(hook);
+                    auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb);
+                    this->ret_hooks[hook_ID] = std::move(hook);
                 }
             }
         }
     }
     // Third stage of getting data consists of 2 steps: 1) Get data size 2) Get data
-    else if (IoControlCode == IOCTL_WMI_QUERY_ALL_DATA && hook_ID == plugin->pid_tid)
+    else if (IoControlCode == IOCTL_WMI_QUERY_ALL_DATA && hook_ID == this->pid_tid)
     {
         if (check_process_is_wmiprvse(info))
         {
-            if (plugin->stage == STAGE_WMI_QUERY_ALL_DATA)
+            if (this->stage == STAGE_WMI_QUERY_ALL_DATA)
             {
                 addr_t InputBuffer = 0;
                 addr_t IoStatusBlock = 0;
@@ -534,37 +529,37 @@ static event_response_t NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap
                 if (!InputBuffer)
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA): Failed to read InputBuffer\n");
-                    plugin->stage = 0;
+                    this->stage = 0;
                     return VMI_EVENT_RESPONSE_NONE;
                 }
                 if (!IoStatusBlock)
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA): Failed to read IoStatusBlock\n");
-                    plugin->stage = 0;
+                    this->stage = 0;
                     return VMI_EVENT_RESPONSE_NONE;
                 }
 
                 ACCESS_CONTEXT(ctx,
                     .translate_mechanism = VMI_TM_PROCESS_DTB,
                     .dtb = info->regs->cr3,
-                    .addr = InputBuffer + WmiKmQueryData_Handle,
+                    .addr = InputBuffer + WmiKmQueryData_Handle
                 );
                 if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &InputBuffer_Handle))
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA): Failed to read InputBuffer.Handle\n");
-                    plugin->stage = 0;
+                    this->stage = 0;
                     return VMI_EVENT_RESPONSE_NONE;
                 }
-                if (InputBuffer_Handle == plugin->FakeWmiGuidHandle)
+                if (InputBuffer_Handle == this->FakeWmiGuidHandle)
                 {
-                    plugin->addr_IoStatusBlock_Information = IoStatusBlock + plugin->iostatusblock_information;
-                    plugin->addr_InputBuffer = InputBuffer;
+                    this->addr_IoStatusBlock_Information = IoStatusBlock + this->iostatusblock_information;
+                    this->addr_InputBuffer = InputBuffer;
 
                     // If this is a first call with IOCTL_WMI_QUERY_ALL_DATA we set the first stage
-                    if (!plugin->query_stage)
-                        plugin->query_stage = 1;
-                    auto hook = plugin->createReturnHook(info, &ReturnNtDeviceIoControlFile_cb);
-                    plugin->ret_hooks[hook_ID] = std::move(hook);
+                    if (!this->query_stage)
+                        this->query_stage = 1;
+                    auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb);
+                    this->ret_hooks[hook_ID] = std::move(hook);
                 }
             }
         }
@@ -628,7 +623,7 @@ static bool replace_object_name(vmi_instance_t vmi, uint64_t cr3, addr_t addr_st
             ACCESS_CONTEXT(ctx,
                 .translate_mechanism = VMI_TM_PROCESS_DTB,
                 .dtb = cr3,
-                .addr = addr_strQuery + object_name_pos * 2,
+                .addr = addr_strQuery + object_name_pos * 2
             );
             if (VMI_SUCCESS == vmi_write(vmi, &ctx, replacement_utf16.length, replacement_utf16.contents + 2, nullptr))
             {
@@ -663,7 +658,7 @@ static void check_and_replace_query_string(drakvuf_t drakvuf, drakvuf_trap_info_
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = addr_strQuery,
+        .addr = addr_strQuery
     );
     unicode_string_t* strQuery = drakvuf_read_wchar_string(drakvuf, &ctx);
 
@@ -772,7 +767,7 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
         throw -1;
     }
 
-    this->NtDeviceIoControlFile_hook = createSyscallHook("NtDeviceIoControlFile", &NtDeviceIoControlFile_cb, UNLIMITED_TTL);
+    this->NtDeviceIoControlFile_hook = createSyscallHook("NtDeviceIoControlFile", &hidevm::NtDeviceIoControlFile_cb, UNLIMITED_TTL);
 
     // Usermode hooking for WQL spoofing
     if (!drakvuf_are_userhooks_supported(drakvuf))
@@ -823,8 +818,4 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
             PRINT_DEBUG("[HIDEVM] WMI queries (Win32_PerfFormattedData, Win32_PerfRawData) spoofing not supported for this OS\n");
         }
     }
-}
-
-hidevm::~hidevm()
-{
 }

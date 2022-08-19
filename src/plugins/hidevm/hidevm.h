@@ -118,6 +118,10 @@ struct hidevm_config
 class hidevm: public pluginex
 {
 public:
+    event_response_t NtClose_cb(drakvuf_t, drakvuf_trap_info*);
+    event_response_t ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info*);
+    event_response_t NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info*);
+
     drakvuf_t drakvuf;
     const output_format_t format;
 
@@ -155,7 +159,7 @@ public:
     size_t* m_offsets;
 
     hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t output);
-    ~hidevm();
+    ~hidevm() = default;
 
 };
 
