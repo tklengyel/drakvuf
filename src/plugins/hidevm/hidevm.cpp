@@ -124,7 +124,7 @@ static uint64_t make_hook_id(drakvuf_trap_info_t* info)
     return (u64_pid << 32) | u64_tid;
 }
 
-event_response_t hidevm::NtClose_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t hidevm::NtClose_cb(drakvuf_t, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
     uint64_t hook_ID = make_hook_id(info);
@@ -148,7 +148,7 @@ event_response_t hidevm::NtClose_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
     auto params = libhook::GetTrapParams(info);
@@ -368,10 +368,10 @@ static bool check_process_is_wmiprvse(drakvuf_trap_info_t* info)
     return (attached_process.find(wmiprvse_proc) != std::string::npos);
 }
 
-event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    
+
     uint64_t IoControlCode = drakvuf_get_function_argument(drakvuf, info, 6) & 0xFFFFFFFF;
     // Hook ID is needed to validate, that syscall return hook is in the same context as our hook chain
     uint64_t hook_ID = make_hook_id(info);
