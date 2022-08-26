@@ -112,16 +112,49 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <getopt.h>
+#include <sys/time.h>
+#include <filesystem>
 #include <libvmi/libvmi.h>
 
 #include <libdrakvuf/libdrakvuf.h>
 #include <libinjector/libinjector.h>
+
+#include "exitcodes.h"
 
 static drakvuf_t drakvuf;
 
 static void close_handler(int sig)
 {
     drakvuf_interrupt(drakvuf, sig);
+}
+
+static void timeout_handler(int sig)
+{
+    (void)sig;
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFTIMEOUT);
+}
+
+static bool startup_timer(int timeout)
+{
+    struct itimerval it =
+    {
+        .it_value.tv_sec = timeout
+    };
+
+    if ( setitimer(ITIMER_REAL, &it, NULL) )
+    {
+        fprintf(stderr, "Failed to setup timeout: %i\n", errno);
+        return false;
+    }
+
+    return true;
+}
+
+static void cleanup_timer(void)
+{
+    struct itimerval it {};
+    setitimer(ITIMER_REAL, &it, NULL);
 }
 
 static inline void print_help(void)
@@ -156,6 +189,8 @@ static inline void print_help(void)
         "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
         "\t -c <current_working_dir>  The current working directory for injected executable\n"
         "\t -w                        Inject process and wait until it terminates (requires -m createproc)\n"
+        "\t --timeout <seconds>\n"
+        "\t                           Injection timeout (in seconds, default: 0 == no timeout)\n"
 #ifdef DRAKVUF_DEBUG
         "\t -v                        Turn on verbose (debug) output\n"
 #endif
@@ -167,7 +202,7 @@ int main(int argc, char** argv)
     int rc = 0;
     vmi_pid_t injection_pid = 0;
     uint32_t injection_thread = 0;
-    char c;
+    int c;
     char* json_kernel_path = NULL;
     char* domain = NULL;
     char* inject_file = NULL;
@@ -183,6 +218,7 @@ int main(int argc, char** argv)
     addr_t kpgd = 0;
     output_format_t output = OUTPUT_DEFAULT;
     vmi_pid_t injected_pid = 0;
+    int timeout = 0;
 
     fprintf(stderr, "%s %s v%s Copyright (C) 2014-2022 Tamas K Lengyel\n",
         PACKAGE_NAME, argv[0], PACKAGE_VERSION);
@@ -193,7 +229,20 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlgo:w")) != -1)
+    enum
+    {
+        opt_timeout = 1000,
+    };
+
+    const option long_opts[] =
+    {
+        {"timeout", required_argument, NULL, opt_timeout},
+        {NULL, 0, NULL, 0}
+    };
+    const char* opts = "r:d:i:I:e:m:B:P:f:k:vlgo:w";
+
+    int long_index = -1;
+    while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
         {
             case 'r':
@@ -268,6 +317,9 @@ int main(int argc, char** argv)
             case 'w':
                 wait_for_exit = true;
                 break;
+            case opt_timeout:
+                timeout = atoi(optarg);
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -299,7 +351,18 @@ int main(int argc, char** argv)
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+    if (timeout == 0)
+    {
+        sigaction(SIGALRM, &act, NULL);
+    }
+    else
+    {
+        struct sigaction act_timer;
+        act_timer.sa_handler = timeout_handler;
+        act_timer.sa_flags = 0;
+        sigemptyset(&act_timer.sa_mask);
+        sigaction(SIGALRM, &act_timer, NULL);
+    }
 
     if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, libvmi_conf, kpgd, false, UNLIMITED_TTL, NULL, true, false))
     {
@@ -307,14 +370,12 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-        if (!injection_thread)
-            injection_thread = injection_pid;
-
     if (output == OUTPUT_DEFAULT)
         printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
-    int injection_result = injector_start_app(
+    startup_timer(timeout);
+
+    injector_status_t injection_result = injector_start_app(
             drakvuf,
             injection_pid,
             injection_thread,
@@ -332,21 +393,25 @@ int main(int argc, char** argv)
             args,
             &injected_pid);
 
-    if (injection_result)
-    {
-        if (output == OUTPUT_DEFAULT)
-            printf("Process startup success\n");
-    }
-    else
-    {
-        if (output == OUTPUT_DEFAULT)
-            printf("Process startup failed\n");
-        rc = 1;
-    }
+    cleanup_timer();
 
     drakvuf_resume(drakvuf);
 
     drakvuf_close(drakvuf, 0);
 
-    return rc;
+    switch (injection_result)
+    {
+        case INJECTOR_SUCCEEDED:
+            if (output == OUTPUT_DEFAULT)
+                printf("Process startup success\n");
+            return drakvuf_exit_code_t::SUCCESS;
+        case INJECTOR_TIMEOUTED:
+            if (output == OUTPUT_DEFAULT)
+                printf("Process startup timeouted\n");
+            return drakvuf_exit_code_t::INJECTION_TIMEOUT;
+        default:
+            if (output == OUTPUT_DEFAULT)
+                printf("Process startup failed\n");
+            return drakvuf_exit_code_t::FAIL;
+    }
 }
