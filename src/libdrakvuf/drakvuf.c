@@ -155,7 +155,6 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         g_free(drakvuf->wow_offsets);
     }
 
-    g_rec_mutex_clear(&drakvuf->vmi_lock);
     g_slist_free(drakvuf->ignored_processes);
     g_free(drakvuf->offsets);
     drakvuf->offsets = NULL;
@@ -169,6 +168,10 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     drakvuf->json_kernel_path = NULL;
     g_free(drakvuf->json_wow_path);
     drakvuf->json_wow_path = NULL;
+
+    drakvuf_release_vmi(drakvuf);
+    g_rec_mutex_clear(&drakvuf->vmi_lock);
+
     g_free(drakvuf);
 }
 
