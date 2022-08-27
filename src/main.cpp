@@ -186,7 +186,7 @@ static void print_usage()
         "\t --exit-injection-thread   Exit injection thread after process injection complete\n"
         "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
         "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
-        "\t --write-file <src> <dst>  [WIN] Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
+        "\t --write-file <src> <dst>  Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
         "\t                           Can be used multiple times to copy multiple files\n"
         "\t --write-file-timeout <seconds>\n"
         "\t                           write-file timeout (in seconds, default: 0 == no timeout, requires --write-file)\n"
@@ -420,7 +420,6 @@ int main(int argc, char** argv)
         return drakvuf_exit_code_t::FAIL;
     }
 
-    int long_index = 0;
     enum
     {
         opt_json_sspicli = 1000,
@@ -562,6 +561,7 @@ int main(int argc, char** argv)
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hFC";
 
+    int long_index = 0;
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
         {
