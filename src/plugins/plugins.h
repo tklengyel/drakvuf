@@ -359,34 +359,8 @@ public:
 
 struct vmi_lock_guard
 {
-    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf(drakvuf_), vmi()
+    explicit vmi_lock_guard(drakvuf_t drakvuf) : drakvuf{drakvuf}, vmi{drakvuf_lock_and_get_vmi(drakvuf)}
     {
-        lock();
-    }
-
-    vmi_instance_t lock()
-    {
-        if (!vmi)
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-        return vmi;
-    }
-
-    bool unlock()
-    {
-        if (vmi)
-        {
-            drakvuf_release_vmi(drakvuf);
-            vmi = nullptr;
-            return true;
-        }
-        return false;
-
-    }
-
-    bool is_lock() const
-    {
-        return vmi == nullptr ? true : false;
     }
 
     operator vmi_instance_t() const
@@ -396,11 +370,13 @@ struct vmi_lock_guard
 
     ~vmi_lock_guard()
     {
-        unlock();
+        drakvuf_release_vmi(drakvuf);
     }
 
+private:
     drakvuf_t drakvuf;
-    vmi_instance_t vmi;
+public:
+    vmi_instance_t vmi; // TODO: make field private
 };
 
 #endif

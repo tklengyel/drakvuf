@@ -232,8 +232,6 @@ static event_response_t trap_DefineDosDeviceW_cb(drakvuf_t drakvuf, drakvuf_trap
         reinterpret_cast<char*>(target_path_us->contents) :
         "<UNKNOWN>";
 
-    wmi_lock.unlock();
-
     fmt::print(p->m_output_format, "envmon", drakvuf, info,
         keyval("Flags", fmt::Qstr(flags)),
         keyval("DeviceName", fmt::Qstr(device_name)),
