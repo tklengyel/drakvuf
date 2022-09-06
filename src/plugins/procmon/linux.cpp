@@ -498,7 +498,7 @@ static event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     // Save data about current process
     lw->procmon = procmon;
     lw->process_name = current_proc_data.name;
-    lw->thread_name = current_thread_name;
+    lw->thread_name = current_thread_name ?: "";
     lw->pid = current_proc_data.pid;
     lw->tid = current_proc_data.tid;
     lw->ppid = current_proc_data.ppid;
@@ -506,7 +506,7 @@ static event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     // Save data about target process
     lw->target_process_name = target_proc_data.name;
-    lw->target_thread_name = target_thread_name;
+    lw->target_thread_name = target_thread_name ?: "";
     lw->target_pid = target_proc_data.pid;
     lw->target_tid = target_proc_data.tid;
     lw->target_ppid = target_proc_data.ppid;
