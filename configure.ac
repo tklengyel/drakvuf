@@ -522,6 +522,16 @@ if test x$plugin_spraymon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SPRAYMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_hidevm],
+  [AS_HELP_STRING([--disable-plugin-hidevm],
+    [Enable the HIDEVM plugin @<:@yes@:>@])],
+  [plugin_hidevm="$enableval"],
+  [plugin_hidevm="yes"])
+AM_CONDITIONAL([PLUGIN_HIDEVM], [test x$plugin_hidevm = xyes])
+if test x$plugin_hidevm = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDEVM, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -827,6 +837,7 @@ HidSim:        $plugin_hidsim
 Rootkitmon:    $plugin_rootkitmon
 Spraymon:      $plugin_spraymon
 Callbackmon:   $plugin_callbackmon
+HideVM:        $plugin_hidevm
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:        $plugin_wmimon
