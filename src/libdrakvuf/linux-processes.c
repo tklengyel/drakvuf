@@ -273,6 +273,11 @@ static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString* b
 
         ctx.addr = dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
         gchar* res = vmi_read_str(drakvuf->vmi, &ctx);
+        if (!res)
+        {
+            PRINT_DEBUG("Can't read path->dentry->qstr data\n");
+            return;
+        }
 
         g_string_prepend(b, res);
         g_string_prepend(b, "/");
@@ -316,12 +321,11 @@ static bool get_fs_root_rcu(drakvuf_t drakvuf, addr_t process_base, addr_t* root
  */
 static char* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
 {
-    GString* b = g_string_new("");
-
     addr_t root;
     if (!get_fs_root_rcu(drakvuf, process_base, &root))
         return NULL;
 
+    GString* b = g_string_new("");
     prepend_path(drakvuf, path, root, b);
     return g_string_free(b, 0);
 }
