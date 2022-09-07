@@ -102,118 +102,65 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "libinjector.h"
+#ifndef HIDEVM_H
+#define HIDEVM_H
+
+#include <libusermode/userhook.hpp>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
 #include "private.h"
 
-injector_status_t injector_start_app(
-    drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid,
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,
-    const char* target_process,
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search,
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid)
+struct hidevm_config
 {
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-    {
-        return injector_start_app_on_win(drakvuf,
-                pid,
-                tid,
-                app,
-                cwd,
-                method,
-                format,
-                binary_path,
-                target_process,
-                break_loop_on_detection,
-                injector_to_be_freed,
-                global_search,
-                wait_for_exit,
-                injected_pid);
-    }
-    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        if (!tid)
-            tid = pid;
+    uint64_t delay;
+};
 
-        return injector_start_app_on_linux(drakvuf,
-                pid,
-                tid,
-                app,
-                method,
-                format,
-                binary_path,
-                args_count,
-                args,
-                injected_pid);
-    }
-    else
-    {
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-        return 0;
-    }
-}
-
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid)
+class hidevm: public pluginex
 {
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_terminate_on_win(drakvuf, injection_pid, injection_tid, pid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
+public:
+    event_response_t NtClose_cb(drakvuf_t, drakvuf_trap_info*);
+    event_response_t ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info*);
+    event_response_t NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info*);
 
-void injector_exitthread(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_exitthread_on_win(drakvuf, injection_pid, injection_tid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
+    drakvuf_t drakvuf;
+    const output_format_t format;
 
-void injector_free(drakvuf_t drakvuf, injector_t injector)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_free_win(injector);
-    else
-        injector_free_linux(injector);
-}
+    uint8_t stage = 0;
+    uint8_t query_stage = 0;
 
-const char* injection_method_name(injection_method_t method)
-{
-    switch (method)
-    {
-        case INJECT_METHOD_CREATEPROC:
-            return "CreateProc";
-        case INJECT_METHOD_TERMINATEPROC:
-            return "TerminateProc";
-        case INJECT_METHOD_EXITTHREAD:
-            return "ExitThread";
-        case INJECT_METHOD_SHELLEXEC:
-            return "ShellExec";
-        case INJECT_METHOD_SHELLCODE:
-            return "Shellcode";
-        case INJECT_METHOD_READ_FILE:
-            return "ReadFile";
-        case INJECT_METHOD_WRITE_FILE:
-            return "WriteFile";
-        case INJECT_METHOD_EXECPROC:
-            return "ExecProc";
-        case __INJECT_METHOD_MAX:
-            break;
-    }
-    return "Unknown";
-}
+    std::unique_ptr<libhook::SyscallHook> NtDeviceIoControlFile_hook;
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::SyscallHook>> NtClose_hook;
+
+    addr_t objattr_length;
+    addr_t objattr_name;
+    addr_t iostatusblock_information;
+
+    uint64_t pid_tid;
+
+    // Stage 1
+    // Address of WMI_KM_REQUEST_OPEN_BLOCK.Handle field, where WmiGuid handle should be stored on return of NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK)
+    addr_t addr_WmiKmRequestOpenBlock_Handle = 0;
+    uint64_t FakeWmiGuidHandle = 0xFACEDEAD;
+
+    // Stage 2
+    /*
+    * On enter InputBuffer -> WMI_KM_REQUEST_GUID_INFO.Handle should be equal to FakeWmiGuidHandle
+    * On return set IoStatusBlock.Information = 0, WMI_KM_REQUEST_GUID_INFO.Status = 0
+    */
+    addr_t addr_InputBuffer_Status = 0;
+    addr_t addr_IoStatusBlock_Information = 0;
+
+    // Stage 3
+    addr_t addr_InputBuffer = 0;
+
+    // WQL hook
+    wanted_hooks_t wanted_hooks;
+    size_t* m_offsets;
+
+    hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t output);
+    ~hidevm() = default;
+
+};
+
+#endif

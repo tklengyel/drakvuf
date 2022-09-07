@@ -183,9 +183,10 @@ static void print_usage()
         "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
         "\t -e <injection_cmd>        The executable to start with injection\n"
         "\t -c <current_working_dir>  The current working directory for injected executable\n"
+        "\t --exit-injection-thread   Exit injection thread after process injection complete\n"
         "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
         "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
-        "\t --write-file <src> <dst>  [WIN] Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
+        "\t --write-file <src> <dst>  Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
         "\t                           Can be used multiple times to copy multiple files\n"
         "\t --write-file-timeout <seconds>\n"
         "\t                           write-file timeout (in seconds, default: 0 == no timeout, requires --write-file)\n"
@@ -372,6 +373,7 @@ int main(int argc, char** argv)
     uint64_t limited_traps_ttl = UNLIMITED_TTL;
     char const* injection_cmd = nullptr;
     char const* injection_cwd = nullptr;
+    bool exit_injection_thread = false;
     std::map<std::filesystem::path, std::filesystem::path> write_files;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
@@ -418,7 +420,6 @@ int main(int argc, char** argv)
         return drakvuf_exit_code_t::FAIL;
     }
 
-    int long_index = 0;
     enum
     {
         opt_json_sspicli = 1000,
@@ -481,6 +482,7 @@ int main(int argc, char** argv)
         opt_libdrakvuf_not_get_userid,
         opt_ignore_pid,
         opt_enable_active_callback_check,
+        opt_exit_injection_thread,
     };
     const option long_opts[] =
     {
@@ -554,10 +556,12 @@ int main(int argc, char** argv)
         {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
         {"ignore-pid", required_argument, NULL, opt_ignore_pid},
         {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
+        {"exit-injection-thread", no_argument, NULL, opt_exit_injection_thread},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hFC";
 
+    int long_index = 0;
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
         {
@@ -578,6 +582,9 @@ int main(int argc, char** argv)
                 break;
             case 'c':
                 injection_cwd = optarg;
+                break;
+            case opt_exit_injection_thread:
+                exit_injection_thread = true;
                 break;
             case 'g':
                 injection_global_search = true;
@@ -996,6 +1003,9 @@ int main(int argc, char** argv)
             case INJECTOR_TIMEOUTED:
                 return drakvuf_exit_code_t::INJECTION_TIMEOUT;
         }
+
+        if (exit_injection_thread)
+            drakvuf->exit_thread(injection_pid, injection_thread);
 
         drakvuf->interrupt(0); // clear
     }

@@ -645,6 +645,43 @@ bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
     return false ;
 }
 
+GHashTable* win_enum_threads(drakvuf_t drakvuf, addr_t process)
+{
+    GHashTable* threads = g_hash_table_new(g_direct_hash, g_direct_equal);
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    addr_t list_head;
+    if ( VMI_SUCCESS != vmi_read_addr_va(vmi, process + drakvuf->offsets[EPROCESS_LISTTHREADHEAD], 0, &list_head) )
+        return false;
+
+    addr_t current_list_entry = list_head;
+    addr_t next_list_entry;
+    if ( VMI_SUCCESS != vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry) )
+    {
+        PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
+        return false;
+    }
+
+    do
+    {
+        addr_t current_thread = current_list_entry - drakvuf->offsets[ETHREAD_THREADLISTENTRY] ;
+
+        uint32_t tid = 0;
+        if (win_get_thread_id(drakvuf, current_thread, &tid))
+            g_hash_table_insert(threads, GINT_TO_POINTER((uint64_t)tid), GINT_TO_POINTER(current_thread));
+
+        current_list_entry = next_list_entry;
+
+        if ( VMI_SUCCESS != vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry) )
+        {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
+            return false;
+        }
+    } while (next_list_entry != list_head);
+
+    return threads;
+}
+
 bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status)
 {
     vmi_instance_t vmi = drakvuf->vmi;

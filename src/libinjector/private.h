@@ -162,6 +162,10 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     uint32_t injection_tid,
     vmi_pid_t pid);
 
+void injector_exitthread_on_win(drakvuf_t drakvuf,
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid);
+
 void injector_free_win(injector_t injector);
 void injector_free_linux(injector_t injector);
 

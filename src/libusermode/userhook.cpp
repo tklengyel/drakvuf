@@ -128,7 +128,6 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 #include <libdrakvuf/libdrakvuf.h>
-#include <libinjector/libinjector.h>
 #include <assert.h>
 
 #include "userhook.hpp"

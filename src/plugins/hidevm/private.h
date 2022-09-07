@@ -102,118 +102,106 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "libinjector.h"
-#include "private.h"
+#ifndef HIDEVM_PRIVATE_H
+#define HIDEVM_PRIVATE_H
 
-injector_status_t injector_start_app(
-    drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid,
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,
-    const char* target_process,
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search,
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-    {
-        return injector_start_app_on_win(drakvuf,
-                pid,
-                tid,
-                app,
-                cwd,
-                method,
-                format,
-                binary_path,
-                target_process,
-                break_loop_on_detection,
-                injector_to_be_freed,
-                global_search,
-                wait_for_exit,
-                injected_pid);
-    }
-    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        if (!tid)
-            tid = pid;
+/*
+* advapi32!WmiOpenBlock results in calling nt!NtDeviceIoControlFile with IoControlCode 0x0022413C and InputBuffer and OutputBuffer
+* defined as pointers to the same struct WMI_KM_REQUEST_OPEN_BLOCK
+*
+* struct WMI_KM_REQUEST_OPEN_BLOCK
+* {
+*     OBJECT_ATTRIBUTES *GuidObjectAttributes;
+*     __int64 Access;
+*     HANDLE Handle;
+* };
+*
+* GuidObjectAttributes.ObjectName equals to "WmiGuid\{A1BC18C0-A7C8-11d1-BF3C-00A0C9062910}" for MSAcpi_ThermalZoneTemperature object
+* GuidObjectAttributes.Handle on return contains handle to WmiGuid entry
+*
+*/
+#define IOCTL_WMI_OPEN_GUID_BLOCK 0x0022413C
+#define WmiKmRequestOpenBlock_ObjectAttributes    0
+#define WmiKmRequestOpenBlock_Handle           0x10
 
-        return injector_start_app_on_linux(drakvuf,
-                pid,
-                tid,
-                app,
-                method,
-                format,
-                binary_path,
-                args_count,
-                args,
-                injected_pid);
-    }
-    else
-    {
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-        return 0;
-    }
-}
 
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_terminate_on_win(drakvuf, injection_pid, injection_tid, pid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
+/*
+* After obtaining WmiGuid Handle via advapi!WmiOpenBlock advapi32!WmiQueryGuidInformation is called, which results in calling
+* NtDeviceIoControlFile with IoControl code equals to 0x224138 and InputBuffer and OutputBuffer set *WMI_KM_REQUEST_GUID_INFO
+*
+* struct WMI_KM_REQUEST_GUID_INFO
+* {
+*     HANDLE Handle;
+*     __int64 Status;
+* };
+*
+* NtDeviceIoControlFile should return STATUS_SUCCESS in RAX and IO_STATUS_BLOCK.Information should contain 0x10 and
+* WMI_KM_REQUEST_GUID_INFO.Status set to 0
+*/
+#define IOCTL_WMI_QUERY_GUID_INFORMATION 0x00224138
+#define WmiKmRequestQueryGuidInfo_Status 0x00000008
+#define WmiKmRequestQueryGuidInfo_Handle 0x00000000
 
-void injector_exitthread(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_exitthread_on_win(drakvuf, injection_pid, injection_tid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
+/*
+* advapi32!WmiQueryAllDataW called twice, 1st call
+* return:
+* WMI_KM_QUERY_DATA.Length -> 0x38
+* WMI_KM_QUERY_DATA.Guid -> ThermalZoneGuid
+* WMI_KM_QUERY_DATA.Flags -> 0x20
+* WMI_KM_QUERY_DATA.DataLen -> 0xD8
+* WMI_KM_QUERY_DATA.field_34 -> 1
+* IoStatusBlock.Information -> 0x38
+* NTSTATUS_SUCCESS
+*
+* struct WMI_KM_QUERY_DATA
+* {
+*     int Length;
+*     int field_4;
+*     int field_8;
+*     int field_C;
+*     HANDLE Handle;
+*     GUID Guid;
+*     int field_28;
+*     int Flags;
+*     int DataLen;
+*     int field_34;
+* };
+*
+* 2nd call returns
+* IoStatusBlock.Information -> 0xD8
+* OutputBuffer contains data
+*/
 
-void injector_free(drakvuf_t drakvuf, injector_t injector)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_free_win(injector);
-    else
-        injector_free_linux(injector);
-}
+const uint8_t binThermalZoneGuid[] = {0xC0, 0x18, 0xBC, 0xA1, 0xC8, 0xA7, 0xD1, 0x11, 0xBF, 0x3C, 0x00, 0xA0, 0xC9, 0x06, 0x29, 0x10};
+const uint8_t WMI_data[] = {0xD4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x45, 0xCA, 0x73, 0x47, 0xBB, 0xC9, 0xD7, 0x01, 0xC0, 0x18, 0xBC, 0xA1, 0xC8, 0xA7, 0xD1, 0x11,
+        0xBF, 0x3C, 0x00, 0xA0, 0xC9, 0x06, 0x29, 0x10, 0x00, 0x00, 0x00, 0x00, 0x81, 0x00, 0x01, 0x00,
+        0x48, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x94, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00,
+        0x4C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 0x0C, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x94, 0x0E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x98, 0x00, 0x00, 0x00, 0x30, 0x00, 0x41, 0x00, 0x43, 0x00, 0x50, 0x00,
+        0x49, 0x00, 0x5C, 0x00, 0x54, 0x00, 0x68, 0x00, 0x65, 0x00, 0x72, 0x00, 0x6D, 0x00, 0x61, 0x00,
+        0x6C, 0x00, 0x5A, 0x00, 0x6F, 0x00, 0x6E, 0x00, 0x65, 0x00, 0x5C, 0x00, 0x54, 0x00, 0x48, 0x00,
+        0x52, 0x00, 0x4D, 0x00, 0x5F, 0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
 
-const char* injection_method_name(injection_method_t method)
-{
-    switch (method)
-    {
-        case INJECT_METHOD_CREATEPROC:
-            return "CreateProc";
-        case INJECT_METHOD_TERMINATEPROC:
-            return "TerminateProc";
-        case INJECT_METHOD_EXITTHREAD:
-            return "ExitThread";
-        case INJECT_METHOD_SHELLEXEC:
-            return "ShellExec";
-        case INJECT_METHOD_SHELLCODE:
-            return "Shellcode";
-        case INJECT_METHOD_READ_FILE:
-            return "ReadFile";
-        case INJECT_METHOD_WRITE_FILE:
-            return "WriteFile";
-        case INJECT_METHOD_EXECPROC:
-            return "ExecProc";
-        case __INJECT_METHOD_MAX:
-            break;
-    }
-    return "Unknown";
-}
+#define IOCTL_WMI_QUERY_ALL_DATA  0x00224000
+#define WmiKmQueryData_Length     0x00000000
+#define WmiKmQueryData_Handle     0x00000010
+#define WmiKmQueryData_Guid       0x00000018
+#define WmiKmQueryData_Flags      0x0000002C
+#define WmiKmQueryData_DataLen    0x00000030
+
+#define STATUS_SUCCESS            0x00000000
+#define STATUS_WMI_GUID_NOT_FOUND 0xC0000295
+
+// Stages
+#define STAGE_WMI_OPEN_BLOCK             1
+#define STAGE_WMI_QUERY_GUID_INFORMATION 2
+#define STAGE_WMI_QUERY_ALL_DATA         3
+
+#endif

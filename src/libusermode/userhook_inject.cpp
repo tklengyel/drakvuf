@@ -104,6 +104,7 @@
 
 #ifdef LIBUSERMODE_USE_INJECTION
 
+#include <libinjector/libinjector.h>
 #include "userhook.hpp"
 #include "uh-private.hpp"
 
@@ -127,7 +128,7 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     init_int_argument(&args[5], 0);
     init_struct_argument(&args[6], read_bytes);
 
-    if (!inject_function_call(drakvuf, info, cb, &regs, args, 7, plugin->copy_virt_mem_va, stack_pointer))
+    if (!inject_function_call(drakvuf, info, cb, &regs, args, 7, plugin->copy_virt_mem_va))
     {
         PRINT_DEBUG("[USERHOOK] [%8zu] [%d:%d:%#lx]  "
             "Failed to inject MmCopyVirtualMemory\n"
@@ -136,6 +137,7 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
         );
         return false;
     }
+    *stack_pointer = regs.rsp;
 
     return true;
 }
@@ -194,7 +196,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
         if (plugin->is_stopping())
         {
             PRINT_DEBUG("[USERHOOK] Premature stop\n");
-            drakvuf_vmi_response_set_registers(drakvuf, info, &dll_meta->regs, true);
+            drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &dll_meta->regs, true);
             dll_meta->in_progress = false;
             plugin->destroy_trap(trap);
             return VMI_EVENT_RESPONSE_NONE;
@@ -284,7 +286,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
                     {
                         PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
                             (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-                        drakvuf_vmi_response_set_registers(drakvuf, info, &dll_meta->regs, true);
+                        drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &dll_meta->regs, true);
                         dll_meta->in_progress = false;
                         plugin->destroy_trap(trap);
                         return VMI_EVENT_RESPONSE_NONE;
@@ -315,7 +317,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
     }
 
     PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");
-    drakvuf_vmi_response_set_registers(drakvuf, info, &dll_meta->regs, true);
+    drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &dll_meta->regs, true);
     dll_meta->in_progress = false;
     dll_meta->v.is_hooked = true;
     plugin->destroy_trap(trap);

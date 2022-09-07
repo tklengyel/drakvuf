@@ -553,6 +553,32 @@ bool drakvuf_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* statu
     return ret;
 }
 
+GHashTable* drakvuf_enum_threads(drakvuf_t drakvuf, addr_t process)
+{
+    GHashTable* ret = NULL;
+
+    if ( drakvuf->osi.enum_threads )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.enum_threads(drakvuf, process);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+addr_t drakvuf_get_thread(drakvuf_t drakvuf, addr_t process, uint32_t tid)
+{
+    GHashTable* threads = drakvuf_enum_threads(drakvuf, process);
+    if (!threads)
+        return 0;
+
+    gpointer key = GUINT_TO_POINTER((uint64_t)tid);
+    addr_t thread = (addr_t)g_hash_table_lookup(threads, key);
+    g_hash_table_destroy(threads);
+    return thread;
+}
+
 bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t process_base, addr_t* module_list)
 {
     bool ret = false;

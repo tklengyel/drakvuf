@@ -1,4 +1,4 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+/*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
  * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
@@ -100,120 +100,92 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
- ***************************************************************************/
+***************************************************************************/
 
-#include "libinjector.h"
-#include "private.h"
+#include "win_exitthread.h"
 
-injector_status_t injector_start_app(
-    drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid,
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,
-    const char* target_process,
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search,
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid)
+#include <win/method_helpers.h>
+#include <win/win_functions.h>
+
+static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+
+static bool setup_exitthread_stack(injector_t injector, x86_registers_t* regs)
 {
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-    {
-        return injector_start_app_on_win(drakvuf,
-                pid,
-                tid,
-                app,
-                cwd,
-                method,
-                format,
-                binary_path,
-                target_process,
-                break_loop_on_detection,
-                injector_to_be_freed,
-                global_search,
-                wait_for_exit,
-                injected_pid);
-    }
-    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        if (!tid)
-            tid = pid;
+    struct argument args[1] = { {0} };
 
-        return injector_start_app_on_linux(drakvuf,
-                pid,
-                tid,
-                app,
-                method,
-                format,
-                binary_path,
-                args_count,
-                args,
-                injected_pid);
+    // ExitThread(0)
+    init_int_argument(&args[0], 0);
+
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
+    {
+        fprintf(stderr, "Failed to setup stack for passing inputs!\n");
+        return false;
+    }
+    return true;
+
+}
+
+static event_response_t wait_for_thread_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    if (drakvuf_get_thread(drakvuf,
+            info->attached_proc_data.base_addr, injector->target_tid))
+    {
+        PRINT_DEBUG("Target thread with PID %u and TID %u terminated\n",
+            injector->target_pid, injector->target_tid);
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    event_response_t event;
+
+    if (injector->step == STEP1)
+    {
+        // save registers
+        PRINT_DEBUG("Saving registers\n");
+        memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+
+        if (!setup_exitthread_stack(injector, info->regs))
+            return cleanup(injector, info);
+
+        info->regs->rip = injector->exit_thread;
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+        drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
+        trap->type = REGISTER;
+        trap->reg = CR3;
+        trap->cb = wait_for_thread_exit_cb;
+        trap->data = injector;
+        if (!drakvuf_add_trap(injector->drakvuf, trap))
+        {
+            fprintf(stderr, "Failed to setup wait_for_thread_exit_cb trap!\n");
+            g_free(trap);
+            return false;
+        }
+        PRINT_DEBUG("Waiting for thread exit\n");
     }
     else
     {
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-        return 0;
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
     }
+
+    return event;
 }
 
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid)
+static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
 {
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_terminate_on_win(drakvuf, injection_pid, injection_tid, pid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
+    PRINT_DEBUG("Exiting prematurely\n");
 
-void injector_exitthread(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_exitthread_on_win(drakvuf, injection_pid, injection_tid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
+    if (injector->rc == INJECTOR_SUCCEEDED)
+        injector->rc = INJECTOR_FAILED;
 
-void injector_free(drakvuf_t drakvuf, injector_t injector)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_free_win(injector);
-    else
-        injector_free_linux(injector);
-}
-
-const char* injection_method_name(injection_method_t method)
-{
-    switch (method)
-    {
-        case INJECT_METHOD_CREATEPROC:
-            return "CreateProc";
-        case INJECT_METHOD_TERMINATEPROC:
-            return "TerminateProc";
-        case INJECT_METHOD_EXITTHREAD:
-            return "ExitThread";
-        case INJECT_METHOD_SHELLEXEC:
-            return "ShellExec";
-        case INJECT_METHOD_SHELLCODE:
-            return "Shellcode";
-        case INJECT_METHOD_READ_FILE:
-            return "ReadFile";
-        case INJECT_METHOD_WRITE_FILE:
-            return "WriteFile";
-        case INJECT_METHOD_EXECPROC:
-            return "ExecProc";
-        case __INJECT_METHOD_MAX:
-            break;
-    }
-    return "Unknown";
+    memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
