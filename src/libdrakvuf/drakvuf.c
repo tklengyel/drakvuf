@@ -662,14 +662,6 @@ addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf)
     return drakvuf->kernbase;
 }
 
-addr_t drakvuf_get_kernel_kaslr(drakvuf_t drakvuf)
-{
-    addr_t _text;
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text))
-        return 0;
-    return drakvuf->kernbase - _text;
-}
-
 os_t drakvuf_get_os_type(drakvuf_t drakvuf)
 {
     return drakvuf->os;

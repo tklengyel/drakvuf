@@ -445,7 +445,6 @@ int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 uint16_t drakvuf_get_dom_id(drakvuf_t drakvuf) NOEXCEPT;
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) NOEXCEPT;
-addr_t drakvuf_get_kernel_kaslr(drakvuf_t drakvuf) NOEXCEPT;
 
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info) NOEXCEPT;

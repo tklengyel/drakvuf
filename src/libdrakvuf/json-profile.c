@@ -264,51 +264,6 @@ void drakvuf_free_symbols(symbols_t* symbols)
     g_free(symbols);
 }
 
-bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
-    const char* function,
-    addr_t* rva)
-{
-    json_object* kernel_json = vmi_get_kernel_json(drakvuf->vmi);
-
-    if (drakvuf->os == VMI_OS_WINDOWS)
-        return VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, rva);
-    else if (drakvuf->os == VMI_OS_LINUX)
-    {
-        if (VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, rva))
-        {
-            bool find = false;
-            for (uint8_t i = 0; i < 255; i++)
-            {
-                char tmp[64];
-                snprintf(tmp, sizeof(tmp), "%s.isra.%d", function, i);
-                if (VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, tmp, rva))
-                {
-                    find = true;
-                    break;
-                }
-            }
-            if (!find)
-                return false;
-        }
-    }
-    return true;
-}
-
-bool drakvuf_get_kernel_symbol_va(drakvuf_t drakvuf,
-    const char* function,
-    addr_t* va)
-{
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, function, va))
-        return false;
-
-    addr_t kaslr = drakvuf_get_kernel_kaslr(drakvuf);
-    if (!kaslr)
-        return false;
-
-    *va += kaslr;
-    return true;
-}
-
 bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,
     const char* struct_name,
     size_t* size)

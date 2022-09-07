@@ -287,6 +287,12 @@ typedef struct os_interface
     bool (*get_process_arguments)
     (drakvuf_t drakvuf, addr_t process_base, addr_t* argv);
 
+    bool (*get_kernel_symbol_rva)
+    (drakvuf_t drakvuf, const char* function, addr_t* rva);
+
+    bool (*get_kernel_symbol_va)
+    (drakvuf_t drakvuf, const char* function, addr_t* va);
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

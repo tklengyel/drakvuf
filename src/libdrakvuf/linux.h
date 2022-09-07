@@ -149,4 +149,8 @@ bool linux_get_current_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
 bool linux_get_process_arguments(drakvuf_t drakvuf, addr_t process_base, addr_t* argv);
 
+bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva);
+
+bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va);
+
 #endif

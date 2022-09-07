@@ -465,38 +465,21 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     auto params = libhook::GetTrapParams<send_signal_data>(hook->trap_);
 
     // Save data about current process
-    lw->procmon = procmon;
-    lw->process_name = current_proc_data.name;
-    lw->thread_name = current_thread_name;
-    lw->pid = current_proc_data.pid;
-    lw->tid = current_proc_data.tid;
-    lw->ppid = current_proc_data.ppid;
-    lw->rsp = ret_addr;
+    params->pid = info->proc_data.pid;
+    params->tid = info->proc_data.tid;
+    params->thread_name = current_thread_name ?: "";
+    params->rsp = ret_addr;
 
     // Save data about target process
-    lw->target_process_name = target_proc_data.name;
-    lw->target_thread_name = target_thread_name ?: "";
-    lw->target_pid = target_proc_data.pid;
-    lw->target_tid = target_proc_data.tid;
-    lw->target_ppid = target_proc_data.ppid;
-    lw->signal = signal;
+    params->target_process_name = target_proc_data.name;
+    params->target_thread_name = target_thread_name ?: "";
+    params->target_pid = target_proc_data.pid;
+    params->target_tid = target_proc_data.tid;
+    params->target_ppid = target_proc_data.ppid;
+    params->signal = signal;
 
-    auto trap = new drakvuf_trap_t();
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.pid = 0;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = ret_addr;
-    trap->breakpoint.module = "linux";
-    trap->type = BREAKPOINT;
-    trap->name = info->trap->name;
-    trap->data = lw;
-    trap->cb = send_signal_ret_cb;
-
-    if (!drakvuf_add_trap(drakvuf, trap))
-    {
-        fprintf(stderr, "Failed to trap return at 0x%lx\n", ret_addr);
-        free_trap(trap);
-    }
+    hook->trap_->name = info->trap->name;
+    this->ret_hooks[hookID] = std::move(hook);
 
     g_free(const_cast<char*>(target_proc_data.name));
     g_free(target_thread_name);

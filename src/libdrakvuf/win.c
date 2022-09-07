@@ -495,6 +495,22 @@ bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t
         && (!rsp || info->regs->rsp >= rsp);
 }
 
+bool win_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
+{
+    json_object* kernel_json = vmi_get_kernel_json(drakvuf->vmi);
+    return VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, rva);
+}
+
+bool win_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va)
+{
+    json_object* kernel_json = vmi_get_kernel_json(drakvuf->vmi);
+    if (VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, va))
+        return false;
+
+    *va += drakvuf_get_kernel_base(drakvuf);
+    return true;
+}
+
 bool set_os_windows(drakvuf_t drakvuf)
 {
     if ( !find_kernbase(drakvuf) )
@@ -580,6 +596,8 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_user_stack64 = win_get_user_stack64;
     drakvuf->osi.get_wow_peb = win_get_wow_peb;
     drakvuf->osi.check_return_context = win_check_return_context;
+    drakvuf->osi.get_kernel_symbol_rva = win_get_kernel_symbol_rva;
+    drakvuf->osi.get_kernel_symbol_va = win_get_kernel_symbol_va;
 
     return true;
 }
