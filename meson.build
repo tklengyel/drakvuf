@@ -101,10 +101,11 @@ executable('drakvuf',
 )
 
 executable('injector',
-    'src/injector.c',
+    'src/injector.cpp',
 
     include_directories : incdir,
     dependencies : deps,
+    link_language : 'cpp',
     link_with : [libdrakvuf, libinjector],
     link_args : hardened_link_args
 )
