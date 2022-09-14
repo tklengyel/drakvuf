@@ -106,6 +106,7 @@
 #define FILETRACER_PRIVATE_H
 
 #include <string>
+#include <optional>
 #include "plugins/plugin_utils.h"
 #include "win.h"
 #include "linux.h"
@@ -151,12 +152,12 @@ struct linux_wrapper
     int permissions = 0;
 
     linux_filetracer* f;
-    GString* filename = g_string_new(NULL);
-    GString* flags = g_string_new(NULL);
-    GString* modes = g_string_new(NULL);
-    GString* uid = g_string_new(NULL);
-    GString* gid = g_string_new(NULL);
-    std::map<std::string, GString*> args;
+    std::string filename;
+    std::string flags;
+    std::string modes;
+    std::optional<uint32_t> uid;
+    std::optional<uint32_t> gid;
+    std::map<std::string, std::string> args;
 };
 
 struct pool_header_x86
