@@ -107,7 +107,7 @@ bin_PROGRAMS = drakvuf injector proc_stat
 SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libusermode libhook helpers/hiddump
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h exitcodes.h
-injector_SOURCES = injector.c
+injector_SOURCES = injector.cpp
 proc_stat_SOURCES = proc_stat.cpp
 
 AM_CPPFLAGS = $(CPPFLAGS)
