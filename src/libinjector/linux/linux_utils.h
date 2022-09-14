@@ -196,9 +196,6 @@ struct injector
     bool fork;
     proc_data_t child_data;
 
-    // Traps
-    drakvuf_trap_t* cr3_trap;
-
     // Results:
     injector_status_t rc;
     inject_result_t result;
