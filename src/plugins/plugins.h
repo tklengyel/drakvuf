@@ -375,8 +375,7 @@ struct vmi_lock_guard
 
 private:
     drakvuf_t drakvuf;
-public:
-    vmi_instance_t vmi; // TODO: make field private
+    vmi_instance_t vmi;
 };
 
 #endif

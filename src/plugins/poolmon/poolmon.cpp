@@ -158,8 +158,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
-        vmi_lock_guard vmi_lg(drakvuf);
-        vmi_instance_t& vmi = vmi_lg.vmi;
+        auto vmi = vmi_lock_guard(drakvuf);
         uint32_t _tag;
 
         ctx.addr = info->regs->rsp+12;

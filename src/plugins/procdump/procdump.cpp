@@ -681,8 +681,8 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
             // Otherwise collect prototype PTEs for RtlCopyMemoryNonTemporal.
             auto buf = new addr_t[ptes];
             size_t bytes_read = 0;
-            vmi_lock_guard vmi_lg(drakvuf);
-            if (VMI_SUCCESS != vmi_read_va(vmi_lg.vmi, mmvad->prototype_pte, 0,
+            auto vmi = vmi_lock_guard(drakvuf);
+            if (VMI_SUCCESS != vmi_read_va(vmi, mmvad->prototype_pte, 0,
                     sizeof(addr_t) * ptes, buf,
                     &bytes_read) ||
                 bytes_read != sizeof(addr_t) * ptes)
@@ -1011,7 +1011,7 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     vmi_lock_guard vmi(drakvuf);
     num_cpus = vmi_get_num_vcpus(vmi);
     win_build_info_t build_info;
-    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+    if (!vmi_get_windows_build_info(vmi, &build_info))
         throw -1;
 
     win_build_number = build_info.buildnumber;

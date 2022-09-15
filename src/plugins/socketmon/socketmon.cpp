@@ -508,10 +508,10 @@ static event_response_t trap_DnsQueryExW_impl(drakvuf_t drakvuf, drakvuf_trap_in
         ctx.dtb = info->regs->cr3;
         ctx.addr = domain_name_addr;
 
-        vmi_lock_guard vmi_lg(drakvuf);
+        auto vmi = vmi_lock_guard(drakvuf);
 
         // Read strange function-specific string
-        if ( VMI_FAILURE == vmi_read(vmi_lg.vmi, &ctx, struct_size, &function_specific_string, NULL) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, struct_size, &function_specific_string, NULL) )
         {
             PRINT_DEBUG("[SOCKETMON] Error, getting unicode domain name string from 'strange string' in %s()", __FUNCTION__);
             return 0;
@@ -719,7 +719,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
     {
         vmi_lock_guard vmi(drakvuf);
         win_build_info_t build_info;
-        if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+        if (!vmi_get_windows_build_info(vmi, &build_info))
             throw -1;
 
         this->winver = build_info.version;

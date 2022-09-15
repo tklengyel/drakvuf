@@ -317,7 +317,7 @@ static event_response_t trap_WNetGetProviderNameW_cb(drakvuf_t drakvuf, drakvuf_
 static win_ver_t get_win_ver(drakvuf_t drakvuf)
 {
     vmi_lock_guard vmi(drakvuf);
-    return vmi_get_winver(vmi.vmi);
+    return vmi_get_winver(vmi);
 }
 
 typedef enum
