@@ -36,6 +36,7 @@ option('plugin-callbackmon', type : 'boolean', value : true)
 option('plugin-delaymon', type : 'boolean', value : true)
 option('plugin-memdump', type : 'boolean', value : true)
 option('plugin-hidevm', type : 'boolean', value : true)
+option('plugin-ptracemon', type : 'boolean', value : true)
 
 # Disabled by default plugins
 option('plugin-libhooktest', type : 'boolean', value : 'false')

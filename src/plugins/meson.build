@@ -177,6 +177,12 @@ if get_option('plugin-hidevm')
     config_h.set('ENABLE_PLUGIN_HIDEVM', 1)
 endif
 
+if get_option('plugin-ptracemon')
+    plugin_sources += 'ptracemon/ptracemon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_PTRACEMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -202,6 +208,7 @@ summary({
     'rootkitmon': get_option('plugin-rootkitmon'),
     'spraymon': get_option('plugin-spraymon'),
     'hidevm': get_option('plugin-hidevm'),
+    'ptracemon': get_option('plugin-ptracemon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
