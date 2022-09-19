@@ -748,16 +748,23 @@ win_filetracer::win_filetracer(drakvuf_t drakvuf, output_format_t output)
     // Offset of the FileNameLength field in _FILE_RENAME_INFORMATION structure
     this->newfile_name_length_offset = addr_size * 2;
 
-    // Offset of the CreationTime field in _FILE_BASIC_INFORMATION structure
-    this->basic_creation_offset = 0;
-    // Offset of the LastAccessTime field in _FILE_BASIC_INFORMATION structure
-    this->basic_last_access_offset = addr_size;
-    // Offset of the LastWriteTime field in _FILE_BASIC_INFORMATION structure
-    this->basic_last_write_offset = addr_size * 2;
-    // Offset of the ChangeTime field in _FILE_BASIC_INFORMATION structure
-    this->basic_change_time_offset = addr_size * 3;
-    // Offset of the FileAttributes field in _FILE_BASIC_INFORMATION structure
-    this->basic_attributes_offset = addr_size * 4;
+    /*
+     * On x86 and x64 arch:
+     * kd> dt _FILE_BASIC_INFORMATION poi(@esp+c)
+     * nt!_FILE_BASIC_INFORMATION
+     * +0x000 CreationTime     : _LARGE_INTEGER 0xffffffff`ffffffff
+     * +0x008 LastAccessTime   : _LARGE_INTEGER 0xffffffff`ffffffff
+     * +0x010 LastWriteTime    : _LARGE_INTEGER 0xffffffff`ffffffff
+     * +0x018 ChangeTime       : _LARGE_INTEGER 0xffffffff`ffffffff
+     * +0x020 FileAttributes   : 0
+     *
+     * Offset in _FILE_BASIC_INFORMATION structure
+     */
+    this->basic_creation_offset = 0x00;
+    this->basic_last_access_offset = 0x08;
+    this->basic_last_write_offset = 0x10;
+    this->basic_change_time_offset = 0x18;
+    this->basic_attributes_offset = 0x20;
 
     assert(sizeof(trap)/sizeof(trap[0]) > 6);
     register_trap(drakvuf, "NtCreateFile",          &trap[0], create_file_cb);
