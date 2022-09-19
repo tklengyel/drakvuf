@@ -141,6 +141,7 @@
 #include "spraymon/spraymon.h"
 #include "callbackmon/callbackmon.h"
 #include "hidevm/hidevm.h"
+#include "ptracemon/ptracemon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -541,6 +542,13 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .delay = options->hidevm_delay,
                     };
                     this->plugins[plugin_id] = std::make_unique<hidevm>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_PTRACEMON
+                case PLUGIN_PTRACEMON:
+                {
+                    this->plugins[plugin_id] = std::make_unique<ptracemon>(this->drakvuf, this->output);
                     break;
                 }
 #endif
