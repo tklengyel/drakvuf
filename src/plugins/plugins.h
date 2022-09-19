@@ -119,6 +119,10 @@
 #include <libdrakvuf/libdrakvuf.h>
 #include <libdrakvuf/json-util.h>
 
+#if defined(LIBDRAKVUF_PRIVATE_GUARD)
+#error You should never include libdrakvuf/private.h in a plugin
+#endif
+
 struct plugins_options
 {
     const char* dump_folder;            // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
