@@ -171,6 +171,12 @@ if get_option('plugin-spraymon')
     config_h.set('ENABLE_PLUGIN_SPRAYMON', 1)
 endif
 
+if get_option('plugin-hidevm')
+    plugin_sources += 'hidevm/hidevm.cpp'
+
+    config_h.set('ENABLE_PLUGIN_HIDEVM', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -195,6 +201,7 @@ summary({
     'objmon': get_option('plugin-objmon'),
     'rootkitmon': get_option('plugin-rootkitmon'),
     'spraymon': get_option('plugin-spraymon'),
+    'hidevm': get_option('plugin-hidevm'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
