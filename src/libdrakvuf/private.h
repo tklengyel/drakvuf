@@ -132,6 +132,8 @@
 #define g_memdup_compat(x,y) g_memdup(x,y)
 #endif
 
+#define LIBDRAKVUF_PRIVATE_GUARD
+
 /*
  * How often should the VMI caches be flushed?
  *
