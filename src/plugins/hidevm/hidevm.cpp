@@ -111,7 +111,6 @@
 #include <assert.h>
 #include <libdrakvuf/json-util.h>
 #include <libdrakvuf/libdrakvuf.h>
-#include <libdrakvuf/private.h>
 
 #include "plugins/output_format.h"
 #include "hidevm.h"
