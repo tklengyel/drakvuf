@@ -348,6 +348,9 @@ void drakvuf_free_symbols(symbols_t* symbols) NOEXCEPT;
 bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
     const char* function,
     addr_t* rva) NOEXCEPT;
+bool drakvuf_get_kernel_symbol_va(drakvuf_t drakvuf,
+    const char* function,
+    addr_t* va) NOEXCEPT;
 bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,
     const char* struct_name,
     size_t* size) NOEXCEPT;

@@ -264,13 +264,6 @@ void drakvuf_free_symbols(symbols_t* symbols)
     g_free(symbols);
 }
 
-bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
-    const char* function,
-    addr_t* rva)
-{
-    return VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), function, rva);
-}
-
 bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,
     const char* struct_name,
     size_t* size)

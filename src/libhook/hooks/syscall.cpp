@@ -154,4 +154,12 @@ SyscallHook::SyscallHook(drakvuf_t drakvuf, const std::string& syscall_name, cb_
       trap_()
 {}
 
+SyscallHook::SyscallHook(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::string& display_name)
+    :BaseHook(drakvuf),
+     syscall_name_(syscall_name),
+     display_name_(display_name),
+     callback_(cb),
+     trap_()
+{}
+
 } // namespace libhook

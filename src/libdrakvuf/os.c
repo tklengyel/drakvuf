@@ -1055,3 +1055,31 @@ bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
     return ret;
 }
+
+bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
+{
+    bool ret = false;
+
+    if (drakvuf->osi.get_kernel_symbol_rva)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_kernel_symbol_rva(drakvuf, function, rva);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* rva)
+{
+    bool ret = false;
+
+    if (drakvuf->osi.get_kernel_symbol_rva)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_kernel_symbol_va(drakvuf, function, rva);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
