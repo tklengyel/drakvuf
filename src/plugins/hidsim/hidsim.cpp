@@ -120,7 +120,7 @@ bool hidsim::check_platform_support(drakvuf_t drakvuf)
     win_build_info_t bi;
     {
         vmi_lock_guard vmi(drakvuf);
-        if (!vmi_get_windows_build_info(vmi.vmi, &bi))
+        if (!vmi_get_windows_build_info(vmi, &bi))
             return false;
     }
 
