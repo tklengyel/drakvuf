@@ -171,7 +171,7 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
 
     vmi_lock_guard vmi(drakvuf);
 
-    if (VMI_SUCCESS != vmi_pid_to_dtb(vmi.vmi, pid, &trap->breakpoint.dtb))
+    if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &trap->breakpoint.dtb))
     {
         PRINT_DEBUG("[CLIPBOARDMON] [Init] Failed to get CR3 of \"explorer.exe\"\n");
         return false;
@@ -183,7 +183,7 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
         .dtb = trap->breakpoint.dtb
     );
     addr_t ssdt_va = 0;
-    if (VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &ssdt_va))
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &ssdt_va))
     {
         PRINT_DEBUG("[CLIPBOARDMON] Failed to read the address of SSDT (VA 0x%lx)\n", ssdt_ptr_va);
         return false;

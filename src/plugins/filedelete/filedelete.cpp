@@ -1090,13 +1090,13 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         .addr = w->handle
     );
 
-    vmi_lock_guard vmi_lg(drakvuf);
-    if (VMI_SUCCESS != vmi_read_32(vmi_lg.vmi, &ctx, &handle))
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
         PRINT_DEBUG("[FILEDELETE2] Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);
 
     if (handle)
     {
-        auto filename = get_file_name(w->f, drakvuf, vmi_lg.vmi, info, handle, nullptr, nullptr);
+        auto filename = get_file_name(w->f, drakvuf, vmi, info, handle, nullptr, nullptr);
         if (filename.empty()) filename = "<UNKNOWN>";
 
         w->f->files[ {info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};

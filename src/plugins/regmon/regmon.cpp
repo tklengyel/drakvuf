@@ -223,7 +223,7 @@ static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     if (!attr) return nullptr;
 
-    vmi_lock_guard vmi_lg(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -232,12 +232,12 @@ static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     addr_t key_handle;
     ctx.addr = attr + reg->objattr_root;
-    if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &key_handle) )
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_handle) )
         return nullptr;
 
     addr_t key_name_addr;
     ctx.addr = attr + reg->objattr_name;
-    if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &key_name_addr) )
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_name_addr) )
         return nullptr;
 
     gchar* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
@@ -279,7 +279,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
         .addr = data_addr
     );
 
-    vmi_lock_guard vmi_lg(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if ((type == REG_SZ) || (type == REG_LINK) || (type == REG_EXPAND_SZ))
         return drakvuf_read_wchar_string(drakvuf, &ctx);
@@ -287,7 +287,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
     std::vector<uint8_t> data_bytes(data_size, 0);
 
     size_t bytes_read = 0;
-    if ( VMI_FAILURE == vmi_read(vmi_lg.vmi, &ctx, data_size, data_bytes.data(), &bytes_read) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, data_size, data_bytes.data(), &bytes_read) )
     {
         PRINT_DEBUG("[REGMON] Error reading data, expected %zu bytes, but actually read %zu\n", data_size, bytes_read);
         return nullptr;
@@ -379,7 +379,7 @@ static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_tr
     std::ostringstream ss;
     for (size_t i = 0; i < value_entries_count; ++i)
     {
-        vmi_lock_guard vmi_lg(drakvuf);
+        auto vmi = vmi_lock_guard(drakvuf);
 
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -388,7 +388,7 @@ static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_tr
         );
 
         addr_t value_name_addr;
-        if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &value_name_addr) )
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &value_name_addr) )
             continue;
 
         unicode_string_t* value_name_us = drakvuf_read_unicode(drakvuf, info, value_name_addr);

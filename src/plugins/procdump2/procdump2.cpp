@@ -210,7 +210,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
 
     num_cpus = vmi_get_num_vcpus(vmi);
     win_build_info_t build_info;
-    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+    if (!vmi_get_windows_build_info(vmi, &build_info))
         throw -1;
 
     win_build_number = build_info.buildnumber;

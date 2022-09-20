@@ -181,7 +181,7 @@ static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvu
     do
     {
         ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] + plugin->offsets[LIST_ENTRY_FLINK];
-        if (VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &entry))
+        if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &entry))
         {
             PRINT_DEBUG("dkommon:enumerate drivers: failed to read next entry (VA 0x%lx)\n", ctx.addr);
             return drivers_list;
