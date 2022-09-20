@@ -115,6 +115,7 @@
 #include <filesystem>
 #include <map>
 #include <set>
+#include <vector>
 
 #include "drakvuf.h"
 #include "exitcodes.h"
@@ -397,8 +398,7 @@ int main(int argc, char** argv)
     auto terminated_processes = std::make_shared<std::unordered_map<vmi_pid_t, bool>>();
     plugins_options options = { .terminated_processes = terminated_processes };
     bool disabled_all = false; // Used to disable all plugin once
-    const char* args[10] = {};
-    int args_count = 0;
+    std::vector<const char*> args;
     bool terminate = false;
     int termination_timeout = 20;
     bool context_based_interception = false;
@@ -665,8 +665,7 @@ int main(int argc, char** argv)
                 }
                 break;
             case 'f':
-                args[args_count] = optarg;
-                args_count++;
+                args.push_back(optarg);
                 break;
             case 's':
                 options.cpuid_stealth = true;
@@ -991,7 +990,20 @@ int main(int argc, char** argv)
     if (injection_cmd)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, injection_cmd);
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, injection_cmd, injection_cwd, injection_method, binary_path, target_process, injection_timeout, injection_global_search, args_count, args, &injected_pid);
+        injector_status_t ret = drakvuf->inject_cmd(
+                injection_pid,
+                injection_thread,
+                injection_cmd,
+                injection_cwd,
+                injection_method,
+                binary_path,
+                target_process,
+                injection_timeout,
+                injection_global_search,
+                args.size(),
+                args.data(),
+                &injected_pid
+            );
         switch (ret)
         {
             case INJECTOR_FAILED_WITH_ERROR_CODE:
