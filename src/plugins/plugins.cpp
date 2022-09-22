@@ -142,6 +142,7 @@
 #include "callbackmon/callbackmon.h"
 #include "hidevm/hidevm.h"
 #include "ptracemon/ptracemon.h"
+#include "ebpfmon/ebpfmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -549,6 +550,13 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_PTRACEMON:
                 {
                     this->plugins[plugin_id] = std::make_unique<ptracemon>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_EBPFMON
+                case PLUGIN_EBPFMON:
+                {
+                    this->plugins[plugin_id] = std::make_unique<ebpfmon>(this->drakvuf, this->output);
                     break;
                 }
 #endif
