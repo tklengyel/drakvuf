@@ -115,6 +115,7 @@
 #include <getopt.h>
 #include <sys/time.h>
 #include <filesystem>
+#include <vector>
 #include <libvmi/libvmi.h>
 
 #include <libdrakvuf/libdrakvuf.h>
@@ -213,8 +214,7 @@ int main(int argc, char** argv)
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     bool libvmi_conf = false;
     bool wait_for_exit = false;
-    const char* args[10] = {};
-    int args_count = 0;
+    std::vector<const char*> args;
     addr_t kpgd = 0;
     output_format_t output = OUTPUT_DEFAULT;
     vmi_pid_t injected_pid = 0;
@@ -283,8 +283,7 @@ int main(int argc, char** argv)
                 }
                 break;
             case 'f':
-                args[args_count] = optarg;
-                args_count++;
+                args.push_back(optarg);
                 break;
             case 'g':
                 injection_global_search = true;
@@ -330,15 +329,9 @@ int main(int argc, char** argv)
         print_help();
         return 1;
     }
-    if (injection_method != INJECT_METHOD_EXECPROC && args_count)
+    if (injection_method != INJECT_METHOD_EXECPROC && !args.empty())
     {
         printf("Arguments not supported! \n");
-        print_help();
-        return 1;
-    }
-    if (args_count > 10)
-    {
-        printf("Arguments count is greater than 10! \n");
         print_help();
         return 1;
     }
@@ -389,8 +382,8 @@ int main(int argc, char** argv)
             NULL,
             injection_global_search,
             wait_for_exit,
-            args_count,
-            args,
+            args.size(),
+            args.data(),
             &injected_pid);
 
     cleanup_timer();
