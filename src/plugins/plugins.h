@@ -228,6 +228,7 @@ typedef enum drakvuf_plugin
     PLUGIN_SPRAYMON,
     PLUGIN_CALLBACKMON,
     PLUGIN_HIDEVM,
+    PLUGIN_PTRACEMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -270,6 +271,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_SPRAYMON] = "spraymon",
     [PLUGIN_CALLBACKMON] = "callbackmon",
     [PLUGIN_HIDEVM] = "hidevm",
+    [PLUGIN_PTRACEMON] = "ptracemon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -311,6 +313,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_SPRAYMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CALLBACKMON]  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_HIDEVM]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_PTRACEMON]    = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
 };
 
 class plugin

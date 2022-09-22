@@ -532,6 +532,16 @@ if test x$plugin_hidevm = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDEVM, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_ptracemon],
+  [AS_HELP_STRING([--disable-plugin-ptracemon],
+    [Enable the ptracemon plugin @<:@yes@:>@])],
+  [plugin_ptracemon="$enableval"],
+  [plugin_ptracemon="yes"])
+AM_CONDITIONAL([PLUGIN_PTRACEMON], [test x$plugin_ptracemon = xyes])
+if test x$plugin_ptracemon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PTRACEMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
