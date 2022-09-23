@@ -542,6 +542,16 @@ if test x$plugin_ptracemon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PTRACEMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_ebpfmon],
+  [AS_HELP_STRING([--disable-plugin-ebpfmon],
+    [Enable the epbfmon plugin @<:@yes@:>@])],
+  [plugin_ebpfmon="$enableval"],
+  [plugin_ebpfmon="yes"])
+AM_CONDITIONAL([PLUGIN_EBPFMON], [test x$plugin_ebpfmon = xyes])
+if test x$plugin_ebpfmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EBPFMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
