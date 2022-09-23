@@ -183,6 +183,12 @@ if get_option('plugin-ptracemon')
     config_h.set('ENABLE_PLUGIN_PTRACEMON', 1)
 endif
 
+if get_option('plugin-ebpfmon')
+    plugin_sources += 'ebpfmon/ebpfmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_EBPFMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -209,6 +215,7 @@ summary({
     'spraymon': get_option('plugin-spraymon'),
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
+    'ebpfmon' : get_option('plugin-ebpfmon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
