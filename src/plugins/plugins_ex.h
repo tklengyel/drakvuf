@@ -116,7 +116,7 @@
 
 #include "private.h"
 #include "plugins.h"
-#include "hook_helpers.h"
+#include "helpers/hooks.h"
 
 
 // Errors

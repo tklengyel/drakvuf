@@ -101,61 +101,26 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-
-#ifndef DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
-#define DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
 #pragma once
+#include <libdrakvuf/libdrakvuf.h>
 
-#include <type_traits>
+struct vmi_lock_guard
+{
+    explicit vmi_lock_guard(drakvuf_t drakvuf) : drakvuf{drakvuf}, vmi{drakvuf_lock_and_get_vmi(drakvuf)}
+    {
+    }
 
-template<class T>
-struct always_false: std::false_type {};
+    operator vmi_instance_t() const
+    {
+        return vmi;
+    }
 
-/**/
+    ~vmi_lock_guard()
+    {
+        drakvuf_release_vmi(drakvuf);
+    }
 
-template <class T, class = void>
-struct has_begin_helper : std::false_type {};
-
-template <class T>
-struct has_begin_helper<T, std::void_t<decltype(std::begin(std::declval<T>()))>> : std::true_type {};
-
-template <class T, class = void>
-struct has_end_helper : std::false_type {};
-
-template <class T>
-struct has_end_helper<T, std::void_t<decltype(std::end(std::declval<T>()))>> : std::true_type {};
-
-
-template <class T, class = void>
-struct is_iterable_helper : std::false_type {};
-
-template <class T>
-struct is_iterable_helper<T, std::enable_if_t<has_begin_helper<T>::value&& has_end_helper<T>::value, void>> : std::true_type {};
-
-template <class T>
-struct is_iterable : is_iterable_helper<T> {};
-
-/**/
-
-template <class T, class = void>
-struct is_printable_helper : std::false_type {};
-
-template <class T>
-struct is_printable_helper<T, std::void_t<decltype(std::declval<std::ostream>().operator<<(std::declval<T>()))>> : std::true_type {};
-
-template <class T>
-struct is_printable : is_printable_helper<T> {};
-
-/**/
-
-template <class T>
-std::true_type has_mapped_type_helper(typename T::mapped_type*);
-
-template <class>
-std::false_type has_mapped_type_helper(...);
-
-template <class T>
-struct has_mapped_type : decltype(has_mapped_type_helper<T>(nullptr))
-{};
-
-#endif // DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
+private:
+    drakvuf_t drakvuf;
+    vmi_instance_t vmi;
+};
