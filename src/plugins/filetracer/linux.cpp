@@ -195,6 +195,7 @@ static std::string get_filepath_locked(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
         prev_dirname = dirname;
         path_name = dirname + "/" + path_name;
+        ctx.addr = d_parent + 24;
     }
 
     return "/" + path_name;
