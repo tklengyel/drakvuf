@@ -377,6 +377,11 @@ sources += ebpfmon/ebpfmon.h
 sources += ebpfmon/private.h
 endif
 
+if PLUGIN_MEMACCESSMON
+sources += memaccessmon/memaccessmon.cpp
+sources += memaccessmon/memaccessmon.h
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
