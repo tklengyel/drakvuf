@@ -180,7 +180,7 @@ static std::string get_filepath_locked(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     addr_t d_parent = 0;
     std::string prev_dirname = path_name;
 
-    ctx.addr = dentry_addr + 24;
+    ctx.addr = dentry_addr + f->offsets[_DENTRY_D_PARENT];
     while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &d_parent) && d_parent)
     {
         ctx.addr = d_parent + f->offsets[_DENTRY_D_NAME] + f->offsets[_QSTR_NAME] + 16;
@@ -195,7 +195,7 @@ static std::string get_filepath_locked(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
         prev_dirname = dirname;
         path_name = dirname + "/" + path_name;
-        ctx.addr = d_parent + 24;
+        ctx.addr = d_parent + f->offsets[_DENTRY_D_PARENT];
     }
 
     return "/" + path_name;

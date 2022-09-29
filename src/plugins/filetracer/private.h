@@ -567,6 +567,7 @@ enum
     _PATH_DENTRY,
     _DENTRY_D_NAME,
     _DENTRY_D_INODE,
+    _DENTRY_D_PARENT,
     _QSTR_NAME,
     // _TIMESPEC64_TV_SEC,
 
@@ -588,6 +589,7 @@ static const char* linux_offset_names[__OFFSET_MAX][2] =
     [_PATH_DENTRY] = {"path", "dentry"},
     [_DENTRY_D_NAME] = {"dentry", "d_name"},
     [_DENTRY_D_INODE] = {"dentry", "d_inode"},
+    [_DENTRY_D_PARENT] = {"dentry", "d_parent"},
     [_QSTR_NAME] = {"qstr", "name"},
     // [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
 };
