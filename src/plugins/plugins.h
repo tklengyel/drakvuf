@@ -187,6 +187,7 @@ struct plugins_options
     const char* services_profile;       // PLUGIN_DKOMMON
     const char* netio_profile;          // PLUGIN_CALLBACKMON
     uint64_t hidevm_delay;              // PLUGIN_HIDEVM
+    uint64_t unixsocketmon_max_size;    // PLUGIN_UNIXSOCKETMON
 };
 
 typedef enum drakvuf_plugin
@@ -230,6 +231,7 @@ typedef enum drakvuf_plugin
     PLUGIN_HIDEVM,
     PLUGIN_PTRACEMON,
     PLUGIN_EBPFMON,
+    PLUGIN_UNIXSOCKETMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -274,6 +276,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_HIDEVM] = "hidevm",
     [PLUGIN_PTRACEMON] = "ptracemon",
     [PLUGIN_EBPFMON] = "ebpfmon",
+    [PLUGIN_UNIXSOCKETMON] = "unixsocketmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -317,6 +320,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_HIDEVM]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_PTRACEMON]    = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_EBPFMON]      = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_UNIXSOCKETMON]= { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
 };
 
 class plugin

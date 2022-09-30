@@ -193,6 +193,13 @@ struct DataPrinter
         return print_escaped(os, data.value);
     }
 
+    template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::BinaryString<Tv>& data, char)
+    {
+        data.format(os);
+        return true;
+    }
+
     static bool print_escaped(std::ostream& os, const std::string& value)
     {
         char const* const hexdig = "0123456789ABCDEF";

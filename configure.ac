@@ -552,6 +552,16 @@ if test x$plugin_ebpfmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EBPFMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_unixsocketmon],
+  [AS_HELP_STRING([--disable-plugin-unixsocketmon],
+    [Enable the unixsocketmon plugin @<:@yes@:>@])],
+  [plugin_unixsocketmon="$enableval"],
+  [plugin_unixsocketmon="yes"])
+AM_CONDITIONAL([PLUGIN_UNIXSOCKETMON], [test x$plugin_unixsocketmon = xyes])
+if test x$plugin_unixsocketmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_UNIXSOCKETMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],

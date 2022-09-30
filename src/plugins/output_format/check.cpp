@@ -195,6 +195,20 @@ START_TEST(test_kvfmt_rstr_basic)
 }
 END_TEST
 
+START_TEST(test_kvfmt_binary_string_basic)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    const char* str = "\x1ftest";
+    size_t str_len = strlen(str);
+
+    result = kvfmt::print_data(ss, fmt::BinaryString(reinterpret_cast<const uint8_t*>(str), str_len), ',');
+    ck_assert_msg(ss.str() == std::string("1f74657374"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
 START_TEST(test_kvfmt_xval)
 {
     std::stringstream ss;
@@ -348,6 +362,7 @@ Suite* kvfmt_suite(void)
     tcase_add_test(tc_core, test_kvfmt_qstr_utf_8_multiline);
     tcase_add_test(tc_core, test_kvfmt_qstr_utf_8_binary);
     tcase_add_test(tc_core, test_kvfmt_rstr_basic);
+    tcase_add_test(tc_core, test_kvfmt_binary_string_basic);
     tcase_add_test(tc_core, test_kvfmt_xval);
     tcase_add_test(tc_core, test_kvfmt_nval);
     tcase_add_test(tc_core, test_kvfmt_fval);
