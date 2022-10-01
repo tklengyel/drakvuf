@@ -111,9 +111,6 @@
 class linux_procmon : public pluginex
 {
 public:
-    os_t os;
-    addr_t kaslr;
-
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> exechook;
     std::unique_ptr<libhook::SyscallHook> exithook;

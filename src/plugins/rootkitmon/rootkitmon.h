@@ -108,6 +108,8 @@
 
 #include <array>
 
+using namespace rootkitmon_ns;
+
 struct rootkitmon_config
 {
     const char* fwpkclnt_profile;
@@ -144,7 +146,7 @@ public:
     const output_format_t format;
     win_ver_t winver;
 
-    std::array<size_t, __OFFSET_MAX> offsets;
+    std::array<size_t, rootkitmon_ns::__OFFSET_MAX> offsets;
     size_t guest_ptr_size;
     bool is32bit;
 
