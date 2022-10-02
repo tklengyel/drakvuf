@@ -524,6 +524,8 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf,
     addr_t process_base,
     proc_data_t* proc_data) NOEXCEPT;
 
+addr_t drakvuf_get_rspbase(drakvuf_t dravkuf, drakvuf_trap_info_t* info);
+
 typedef struct _mmvad_info
 {
     uint64_t starting_vpn;

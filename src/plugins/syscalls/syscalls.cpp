@@ -140,7 +140,7 @@ static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_i
 
         else if ( arg.type == PCHAR )
         {
-            cstr = drakvuf_read_ascii_str_limit(drakvuf, info, val, 64 * 1024);
+            cstr = drakvuf_read_ascii_str(drakvuf, info, val);
         }
 
         else if ( s->os == VMI_OS_WINDOWS )
