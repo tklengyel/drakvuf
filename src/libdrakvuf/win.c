@@ -154,43 +154,49 @@ bool win_enumerate_module_info_ctx(drakvuf_t drakvuf, addr_t module_list_head, a
         addr_t base_addr;
         if (vmi_read_addr(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
-            ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-            unicode_string_t* base_name = drakvuf_read_unicode_common(drakvuf, ctx);
-
-            if (base_name)
+            addr_t size = 0;
+            ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE];
+            if (vmi_read_addr(vmi, ctx, &size) == VMI_SUCCESS)
             {
-                PRINT_DEBUG("Found module %s at 0x%lx\n", base_name->contents, base_addr);
+                ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+                unicode_string_t* base_name = drakvuf_read_unicode_common(drakvuf, ctx);
 
-                ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                unicode_string_t* full_name = drakvuf_read_unicode_common(drakvuf, ctx);
-
-                bool need_free = true;
-                bool need_stop = false;
-                bool success = true;
-                module_info_t* module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
-                if (module_info)
+                if (base_name)
                 {
-                    module_info->base_addr = base_addr;
-                    module_info->base_name = base_name;
-                    module_info->full_name = full_name;
+                    PRINT_DEBUG("Found module %s at 0x%lx\n", base_name->contents, base_addr);
 
-                    success = visitor_func(drakvuf, module_info, &need_free, &need_stop, visitor_ctx);
+                    ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+                    unicode_string_t* full_name = drakvuf_read_unicode_common(drakvuf, ctx);
 
-                    if (need_free)
-                        free_module_info(module_info);
+                    bool need_free = true;
+                    bool need_stop = false;
+                    bool success = true;
+                    module_info_t* module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
+                    if (module_info)
+                    {
+                        module_info->base_addr = base_addr;
+                        module_info->size      = size;
+                        module_info->base_name = base_name;
+                        module_info->full_name = full_name;
+
+                        success = visitor_func(drakvuf, module_info, &need_free, &need_stop, visitor_ctx);
+
+                        if (need_free)
+                            free_module_info(module_info);
+                    }
+                    else
+                    {
+                        vmi_free_unicode_str(base_name);
+                        if (full_name)
+                            vmi_free_unicode_str(full_name);
+                    }
+
+                    if (need_stop)
+                        break;
+
+                    if (!success)
+                        return false;
                 }
-                else
-                {
-                    vmi_free_unicode_str(base_name);
-                    if (full_name)
-                        vmi_free_unicode_str(full_name);
-                }
-
-                if (need_stop)
-                    break;
-
-                if (!success)
-                    return false;
             }
         }
 
@@ -222,43 +228,49 @@ bool win_enumerate_module_info_ctx_wow(drakvuf_t drakvuf, addr_t module_list_hea
         uint32_t base_addr = 0;
         if (vmi_read_32(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
-            ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-            unicode_string_t* base_name = drakvuf_read_unicode32_common(drakvuf, ctx);
-
-            if (base_name)
+            uint32_t size = 0;
+            ctx->addr = next_module + drakvuf->offsets[WOW_LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE];
+            if (vmi_read_32(vmi, ctx, &size) == VMI_SUCCESS)
             {
-                PRINT_DEBUG("Found WOW64 module %s at 0x%x\n", base_name->contents, base_addr);
+                ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+                unicode_string_t* base_name = drakvuf_read_unicode32_common(drakvuf, ctx);
 
-                ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                unicode_string_t* full_name = drakvuf_read_unicode32_common(drakvuf, ctx);
-
-                bool need_free = true;
-                bool need_stop = false;
-                bool success = true;
-                module_info_t* module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
-                if (module_info)
+                if (base_name)
                 {
-                    module_info->base_addr = base_addr;
-                    module_info->base_name = base_name;
-                    module_info->full_name = full_name;
+                    PRINT_DEBUG("Found WOW64 module %s at 0x%x\n", base_name->contents, base_addr);
 
-                    success = visitor_func(drakvuf, module_info, &need_free, &need_stop, visitor_ctx);
+                    ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+                    unicode_string_t* full_name = drakvuf_read_unicode32_common(drakvuf, ctx);
 
-                    if (need_free)
-                        free_module_info(module_info);
+                    bool need_free = true;
+                    bool need_stop = false;
+                    bool success = true;
+                    module_info_t* module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
+                    if (module_info)
+                    {
+                        module_info->base_addr = base_addr;
+                        module_info->size      = size;
+                        module_info->base_name = base_name;
+                        module_info->full_name = full_name;
+
+                        success = visitor_func(drakvuf, module_info, &need_free, &need_stop, visitor_ctx);
+
+                        if (need_free)
+                            free_module_info(module_info);
+                    }
+                    else
+                    {
+                        vmi_free_unicode_str(base_name);
+                        if (full_name)
+                            vmi_free_unicode_str(full_name);
+                    }
+
+                    if (need_stop)
+                        break;
+
+                    if (!success)
+                        return false;
                 }
-                else
-                {
-                    vmi_free_unicode_str(base_name);
-                    if (full_name)
-                        vmi_free_unicode_str(full_name);
-                }
-
-                if (need_stop)
-                    break;
-
-                if (!success)
-                    return false;
             }
         }
 
@@ -539,6 +551,10 @@ bool set_os_windows(drakvuf_t drakvuf)
     {
         return 0;
     }
+    if ( VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_EPROCESS", &drakvuf->sizes[EPROCESS]) )
+    {
+        return 0;
+    }
 
     drakvuf->osi.get_current_irql = win_get_current_irql;
     drakvuf->osi.get_current_thread = win_get_current_thread;
@@ -596,6 +612,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_user_stack64 = win_get_user_stack64;
     drakvuf->osi.get_wow_peb = win_get_wow_peb;
     drakvuf->osi.check_return_context = win_check_return_context;
+    drakvuf->osi.get_rspbase = win_get_rspbase;
     drakvuf->osi.get_kernel_symbol_rva = win_get_kernel_symbol_rva;
     drakvuf->osi.get_kernel_symbol_va = win_get_kernel_symbol_va;
 
