@@ -38,6 +38,7 @@ option('plugin-memdump', type : 'boolean', value : true)
 option('plugin-hidevm', type : 'boolean', value : true)
 option('plugin-ptracemon', type : 'boolean', value : true)
 option('plugin-ebpfmon', type : 'boolean', value : true)
+option('plugin-unixsocketmon', type : 'boolean', value : true)
 
 # Disabled by default plugins
 option('plugin-libhooktest', type : 'boolean', value : 'false')

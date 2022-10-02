@@ -186,6 +186,13 @@ struct DataPrinter
     }
 
     template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::BinaryString<Tv>& data, char)
+    {
+        data.format(os);
+        return true;
+    }
+
+    template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Estr<Tv>& data, char)
     {
         gchar* escaped = drakvuf_escape_str(data.value.c_str());

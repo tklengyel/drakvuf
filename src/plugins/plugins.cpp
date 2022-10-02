@@ -143,6 +143,7 @@
 #include "hidevm/hidevm.h"
 #include "ptracemon/ptracemon.h"
 #include "ebpfmon/ebpfmon.h"
+#include "unixsocketmon/unixsocketmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -557,6 +558,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_EBPFMON:
                 {
                     this->plugins[plugin_id] = std::make_unique<ebpfmon>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_UNIXSOCKETMON
+                case PLUGIN_UNIXSOCKETMON:
+                {
+                    unixsocketmon_config config =
+                    {
+                        .print_max_size = options->unixsocketmon_max_size
+                    };
+                    this->plugins[plugin_id] = std::make_unique<unixsocketmon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif

@@ -195,6 +195,13 @@ struct DataPrinter
     }
 
     template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::BinaryString<Tv>& data, char)
+    {
+        data.format(os);
+        return true;
+    }
+
+    template <class Tv = T>
     static bool print(std::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
     {
         auto pos = os.tellp();
