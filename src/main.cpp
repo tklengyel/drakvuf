@@ -361,6 +361,10 @@ static void print_usage()
         "\t --json-services <path to json>\n"
         "\t                           The JSON profile for services.exe\n"
 #endif
+#ifdef ENABLE_PLUGIN_UNIXSOCKETMON
+        "\t --unixsocketmon-max-size-print <size>\n"
+        "\t                           Max message size (in bytes) to print\n"
+#endif
         "\t --libdrakvuf-not-get-userid\n"
         "\t                           Don't collect user id in get process data\n"
         "\t -h, --help                Show this help\n"
@@ -483,6 +487,7 @@ int main(int argc, char** argv)
         opt_ignore_pid,
         opt_enable_active_callback_check,
         opt_exit_injection_thread,
+        opt_unixsocketmon_max_size,
     };
     const option long_opts[] =
     {
@@ -557,6 +562,7 @@ int main(int argc, char** argv)
         {"ignore-pid", required_argument, NULL, opt_ignore_pid},
         {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
         {"exit-injection-thread", no_argument, NULL, opt_exit_injection_thread},
+        {"unixsocketmon-max-size-print", required_argument, NULL, opt_unixsocketmon_max_size},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hFC";
@@ -895,7 +901,11 @@ int main(int argc, char** argv)
                 options.services_profile = optarg;
                 break;
 #endif
-
+#ifdef ENABLE_PLUGIN_UNIXSOCKETMON
+            case opt_unixsocketmon_max_size:
+                options.unixsocketmon_max_size = strtoull(optarg, NULL, 0);
+                break;
+#endif
             case 'h':
                 print_usage();
                 return drakvuf_exit_code_t::SUCCESS;

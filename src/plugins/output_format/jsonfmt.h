@@ -179,6 +179,15 @@ public:
     }
 
     template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::BinaryString<Tv>& data, char)
+    {
+        os << "\"";
+        data.format(os);
+        os << "\"";
+        return true;
+    }
+
+    template <class Tv = T>
     static bool print(std::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
     {
         auto pos = os.tellp();
