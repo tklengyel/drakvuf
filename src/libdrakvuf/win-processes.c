@@ -220,6 +220,26 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return thread;
 }
 
+addr_t win_get_rspbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t rspbase = 0;
+    addr_t prcb = 0;
+    addr_t kpcr = 0;
+
+    if (!win_get_current_kpcr(drakvuf, info, &kpcr, &prcb))
+    {
+        return 0;
+    }
+
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_RSPBASE], 0, &rspbase))
+    {
+        return 0;
+    }
+
+    return rspbase;
+}
+
 addr_t win_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     vmi_instance_t vmi = drakvuf->vmi;

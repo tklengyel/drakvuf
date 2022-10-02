@@ -179,6 +179,7 @@ enum win_offsets
     KPCR_PRCBDATA,
     KPCR_IRQL,
     KPRCB_CURRENTTHREAD,
+    KPRCB_RSPBASE,
 
     KTHREAD_APCSTATE,
     KTHREAD_APCSTATEINDEX,
@@ -250,6 +251,7 @@ enum win_bitfields
 
 enum win_sizes
 {
+    EPROCESS,
     HANDLE_TABLE_ENTRY,
 
     __WIN_SIZES_MAX
