@@ -105,91 +105,93 @@
 #ifndef FILETRACER_LINUX_H
 #define FILETRACER_LINUX_H
 
+#include "plugins/plugins_ex.h"
 #include "plugins/private.h"
-#include "plugins/plugins.h"
+#include "private.h"
 
-class linux_filetracer
+using namespace filetracer_ns;
+
+class linux_filetracer : public pluginex
 {
 public:
-    addr_t kaslr;
-    size_t* offsets;
-    output_format_t format;
-    GSList* traps_to_free;
+    std::array<size_t, __LINUX_OFFSET_MAX> offsets;
+    std::array<size_t, __PT_REGS_MAX> regs;
 
-    drakvuf_trap_t trap[22] =
-    {
-        [0 ... 21] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 0,
-            .breakpoint.addr_type = ADDR_VA,
-            .breakpoint.module = "linux",
-            .type = BREAKPOINT,
-            .data = (void*)this,
-        }
-    };
+    /* Hooks */
+    // File operations hooks
+    std::unique_ptr<libhook::SyscallHook> open_file_hook;
+    std::unique_ptr<libhook::SyscallHook> read_file_hook;
+    std::unique_ptr<libhook::SyscallHook> write_file_hook;
+    std::unique_ptr<libhook::SyscallHook> close_file_hook;
+    std::unique_ptr<libhook::SyscallHook> llseek_file_hook;
+    std::unique_ptr<libhook::SyscallHook> memfd_create_file_hook;
+    std::unique_ptr<libhook::SyscallHook> mknod_file_hook;
+    std::unique_ptr<libhook::SyscallHook> rename_file_hook;
+    std::unique_ptr<libhook::SyscallHook> truncate_file_hook;
+    std::unique_ptr<libhook::SyscallHook> allocate_file_hook;
+    // File attributes change hooks
+    std::unique_ptr<libhook::SyscallHook> chmod_file_hook;
+    std::unique_ptr<libhook::SyscallHook> chown_file_hook;
+    std::unique_ptr<libhook::SyscallHook> utimes_file_hook;
+    std::unique_ptr<libhook::SyscallHook> access_file_hook;
+    // Directory operations hooks
+    std::unique_ptr<libhook::SyscallHook> mkdir_hook;
+    std::unique_ptr<libhook::SyscallHook> rmdir_hook;
+    std::unique_ptr<libhook::SyscallHook> chdir_hook;
+    std::unique_ptr<libhook::SyscallHook> chroot_hook;
+    // Link operations hooks
+    std::unique_ptr<libhook::SyscallHook> link_file_hook;
+    std::unique_ptr<libhook::SyscallHook> unlink_file_hook;
+    std::unique_ptr<libhook::SyscallHook> symbolic_link_file_hook;
+    std::unique_ptr<libhook::SyscallHook> read_link_hook;
+
+    /* Return hooks */
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+
+    /* Callbacks */
+    // File operations callbacks
+    event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t read_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t close_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t llseek_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t memfd_create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t mknod_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t rename_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t truncate_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t allocate_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    // File attributes change callbacks
+    event_response_t chmod_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t chown_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t utimes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t access_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    // Directory operations callbacks
+    event_response_t mkdir_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t rmdir_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t chdir_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t chroot_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    // Link operations callbacks
+    event_response_t link_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t unlink_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t symbolic_link_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t read_link_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* Return callbacks */
+    event_response_t open_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* Helper functions */
+    uint64_t make_hook_id(drakvuf_trap_info_t* info);
+    void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params);
+
+    /* File info parsing */
+    bool get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t struct_addr = 0, std::string struct_name = "");
+    std::string get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t dentry_addr);
+    std::string get_filepath_locked(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, addr_t dentry_addr);
+    char* read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t fileaddr);
 
     linux_filetracer(drakvuf_t drakvuf, output_format_t output);
     linux_filetracer(const linux_filetracer&) = delete;
     linux_filetracer& operator=(const linux_filetracer&) = delete;
-    ~linux_filetracer();
-};
-
-enum linux_pt_regs
-{
-    PT_REGS_R15,
-    PT_REGS_R14,
-    PT_REGS_R13,
-    PT_REGS_R12,
-    PT_REGS_RBP,
-    PT_REGS_RBX,
-
-    PT_REGS_R11,
-    PT_REGS_R10,
-    PT_REGS_R9,
-    PT_REGS_R8,
-    PT_REGS_RAX,
-    PT_REGS_RCX,
-    PT_REGS_RDX,
-    PT_REGS_RSI,
-    PT_REGS_RDI,
-
-    PT_REGS_ORIG_RAX,
-
-    PT_REGS_RIP,
-    PT_REGS_CS,
-    PT_REGS_EFLAGS,
-    PT_REGS_RSP,
-    PT_REGS_SS,
-
-    __PT_REGS_MAX
-};
-
-static const char* linux_pt_regs_names[__PT_REGS_MAX] =
-{
-    [PT_REGS_R15] = "r15",
-    [PT_REGS_R14] = "r14",
-    [PT_REGS_R13] = "r13",
-    [PT_REGS_R12] = "r12",
-    [PT_REGS_RBP] = "bp",
-    [PT_REGS_RBX] = "bx",
-
-    [PT_REGS_R11] = "r11",
-    [PT_REGS_R10] = "r10",
-    [PT_REGS_R9] = "r9",
-    [PT_REGS_R8] = "r8",
-    [PT_REGS_RAX] = "ax",
-    [PT_REGS_RCX] = "cx",
-    [PT_REGS_RDX] = "dx",
-    [PT_REGS_RSI] = "si",
-    [PT_REGS_RDI] = "di",
-
-    [PT_REGS_ORIG_RAX] = "orig_ax",
-
-    [PT_REGS_RIP] = "ip",
-    [PT_REGS_CS] = "cs",
-    [PT_REGS_EFLAGS] = "flags",
-    [PT_REGS_RSP] = "sp",
-    [PT_REGS_SS] = "ss",
 };
 
 #endif

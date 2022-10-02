@@ -106,36 +106,14 @@
 #include <assert.h>
 
 #include "filetracer.h"
-#include "private.h"
 #include "linux.h"
 #include "win.h"
 
-filetracer::filetracer(drakvuf_t drakvuf, output_format_t output) :
-    os(drakvuf_get_os_type(drakvuf)), wf(), lf()
+filetracer::filetracer(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output)
 {
-    if (this->os == VMI_OS_WINDOWS)
-    {
-        this->wf = new win_filetracer(drakvuf, output);
-    }
+    auto os = drakvuf_get_os_type(drakvuf);
+    if (os == VMI_OS_WINDOWS)
+        this->wf = std::make_unique<win_filetracer>(drakvuf, output);
     else
-    {
-        this->lf = new linux_filetracer(drakvuf, output);
-    }
-}
-
-filetracer::~filetracer()
-{
-    if (this->os == VMI_OS_WINDOWS)
-    {
-        delete this->wf;
-    }
-    else
-    {
-        delete this->lf;
-    }
-}
-
-bool filetracer::stop_impl()
-{
-    return true;
+        this->lf = std::make_unique<linux_filetracer>(drakvuf, output);
 }

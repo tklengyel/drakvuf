@@ -109,6 +109,8 @@
 #include "rootkitmon.h"
 #include "private.h"
 
+using namespace rootkitmon_ns;
+
 static constexpr uint16_t vista_rtm_ver = 6000;
 static constexpr uint16_t win7_sp1_ver = 7601;
 static constexpr uint16_t win8_rtm_ver = 9200;
