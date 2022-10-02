@@ -140,7 +140,7 @@ static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_i
 
         else if ( arg.type == PCHAR )
         {
-            cstr = drakvuf_read_ascii_str(drakvuf, info, val);
+            cstr = drakvuf_read_ascii_str_limit(drakvuf, info, val, 64 * 1024);
         }
 
         else if ( s->os == VMI_OS_WINDOWS )
@@ -208,7 +208,7 @@ static uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, co
 void print_syscall(
     syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     int nr, std::string&& module, const syscall_t* sc,
-    const std::vector<uint64_t>& args
+    const std::vector<uint64_t>& args, bool inlined
 )
 {
     if (sc)
@@ -237,6 +237,7 @@ void print_syscall(
         keyval("CR3", fmt::Xval(info->regs->cr3)),
         keyval("Syscall", fmt::Nval(nr)),
         keyval("NArgs", fmt::Nval(args.size())),
+        keyval("Inlined", fmt::Qstr(inlined ? "True" : "False")),
         s->fmt_args
     );
 }

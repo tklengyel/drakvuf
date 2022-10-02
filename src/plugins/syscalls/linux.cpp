@@ -258,7 +258,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     auto args = linux_build_argbuf(vmi, info, s, sc, pt_regs);
 
-    print_syscall(s, drakvuf, info, nr, info->trap->breakpoint.module, sc, args);
+    print_syscall(s, drakvuf, info, nr, info->trap->breakpoint.module, sc, args, false);
 
     if ( s->disable_sysret )
         return 0;
