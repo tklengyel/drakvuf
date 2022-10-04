@@ -183,6 +183,8 @@ struct breakpoint_in_system_process_searcher
                 return nullptr;
             }
 
+            trap->type = BREAKPOINT;
+
             if (m_virt_addr)
             {
                 trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -250,6 +252,7 @@ struct breakpoint_in_dll_module_searcher
                 return nullptr;
             }
 
+            trap->type = BREAKPOINT;
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.addr_type = ADDR_VA;
             trap->breakpoint.module = m_module_name;
@@ -323,6 +326,7 @@ struct breakpoint_by_dtb_searcher
                     return nullptr;
             }
 
+            trap->type = BREAKPOINT;
             trap->breakpoint.lookup_type = LOOKUP_DTB;
             trap->breakpoint.dtb = dtb;
             trap->breakpoint.addr_type = ADDR_VA;
@@ -351,6 +355,7 @@ struct breakpoint_by_pid_searcher
             if (!ret_addr)
                 return nullptr;
 
+            trap->type = BREAKPOINT;
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.pid = info->trap->breakpoint.pid;
             trap->breakpoint.addr_type = ADDR_VA;
@@ -365,6 +370,43 @@ struct breakpoint_by_pid_searcher
         }
         return trap;
     }
+};
+
+struct memaccess_trap
+{
+    memaccess_trap& for_gfn(uint64_t _gfn, vmi_mem_access_t vmi_access_type, memaccess_type_t memaccess_type = POST)
+    {
+        gfn = _gfn;
+        access = vmi_access_type;
+        access_type = memaccess_type;
+        return *this;
+    }
+
+    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
+    {
+        if(trap)
+        {
+            if(access == VMI_MEMACCESS_INVALID)
+                return nullptr;
+
+            trap->type = MEMACCESS;
+            trap->memaccess.access = access;
+            trap->memaccess.type = access_type;
+            trap->memaccess.gfn = gfn;
+
+            if (!trap->name && info && info->trap)
+                trap->name = info->trap->name;
+
+            if (!drakvuf_add_trap(drakvuf, trap))
+                return nullptr;
+        }
+
+        return trap;
+    }
+
+    uint64_t gfn;
+    vmi_mem_access_t access;
+    memaccess_type_t access_type;
 };
 
 struct call_result_t
@@ -750,7 +792,6 @@ drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,
 
     trap->name = trap_name;
     trap->cb = hook_cb;
-    trap->type = BREAKPOINT;
     trap->ttl = ttl;
     trap->ah_cb = ah_cb;
 
