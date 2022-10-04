@@ -140,6 +140,9 @@
 #define IPV4_ADDR_OFFSET 4
 #define IPV6_ADDR_OFFSET 8
 
+static constexpr uint16_t win_7_sp1_ver   = 7601;
+static constexpr uint16_t win_10_1803_ver = 17134;
+
 static char* ipv4_to_str(uint8_t ipv4[4])
 {
     return g_strdup_printf("%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
@@ -203,13 +206,6 @@ static char const* tcp_addressfamily_string(int family)
     return (family == AF_INET) ? "TCPv4" : "TCPv6";
 }
 
-static char const* tcp_state_string(int tcp_state)
-{
-    if (tcp_state < 0 || tcp_state >= __TCP_STATE_MAX)
-        return "invalid";
-    return tcp_state_str[tcp_state];
-}
-
 static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
 {
     fmt::print(s->format, "socketmon", drakvuf, info,
@@ -224,7 +220,7 @@ static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
 }
 
 static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data,
-    int addressfamily, int tcp_state, char const* lip, int localport, char const* rip, int remoteport)
+    int addressfamily, char const* lip, int localport, char const* rip, int remoteport)
 {
     fmt::print(s->format, "socketmon", drakvuf, info,
         keyval("Owner", fmt::Qstr(owner_proc_data.name)),
@@ -232,7 +228,6 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
         keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
         keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
         keyval("Protocol", fmt::Rstr(tcp_addressfamily_string(addressfamily))),
-        keyval("TcpState", fmt::Rstr(tcp_state_string(tcp_state))),
         keyval("LocalIp", fmt::Rstr(lip ?: "")),
         keyval("LocalPort", fmt::Nval(localport)),
         keyval("RemoteIp", fmt::Rstr(rip ?: "")),
@@ -240,23 +235,21 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
     );
 }
 
-template<typename tcp_endpoint_struct, typename inetaf_struct, typename addr_info_struct, typename local_address_struct>
-static event_response_t tcpe_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+template<typename tcp_endpoint_struct, typename inetaf_struct, typename addr_info_struct>
+static event_response_t tcpe_old_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     socketmon* s = (socketmon*)info->trap->data;
 
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* rip = NULL;
+    char* rip = nullptr;
+
     ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    ctx.dtb                 = info->regs->cr3;
 
     proc_data_t owner_proc_data = {};
-    tcp_endpoint_struct tcpe = {};
-    inetaf_struct inetaf = {};
-    addr_info_struct addrinfo = {};
-    local_address_struct local = {};
+    tcp_endpoint_struct tcpe    = {};
+    inetaf_struct inetaf        = {};
+    addr_info_struct addrinfo   = {};
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -271,7 +264,7 @@ static event_response_t tcpe_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     // Convert ports to little endian
-    tcpe.localport = __bswap_16(tcpe.localport);
+    tcpe.localport  = __bswap_16(tcpe.localport);
     tcpe.remoteport = __bswap_16(tcpe.remoteport);
 
     ctx.addr = tcpe.inetaf;
@@ -282,57 +275,130 @@ static event_response_t tcpe_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(addrinfo), &addrinfo, NULL) )
         goto done;
 
-    ctx.addr = addrinfo.local;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(local), &local, NULL) )
-        goto done;
-
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
     rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
     if (!rip) goto done;
 
     if (!drakvuf_get_process_data(drakvuf, tcpe.owner, &owner_proc_data))
         goto done;
 
-    print_tcpe(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, tcpe.state, lip, tcpe.localport, rip, tcpe.remoteport);
+    if (inetaf.addressfamily == AF_INET)
+        print_tcpe(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, "127.0.0.1", tcpe.localport, rip, tcpe.remoteport);
+    else
+        print_tcpe(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, "::1", tcpe.localport, rip, tcpe.remoteport);
 
 done:
     g_free(const_cast<char*>(owner_proc_data.name));
-    g_free(lip);
     g_free(rip);
     drakvuf_release_vmi(drakvuf);
-
     return 0;
 }
 
 static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    return tcpe_cb<tcp_endpoint_x86, inetaf_x86, addr_info_x86, local_address_x86>(drakvuf, info);
-}
-
-static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    return tcpe_cb<tcp_endpoint_x64, inetaf_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+    return tcpe_old_cb<tcp_endpoint_x86, inetaf_x86, addr_info_x86>(drakvuf, info);
 }
 
 static event_response_t tcpe_win81_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    return tcpe_cb<tcp_endpoint_win81_x64, inetaf_win81_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+    return tcpe_old_cb<tcp_endpoint_win81_x64, inetaf_win81_x64, addr_info_x64>(drakvuf, info);
 }
 
 static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    return tcpe_cb<tcp_endpoint_win10_x64, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+    return tcpe_old_cb<tcp_endpoint_win10_x64, inetaf_win10_x64, addr_info_x64>(drakvuf, info);
 }
 
-static event_response_t tcpe_win10_x64_1803_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+// uint16_t family = *(uint16_t*)(*(uint64_t*)(rcx + off1) + off2);
+static uint16_t tcp_get_family(vmi_instance_t vmi, addr_t rcx, addr_t build)
 {
-    return tcpe_cb<tcp_endpoint_win10_x64_1803, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+    addr_t ptr = 0, off1 = 0, off2 = 0;
+    uint16_t family = 0;
+
+    if (build == win_7_sp1_ver)
+    {
+        off1 = 0x18;
+        off2 = 0x14;
+    }
+    else if (build == win_10_1803_ver)
+    {
+        off1 = 0x10;
+        off2 = 0x18;
+    }
+
+    if (!off1 || !off2 || VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + off1, 4, &ptr))
+        return 0;
+
+    if (VMI_SUCCESS != vmi_read_16_va(vmi, ptr + off2, 4, &family))
+        return 0;
+    return family;
+}
+
+// uint16_t port = *(uint16_t*)(rcx + off1);
+static std::pair<uint16_t, uint16_t> tcp_get_port(vmi_instance_t vmi, addr_t rcx, addr_t build)
+{
+    addr_t   off1 = 0;
+    uint16_t rport = 0, lport = 0;
+
+    if (build == win_7_sp1_ver)
+    {
+        off1 = 0x6c;
+    }
+    else if (build == win_10_1803_ver)
+    {
+        off1 = 0x70;
+    }
+
+    if (off1)
+    {
+        vmi_read_16_va(vmi, rcx + off1,     4, &lport);
+        vmi_read_16_va(vmi, rcx + off1 + 2, 4, &rport);
+        lport = __bswap_16(lport);
+        rport = __bswap_16(rport);
+    }
+    return std::make_pair(lport, rport);
+}
+
+// uint8_t* addr = *(uint8_t*)(*(uint64_t*)(rcx + off1) + off2);
+static char* tcp_get_addr(vmi_instance_t vmi, addr_t rcx, addr_t build, uint16_t family)
+{
+    addr_t ptr = 0, off1 = 0, off2 = 0;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid                 = 4
+    );
+
+    if (build == win_7_sp1_ver)
+    {
+        off1 = 0x20;
+        off2 = 0xf0;
+    }
+    else if (build == win_10_1803_ver)
+    {
+        off1 = 0x18;
+        off2 = 0xf0;
+    }
+
+    if (!off1 || !off2 || VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + off1, 4, &ptr))
+        return nullptr;
+    return read_ip_string(vmi, ctx, ptr + off2, family);
+}
+
+static event_response_t tcp_tcb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* s = (socketmon*)info->trap->data;
+    vmi_lock_guard vmi(drakvuf);
+
+    auto arg            = drakvuf_get_function_argument(drakvuf, info, 1);
+    auto family         = tcp_get_family(vmi, arg, s->build.buildnumber);
+    auto [lport, rport] = tcp_get_port  (vmi, arg, s->build.buildnumber);
+    auto remote         = tcp_get_addr  (vmi, arg, s->build.buildnumber, family);
+    auto local          = family == AF_INET ? "127.0.0.1" : "::1";
+
+    print_tcpe(drakvuf, info, s, info->attached_proc_data, family, local, lport, remote, rport);
+
+    g_free(remote);
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static proc_data_t* udp_get_process_data(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t udp_info)
@@ -714,16 +780,10 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
     : format{output}
 {
     this->pm = drakvuf_get_page_mode(drakvuf);
-
-    uint16_t build = 0;
     {
         vmi_lock_guard vmi(drakvuf);
-        win_build_info_t build_info;
-        if (!vmi_get_windows_build_info(vmi, &build_info))
+        if (!vmi_get_windows_build_info(vmi, &this->build))
             throw -1;
-
-        this->winver = build_info.version;
-        build = build_info.buildnumber;
     }
 
     if ( !c->tcpip_profile )
@@ -732,7 +792,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
         return;
     }
 
-    if ( this->winver == VMI_OS_WINDOWS_10 && this->pm != VMI_PM_IA32E )
+    if ( this->build.version == VMI_OS_WINDOWS_10 && this->pm != VMI_PM_IA32E )
     {
         PRINT_DEBUG("Socketmon plugin not supported on 32-bit Windows 10\n");
         throw -1;
@@ -743,7 +803,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
     register_dnsapi_trap(drakvuf, &this->dnsapi_traps[1], "DnsQuery_A", trap_DnsQuery_A_cb);
     register_dnsapi_trap(drakvuf, &this->dnsapi_traps[2], "DnsQuery_UTF8", trap_DnsQuery_A_cb); // intentionally trap_DnsQuery_A_cb
 
-    if (this->winver == VMI_OS_WINDOWS_7)
+    if (this->build.version == VMI_OS_WINDOWS_7)
     {
         if (pm == VMI_PM_IA32E)
             register_dnsapi_trap(drakvuf, &this->dnsapi_traps[3], "DnsQueryExW", trap_DnsQueryExW_x64_cb, trap_DnsQueryExW_x86_cb);
@@ -752,7 +812,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
         register_dnsapi_trap(drakvuf, &this->dnsapi_traps[4], "DnsQueryExA", trap_DnsQueryExA_cb);
     }
 
-    if (this->winver >= VMI_OS_WINDOWS_8)
+    if (this->build.version >= VMI_OS_WINDOWS_8)
     {
         register_dnsapi_trap(drakvuf, &this->dnsapi_traps[5], "DnsQueryEx", trap_DnsQueryEx_cb);
     }
@@ -764,26 +824,26 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
         throw -1;
     }
 
-    event_response_t(*tcpe_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr;
+    event_response_t(*tcpe_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = tcp_tcb_cb;
+
     if (pm == VMI_PM_IA32E)
     {
-        switch (winver)
+        switch (this->build.version)
         {
             case VMI_OS_WINDOWS_8:
                 // Tested on Windows 8.1 update 1 x64
                 tcpe_cb = tcpe_win81_x64_cb;
                 break;
             case VMI_OS_WINDOWS_10:
-                if (build < 17134)
+                if (this->build.buildnumber < 17134)
                     // Tested on Windows 10 x64 before 1803
                     tcpe_cb = tcpe_win10_x64_cb;
-                else
-                    // Tested on Windows 10 1803 x64
-                    tcpe_cb = tcpe_win10_x64_1803_cb;
+                break;
+            case VMI_OS_WINDOWS_7:
                 break;
             default:
-                // Tested on Windows 7 SP1 x64
-                tcpe_cb = tcpe_x64_cb;
+                PRINT_DEBUG("Socketmon plugin is not supported on %d %d", this->build.version, this->build.buildnumber);
+                throw -1;
                 break;
         }
     }
@@ -793,7 +853,9 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
         tcpe_cb = tcpe_x86_cb;
     }
 
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpCreateAndConnectTcbComplete", &this->tcpip_trap[0], tcpe_cb);
+    auto tcp_hook = tcpe_cb == tcp_tcb_cb ? "TcpCreateAndConnectTcbRateLimitComplete" : "TcpCreateAndConnectTcbComplete";
+
+    register_tcpip_trap(drakvuf, tcpip_profile_json, tcp_hook, &this->tcpip_trap[0], tcpe_cb);
     if (this->pm == VMI_PM_IA32E)
         register_tcpip_trap(drakvuf, tcpip_profile_json, "UdpSendMessages", &this->tcpip_trap[1], udp_send_cb);
 
