@@ -115,7 +115,6 @@ namespace jsonfmt
 template <class T>
 constexpr bool print_data(std::ostream& os, const T& data, char sep);
 
-
 template <class T, class = void>
 class DataPrinter
 {
@@ -226,6 +225,11 @@ public:
         return false;
     }
 
+    static bool print(std::ostream& os, const flagsval& flags, char sep)
+    {
+        return print_data(os, keyval(flags.name, fmt::Rstr(flags.values)), sep);
+    }
+
     template <class... Ts>
     static bool print(std::ostream& os, const std::variant<Ts...>& data, char sep)
     {
@@ -297,6 +301,11 @@ private:
         if (!printed)
             os.seekp(pos);
         return printed;
+    }
+
+    static bool print_data(std::ostream& os, const flagsval& flags, char sep)
+    {
+        return print_data(os, keyval(flags.name, fmt::Rstr(flags.values)), sep);
     }
 
     template <class Tv, class... Ts>
