@@ -201,6 +201,8 @@ bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callb
 bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
 uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+bool win_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+uint64_t win_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid);

@@ -958,6 +958,34 @@ uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uin
     return ret;
 }
 
+bool drakvuf_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.mmvad_private_memory )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.mmvad_private_memory(drakvuf, mmvad);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+uint64_t drakvuf_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    uint64_t ret = 0;
+
+    if ( drakvuf->osi.mmvad_protection )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.mmvad_protection(drakvuf, mmvad);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
 {
     bool ret = false;

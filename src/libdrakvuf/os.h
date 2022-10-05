@@ -255,6 +255,12 @@ typedef struct os_interface
     uint64_t (*mmvad_commit_charge)
     (drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
 
+    bool (*mmvad_private_memory)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
+
+    uint64_t (*mmvad_protection)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
+
     bool (*get_pid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
