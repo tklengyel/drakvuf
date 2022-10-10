@@ -305,4 +305,35 @@ struct dns_query_ex_w_string_x86_t
     uint32_t pBuffer = 0;
 } __attribute__ ((packed));
 
+enum
+{
+    IP_FAMILY_OFF0,
+    IP_FAMILY_OFF1,
+    LOCAL_PORT,
+    REMOTE_PORT,
+    REMOTE_ADDR_OFF0,
+    REMOTE_ADDR_OFF1,
+    __TCP_ARRAY_MAX
+};
+
+static const uint16_t win7_sp1_tcp_offsets[__TCP_ARRAY_MAX] =
+{
+    [IP_FAMILY_OFF0]    = 0x18,
+    [IP_FAMILY_OFF1]    = 0x14,
+    [LOCAL_PORT]        = 0x6c,
+    [REMOTE_PORT]       = 0x6e,
+    [REMOTE_ADDR_OFF0]  = 0x20,
+    [REMOTE_ADDR_OFF1]  = 0xf0,
+};
+
+static const uint16_t win10_1803_tcp_offsets[__TCP_ARRAY_MAX] =
+{
+    [IP_FAMILY_OFF0]    = 0x10,
+    [IP_FAMILY_OFF1]    = 0x18,
+    [LOCAL_PORT]        = 0x70,
+    [REMOTE_PORT]       = 0x72,
+    [REMOTE_ADDR_OFF0]  = 0x18,
+    [REMOTE_ADDR_OFF1]  = 0xf0,
+};
+
 #endif

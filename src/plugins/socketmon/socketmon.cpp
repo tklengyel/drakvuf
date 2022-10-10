@@ -308,80 +308,83 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return tcpe_old_cb<tcp_endpoint_win10_x64, inetaf_win10_x64, addr_info_x64>(drakvuf, info);
 }
 
-// uint16_t family = *(uint16_t*)(*(uint64_t*)(rcx + off1) + off2);
 static uint16_t tcp_get_family(vmi_instance_t vmi, addr_t rcx, addr_t build)
 {
-    addr_t ptr = 0, off1 = 0, off2 = 0;
+    addr_t ptr = 0;
     uint16_t family = 0;
+    const uint16_t* offsets = nullptr;
 
-    if (build == win_7_sp1_ver)
+    switch (build)
     {
-        off1 = 0x18;
-        off2 = 0x14;
-    }
-    else if (build == win_10_1803_ver)
-    {
-        off1 = 0x10;
-        off2 = 0x18;
-    }
+        case win_7_sp1_ver:
+            offsets = win7_sp1_tcp_offsets;
+            break;
+        case win_10_1803_ver:
+            offsets = win10_1803_tcp_offsets;
+            break;
+        default:
+            return 0;
+    };
 
-    if (!off1 || !off2 || VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + off1, 4, &ptr))
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + offsets[IP_FAMILY_OFF0], 0, &ptr))
         return 0;
 
-    if (VMI_SUCCESS != vmi_read_16_va(vmi, ptr + off2, 4, &family))
+    if (VMI_SUCCESS != vmi_read_16_va(vmi, ptr + offsets[IP_FAMILY_OFF1], 0, &family))
         return 0;
     return family;
 }
 
-// uint16_t port = *(uint16_t*)(rcx + off1);
 static std::pair<uint16_t, uint16_t> tcp_get_port(vmi_instance_t vmi, addr_t rcx, addr_t build)
 {
-    addr_t   off1 = 0;
     uint16_t rport = 0, lport = 0;
+    const uint16_t* offsets = nullptr;
 
-    if (build == win_7_sp1_ver)
+    switch (build)
     {
-        off1 = 0x6c;
-    }
-    else if (build == win_10_1803_ver)
-    {
-        off1 = 0x70;
-    }
+        case win_7_sp1_ver:
+            offsets = win7_sp1_tcp_offsets;
+            break;
+        case win_10_1803_ver:
+            offsets = win10_1803_tcp_offsets;
+            break;
+        default:
+            return std::make_pair(0, 0);
+    };
 
-    if (off1)
-    {
-        vmi_read_16_va(vmi, rcx + off1,     4, &lport);
-        vmi_read_16_va(vmi, rcx + off1 + 2, 4, &rport);
-        lport = __bswap_16(lport);
-        rport = __bswap_16(rport);
-    }
+    vmi_read_16_va(vmi, rcx + offsets[LOCAL_PORT],  0, &lport);
+    vmi_read_16_va(vmi, rcx + offsets[REMOTE_PORT], 0, &rport);
+    lport = __bswap_16(lport);
+    rport = __bswap_16(rport);
     return std::make_pair(lport, rport);
 }
 
-// uint8_t* addr = *(uint8_t*)(*(uint64_t*)(rcx + off1) + off2);
 static char* tcp_get_addr(vmi_instance_t vmi, addr_t rcx, addr_t build, uint16_t family)
 {
-    addr_t ptr = 0, off1 = 0, off2 = 0;
+    addr_t ptr = 0;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
         .pid                 = 4
     );
 
-    if (build == win_7_sp1_ver)
-    {
-        off1 = 0x20;
-        off2 = 0xf0;
-    }
-    else if (build == win_10_1803_ver)
-    {
-        off1 = 0x18;
-        off2 = 0xf0;
-    }
+    const uint16_t* offsets = nullptr;
 
-    if (!off1 || !off2 || VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + off1, 4, &ptr))
+    switch (build)
+    {
+        case win_7_sp1_ver:
+            offsets = win7_sp1_tcp_offsets;
+            break;
+        case win_10_1803_ver:
+            offsets = win10_1803_tcp_offsets;
+            break;
+        default:
+            return nullptr;
+    };
+
+
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + offsets[REMOTE_ADDR_OFF0], 0, &ptr))
         return nullptr;
-    return read_ip_string(vmi, ctx, ptr + off2, family);
+    return read_ip_string(vmi, ctx, ptr + offsets[REMOTE_ADDR_OFF1], family);
 }
 
 static event_response_t tcp_tcb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
