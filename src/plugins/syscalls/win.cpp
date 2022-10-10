@@ -118,6 +118,7 @@
 
 namespace syscalls_ns
 {
+static constexpr auto ki_syscall_user_ret_offset = 0x28;
 
 static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -262,7 +263,7 @@ static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, sys
 
     // Read return address to usermode.
     vmi_lock_guard vmi(drakvuf);
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, rspbase - 0x28, 0, &user_ret_addr))
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, rspbase - ki_syscall_user_ret_offset, 0, &user_ret_addr))
         return false;
 
     // Resolve ntdll.dll.
