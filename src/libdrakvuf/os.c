@@ -1097,4 +1097,3 @@ bool drakvuf_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_
 
     return ret;
 }
-
