@@ -131,6 +131,15 @@ struct TimeVal
     glong tv_usec;
 };
 
+struct flagsval
+{
+    const char* name;
+    std::string values;
+
+    flagsval() = default;
+    flagsval(const char* n, std::string v) : name{n}, values{std::move(v)} {}
+};
+
 template<class Value>
 auto keyval(const char* key, Value&& value)
 {

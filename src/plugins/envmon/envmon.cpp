@@ -285,20 +285,10 @@ static event_response_t trap_GetAdaptersAddresses_cb(drakvuf_t drakvuf, drakvuf_
     const auto family = print::FieldToString(family_name_formats, drakvuf_get_function_argument(drakvuf, info, 1));
     const auto flags  = print::FieldToString(flags_name_formats, std::bitset<64>(drakvuf_get_function_argument(drakvuf, info, 2)));
 
-    if (p->m_output_format == OUTPUT_KV)
-    {
-        kvfmt::print("envmon", drakvuf, info,
-            keyval("Family", fmt::Rstr(family)),
-            fmt::Rstr(flags)
-        );
-    }
-    else
-    {
-        fmt::print(p->m_output_format, "envmon", drakvuf, info,
-            keyval("Family", fmt::Qstr(family)),
-            keyval("Flags", fmt::Qstr(flags))
-        );
-    }
+    fmt::print(p->m_output_format, "envmon", drakvuf, info,
+        keyval("Family", fmt::Qstr(family)),
+        flagsval("Flags", std::move(flags))
+    );
 
     return VMI_EVENT_RESPONSE_NONE;
 }

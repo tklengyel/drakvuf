@@ -287,28 +287,14 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
             break;
     }
 
-    if (f->format == OUTPUT_KV)
-    {
-        kvfmt::print("fileextractor", drakvuf, info,
-            keyval("FileName", fmt::Qstr(filename)),
-            keyval("Size", fmt::Nval(bytes_read)),
-            keyval("Flags", fmt::Xval(fo_flags)),
-            fmt::Rstr(flags),
-            keyval("SeqNum", fmt::Nval(seq_number)),
-            keyval("Reason", fmt::Qstr(r))
-        );
-    }
-    else
-    {
-        fmt::print(f->format, "fileextractor", drakvuf, info,
-            keyval("FileName", fmt::Qstr(filename)),
-            keyval("Size", fmt::Nval(bytes_read)),
-            keyval("Flags", fmt::Xval(fo_flags)),
-            keyval("FlagsExpanded", fmt::Qstr(flags)),
-            keyval("SeqNum", fmt::Nval(seq_number)),
-            keyval("Reason", fmt::Qstr(r))
-        );
-    }
+    fmt::print(f->format, "fileextractor", drakvuf, info,
+        keyval("FileName", fmt::Qstr(filename)),
+        keyval("Size", fmt::Nval(bytes_read)),
+        keyval("Flags", fmt::Xval(fo_flags)),
+        flagsval("FlagsExpanded", std::move(flags)),
+        keyval("SeqNum", fmt::Nval(seq_number)),
+        keyval("Reason", fmt::Qstr(r))
+    );
 }
 
 static void print_extraction_failure(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const string& filename, const string& message)
