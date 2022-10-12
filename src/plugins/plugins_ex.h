@@ -384,9 +384,9 @@ struct memaccess_trap
 
     drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
     {
-        if(trap)
+        if (trap)
         {
-            if(access == VMI_MEMACCESS_INVALID)
+            if (access == VMI_MEMACCESS_INVALID)
                 return nullptr;
 
             trap->type = MEMACCESS;
