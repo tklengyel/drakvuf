@@ -162,20 +162,6 @@ struct tcp_endpoint_x86
     uint32_t owner;
 } __attribute__ ((packed));
 
-struct tcp_endpoint_x64
-{
-    uint8_t _pad1[0x18];
-    uint64_t inetaf;
-    uint64_t addrinfo;
-    uint64_t listentry;
-    uint8_t _pad2[0x38];
-    uint32_t state;
-    uint16_t localport;
-    uint16_t remoteport;
-    uint8_t _pad3[0x1c8];
-    uint64_t owner;
-} __attribute__ ((packed));
-
 // Tested for Windows 8.1
 struct tcp_endpoint_win81_x64
 {
@@ -206,20 +192,6 @@ struct tcp_endpoint_win10_x64
     addr_t createtime;
 } __attribute__((packed));
 
-// Tested for Windows 10 build 1803
-struct tcp_endpoint_win10_x64_1803
-{
-    addr_t _pad1[2];      // +0x0
-    addr_t inetaf;        // +0x10 -> inetaf_win10_x64
-    addr_t addrinfo;      // +0x18
-    uint8_t _pad2[0x4c];  // +0x20
-    uint32_t state;       // +0x6c
-    uint16_t localport;   // +0x70
-    uint16_t remoteport;  // +0x72
-    uint8_t _pad3[0x204]; // +0x74
-    addr_t owner;         // +0x278
-} __attribute__((packed));
-
 struct addr_info_x86
 {
     uint32_t local; // local_address
@@ -232,18 +204,6 @@ struct addr_info_x64
     uint64_t local;
     uint64_t _pad;
     uint64_t remote;
-} __attribute__ ((packed));
-
-struct local_address_x86
-{
-    uint8_t _pad[0xc];
-    uint32_t pdata;
-} __attribute__ ((packed));
-
-struct local_address_x64
-{
-    uint8_t _pad[0x10];
-    uint64_t pdata;
 } __attribute__ ((packed));
 
 struct local_address_win10_udp_x64
@@ -344,5 +304,36 @@ struct dns_query_ex_w_string_x86_t
     uint32_t unknown = 0;
     uint32_t pBuffer = 0;
 } __attribute__ ((packed));
+
+enum
+{
+    IP_FAMILY_OFF0,
+    IP_FAMILY_OFF1,
+    LOCAL_PORT,
+    REMOTE_PORT,
+    REMOTE_ADDR_OFF0,
+    REMOTE_ADDR_OFF1,
+    __TCP_ARRAY_MAX
+};
+
+static const uint16_t win7_sp1_tcp_offsets[__TCP_ARRAY_MAX] =
+{
+    [IP_FAMILY_OFF0]    = 0x18,
+    [IP_FAMILY_OFF1]    = 0x14,
+    [LOCAL_PORT]        = 0x6c,
+    [REMOTE_PORT]       = 0x6e,
+    [REMOTE_ADDR_OFF0]  = 0x20,
+    [REMOTE_ADDR_OFF1]  = 0xf0,
+};
+
+static const uint16_t win10_1803_tcp_offsets[__TCP_ARRAY_MAX] =
+{
+    [IP_FAMILY_OFF0]    = 0x10,
+    [IP_FAMILY_OFF1]    = 0x18,
+    [LOCAL_PORT]        = 0x70,
+    [REMOTE_PORT]       = 0x72,
+    [REMOTE_ADDR_OFF0]  = 0x18,
+    [REMOTE_ADDR_OFF1]  = 0xf0,
+};
 
 #endif

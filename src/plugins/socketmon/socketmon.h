@@ -119,7 +119,7 @@ class socketmon: public plugin
 public:
     page_mode_t pm;
     output_format_t format;
-    win_ver_t winver;
+    win_build_info_t build;
 
     drakvuf_trap_t tcpip_trap[2] =
     {
