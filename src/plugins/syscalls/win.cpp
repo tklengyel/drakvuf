@@ -252,7 +252,7 @@ static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, sys
     // -0x190: sub     rsp, 158h
     // Since we hook Nt* functions, there are situations when the call originated from other driver and not from usermode.
     // This checks if stack displacement is less than 0x190 + 8 (call instruction) + N (number of function arguments that are pushed on the stack).
-    if (0x190 > diff || diff > 0x220)
+    if (diff > 0x220 || diff < 0x190)
         return false;
 
     addr_t user_ret_addr = 0;
