@@ -133,8 +133,9 @@ public:
     size_t* offsets;
 
     addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
+    addr_t ntdll_base, ntdll_size, wow64cpu_base, wow64cpu_size;
 
-    addr_t kernel_base;
+    addr_t kernel_base, kernel_size;
     addr_t image_path_name;
     std::string win32k_profile;
 

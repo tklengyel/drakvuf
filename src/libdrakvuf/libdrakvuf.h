@@ -524,6 +524,8 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf,
     addr_t process_base,
     proc_data_t* proc_data) NOEXCEPT;
 
+addr_t drakvuf_get_rspbase(drakvuf_t dravkuf, drakvuf_trap_info_t* info);
+
 typedef struct _mmvad_info
 {
     uint64_t starting_vpn;
@@ -620,6 +622,7 @@ typedef struct _module_info
     addr_t dtb ;                  /* DTB for the process where the module is currently loaded   */
     vmi_pid_t pid ;               /* PID of the process where the module is currently is loaded */
     addr_t base_addr ;            /* Module base address                                        */
+    addr_t size ;                 /* Size of Image                                              */
     unicode_string_t* full_name ; /* Module full name                                           */
     unicode_string_t* base_name ; /* Module base name                                           */
     bool is_wow ;                 /* Is WoW64 module?                                           */
