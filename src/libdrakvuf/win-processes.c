@@ -1837,6 +1837,18 @@ uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad)
     return win_mmvad_flag(drakvuf, mmvad->flags, idx);
 }
 
+bool win_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    int idx = MMVAD_FLAGS_PRIVATEMEMORY;
+    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
+}
+
+uint64_t win_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    int idx = MMVAD_FLAGS_PROTECTION;
+    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
+}
+
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
 {
     if (handle == 0 || handle == UINT64_MAX)

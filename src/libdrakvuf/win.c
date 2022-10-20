@@ -605,6 +605,8 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.is_mmvad_commited = win_is_mmvad_commited;
     drakvuf->osi.mmvad_commit_charge = win_mmvad_commit_charge;
     drakvuf->osi.mmvad_type = win_mmvad_type;
+    drakvuf->osi.mmvad_private_memory = win_mmvad_private_memory;
+    drakvuf->osi.mmvad_protection = win_mmvad_protection;
     drakvuf->osi.get_pid_from_handle = win_get_pid_from_handle;
     drakvuf->osi.get_tid_from_handle = win_get_tid_from_handle;
     drakvuf->osi.get_wow_context = win_get_wow_context;
