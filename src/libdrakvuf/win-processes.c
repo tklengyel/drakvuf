@@ -1561,6 +1561,7 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
             uint32_t flags1 = 0;
 
             out_mmvad->file_name_ptr = 0;
+            out_mmvad->node_addr = node_addr;
 
             if (is_win7)
             {
@@ -1691,6 +1692,7 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     mmvad.file_name_ptr = 0;
     mmvad.total_number_of_ptes = 0;
     mmvad.prototype_pte = 0;
+    mmvad.node_addr = node_addr;
 
     if (is_win7)
     {
