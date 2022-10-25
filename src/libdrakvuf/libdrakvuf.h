@@ -538,6 +538,7 @@ typedef struct _mmvad_info
     addr_t file_name_ptr;
     uint32_t total_number_of_ptes;
     addr_t prototype_pte;
+    addr_t node_addr;
 } mmvad_info_t;
 
 typedef bool (*mmvad_callback)(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data);
