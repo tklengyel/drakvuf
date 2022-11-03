@@ -120,17 +120,24 @@
 #include "drakvuf.h"
 #include "exitcodes.h"
 
+static int is_interrupted = 0;
 static std::unique_ptr<drakvuf_c> drakvuf;
 
-void close_handler(int signal)
+static void close_handler(int signal)
 {
-    drakvuf->interrupt(signal);
+    is_interrupted = signal;
+    if (drakvuf) drakvuf->interrupt(signal);
 }
 
-void timeout_handler(int signal)
+static void timeout_handler(int signal)
 {
     (void)signal;
-    drakvuf->interrupt(SIGDRAKVUFTIMEOUT);
+    close_handler(SIGDRAKVUFTIMEOUT);
+}
+
+static void clear_interrupt()
+{
+    close_handler(0); // clear
 }
 
 static inline bool disable_plugin(char* _optarg, bool* plugin_list)
@@ -935,6 +942,21 @@ int main(int argc, char** argv)
         return drakvuf_exit_code_t::FAIL;
     }
 
+    /* for a clean exit */
+    struct sigaction act;
+    act.sa_handler = close_handler;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP, &act, nullptr);
+    sigaction(SIGTERM, &act, nullptr);
+    sigaction(SIGINT, &act, nullptr);
+
+    struct sigaction act_timer;
+    act_timer.sa_handler = timeout_handler;
+    act_timer.sa_flags = 0;
+    sigemptyset(&act_timer.sa_mask);
+    sigaction(SIGALRM, &act_timer, nullptr);
+
     PRINT_DEBUG("Starting DRAKVUF initialization\n");
 
     try
@@ -962,21 +984,6 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("DRAKVUF initializated\n");
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, nullptr);
-    sigaction(SIGTERM, &act, nullptr);
-    sigaction(SIGINT, &act, nullptr);
-
-    struct sigaction act_timer;
-    act_timer.sa_handler = timeout_handler;
-    act_timer.sa_flags = 0;
-    sigemptyset(&act_timer.sa_mask);
-    sigaction(SIGALRM, &act_timer, nullptr);
-
     for (const auto&[src, dst] : write_files)
     {
         PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", src.c_str(), dst.c_str());
@@ -993,7 +1000,9 @@ int main(int argc, char** argv)
                 return drakvuf_exit_code_t::WRITE_FILE_ERROR;
         }
 
-        drakvuf->interrupt(0); // clear
+        if (is_interrupted)
+            return drakvuf_exit_code_t::SUCCESS;
+        clear_interrupt();
     }
 
     vmi_pid_t injected_pid = 0;
@@ -1029,7 +1038,9 @@ int main(int argc, char** argv)
         if (exit_injection_thread)
             drakvuf->exit_thread(injection_pid, injection_thread);
 
-        drakvuf->interrupt(0); // clear
+        if (is_interrupted)
+            return drakvuf_exit_code_t::SUCCESS;
+        clear_interrupt();
     }
     if (procdump_on_finish)
         options.procdump_on_finish = injected_pid;
@@ -1058,6 +1069,10 @@ int main(int argc, char** argv)
         default:
             break;
     }
+
+    if (is_interrupted != SIGINT)
+        return drakvuf_exit_code_t::SUCCESS;
+    clear_interrupt();
 
     if (terminate && injected_pid)
         drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
