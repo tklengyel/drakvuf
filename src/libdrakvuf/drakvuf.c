@@ -466,6 +466,14 @@ static bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         drakvuf->cr3 = g_slist_prepend(drakvuf->cr3, trap);
         return 1;
     }
+    else if (CR4 == trap->reg)
+    {
+        if ( !drakvuf->cr4 && !control_cr4_trap(drakvuf, 1) )
+            return 0;
+
+        drakvuf->cr4 = g_slist_prepend(drakvuf->cr4, trap);
+        return 1;
+    }
     else if (MSR_ALL == trap->reg)
     {
         if ( !drakvuf->msr && !control_msr_trap(drakvuf, 1) )

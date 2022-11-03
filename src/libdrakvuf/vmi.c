@@ -873,6 +873,48 @@ static event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     return ret;
 }
 
+static event_response_t _cr4_cb(drakvuf_t drakvuf, vmi_event_t* event)
+{
+    event_response_t rsp = 0;
+
+    flush_vmi(drakvuf);
+#ifdef DRAKVUF_DEBUG
+    if (drakvuf->cr4)
+        PRINT_DEBUG("CR4 cb on vCPU %u: 0x%" PRIx64 "\n", event->vcpu_id, event->reg_event.value);
+#endif
+
+    drakvuf_trap_info_t trap_info;
+    proc_data_priv_t proc_data;
+    proc_data_priv_t attached_proc_data;
+    fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
+    trap_info.reg = &event->reg_event;
+    drakvuf->in_callback = 1;
+    GSList* loop = drakvuf->cr4;
+    while (loop)
+    {
+        trap_info.trap = (drakvuf_trap_t*)loop->data;
+        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+        loop = loop->next;
+    }
+    drakvuf->in_callback = 0;
+
+    free_proc_data_priv_2(&proc_data, &attached_proc_data);
+
+    process_free_requests(drakvuf);
+
+    return rsp;
+}
+
+static event_response_t cr4_cb(vmi_instance_t vmi, vmi_event_t* event)
+{
+    UNUSED(vmi);
+    drakvuf_t drakvuf = (drakvuf_t)event->data;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _cr4_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
 static event_response_t _debug_cb(drakvuf_t drakvuf, vmi_event_t* event)
 {
     event_response_t rsp = 0;
@@ -1565,6 +1607,35 @@ bool control_cr3_trap(drakvuf_t drakvuf, bool toggle)
         if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->cr3_event, NULL))
         {
             fprintf(stderr, "Failed to clear CR3 event\n");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+bool control_cr4_trap(drakvuf_t drakvuf, bool toggle)
+{
+    drakvuf->cr4_event.version = VMI_EVENTS_VERSION;
+    drakvuf->cr4_event.type = VMI_EVENT_REGISTER;
+    drakvuf->cr4_event.reg_event.reg = CR4;
+    drakvuf->cr4_event.reg_event.in_access = VMI_REGACCESS_W;
+    drakvuf->cr4_event.data = drakvuf;
+    drakvuf->cr4_event.callback = cr4_cb;
+
+    if ( toggle )
+    {
+        if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->cr4_event))
+        {
+            fprintf(stderr, "Failed to register CR4 event\n");
+            return 0;
+        }
+    }
+    else
+    {
+        if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->cr4_event, NULL))
+        {
+            fprintf(stderr, "Failed to clear CR4 event\n");
             return 0;
         }
     }
