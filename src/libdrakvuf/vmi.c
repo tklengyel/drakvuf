@@ -300,7 +300,8 @@ static event_response_t _post_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
     PRINT_DEBUG("Post mem cb @ 0x%lx vCPU %u altp2m %u\n", pass->pa, event->vcpu_id, event->slat_id);
 
-    if (!drakvuf_is_ignored_process(drakvuf, pass->attached_proc_data.pid))
+    vmi_pid_t pid = (drakvuf->os == VMI_OS_WINDOWS) ? pass->attached_proc_data.pid : pass->proc_data.pid;
+    if (!drakvuf_is_ignored_process(drakvuf, pid))
     {
         drakvuf->in_callback = 1;
         GSList* loop = s->traps;
@@ -505,7 +506,8 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
     if (s->traps)
         trap_info.event_uid = ++drakvuf->event_counter;
 
-    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
+    vmi_pid_t pid = (drakvuf->os == VMI_OS_WINDOWS) ? attached_proc_data.pid : proc_data.pid;
+    if (!drakvuf_is_ignored_process(drakvuf, pid))
     {
         GSList* loop = s->traps;
         drakvuf->in_callback = 1;
@@ -691,7 +693,8 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     if (s->traps)
         trap_info.event_uid = ++drakvuf->event_counter;
 
-    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
+    vmi_pid_t pid = (drakvuf->os == VMI_OS_WINDOWS) ? attached_proc_data.pid : proc_data.pid;
+    if (!drakvuf_is_ignored_process(drakvuf, pid))
     {
         drakvuf->in_callback = 1;
         GSList* lists[2] = {drakvuf->catchall_breakpoint, s->traps};
@@ -799,7 +802,8 @@ static event_response_t _cr3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     proc_data_priv_t attached_proc_data;
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
 
-    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
+    vmi_pid_t pid = (drakvuf->os == VMI_OS_WINDOWS) ? attached_proc_data.pid : proc_data.pid;
+    if (!drakvuf_is_ignored_process(drakvuf, pid))
     {
         drakvuf->in_callback = 1;
         GSList* loop = drakvuf->cr3;
@@ -888,7 +892,8 @@ static event_response_t _debug_cb(drakvuf_t drakvuf, vmi_event_t* event)
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
     trap_info.debug = &event->debug_event;
 
-    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
+    vmi_pid_t pid = (drakvuf->os == VMI_OS_WINDOWS) ? attached_proc_data.pid : proc_data.pid;
+    if (!drakvuf_is_ignored_process(drakvuf, pid))
     {
         drakvuf->in_callback = 1;
         GSList* loop = drakvuf->debug;
@@ -935,7 +940,8 @@ static event_response_t _msr_cb(drakvuf_t drakvuf, vmi_event_t* event)
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
     trap_info.reg = &event->reg_event;
 
-    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
+    vmi_pid_t pid = (drakvuf->os == VMI_OS_WINDOWS) ? attached_proc_data.pid : proc_data.pid;
+    if (!drakvuf_is_ignored_process(drakvuf, pid))
     {
         drakvuf->in_callback = 1;
         GSList* loop = drakvuf->msr;
@@ -983,7 +989,8 @@ static event_response_t _cpuid_cb(drakvuf_t drakvuf, vmi_event_t* event)
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
     trap_info.cpuid = &event->cpuid_event;
 
-    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
+    vmi_pid_t pid = (drakvuf->os == VMI_OS_WINDOWS) ? attached_proc_data.pid : proc_data.pid;
+    if (!drakvuf_is_ignored_process(drakvuf, pid))
     {
         drakvuf->in_callback = 1;
         GSList* loop = drakvuf->cpuid;
