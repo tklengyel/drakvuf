@@ -1624,7 +1624,7 @@ bool control_msr_trap(drakvuf_t drakvuf, bool toggle)
 void drakvuf_vmi_event_callback (int fd, void* data)
 {
     UNUSED(fd);
-    drakvuf_t drakvuf = *(drakvuf_t*) data;
+    drakvuf_t drakvuf = (drakvuf_t)data;
     status_t status = vmi_events_listen(drakvuf->vmi, drakvuf->poll_rc);
     if (VMI_SUCCESS != status)
     {

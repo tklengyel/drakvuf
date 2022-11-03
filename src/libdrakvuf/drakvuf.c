@@ -138,6 +138,14 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         g_free(loop->data);
         loop = loop->next;
     }
+    loop = drakvuf->context_switch_intercept_processes;
+    while (loop)
+    {
+        intercept_process_t* data = (intercept_process_t*)loop->data;
+        g_free(data->name);
+        g_free(data);
+        loop = loop->next;
+    }
     g_slist_free(drakvuf->event_fd_info);
 
     if (drakvuf->xen)
@@ -156,6 +164,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     }
 
     g_slist_free(drakvuf->ignored_processes);
+    drakvuf->ignored_processes = NULL;
     g_free(drakvuf->offsets);
     drakvuf->offsets = NULL;
     g_free(drakvuf->bitfields);
@@ -171,12 +180,11 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
 
     drakvuf_release_vmi(drakvuf);
     g_rec_mutex_clear(&drakvuf->vmi_lock);
-
     g_free(drakvuf);
 }
 
 bool drakvuf_init(
-    drakvuf_t* drakvuf,
+    drakvuf_t* out_drakvuf,
     const char* domain,
     const char* json_kernel_path,
     const char* json_wow_path,
@@ -189,56 +197,55 @@ bool drakvuf_init(
     bool enable_active_callback_check
 )
 {
+    *out_drakvuf = NULL;
 
     if ( !domain )
         return 0;
 
-    *drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
+    drakvuf_t drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
 
-    (*drakvuf)->get_userid = get_userid;
-    (*drakvuf)->limited_traps_ttl = limited_traps_ttl;
-    (*drakvuf)->context_switch_intercept_processes = NULL;
-    (*drakvuf)->enable_cr3_based_interception = false;
-    (*drakvuf)->libvmi_conf = libvmi_conf;
-    (*drakvuf)->kpgd = kpgd;
-    (*drakvuf)->enable_active_callback_check = enable_active_callback_check;
-
-    (*drakvuf)->ignored_processes = ignored_processes;
-    ignored_processes = NULL;
+    drakvuf->get_userid = get_userid;
+    drakvuf->limited_traps_ttl = limited_traps_ttl;
+    drakvuf->context_switch_intercept_processes = NULL;
+    drakvuf->enable_cr3_based_interception = false;
+    drakvuf->libvmi_conf = libvmi_conf;
+    drakvuf->kpgd = kpgd;
+    drakvuf->enable_active_callback_check = enable_active_callback_check;
+    drakvuf->ignored_processes = ignored_processes;
 
     if ( json_kernel_path )
-        (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
+        drakvuf->json_kernel_path = g_strdup(json_kernel_path);
 
     if ( json_wow_path )
     {
-        (*drakvuf)->json_wow = json_object_from_file(json_wow_path);
-        (*drakvuf)->json_wow_path = g_strdup(json_wow_path);
+        drakvuf->json_wow = json_object_from_file(json_wow_path);
+        drakvuf->json_wow_path = g_strdup(json_wow_path);
     }
     else
         PRINT_DEBUG("drakvuf_init: Rekall WoW64 profile not used\n");
 
-    g_rec_mutex_init(&(*drakvuf)->vmi_lock);
+    g_rec_mutex_init(&drakvuf->vmi_lock);
 
-    if ( !xen_init_interface(&(*drakvuf)->xen) )
+    if ( !xen_init_interface(&drakvuf->xen) )
         goto err;
 
     /* register the main VMI event callback */
-    drakvuf_event_fd_add(*drakvuf, (*drakvuf)->xen->evtchn_fd, drakvuf_vmi_event_callback, drakvuf);
+    drakvuf_event_fd_add(drakvuf, drakvuf->xen->evtchn_fd, drakvuf_vmi_event_callback, drakvuf);
     PRINT_DEBUG("drakvuf_init: adding event_fd done\n");
 
-    get_dom_info((*drakvuf)->xen, domain, &(*drakvuf)->domID, &(*drakvuf)->dom_name);
+    get_dom_info(drakvuf->xen, domain, &drakvuf->domID, &drakvuf->dom_name);
     domid_t test = ~0;
-    if ( (*drakvuf)->domID == test )
+    if ( drakvuf->domID == test )
         goto err;
 
-    drakvuf_pause(*drakvuf);
+    drakvuf_pause(drakvuf);
 
-    if (!init_vmi(*drakvuf, fast_singlestep))
+    if (!init_vmi(drakvuf, fast_singlestep))
         goto err;
 
-    drakvuf_init_os(*drakvuf);
+    drakvuf_init_os(drakvuf);
 
-    if ( (*drakvuf)->pm == VMI_PM_UNKNOWN )
+    if ( drakvuf->pm == VMI_PM_UNKNOWN )
     {
         fprintf(stderr, "Failed to determine paging mode\n");
         goto err;
@@ -246,12 +253,12 @@ bool drakvuf_init(
 
     PRINT_DEBUG("libdrakvuf initialized\n");
 
+    *out_drakvuf = drakvuf;
     return 1;
 
 err:
     g_slist_free(ignored_processes);
-    drakvuf_close(*drakvuf, 1);
-    *drakvuf = NULL;
+    drakvuf_close(drakvuf, 1);
 
     PRINT_DEBUG("libdrakvuf initialization failed\n");
 
@@ -477,7 +484,7 @@ static bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* t
 {
     drakvuf->catchall_breakpoint = g_slist_prepend(drakvuf->catchall_breakpoint, trap);
     return 1;
-};
+}
 
 static bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
@@ -486,7 +493,7 @@ static bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
     drakvuf->debug = g_slist_prepend(drakvuf->debug, trap);
     return 1;
-};
+}
 
 static bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
@@ -495,7 +502,7 @@ static bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
     drakvuf->cpuid = g_slist_prepend(drakvuf->cpuid, trap);
     return 1;
-};
+}
 
 static bool _drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
