@@ -128,12 +128,12 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     : pluginex(drakvuf, output)
     , timeout{config->timeout}
     , procdump_dir{config->procdump_dir ?: ""}
-    , procdump_on_finish(config->procdump_on_finish)
+    , dump_process_on_finish(config->dump_process_on_finish)
+    , dump_new_processes_on_finish(config->dump_new_processes_on_finish)
     , use_compression{config->compress_procdumps}
-    , drakvuf(drakvuf)
     , pools(std::make_unique<pool_manager>())
 {
-    if (!config->procdump_dir)
+    if (procdump_dir.empty())
         return;
 
     if (config->disable_kideliverapc_hook &&
@@ -230,6 +230,9 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     if (!config->disable_kideliverapc_hook)
         this->deliver_apc_hook = createSyscallHook("KiDeliverApc",
                 &procdump2::deliver_apc_cb);
+
+    if (config->dump_new_processes_on_finish)
+        running_processes_on_start = get_running_processes();
 }
 
 procdump2::~procdump2()
@@ -238,48 +241,38 @@ procdump2::~procdump2()
 
 bool procdump2::stop_impl()
 {
+    bool is_plugin_enabled = this->delay_execution_hook || this->deliver_apc_hook;
+
     if (!begin_stop_at)
         begin_stop_at = g_get_real_time() / G_USEC_PER_SEC;
-    if (procdump_on_finish &&
-        !is_active_process(procdump_on_finish) &&
-        !is_process_handled(procdump_on_finish))
+
+    if (is_plugin_enabled && !is_stopping())
     {
-        vmi_pid_t target_process_pid = procdump_on_finish;
-        addr_t target_process_base = 0;
-        addr_t dtb = 0;
-        if ( drakvuf_get_process_by_pid(drakvuf,
-                target_process_pid,
-                &target_process_base,
-                &dtb) )
+        // On first stop call we collect PIDs for dump
+
+        std::vector<vmi_pid_t> pids;
+        if (dump_process_on_finish)
+            pids.push_back(dump_process_on_finish);
+        if (dump_new_processes_on_finish)
         {
-            auto ctx = std::make_shared<procdump2_ctx>(
-                    false,
-                    target_process_base,
-                    std::string(drakvuf_get_process_name(drakvuf,
-                            target_process_base, true)),
-                    target_process_pid,
-                    procdumps_count++,
-                    procdump_dir,
-                    use_compression);
-            ctx->stage(procdump_stage::need_suspend);
-            ctx->wait_awaken = false;
-            ctx->target.restored = true;
-            PRINT_DEBUG("[PROCDUMP] [%d:%d] "
-                "Dispatch new process\n"
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
-
-
-            /* Save new target process into the list */
-            this->active[target_process_pid] = ctx;
-
-            /* NOTE This prevents errors on subsequent calls to the stop method
-            *
-            * If "wait stop plugins" option been used then multiple calls to
-            * stop method would occur.
-            */
-            procdump_on_finish = 0;
+            auto running_processes_on_finish = get_running_processes();
+            for (auto pid : running_processes_on_finish)
+            {
+                auto it = std::find(running_processes_on_start.begin(), running_processes_on_start.end(), pid);
+                if (it == running_processes_on_start.end())
+                    pids.push_back(pid); // pid is a new process
+            }
         }
+
+        // Filter out dead or 'dump already in progress' PIDs
+        auto new_end = std::remove_if(pids.begin(), pids.end(), [this](vmi_pid_t pid)
+        {
+            return is_active_process(pid) || is_process_handled(pid);
+        });
+        pids.erase(new_end, pids.end());
+
+        for (auto pid : pids)
+            this->start_dump_process(pid);
     }
 
     if (!is_plugin_active())
@@ -288,6 +281,32 @@ bool procdump2::stop_impl()
         return true;
     }
     return false;
+}
+
+void procdump2::start_dump_process(vmi_pid_t pid)
+{
+    addr_t process_base = 0;
+    if (!drakvuf_get_process_by_pid(drakvuf, pid, &process_base, nullptr))
+        return;
+
+    auto proc_name = drakvuf_get_process_name(drakvuf, process_base, true);
+    auto ctx = std::make_shared<procdump2_ctx>(
+            false,
+            process_base,
+            std::string(proc_name ?: ""),
+            pid,
+            procdumps_count++,
+            procdump_dir,
+            use_compression,
+            "FinishAnalysis");
+    g_free(proc_name);
+    ctx->stage(procdump_stage::need_suspend);
+    ctx->wait_awaken = false;
+    ctx->target.restored = true;
+    PRINT_DEBUG("[PROCDUMP] [%d:%d] Dispatch new process\n", pid, to_int(ctx->stage()));
+
+    /* Save new target process into the list */
+    this->active[pid] = ctx;
 }
 
 /*****************************************************************************
@@ -816,7 +835,8 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
             target_process_pid,
             procdumps_count++,
             procdump_dir,
-            use_compression);
+            use_compression,
+            "TerminateProcess");
 
     this->active[target_process_pid] = ctx;
 
@@ -1220,7 +1240,7 @@ void procdump2::finish_task(drakvuf_trap_info_t* info,
     fmt::print(m_output_format, "procdump", drakvuf, info,
         keyval("TargetPID", fmt::Nval(ctx->target_process_pid)),
         keyval("TargetName", fmt::Qstr(ctx->target_process_name)),
-        keyval("DumpReason", fmt::Qstr("TerminateProcess")),
+        keyval("DumpReason", fmt::Qstr(ctx->dump_reason)),
         keyval("DumpSize", fmt::Nval(ctx->size)),
         keyval("SN", fmt::Nval(ctx->idx)),
         keyval("Status", fmt::Qstr(ctx->status()))
@@ -1297,10 +1317,7 @@ std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info
 
 bool procdump2::is_plugin_active()
 {
-    if (!this->active.empty())
-        return true;
-
-    return false;
+    return !this->active.empty();
 }
 
 bool procdump2::is_active_process(vmi_pid_t pid)
@@ -1530,4 +1547,25 @@ bool procdump2::start_copy_memory(drakvuf_trap_info_t* info, std::shared_ptr<pro
     }
 
     return false;
+}
+
+static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
+{
+    auto ctx = reinterpret_cast<std::vector<vmi_pid_t>*>(visitor_ctx);
+
+    vmi_pid_t pid = 0;
+    if (!drakvuf_get_process_pid(drakvuf, process, &pid))
+    {
+        PRINT_DEBUG("Failed to get PID of process 0x%" PRIx64 "\n", process);
+        return;
+    }
+
+    ctx->push_back(pid);
+}
+
+std::vector<vmi_pid_t> procdump2::get_running_processes()
+{
+    std::vector<vmi_pid_t> pids;
+    drakvuf_enumerate_processes(drakvuf, process_visitor, &pids);
+    return pids;
 }
