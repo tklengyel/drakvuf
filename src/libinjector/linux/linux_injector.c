@@ -269,6 +269,17 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static event_response_t kernel_panic_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // right now we are in kernel space
+    PRINT_DEBUG("Kernel panic. PID: %u PPID: %u TID: %u\n",
+        info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
+
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFKERNELPANIC);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused)))
 {
     return drakvuf_is_interrupted(drakvuf);
@@ -299,7 +310,43 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     if (!drakvuf_add_trap(drakvuf, &trap))
     {
-        fprintf(stderr, "Failed to set trap wait_for_target_process_cb callback");
+        fprintf(stderr, "Failed to set trap wait_for_target_process_cb callback\n");
+        return false;
+    }
+
+    addr_t kernel_base = drakvuf_get_kernel_base(drakvuf);
+
+    addr_t _text;
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text) )
+    {
+        PRINT_DEBUG("Failed to get RVA of _text\n");
+        return false;
+    }
+
+    addr_t kaslr = kernel_base - _text;
+
+    addr_t panic;
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "panic", &panic) )
+    {
+        PRINT_DEBUG("Failed to get RVA of panic\n");
+        return false;
+    }
+
+    drakvuf_trap_t trap_panic =
+    {
+        .type = BREAKPOINT,
+        .breakpoint.lookup_type = LOOKUP_PID,
+        .breakpoint.pid = 0,
+        .breakpoint.addr_type = ADDR_VA,
+        .breakpoint.addr = panic + kaslr,
+        .name = "panic",
+        .cb = kernel_panic_cb,
+        .data = injector
+    };
+
+    if (!drakvuf_add_trap(drakvuf, &trap_panic))
+    {
+        fprintf(stderr, "Failed to set trap kernel_panic_cb callback\n");
         return false;
     }
 
@@ -309,6 +356,8 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         drakvuf_loop(drakvuf, is_interrupted, NULL);
         PRINT_DEBUG("Finished drakvuf loop\n");
     }
+
+    drakvuf_remove_trap(drakvuf, &trap_panic, NULL);
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
         injector->rc = INJECTOR_TIMEOUTED;
