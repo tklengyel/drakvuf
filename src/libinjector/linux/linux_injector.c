@@ -160,10 +160,10 @@ static bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* 
 
     if (info->regs->rip != info->trap->breakpoint.addr)
     {
-        PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)",
+        PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)\n",
             info->trap->breakpoint.addr, info->regs->rip);
         if (is_child && !injector->execve)
-            assert(false);
+            PRINT_DEBUG("Trap child process in not execve stage\n");
     }
 
     return true;
@@ -219,7 +219,7 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
     return event;
 }
 
-static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
@@ -254,7 +254,7 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
         PRINT_DEBUG("Usermode Trap Addr: %lx\n", info->regs->rcx);
         injector->bp = bp;
 
-        // Unsubscribe from the CR3 trap
+        // Unsubscribe from the trap
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
     }
     else
@@ -276,17 +276,30 @@ static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused))
 
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
+    reg_t lstar;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool status = VMI_SUCCESS == vmi_get_vcpureg(vmi, &lstar, MSR_LSTAR, 0);
+    drakvuf_release_vmi(drakvuf);
+    if (!status)
+    {
+        fprintf(stderr, "Failed to get MSR_LSTAR\n");
+        return false;
+    }
+
     drakvuf_trap_t trap =
     {
-        .type = REGISTER,
-        .reg = CR3,
-        .cb = wait_for_target_process_cr3_cb,
-        .data = injector,
+        .type = BREAKPOINT,
+        .breakpoint.lookup_type = LOOKUP_KERNEL,
+        .breakpoint.addr_type = ADDR_VA,
+        .breakpoint.addr = lstar,
+        .name = "entry_SYSCALL_64",
+        .cb = wait_for_target_process_cb,
+        .data = injector
     };
 
     if (!drakvuf_add_trap(drakvuf, &trap))
     {
-        fprintf(stderr, "Failed to set trap wait_for_target_process_cr3_cb callback");
+        fprintf(stderr, "Failed to set trap wait_for_target_process_cb callback");
         return false;
     }
 
