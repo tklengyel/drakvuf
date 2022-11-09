@@ -109,6 +109,7 @@
 #include "plugins/plugins.h"
 
 #include <map>
+#include <string>
 
 class bsodmon : public plugin
 {
