@@ -162,7 +162,8 @@ static bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* 
     {
         PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)",
             info->trap->breakpoint.addr, info->regs->rip);
-        assert(false);
+        if (is_child && !injector->execve)
+            assert(false);
     }
 
     return true;
