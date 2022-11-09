@@ -172,12 +172,11 @@ enum class procdump_stage
     prepare_minidump, // 5
     copy_memory,      // 6
     resume,           // 7
-    awaken,           // 8
+    target_awaken,    // 8
     // TODO Check if the stage is steel needed
     finished,         // 9
     target_wakeup,    // 10
     timeout,          // 11
-    invalid           // 12
 };
 
 int to_int(procdump_stage stage)
@@ -205,15 +204,14 @@ std::string to_str(procdump_stage stage)
             return "copy_memory";
         case procdump_stage::resume:
             return "resume";
-        case procdump_stage::awaken:
-            return "awaken";
+        case procdump_stage::target_awaken:
+            return "target_awaken";
         case procdump_stage::finished:
             return "finished";
         case procdump_stage::target_wakeup:
             return "target_wakeup";
         case procdump_stage::timeout:
             return "timeout";
-        case procdump_stage::invalid:
         default:
             return "invalid";
     }
@@ -221,11 +219,32 @@ std::string to_str(procdump_stage stage)
 
 struct return_ctx
 {
+private:
+    uint64_t m_stack_marker;
+
+public:
     vmi_pid_t ret_pid{0};
     addr_t    ret_rsp{0};
     uint32_t  ret_tid{0};
     x86_registers_t regs;
     bool restored{false};
+
+    uint64_t stack_marker()
+    {
+        // TODO Set initial random value and print this to log
+        return 0x4a4c3ac04a4c3ac0;
+    }
+
+    uint64_t* set_stack_marker()
+    {
+        m_stack_marker = stack_marker();
+        return &m_stack_marker;
+    }
+
+    uint64_t stack_marker_va()
+    {
+        return m_stack_marker;
+    }
 };
 
 // TODO Rename into "task"
@@ -329,6 +348,12 @@ public:
             host.restored = true;
     }
 
+    ~procdump2_ctx()
+    {
+        PRINT_DEBUG("[PROCDUMP] [%d:%d] [%srestored] Destroy task context\n"
+            , target_process_pid, stage(), is_restored() ? "" : "not ");
+    }
+
     bool on_target_resuspend()
     {
         if (++target_resuspend_count < TARGET_RESUSPEND_COUNT_MAX)
@@ -337,7 +362,7 @@ public:
             return false;
     }
 
-    const char* status()
+    const char* status() const
     {
         if (is_timed_out())
             return "Timeout";
@@ -345,7 +370,10 @@ public:
         switch (m_stage)
         {
             case procdump_stage::finished:
-                return "Success";
+                if (size == 0)
+                    return "Empty";
+                else
+                    return "Success";
             case procdump_stage::target_wakeup:
                 return "WakeUp";
             case procdump_stage::prepare_minidump:
@@ -357,7 +385,7 @@ public:
         }
     }
 
-    bool is_timed_out()
+    bool is_timed_out() const
     {
         return m_timeout || m_stage == procdump_stage::timeout;
     }
