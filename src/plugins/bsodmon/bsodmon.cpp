@@ -258,8 +258,10 @@ bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, const char* _crashdump_
     : drakvuf{drakvuf}
     , format{output}
     , abort_on_bsod{_abort_on_bsod}
-    , crashdump_dir{_crashdump_dir}
 {
+    if (_crashdump_dir)
+        this->crashdump_dir = _crashdump_dir;
+
     init_bugcheck_map(this, drakvuf);
 
     trap.breakpoint.symbol = "KeBugCheck2";
