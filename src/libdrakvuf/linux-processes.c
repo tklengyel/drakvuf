@@ -171,9 +171,6 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     addr_t process;
     if ( VMI_SUCCESS == vmi_read_addr_va(drakvuf->vmi, addr, 0, &process) && process >= MIN_KERNEL_BOUNDARY )
         return process;
-    else
-        // TODO Remove after debug
-        fprintf(stderr, "Failed to get process base: %#lx. Fallback to old method.\n", process);
 
     // NOTE The old method is leaved here as is to make diff as little as possible.
     // This also allows to make more robust research before removing old method.
