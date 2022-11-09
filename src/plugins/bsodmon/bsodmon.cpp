@@ -109,6 +109,113 @@
 #include "bugcheck.h"
 #include "plugins/output_format.h"
 
+static std::string to_hex_string(uint64_t value)
+{
+    std::stringstream stream;
+    stream << std::hex << value;
+    return stream.str();
+}
+
+static void save_file_metadata(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    bsodmon* f,
+    uint64_t code,
+    uint64_t param1,
+    uint64_t param2,
+    uint64_t param3,
+    uint64_t param4)
+{
+    // TODO Add option
+    auto file = f->crashdump_dir + "/crashdump.metadata";
+    if (file.empty())
+        return;
+
+    FILE* fp = fopen(file.data(), "w");
+    if (!fp)
+        return;
+
+    json_object* jobj = json_object_new_object();
+    if (!jobj)
+    {
+        fclose(fp);
+        return;
+    }
+
+    json_object_object_add(jobj,
+        "KernelBase",
+        json_object_new_string(to_hex_string(drakvuf_get_kernel_base(drakvuf)).data()));
+
+    json_object_object_add(jobj,
+        "BugCheckCode",
+        json_object_new_string(to_hex_string(code).data()));
+
+    json_object_object_add(jobj,
+        "Param1",
+        json_object_new_string(to_hex_string(param1).data()));
+
+    json_object_object_add(jobj,
+        "Param2",
+        json_object_new_string(to_hex_string(param2).data()));
+
+    json_object_object_add(jobj,
+        "Param3",
+        json_object_new_string(to_hex_string(param3).data()));
+
+    json_object_object_add(jobj,
+        "Param4",
+        json_object_new_string(to_hex_string(param4).data()));
+
+    json_object_object_add(jobj,
+        "CR3",
+        json_object_new_string(to_hex_string(info->regs->cr3).data()));
+
+    json_object_object_add(jobj,
+        "RSP",
+        json_object_new_string(to_hex_string(info->regs->rsp).data()));
+
+    fprintf(fp, "%s\n", json_object_get_string(jobj));
+    fclose(fp);
+
+    json_object_put(jobj);
+}
+
+static void dump_system(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    bsodmon* f,
+    uint64_t code,
+    uint64_t param1,
+    uint64_t param2,
+    uint64_t param3,
+    uint64_t param4)
+{
+    save_file_metadata(drakvuf, info, f, code, param1, param2, param3, param4);
+
+    auto file = f->crashdump_dir + "/crashdump.bin";
+    if (file.empty())
+        return;
+
+    FILE* fp = fopen(file.data(), "w");
+    if (!fp)
+        return;
+
+    vmi_lock_guard vmi(drakvuf);
+    uint8_t buf[VMI_PS_4KB];
+    size_t bytes_read;
+
+    for (uint64_t addr = 0; addr < drakvuf_get_init_memsize(drakvuf) * VMI_PS_1KB; addr += VMI_PS_4KB)
+    {
+        // Memory mapped deviced could not be read so skip them
+        if (VMI_SUCCESS != vmi_read_pa(vmi, addr, VMI_PS_4KB, buf, &bytes_read))
+            memset(buf, 0, VMI_PS_4KB);
+
+        fwrite(buf, VMI_PS_4KB, 1, fp);
+    }
+
+    fclose(fp);
+}
+
 static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     bsodmon* f = static_cast<bsodmon*>(info->trap->data);
@@ -138,16 +245,20 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         fmt::print(f->format, "bsodmon", drakvuf, info, tuple);
     }
 
+    if (!f->crashdump_dir.empty())
+        dump_system(drakvuf, info, f, code, param1, param2, param3, param4);
+
     if ( f->abort_on_bsod )
         drakvuf_interrupt( drakvuf, SIGDRAKVUFKERNELPANIC);
 
     return 0;
 }
 
-bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, output_format_t output)
+bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, const char* _crashdump_dir, output_format_t output)
     : drakvuf{drakvuf}
     , format{output}
     , abort_on_bsod{_abort_on_bsod}
+    , crashdump_dir{_crashdump_dir}
 {
     init_bugcheck_map(this, drakvuf);
 

@@ -437,6 +437,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
 os_t drakvuf_get_os_type(drakvuf_t drakvuf) NOEXCEPT;
 page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf) NOEXCEPT;
 size_t drakvuf_get_address_width(drakvuf_t drakvuf) NOEXCEPT;
+uint64_t drakvuf_get_init_memsize(drakvuf_t drakvuf) NOEXCEPT;
 size_t drakvuf_get_process_address_width(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info) NOEXCEPT;
 int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info,

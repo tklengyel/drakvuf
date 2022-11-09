@@ -117,8 +117,9 @@ public:
     const output_format_t format;
     std::map<int, const char*> bugcheck_map;
     bool abort_on_bsod;
+    std::string crashdump_dir;
 
-    bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output);
+    bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, const char* crashdump_dir, output_format_t output);
     ~bsodmon();
 
     virtual bool stop_impl() override;
