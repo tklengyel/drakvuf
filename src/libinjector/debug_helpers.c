@@ -133,10 +133,10 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
         addr_t val = 0;
         vmi_read_64(vmi, &ctx, &val);
         if ((i%4)==0)
-            PRINT_DEBUG("\n%016lx:", addr + (i/4)*32);
-        PRINT_DEBUG(" %016lx", val);
+            fprintf(stderr, "\n%016lx:", addr + (i/4)*32);
+        fprintf(stderr, " %016lx", val);
     }
-    PRINT_DEBUG("\n");
+    fprintf(stderr, "\n");
 
     drakvuf_release_vmi(drakvuf);
 }
