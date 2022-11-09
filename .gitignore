@@ -35,7 +35,7 @@ stamp-h1
 # check unit tests files
 **/*.log
 **/*.trs
-check
+*check
 
 # drakvuf binaries
 drakvuf

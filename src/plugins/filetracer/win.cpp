@@ -355,9 +355,9 @@ static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &change) )
         return;
 
-    uint64_t attributes = 0;
+    uint32_t attributes = 0;
     ctx.addr = fileinfo + f->basic_attributes_offset;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &attributes) )
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &attributes) )
         return;
 
     char* filename_ = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
