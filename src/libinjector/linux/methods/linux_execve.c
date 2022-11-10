@@ -110,17 +110,19 @@
 #include "linux_execve.h"
 #include "linux_syscalls.h"
 
+/* FIXME Could break analysis in general case
+ *
+ * If there exists other child process for the parent in return path from the
+ * same system call then it could break thing during STEP4 or STEP5.
+ */
 static event_response_t cleanup(injector_t injector, x86_registers_t* regs);
 bool is_child_process(injector_t injector,  drakvuf_trap_info_t* info)
 {
-    if (info->proc_data.ppid == injector->target_pid)
-    {
-        PRINT_DEBUG("Inside child process\n");
-        return true;
-    }
-    PRINT_DEBUG("Inside parent process: %d\n", info->proc_data.pid);
+    bool is_child = info->proc_data.pid == injector->child_data.pid;
+    PRINT_DEBUG("Inside %s process: %d\n", is_child ? "child" : "parent",
+        info->proc_data.pid);
     PRINT_DEBUG("Step of injector: %d\n", injector->step + 1);
-    return false;
+    return is_child;
 }
 
 /* This function handles execve syscalls, it does so in a total of 5 steps
@@ -247,8 +249,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             if (is_child_process(injector, info))
             {
-                fprintf(stderr, "Assertion: Should never happen, Child process alive\n");
-                drakvuf_interrupt(drakvuf, SIGINT);
+                fprintf(stderr, "Assertion: Child process alive. Wait parent for cleanup\n");
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
