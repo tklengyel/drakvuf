@@ -162,6 +162,7 @@ struct plugins_options
     const char* procdump_dir;           // PLUGIN_PROCDUMP
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     vmi_pid_t procdump_on_finish;       // PLUGIN_PROCDUMP2
+    bool procdump_new_processes_on_finish; // PLUGIN_PROCDUMP2
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
     const char* hal_profile;            // PLUGIN_PROCDUMP2
     bool procdump_disable_kideliverapc_hook; // PLUGIN_PROCDUMP2
