@@ -152,27 +152,35 @@ static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t*
 
 addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t dtb, addr;
+    addr_t dtb, gs_base;
     if (info->regs->cs_sel & 3)
     {
         // Let's assume a modern kernel with KPTI enabled first
         dtb = info->regs->cr3 & ~0x1fffull;
-        addr = info->regs->shadow_gs;
+        gs_base = info->regs->shadow_gs;
     }
     else
     {
         // Mask PCID bits
         dtb = info->regs->cr3 & ~0xfffull;
         // We might trap before swapgs
-        addr = VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
+        gs_base = VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
     }
+
+    addr_t addr = gs_base + drakvuf->offsets[CURRENT_TASK];
+    addr_t process;
+    if ( VMI_SUCCESS == vmi_read_addr_va(drakvuf->vmi, addr, 0, &process) && process >= MIN_KERNEL_BOUNDARY )
+        return process;
+
+    // NOTE The old method is leaved here as is to make diff as little as possible.
+    // This also allows to make more robust research before removing old method.
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = dtb,
-        .addr = addr + drakvuf->offsets[CURRENT_TASK]
+        .addr = addr
     );
-    addr_t process = read_process_base(drakvuf, info->regs->rsp, &ctx);
+    process = read_process_base(drakvuf, info->regs->rsp, &ctx);
 
     if ( !process && (info->regs->cs_sel & 3) )
     {

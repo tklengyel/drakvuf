@@ -194,6 +194,7 @@ struct injector
 
     // execve
     bool fork;
+    bool execve;
     proc_data_t child_data;
 
     // Results:
