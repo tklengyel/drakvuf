@@ -102,6 +102,7 @@
 *                                                                         *
 ***************************************************************************/
 
+#include <sys/stat.h>
 #include <libdrakvuf/libdrakvuf.h>
 
 #include "bsodmon.h"
@@ -131,6 +132,7 @@ static void save_file_metadata(
     if (file.empty())
         return;
 
+    umask(S_IWGRP | S_IWOTH);
     FILE* fp = fopen(file.data(), "w");
     if (!fp)
         return;
@@ -196,6 +198,7 @@ static void dump_system(
     if (file.empty())
         return;
 
+    umask(S_IWGRP | S_IWOTH);
     FILE* fp = fopen(file.data(), "w");
     if (!fp)
         return;
