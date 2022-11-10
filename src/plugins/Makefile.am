@@ -449,6 +449,11 @@ AM_DEFAULT_SOURCE_EXT = .cpp
 
 check_PROGRAMS =
 
+check_PROGRAMS += plugin_utils_check
+plugin_utils_check_SOURCES = plugin_utils_check.cpp
+plugin_utils_check_CFLAGS = $(CHECK_CFLAGS)
+plugin_utils_check_LDADD = $(CHECK_LIBS) plugin_utils.lo
+
 if PLUGIN_PROCMON
 check_PROGRAMS += procmon/check
 procmon_check_SOURCES = procmon/check.cpp
