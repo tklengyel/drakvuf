@@ -274,6 +274,7 @@ public:
     addr_t    target_process_base{0};
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
+    const char* dump_reason;
 
     const uint8_t TARGET_RESUSPEND_COUNT_MAX{3};
     uint8_t target_resuspend_count{0};
@@ -306,11 +307,13 @@ public:
         vmi_pid_t pid,
         uint64_t idx_,
         std::string procdump_dir,
-        bool use_compression)
+        bool use_compression,
+        const char* dump_reason)
         : is_hosted(is_hosted)
         , target_process_base(base)
         , target_process_name(name)
         , target_process_pid(pid)
+        , dump_reason{dump_reason}
         , idx(idx_)
     {
         data_file_name = "procdump."s + std::to_string(idx);

@@ -120,8 +120,8 @@ struct procdump2_config
     uint32_t timeout;
     const char* procdump_dir;
     bool compress_procdumps;
-    vmi_pid_t procdump_on_finish;
-    std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
+    vmi_pid_t dump_process_on_finish;
+    bool dump_new_processes_on_finish;
     const char* hal_profile;
     bool disable_kideliverapc_hook;
     bool disable_kedelayexecutionthread_hook;
@@ -143,12 +143,11 @@ private:
     uint32_t                                             timeout{0};
     // TODO Use `std::filesystem::path`
     std::string const                                    procdump_dir;
-    // TODO Rename
-    vmi_pid_t                                            procdump_on_finish{0};
+    vmi_pid_t const                                      dump_process_on_finish;
+    bool const                                           dump_new_processes_on_finish;
     bool const                                           use_compression{false};
 
     /* Internal data */
-    drakvuf_t                                            drakvuf{nullptr};
     uint64_t                                             procdumps_count{0};
     std::unique_ptr<pool_manager>                        pools;
     std::map<vmi_pid_t, std::shared_ptr<procdump2_ctx>>  active;
@@ -174,6 +173,11 @@ private:
      * // TODO Move this long description into README at the end of development.
      */
     std::set<uint32_t> working_threads;
+    /* List of PIDs of running processes on plugin start.
+     *
+     * Used only with procdump_new_processes_on_finish.
+     */
+    std::vector<vmi_pid_t> running_processes_on_start;
 
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> terminate_process_hook;
@@ -233,6 +237,8 @@ private:
     void restore(drakvuf_trap_info_t*, return_ctx&);
     void save_file_metadata(std::shared_ptr<procdump2_ctx>, proc_data_t*);
     bool start_copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void start_dump_process(vmi_pid_t pid);
+    std::vector<vmi_pid_t> get_running_processes();
 };
 
 #endif

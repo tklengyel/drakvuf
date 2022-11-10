@@ -311,6 +311,8 @@ static void print_usage()
 #ifdef ENABLE_PLUGIN_PROCDUMP2
         "\t --procdump-disable-dump-on-finish\n"
         "\t                           Disable dumping of injected process memory upon completion of monitoring\n"
+        "\t --procdump-new-processes-on-finish\n"
+        "\t                           Dump memory for all new processes upon completion of monitoring\n"
         "\t --procdump-disable-kideliverapc-hook\n"
         "\t                           Disables hook on KiDeliverApc\n"
         "\t --procdump-disable-kedelayexecutionthread-hook\n"
@@ -456,6 +458,7 @@ int main(int argc, char** argv)
         opt_procdump_dir,
         opt_compress_procdumps,
         opt_procdump_disable_dump_on_finish,
+        opt_procdump_new_processes_on_finish,
         opt_procdump_disable_kideliverapc_hook,
         opt_procdump_disable_kedelayexecutionthread_hook,
         opt_json_clr,
@@ -530,6 +533,7 @@ int main(int argc, char** argv)
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
         {"procdump-disable-dump-on-finish", no_argument, NULL, opt_procdump_disable_dump_on_finish},
+        {"procdump-new-processes-on-finish", no_argument, NULL, opt_procdump_new_processes_on_finish},
         {"procdump-disable-kideliverapc-hook", no_argument, NULL, opt_procdump_disable_kideliverapc_hook},
         {"procdump-disable-kedelayexecutionthread-hook", no_argument, NULL, opt_procdump_disable_kedelayexecutionthread_hook},
         {"json-clr", required_argument, NULL, opt_json_clr},
@@ -824,6 +828,9 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_PROCDUMP2
             case opt_procdump_disable_dump_on_finish:
                 procdump_on_finish = false;
+                break;
+            case opt_procdump_new_processes_on_finish:
+                options.procdump_new_processes_on_finish = true;
                 break;
             case opt_procdump_disable_kideliverapc_hook:
                 options.procdump_disable_kideliverapc_hook = true;
