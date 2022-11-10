@@ -120,6 +120,7 @@ void print_hex(const char* array, size_t len)
 
 void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 {
+#ifdef DRAKVUF_DEBUG
     PRINT_DEBUG("Stack\n");
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -139,6 +140,7 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
     fprintf(stderr, "\n");
 
     drakvuf_release_vmi(drakvuf);
+#endif
 }
 
 void print_registers(drakvuf_trap_info_t* info)
