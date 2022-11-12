@@ -142,6 +142,7 @@ struct plugins_options
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
     bool disable_sysret;                // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
+    const char* crashdump_dir;          // PLUGIN_BSODMON
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON
     const char* ole32_profile;          // PLUGIN_WMIMON
     const char* wow_ole32_profile;      // PLUGIN_WMIMON

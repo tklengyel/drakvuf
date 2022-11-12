@@ -243,6 +243,10 @@ static void print_usage()
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
         "\t -b                        Exit from execution as soon as a BSoD is detected\n"
+        "\t --bsodmon-ignore-stop\n"
+        "\t                           Prevent bsodmon from stopping with other plugins\n"
+        "\t --crashdump-dir <directory>\n"
+        "\t                           Where to store OS crash dumps\n"
 #endif
         "\t -w, --json-wow <path to json>\n"
         "\t                           The JSON profile for WoW64 NTDLL\n"
@@ -419,6 +423,7 @@ int main(int argc, char** argv)
     bool procdump_on_finish = true;
     bool libdrakvuf_get_userid = true;
     std::set<uint64_t> ignored_processes;
+    bool bsodmon_ignore_stop = false;
     bool enable_active_callback_check = false;
 
     eprint_current_time();
@@ -495,6 +500,8 @@ int main(int argc, char** argv)
         opt_json_hal,
         opt_libdrakvuf_not_get_userid,
         opt_ignore_pid,
+        opt_bsodmon_ignore_stop,
+        opt_crashdump_dir,
         opt_enable_active_callback_check,
         opt_exit_injection_thread,
         opt_unixsocketmon_max_size,
@@ -571,6 +578,8 @@ int main(int argc, char** argv)
         {"json-hal", required_argument, NULL, opt_json_hal},
         {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
         {"ignore-pid", required_argument, NULL, opt_ignore_pid},
+        {"bsodmon-ignore-stop", no_argument, NULL, opt_bsodmon_ignore_stop},
+        {"crashdump-dir", required_argument, NULL, opt_crashdump_dir},
         {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
         {"exit-injection-thread", no_argument, NULL, opt_exit_injection_thread},
         {"unixsocketmon-max-size-print", required_argument, NULL, opt_unixsocketmon_max_size},
@@ -717,9 +726,17 @@ int main(int argc, char** argv)
                 options.filedelete_use_injector = true;
                 break;
 #endif
+#ifdef ENABLE_PLUGIN_BSODMON
             case 'b':
                 options.abort_on_bsod = true;
                 break;
+            case opt_bsodmon_ignore_stop:
+                bsodmon_ignore_stop = true;
+                break;
+            case opt_crashdump_dir:
+                options.crashdump_dir = optarg;
+                break;
+#endif
             case 'l':
                 libvmi_conf = true;
                 break;
@@ -1085,6 +1102,11 @@ int main(int argc, char** argv)
         drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
 
     PRINT_DEBUG("Beginning stop plugins\n");
+
+#ifdef ENABLE_PLUGIN_BSODMON
+    if (bsodmon_ignore_stop)
+        plugin_list[PLUGIN_BSODMON] = false;
+#endif
 
     int rc = drakvuf->stop_plugins(plugin_list);
     if (rc < 0)

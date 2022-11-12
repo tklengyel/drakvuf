@@ -692,6 +692,11 @@ size_t drakvuf_get_address_width(drakvuf_t drakvuf)
     return drakvuf->address_width;
 }
 
+uint64_t drakvuf_get_init_memsize(drakvuf_t drakvuf)
+{
+    return drakvuf->init_memsize;
+}
+
 bool drakvuf_process_is32bit(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     return (drakvuf_get_address_width(drakvuf) == 4) || drakvuf_is_wow64(drakvuf, info);
