@@ -128,15 +128,15 @@ static bool traverse_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callbac
     addr_t ending_va = mmvad->ending_vpn * VMI_PS_4KB;
     unicode_string_t* filepath = nullptr;
     std::string sFilepath = "None";
-     if (mmvad->file_name_ptr)
-     {
+    if (mmvad->file_name_ptr)
+    {
         filepath = drakvuf_read_unicode_va(drakvuf, mmvad->file_name_ptr, 0);
         if (filepath)
         {
             sFilepath = std::string((const char*) filepath->contents);
             vmi_free_unicode_str(filepath);
         }
-     }
+    }
 
     plugin->vads[cb_data->target_pid].push_back(MMVAD_ENTRY
     {
@@ -158,7 +158,7 @@ event_response_t memaccessmon::readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t base_address = drakvuf_get_function_argument(drakvuf, info, 2);
     size_t bytes = drakvuf_get_function_argument(drakvuf, info, 4);
-    
+
     // Ignore self reading
     if (handle == -1UL)
     {
