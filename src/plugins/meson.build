@@ -189,6 +189,12 @@ if get_option('plugin-ebpfmon')
     config_h.set('ENABLE_PLUGIN_EBPFMON', 1)
 endif
 
+if get_option('plugin-memaccessmon')
+    plugin_sources += 'memaccessmon/memaccessmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_EBPFMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -216,6 +222,7 @@ summary({
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon' : get_option('plugin-ebpfmon'),
+    'memaccessmon' : get_option('plugin-memaccessmon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
