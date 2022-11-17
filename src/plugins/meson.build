@@ -192,7 +192,7 @@ endif
 if get_option('plugin-memaccessmon')
     plugin_sources += 'memaccessmon/memaccessmon.cpp'
 
-    config_h.set('ENABLE_PLUGIN_EBPFMON', 1)
+    config_h.set('ENABLE_PLUGIN_MEMACCESSMON', 1)
 endif
 
 summary({
