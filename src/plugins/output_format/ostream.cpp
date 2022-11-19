@@ -124,8 +124,12 @@ public:
 protected:
     int sync() final
     {
+#ifdef DISABLE_OUTPUT_BUFFERING
+        const int threshold = 0;
+#else
         // Disable buffering when printing on tty
         const int threshold = stdout_is_tty_ ? 0 : 4 * 1024;
+#endif
         return sync(threshold);
     }
 

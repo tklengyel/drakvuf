@@ -628,6 +628,13 @@ if test x$threadsafety = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_THREADSAFETY, 1, "")
 fi
 
+AC_ARG_ENABLE([output_buffering],
+  [AS_HELP_STRING([--disable-ouput-buffering],
+    [Disable TTY output buffering @<:@yes@:>@])],
+  [output_buffering="$enableval"],
+  [output_buffering="yes"])
+AM_CONDITIONAL([OUTPUT_BUFFERING], [test x$output_buffering = xyes])
+
 #####################################################
 # AUTOHARDEN START
 # We want to check for compiler flag support, but there is no way to make
@@ -834,45 +841,46 @@ Build system type: $build
 Installation prefix: $prefix
 -------------------------------------------------------------------------------
 DRAKVUF Plugins
-Syscalls:      $plugin_syscalls
-Poolmon:       $plugin_poolmon
-Filetracer:    $plugin_filetracer
-Fileextractor: $plugin_fileextractor
-Objmon:        $plugin_objmon
-Exmon:         $plugin_exmon
-SSDTmon:       $plugin_ssdtmon
-CPUIDmon:      $plugin_cpuidmon
-Debugmon:      $plugin_debugmon
-Socketmon:     $plugin_socketmon
-Regmon:        $plugin_regmon
-Procmon:       $plugin_procmon
-BSODmon:       $plugin_bsodmon
-EnvMon:        $plugin_envmon
-CrashMon:      $plugin_crashmon
-ClipboardMon:  $plugin_clipboardmon
-WindowMon:     $plugin_windowmon
-LibraryMon:    $plugin_librarymon
-DKOMmon:       $plugin_dkommon
-MEMDump:       $plugin_memdump
-ProcDump:      $plugin_procdump
-ProcDump2:     $plugin_procdump2
-APIMon:        $plugin_apimon
-RPCMon:        $plugin_rpcmon
-TLSMon:        $plugin_tlsmon
-Codemon:       $plugin_codemon
-Exploitmon:    $plugin_exploitmon
-LibHookTest:   $plugin_libhooktest
-IPT:           $plugin_ipt
-HidSim:        $plugin_hidsim
-Rootkitmon:    $plugin_rootkitmon
-Spraymon:      $plugin_spraymon
-Callbackmon:   $plugin_callbackmon
-HideVM:        $plugin_hidevm
+Syscalls:           $plugin_syscalls
+Poolmon:            $plugin_poolmon
+Filetracer:         $plugin_filetracer
+Fileextractor:      $plugin_fileextractor
+Objmon:             $plugin_objmon
+Exmon:              $plugin_exmon
+SSDTmon:            $plugin_ssdtmon
+CPUIDmon:           $plugin_cpuidmon
+Debugmon:           $plugin_debugmon
+Socketmon:          $plugin_socketmon
+Regmon:             $plugin_regmon
+Procmon:            $plugin_procmon
+BSODmon:            $plugin_bsodmon
+EnvMon:             $plugin_envmon
+CrashMon:           $plugin_crashmon
+ClipboardMon:       $plugin_clipboardmon
+WindowMon:          $plugin_windowmon
+LibraryMon:         $plugin_librarymon
+DKOMmon:            $plugin_dkommon
+MEMDump:            $plugin_memdump
+ProcDump:           $plugin_procdump
+ProcDump2:          $plugin_procdump2
+APIMon:             $plugin_apimon
+RPCMon:             $plugin_rpcmon
+TLSMon:             $plugin_tlsmon
+Codemon:            $plugin_codemon
+Exploitmon:         $plugin_exploitmon
+LibHookTest:        $plugin_libhooktest
+IPT:                $plugin_ipt
+HidSim:             $plugin_hidsim
+Rootkitmon:         $plugin_rootkitmon
+Spraymon:           $plugin_spraymon
+Callbackmon:        $plugin_callbackmon
+HideVM:             $plugin_hidevm
 -------------------------------------------------------------------------------
 Deprecated Plugins
-WMIMon:        $plugin_wmimon
-Filedelete:    $plugin_filedelete
+WMIMon:             $plugin_wmimon
+Filedelete:         $plugin_filedelete
 -------------------------------------------------------------------------------
-REPL:          $repl
-Thread safe:   $threadsafety
+REPL:               $repl
+Thread safe:        $threadsafety
+Output buffering:   $output_buffering
 -------------------------------------------------------------------------------])

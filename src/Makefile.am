@@ -138,6 +138,10 @@ AM_CXXFLAGS += $(SANITIZE_CFLAGS)
 AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
+if !OUTPUT_BUFFERING
+AM_CXXFLAGS += -DDISABLE_OUTPUT_BUFFERING
+endif
+
 # Note that -pg is incompatible with HARDENING
 if !DEBUG
 AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
