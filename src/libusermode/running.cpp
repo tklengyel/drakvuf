@@ -310,7 +310,7 @@ event_response_t hook_process_cb(
             rh_data->target_process_rsp = info->regs->rsp;
             rh_data->inject_in_progress = true;
             addr_t stack_pointer;
-            if (inject_copy_memory(userhook_plugin, drakvuf, info, info->trap->cb, rh_data->func_addr, &stack_pointer))
+            if (inject_copy_memory(userhook_plugin, drakvuf, info, info->trap->cb, nullptr, rh_data->func_addr, &stack_pointer))
 #endif
             {
                 rh_data->state = HOOK_PAGEFAULT_RETRY;

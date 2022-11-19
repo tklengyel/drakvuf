@@ -112,7 +112,9 @@
 bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
-    addr_t addr, addr_t* stack_pointer)
+    uint64_t* stack_marker,
+    addr_t addr,
+    addr_t* stack_pointer)
 {
     x86_registers_t regs;
     memcpy(&regs, info->regs, sizeof(x86_registers_t));
@@ -128,7 +130,7 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     init_int_argument(&args[5], 0);
     init_struct_argument(&args[6], read_bytes);
 
-    if (!inject_function_call(drakvuf, info, cb, &regs, args, 7, plugin->copy_virt_mem_va))
+    if (!inject_function_call(drakvuf, info, cb, &regs, args, 7, plugin->copy_virt_mem_va, stack_marker))
     {
         PRINT_DEBUG("[USERHOOK] [%8zu] [%d:%d:%#lx]  "
             "Failed to inject MmCopyVirtualMemory\n"
@@ -156,6 +158,32 @@ static event_response_t map_view_of_section_ret_cb_2(drakvuf_t drakvuf, drakvuf_
     return hook_dll(drakvuf, info, params->base_address_ptr);
 }
 
+static void check_stack_marker(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    vmi_lock_guard& vmi,
+    dll_t* task)
+{
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = task->stack_marker_va();
+    uint64_t stack_marker;
+
+    if ( VMI_SUCCESS == vmi_read_64(vmi, &ctx, &stack_marker) &&
+        stack_marker != task->stack_marker())
+    {
+        PRINT_DEBUG("[USERHOOK] [%8zu] [%d:%d] "
+            "Stack marker check failed at %#lx: "
+            "expected %#lx, result %#lx\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , task->stack_marker_va(), task->stack_marker()
+            , stack_marker
+        );
+    }
+}
+
 event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
 {
     auto vmi = vmi_lock_guard(drakvuf);
@@ -165,7 +193,10 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
     // and we will be unable to add hooks
 
     if (drakvuf_lookup_injection(drakvuf, info))
+    {
+        check_stack_marker(drakvuf, info, vmi, dll_meta);
         drakvuf_remove_injection(drakvuf, info);
+    }
 
     drakvuf_trap_t* trap = nullptr;
     map_view_of_section_result_t* params = nullptr;
@@ -221,7 +252,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
         }
 
         addr_t stack_pointer;
-        if (inject_copy_memory(plugin, drakvuf, info, trap->cb, dll_meta->pf_current_addr, &stack_pointer))
+        if (inject_copy_memory(plugin, drakvuf, info, trap->cb, dll_meta->set_stack_marker(), dll_meta->pf_current_addr, &stack_pointer))
         {
             PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
             dll_meta->pf_current_addr += VMI_PS_4KB;
@@ -276,7 +307,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
                 else
                 {
                     addr_t stack_pointer;
-                    if (inject_copy_memory(plugin, drakvuf, info, trap->cb, exec_func, &stack_pointer))
+                    if (inject_copy_memory(plugin, drakvuf, info, trap->cb, dll_meta->set_stack_marker(), exec_func, &stack_pointer))
                     {
                         target.state = HOOK_PAGEFAULT_RETRY;
                         params->set_result_call_params(info, stack_pointer);

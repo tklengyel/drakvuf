@@ -187,6 +187,25 @@ struct dll_t
 
     bool in_progress{false};
     x86_registers_t regs;
+
+    uint64_t stack_marker()
+    {
+        // TODO Set initial random value and print this to log
+        return 0x1aef05de1aef05de;
+    }
+
+    uint64_t* set_stack_marker()
+    {
+        m_stack_marker = stack_marker();
+        return &m_stack_marker;
+    }
+
+    uint64_t stack_marker_va()
+    {
+        return m_stack_marker;
+    }
+
+    uint64_t m_stack_marker;
 };
 
 struct map_view_of_section_result_t : public call_result_t
@@ -264,6 +283,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
 bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+    uint64_t* stack_marker,
     addr_t addr,
     addr_t* stack_pointer);
 #else
