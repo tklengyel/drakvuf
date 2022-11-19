@@ -105,9 +105,11 @@
 #ifndef PROCMON_PRIVATE_H
 #define PROCMON_PRIVATE_H
 
-#include "linux.h"
+#include "plugins/plugin_utils.h"
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
 
-namespace procmon
+namespace procmon_ns
 {
 
 struct execve_data : PluginResult
@@ -120,11 +122,14 @@ struct execve_data : PluginResult
         , new_pid()
         , new_tid()
         , rsp()
+        , execat_rsp()
+        , cr3()
         , process_name()
         , thread_name()
         , image_path_name()
         , command_line()
         , envp()
+        , is_error()
     {
     }
 
@@ -134,12 +139,16 @@ struct execve_data : PluginResult
     vmi_pid_t new_pid;
     uint32_t new_tid;
     addr_t rsp;
+    addr_t execat_rsp;
+    addr_t cr3;
 
     std::string process_name;
     std::string thread_name;
     std::string image_path_name;
     std::string command_line;
     std::map<std::string, std::string> envp;
+
+    bool is_error = false;
 };
 
 struct send_signal_data : PluginResult
@@ -171,6 +180,25 @@ struct send_signal_data : PluginResult
     std::string target_thread_name;
 
     uint64_t signal;
+};
+
+struct kernel_clone_data : PluginResult
+{
+    kernel_clone_data()
+        : PluginResult()
+        , pid()
+        , tid()
+        , rsp()
+        , flags()
+        , exit_signal()
+    {
+    }
+    vmi_pid_t pid;
+    uint32_t tid;
+    addr_t rsp;
+
+    uint64_t flags;
+    uint32_t exit_signal;
 };
 
 typedef enum exit_status
@@ -384,8 +412,69 @@ static inline const char* signal_to_string(signal_t signal)
     return "UNDEFINED";
 }
 
-}
+enum
+{
+    CLONE_CLEAR_SIGHAND = 0x100000000ULL,
+    CLONE_INTO_CGROUP = 0x200000000ULL,
+#ifndef CLONE_PIDFD
+    CLONE_PIDFD = 0x00001000ULL,
+#endif
+    CLONE_NEWTIME =	0x00000080
+};
+
+static const flags_str_t kernel_clone_flags =
+{
+    REGISTER_FLAG(CSIGNAL),              /* signal mask to be sent at exit */
+    REGISTER_FLAG(CLONE_VM),             /* set if VM shared between processes */
+    REGISTER_FLAG(CLONE_FS),             /* set if fs info shared between processes */
+    REGISTER_FLAG(CLONE_FILES),          /* set if open files shared between processes */
+    REGISTER_FLAG(CLONE_SIGHAND),        /* set if signal handlers and blocked signals shared */
+    REGISTER_FLAG(CLONE_PIDFD),          /* set if a pidfd should be placed in parent */
+    REGISTER_FLAG(CLONE_PTRACE),         /* set if we want to let tracing continue on the child too */
+    REGISTER_FLAG(CLONE_VFORK),          /* set if the parent wants the child to wake it up on mm_release */
+    REGISTER_FLAG(CLONE_PARENT),         /* set if we want to have the same parent as the cloner */
+    REGISTER_FLAG(CLONE_THREAD),         /* Same thread group? */
+    REGISTER_FLAG(CLONE_NEWNS),          /* New mount namespace group */
+    REGISTER_FLAG(CLONE_SYSVSEM),        /* share system V SEM_UNDO semantics */
+    REGISTER_FLAG(CLONE_SETTLS),         /* create a new TLS for the child */
+    REGISTER_FLAG(CLONE_PARENT_SETTID),  /* set the TID in the parent */
+    REGISTER_FLAG(CLONE_CHILD_CLEARTID), /* clear the TID in the child */
+    REGISTER_FLAG(CLONE_DETACHED),       /* Unused, ignored */
+    REGISTER_FLAG(CLONE_UNTRACED),       /* set if the tracing process can't force CLONE_PTRACE on this clone */
+    REGISTER_FLAG(CLONE_CHILD_SETTID),   /* set the TID in the child */
+    REGISTER_FLAG(CLONE_NEWCGROUP),      /* New cgroup namespace */
+    REGISTER_FLAG(CLONE_NEWUTS),         /* New utsname namespace */
+    REGISTER_FLAG(CLONE_NEWIPC),         /* New ipc namespace */
+    REGISTER_FLAG(CLONE_NEWUSER),        /* New user namespace */
+    REGISTER_FLAG(CLONE_NEWPID),         /* New pid namespace */
+    REGISTER_FLAG(CLONE_NEWNET),         /* New network namespace */
+    REGISTER_FLAG(CLONE_IO),             /* Clone io context */
+    REGISTER_FLAG(CLONE_CLEAR_SIGHAND),  /* Clear any signal handler and reset to SIG_DFL. */
+    REGISTER_FLAG(CLONE_INTO_CGROUP),    /* Clone into a specific cgroup given the right permissions. */
+    REGISTER_FLAG(CLONE_NEWTIME)         /* New time namespace */
+};
+
+// Offsets name
+enum
+{
+    _KERNEL_CLONE_ARGS_FLAGS,
+    _KERNEL_CLONE_ARGS_EXIT_SIGNAL,
+    _FILE_F_PATH,
+    _PATH_DENTRY,
+    __LINUX_OFFSET_MAX
+};
+
+static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
+{
+    [_KERNEL_CLONE_ARGS_FLAGS] = {"kernel_clone_args", "flags"},
+    [_KERNEL_CLONE_ARGS_EXIT_SIGNAL] = {"kernel_clone_args", "exit_signal"},
+    [_FILE_F_PATH] = {"file", "f_path"},
+    [_PATH_DENTRY] = {"path", "dentry"},
+};
+
+} // procmon_ns
 
 #define ARG_MAX 131072
+#define MAX_ERRNO 4095
 
 #endif
