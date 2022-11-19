@@ -183,6 +183,7 @@ private:
     std::unique_ptr<libhook::SyscallHook> terminate_process_hook;
     std::unique_ptr<libhook::SyscallHook> deliver_apc_hook;
     std::unique_ptr<libhook::SyscallHook> delay_execution_hook;
+    std::unique_ptr<libhook::SyscallHook> clean_process_memory_hook;
 
     /* VA of functions to be injected */
     addr_t malloc_va{0};
@@ -207,6 +208,7 @@ private:
     event_response_t deliver_apc_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t terminate_process_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t delay_execution_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t clean_process_memory_cb(drakvuf_t, drakvuf_trap_info_t*);
 
     /* Dispatchers */
     event_response_t dispatcher(drakvuf_trap_info_t*);
@@ -225,7 +227,11 @@ private:
     void delay_execution(drakvuf_trap_info_t*, return_ctx&, uint16_t msec = 100);
 
     /* Routines */
+    void check_stack_marker(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, return_ctx&);
     std::shared_ptr<procdump2_ctx> continues_task(drakvuf_trap_info_t*);
+    /* The function erases task context from "this->active".
+     * So be carefull while iterating over it.
+     */
     void finish_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     bool is_active_process(vmi_pid_t pid);
