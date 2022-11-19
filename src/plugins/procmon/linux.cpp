@@ -289,7 +289,7 @@ event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     if ((unsigned long)(void*)(file_struct) >= (unsigned long)(-MAX_ERRNO))
     {
         PRINT_DEBUG("[PROCMON] do_execveat_common kernel error. Not an error, just skipping the event.\n");
-        params->is_error = true;
+        params->internal_error = true;
     }
     else
     {
@@ -381,7 +381,7 @@ event_response_t linux_procmon::do_execveat_common_ret_cb(drakvuf_t drakvuf, dra
     if (!drakvuf_check_return_context(drakvuf, info, params->new_pid, params->new_tid, params->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
-    if (!params->is_error)
+    if (!params->internal_error)
         linux_procmon::print_info(drakvuf, info);
 
     uint64_t hookID = make_hook_id(info);
@@ -702,24 +702,24 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output) : plugin
         return;
     }
 
-    // exit_hook = createSyscallHook("do_exit", &linux_procmon::do_exit_cb);
-    // if (nullptr == exit_hook)
-    // {
-    //     PRINT_DEBUG("[PROCMON] Method do_exit not found.\n");
-    //     return;
-    // }
+    exit_hook = createSyscallHook("do_exit", &linux_procmon::do_exit_cb);
+    if (nullptr == exit_hook)
+    {
+        PRINT_DEBUG("[PROCMON] Method do_exit not found.\n");
+        return;
+    }
 
-    // signal_hook = createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal");
-    // if (nullptr == signal_hook)
-    // {
-    //     PRINT_DEBUG("[PROCMON] Method __send_signal not found.\n");
-    //     return;
-    // }
+    signal_hook = createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal");
+    if (nullptr == signal_hook)
+    {
+        PRINT_DEBUG("[PROCMON] Method __send_signal not found.\n");
+        return;
+    }
 
-    // kernel_clone_hook = createSyscallHook("kernel_clone", &linux_procmon::kernel_clone_cb);
-    // if (nullptr == kernel_clone_hook)
-    // {
-    //     PRINT_DEBUG("[PROCMON] Method kernel_clone not found.\n");
-    //     return;
-    // }
+    kernel_clone_hook = createSyscallHook("kernel_clone", &linux_procmon::kernel_clone_cb);
+    if (nullptr == kernel_clone_hook)
+    {
+        PRINT_DEBUG("[PROCMON] Method kernel_clone not found.\n");
+        return;
+    }
 }

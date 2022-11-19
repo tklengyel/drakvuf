@@ -129,7 +129,7 @@ struct execve_data : PluginResult
         , image_path_name()
         , command_line()
         , envp()
-        , is_error()
+        , internal_error()
     {
     }
 
@@ -148,7 +148,7 @@ struct execve_data : PluginResult
     std::string command_line;
     std::map<std::string, std::string> envp;
 
-    bool is_error = false;
+    bool internal_error = false;
 };
 
 struct send_signal_data : PluginResult
