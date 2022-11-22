@@ -382,6 +382,12 @@ sources += memaccessmon/memaccessmon.cpp
 sources += memaccessmon/memaccessmon.h
 endif
 
+if PLUGIN_UNIXSOCKETMON
+sources += unixsocketmon/unixsocketmon.cpp
+sources += unixsocketmon/unixsocketmon.h
+sources += unixsocketmon/private.h
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
@@ -447,6 +453,11 @@ if MAKE_TESTS
 AM_DEFAULT_SOURCE_EXT = .cpp
 
 check_PROGRAMS =
+
+check_PROGRAMS += plugin_utils_check
+plugin_utils_check_SOURCES = plugin_utils_check.cpp
+plugin_utils_check_CFLAGS = $(CHECK_CFLAGS)
+plugin_utils_check_LDADD = $(CHECK_LIBS) plugin_utils.lo
 
 if PLUGIN_PROCMON
 check_PROGRAMS += procmon/check

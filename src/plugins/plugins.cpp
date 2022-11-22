@@ -144,6 +144,7 @@
 #include "ptracemon/ptracemon.h"
 #include "ebpfmon/ebpfmon.h"
 #include "memaccessmon/memaccessmon.h"
+#include "unixsocketmon/unixsocketmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -278,7 +279,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
                 case PLUGIN_BSODMON:
-                    this->plugins[plugin_id] = std::make_unique<bsodmon>(this->drakvuf, options->abort_on_bsod, this->output);
+                    this->plugins[plugin_id] = std::make_unique<bsodmon>(this->drakvuf, options->abort_on_bsod, options->crashdump_dir, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_ENVMON
@@ -415,8 +416,8 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .timeout = options->procdump_timeout,
                         .procdump_dir = options->procdump_dir,
                         .compress_procdumps = options->compress_procdumps,
-                        .procdump_on_finish = options->procdump_on_finish,
-                        .terminated_processes = options->terminated_processes,
+                        .dump_process_on_finish = options->procdump_on_finish,
+                        .dump_new_processes_on_finish = options->procdump_new_processes_on_finish,
                         .hal_profile = options->hal_profile,
                         .disable_kideliverapc_hook = options->procdump_disable_kideliverapc_hook,
                         .disable_kedelayexecutionthread_hook = options->procdump_disable_kedelayexecutionthread_hook
@@ -565,6 +566,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_MEMACCESSMON:
                 {
                     this->plugins[plugin_id] = std::make_unique<memaccessmon>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_UNIXSOCKETMON
+                case PLUGIN_UNIXSOCKETMON:
+                {
+                    unixsocketmon_config config =
+                    {
+                        .print_max_size = options->unixsocketmon_max_size
+                    };
+                    this->plugins[plugin_id] = std::make_unique<unixsocketmon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif

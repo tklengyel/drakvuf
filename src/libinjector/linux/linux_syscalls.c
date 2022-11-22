@@ -359,6 +359,10 @@ bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char
         PRINT_DEBUG("Failed to setup execve syscall\n");
         return false;
     }
+
+    // this will loosen the checks in check_userspace_int3_trap
+    // if execve fails child process would hit BP with different RIP
+    injector->execve = true;
     return true;
 }
 

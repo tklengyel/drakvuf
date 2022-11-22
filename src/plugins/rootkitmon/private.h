@@ -105,6 +105,8 @@
 #ifndef ROOTKITMON_PRIVATE_H
 #define ROOTKITMON_PRIVATE_H
 
+namespace rootkitmon_ns
+{
 // PDEVICE_OBJECT
 using device_t  = addr_t;
 // LDR_DATA_TABLE_ENTRY of the driver
@@ -316,5 +318,7 @@ struct descriptors_t
     // Pair of descriptor entry VA and its parsed entry
     std::vector<std::pair<addr_t, gdt_entry_t>> gdt;
 };
+
+}
 
 #endif

@@ -102,10 +102,13 @@
 *                                                                         *
 ***************************************************************************/
 
+#include "common.h"
 #include "kvfmt.h"
+#include "jsonfmt.h"
 
 #include <check.h>
 #include <string>
+#include <vector>
 
 START_TEST(test_kvfmt_qstr_basic)
 {
@@ -191,6 +194,20 @@ START_TEST(test_kvfmt_rstr_basic)
 
     result = kvfmt::print_data(ss, fmt::Rstr("simple"), ',');
     ck_assert_msg(ss.str() == std::string("simple"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_binary_string_basic)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    const char* str = "\x1ftest";
+    size_t str_len = strlen(str);
+
+    result = kvfmt::print_data(ss, fmt::BinaryString(reinterpret_cast<const uint8_t*>(str), str_len), ',');
+    ck_assert_msg(ss.str() == std::string("1f74657374"), nullptr);
     ck_assert_msg(result == true, nullptr);
 }
 END_TEST
@@ -330,6 +347,62 @@ START_TEST(test_kvfmt_variant)
 }
 END_TEST
 
+START_TEST(test_kvfmt_flags)
+{
+    std::stringstream ss;
+
+    auto flags = flagsval("Flags", "FLAG_1=1,FLAG_2=1,FLAG_5=1");
+    bool result = kvfmt::print_data(ss, flags, ',');
+
+    ck_assert(ss.str() == "FLAG_1=1,FLAG_2=1,FLAG_5=1");
+    ck_assert(result);
+}
+END_TEST
+
+START_TEST(test_kvfmt_hier_flags)
+{
+    std::stringstream ss;
+
+    std::vector<flagsval> security_descriptor;
+    security_descriptor.emplace_back(flagsval("Control", "CONTROL1=1,CONTROL2=1"));
+    security_descriptor.emplace_back(flagsval("Sacl", "SASL1=1,SASL4=1"));
+
+    auto value = keyval("SecurityDescriptor", security_descriptor);
+    bool result = kvfmt::print_data(ss, value, ',');
+
+    ck_assert(ss.str() == "CONTROL1=1,CONTROL2=1,SASL1=1,SASL4=1");
+    ck_assert(result);
+}
+END_TEST
+
+START_TEST(test_jsonfmt_flags)
+{
+    std::stringstream ss;
+
+    auto flags = flagsval("Flags", "FLAG_1|FLAG_2|FLAG_5");
+    bool result = jsonfmt::print_data(ss, ',', flags);
+
+    ck_assert(ss.str() == "{\"Flags\":\"FLAG_1|FLAG_2|FLAG_5\"}");
+    ck_assert(result);
+}
+END_TEST
+
+START_TEST(test_jsonfmt_hier_flags)
+{
+    std::stringstream ss;
+
+    std::vector<flagsval> security_descriptor;
+    security_descriptor.emplace_back(flagsval("Control", "CONTROL1|CONTROL2"));
+    security_descriptor.emplace_back(flagsval("Sacl", "SASL1|SASL4"));
+
+    auto value = keyval("SecurityDescriptor", security_descriptor);
+    bool result = jsonfmt::print_data(ss, ',', value);
+
+    ck_assert(ss.str() == "{\"SecurityDescriptor\":[{\"Control\":\"CONTROL1|CONTROL2\"},{\"Sacl\":\"SASL1|SASL4\"}]}");
+    ck_assert(result);
+}
+END_TEST
+
 Suite* kvfmt_suite(void)
 {
     Suite* s;
@@ -348,6 +421,7 @@ Suite* kvfmt_suite(void)
     tcase_add_test(tc_core, test_kvfmt_qstr_utf_8_multiline);
     tcase_add_test(tc_core, test_kvfmt_qstr_utf_8_binary);
     tcase_add_test(tc_core, test_kvfmt_rstr_basic);
+    tcase_add_test(tc_core, test_kvfmt_binary_string_basic);
     tcase_add_test(tc_core, test_kvfmt_xval);
     tcase_add_test(tc_core, test_kvfmt_nval);
     tcase_add_test(tc_core, test_kvfmt_fval);
@@ -358,6 +432,26 @@ Suite* kvfmt_suite(void)
     tcase_add_test(tc_core, test_kvfmt_pair_iterable);
     tcase_add_test(tc_core, test_kvfmt_tuple);
     tcase_add_test(tc_core, test_kvfmt_variant);
+    tcase_add_test(tc_core, test_kvfmt_flags);
+    tcase_add_test(tc_core, test_kvfmt_hier_flags);
+
+    suite_add_tcase(s, tc_core);
+
+    return s;
+}
+
+static Suite* jsonfmt_suite(void)
+{
+    Suite* s;
+    TCase* tc_core;
+
+    s = suite_create("JSONFMT");
+
+    /* Core test case */
+    tc_core = tcase_create("Core");
+
+    tcase_add_test(tc_core, test_jsonfmt_flags);
+    tcase_add_test(tc_core, test_jsonfmt_hier_flags);
 
     suite_add_tcase(s, tc_core);
 
@@ -367,11 +461,13 @@ Suite* kvfmt_suite(void)
 int main(void)
 {
     int number_failed;
-    Suite* s;
     SRunner* sr;
 
-    s = kvfmt_suite();
-    sr = srunner_create(s);
+    sr = srunner_create(kvfmt_suite());
+    srunner_add_suite(sr, jsonfmt_suite());
+
+    // Uncomment if you want to see STDOUT
+    //srunner_set_fork_status(sr, CK_NOFORK);
 
     srunner_run_all(sr, CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);

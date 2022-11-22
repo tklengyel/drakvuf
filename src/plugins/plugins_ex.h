@@ -112,6 +112,7 @@
 #include <vector>
 #include <algorithm>
 #include <functional>
+#include <optional>
 
 #include "private.h"
 #include "plugins.h"
@@ -182,6 +183,8 @@ struct breakpoint_in_system_process_searcher
                 return nullptr;
             }
 
+            trap->type = BREAKPOINT;
+
             if (m_virt_addr)
             {
                 trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -249,6 +252,7 @@ struct breakpoint_in_dll_module_searcher
                 return nullptr;
             }
 
+            trap->type = BREAKPOINT;
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.addr_type = ADDR_VA;
             trap->breakpoint.module = m_module_name;
@@ -322,6 +326,7 @@ struct breakpoint_by_dtb_searcher
                     return nullptr;
             }
 
+            trap->type = BREAKPOINT;
             trap->breakpoint.lookup_type = LOOKUP_DTB;
             trap->breakpoint.dtb = dtb;
             trap->breakpoint.addr_type = ADDR_VA;
@@ -350,6 +355,7 @@ struct breakpoint_by_pid_searcher
             if (!ret_addr)
                 return nullptr;
 
+            trap->type = BREAKPOINT;
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.pid = info->trap->breakpoint.pid;
             trap->breakpoint.addr_type = ADDR_VA;
@@ -364,6 +370,43 @@ struct breakpoint_by_pid_searcher
         }
         return trap;
     }
+};
+
+struct memaccess_trap
+{
+    memaccess_trap& for_gfn(uint64_t _gfn, vmi_mem_access_t vmi_access_type, memaccess_type_t memaccess_type = POST)
+    {
+        gfn = _gfn;
+        access = vmi_access_type;
+        access_type = memaccess_type;
+        return *this;
+    }
+
+    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
+    {
+        if (trap)
+        {
+            if (access == VMI_MEMACCESS_INVALID)
+                return nullptr;
+
+            trap->type = MEMACCESS;
+            trap->memaccess.access = access;
+            trap->memaccess.type = access_type;
+            trap->memaccess.gfn = gfn;
+
+            if (!trap->name && info && info->trap)
+                trap->name = info->trap->name;
+
+            if (!drakvuf_add_trap(drakvuf, trap))
+                return nullptr;
+        }
+
+        return trap;
+    }
+
+    uint64_t gfn;
+    vmi_mem_access_t access;
+    memaccess_type_t access_type;
 };
 
 struct call_result_t
@@ -442,23 +485,19 @@ public:
 
     template<typename Params = PluginResult>
     [[nodiscard]]
-    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb);
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb, const std::optional<std::string>& display_name = {});
 
     template<typename Params = PluginResult>
     [[nodiscard]]
-    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb, int ttl);
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb, int ttl, const std::optional<std::string>& display_name = {});
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb);
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name = {});
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, const std::string& display_name);
-
-    template<typename Params = PluginResult, typename Callback>
-    [[nodiscard]]
-    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, int ttl);
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, int ttl, const std::optional<std::string>& display_name = {});
 
     template<typename Params = PluginResult>
     [[nodiscard]]
@@ -614,32 +653,16 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 }
 
 template<typename Params>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, hook_cb_t cb)
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, hook_cb_t cb, const std::optional<std::string>& display_name)
 {
-    return createSyscallHook<Params>(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
-}
-
-template<typename Params, typename Callback>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, const std::string& display_name)
-{
-    static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-    auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, [=](auto&& ...args) -> event_response_t
-    {
-        return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
-    }, drakvuf_get_limited_traps_ttl(this->drakvuf), display_name);
-
-    if (hook)
-        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
-    else
-        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
-    return hook;
+    return createSyscallHook<Params>(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf), display_name);
 }
 
 template<typename Params>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, hook_cb_t cb, int ttl)
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, hook_cb_t cb, int ttl, const std::optional<std::string>& display_name)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-    auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, cb, ttl);
+    auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, cb, ttl, display_name);
     if (hook)
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
     else
@@ -648,19 +671,20 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb)
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name)
 {
-    return createSyscallHook<Params, Callback>(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+    return createSyscallHook<Params, Callback>(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf), display_name);
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, int ttl)
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, int ttl, const std::optional<std::string>& display_name)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
     auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, [=](auto&& ...args) -> event_response_t
     {
         return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
-    }, ttl);
+    }, ttl, display_name);
+
     if (hook)
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
     else
@@ -768,7 +792,6 @@ drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,
 
     trap->name = trap_name;
     trap->cb = hook_cb;
-    trap->type = BREAKPOINT;
     trap->ttl = ttl;
     trap->ah_cb = ah_cb;
 

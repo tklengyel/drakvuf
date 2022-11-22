@@ -131,7 +131,7 @@ extern const flags_str_t generic_ar;
 
 static auto build_security_descriptor(const win_objattrs_t& attrs)
 {
-    std::vector<std::pair<std::string, fmt::Rstr<std::string>>> security_descriptor;
+    std::vector<flagsval> security_descriptor;
     if (!attrs.security_flags.empty())
         security_descriptor.emplace_back("Control", attrs.security_flags);
     if (!attrs.owner.empty())
@@ -147,28 +147,12 @@ static auto build_security_descriptor(const win_objattrs_t& attrs)
 
 static void print_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_filetracer* f, const win_objattrs_t& attrs)
 {
-    if (f->format == OUTPUT_KV)
-    {
-        kvfmt::print("filetracer", drakvuf, info,
-            keyval("FileName", fmt::Qstr(attrs.file_path)),
-            fmt::Rstr(attrs.obj_attrs),
-            fmt::Rstr(attrs.security_flags),
-            fmt::Rstr(attrs.owner),
-            fmt::Rstr(attrs.group),
-            fmt::Rstr(attrs.sacl),
-            fmt::Rstr(attrs.dacl)
-        );
-    }
-    else
-    {
-        auto security_descriptor = build_security_descriptor(attrs);
-
-        fmt::print(f->format, "filetracer", drakvuf, info,
-            keyval("FileName", fmt::Qstr(attrs.file_path)),
-            keyval("ObjectAttributes", fmt::Qstr(attrs.obj_attrs)),
-            keyval("SecurityDescriptor", security_descriptor)
-        );
-    }
+    auto security_descriptor = build_security_descriptor(attrs);
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("FileName", fmt::Estr(attrs.file_path)),
+        flagsval("ObjectAttributes", attrs.obj_attrs),
+        keyval("SecurityDescriptor", security_descriptor)
+    );
 }
 
 static void print_create_file_obj_info(drakvuf_t drakvuf,
@@ -188,43 +172,20 @@ static void print_create_file_obj_info(drakvuf_t drakvuf,
     auto desired_access = w->create_opts & FILE_DIRECTORY_FILE
         ? parse_flags(w->desired_access, directory_ar, f->format)
         : parse_flags(w->desired_access, file_ar, f->format);
+    auto security_descriptor = build_security_descriptor(attrs);
 
-    if (f->format == OUTPUT_KV)
-    {
-        kvfmt::print("filetracer", drakvuf, info,
-            keyval("FileName", fmt::Qstr(attrs.file_path)),
-            keyval("FileHandle", fmt::Xval(handle)),
-            fmt::Rstr(attrs.obj_attrs),
-            fmt::Rstr(attrs.security_flags),
-            fmt::Rstr(attrs.owner),
-            fmt::Rstr(attrs.group),
-            fmt::Rstr(attrs.sacl),
-            fmt::Rstr(attrs.dacl),
-            fmt::Rstr(desired_access),
-            fmt::Rstr(file_attrs),
-            fmt::Rstr(share_access),
-            fmt::Rstr(create_disposition),
-            fmt::Rstr(create_opts),
-            keyval("Status", fmt::Qstr(status))
-        );
-    }
-    else
-    {
-        auto security_descriptor = build_security_descriptor(attrs);
-
-        fmt::print(f->format, "filetracer", drakvuf, info,
-            keyval("FileName", fmt::Qstr(attrs.file_path)),
-            keyval("FileHandle", fmt::Xval(handle)),
-            keyval("ObjectAttributes", fmt::Qstr(attrs.obj_attrs)),
-            keyval("SecurityDescriptor", security_descriptor),
-            keyval("DesiredAccess", fmt::Qstr(desired_access)),
-            keyval("FileAttributes", fmt::Qstr(file_attrs)),
-            keyval("ShareAccess", fmt::Qstr(share_access)),
-            keyval("CreateDisposition", fmt::Qstr(create_disposition)),
-            keyval("CreateOptions", fmt::Qstr(create_opts)),
-            keyval("Status", fmt::Qstr(status))
-        );
-    }
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("FileName", fmt::Estr(attrs.file_path)),
+        keyval("FileHandle", fmt::Xval(handle)),
+        flagsval("ObjectAttributes", attrs.obj_attrs),
+        keyval("SecurityDescriptor", security_descriptor),
+        flagsval("DesiredAccess", desired_access),
+        flagsval("FileAttributes", file_attrs),
+        flagsval("ShareAccess", share_access),
+        flagsval("CreateDisposition", create_disposition),
+        flagsval("CreateOptions", create_opts),
+        keyval("Status", fmt::Rstr(status))
+    );
 }
 
 static std::tuple<bool, win_objattrs_t> objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_filetracer* f, addr_t attrs)
@@ -394,9 +355,9 @@ static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &change) )
         return;
 
-    uint64_t attributes = 0;
+    uint32_t attributes = 0;
     ctx.addr = fileinfo + f->basic_attributes_offset;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &attributes) )
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &attributes) )
         return;
 
     char* filename_ = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);

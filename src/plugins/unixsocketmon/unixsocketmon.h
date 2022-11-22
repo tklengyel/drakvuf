@@ -43,7 +43,7 @@
  *                                                                         *
  * This list is not exclusive, but is meant to clarify our interpretation  *
  * of derived works with some common examples.  Other people may interpret *
-* the plain GPL differently, so we consider this a special exception to   *
+ * the plain GPL differently, so we consider this a special exception to   *
  * the GPL that we apply to Covered Software.  Works which meet any of     *
  * these conditions must conform to all of the terms of this license,      *
  * particularly including the GPL Section 3 requirements of providing      *
@@ -88,7 +88,7 @@
  * otherwise) that you are offering unlimited, non-exclusive right to      *
  * reuse, modify, and relicense the code.  DRAKVUF will always be          *
  * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
+* relicense code has caused devastating problems for other Free Software  *
  * projects (such as KDE and NASM).                                        *
  * To specify special license conditions of your contributions, just say   *
  * so when you send them.                                                  *
@@ -102,192 +102,34 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdlib.h>
-#include <sys/prctl.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <limits.h>
-#include <glib.h>
+#ifndef UNIXSOCKETMON_H
+#define UNIXSOCKETMON_H
 
-#include "private.h"
-#include "linux-exports.h"
-#include "linux.h"
-#include "linux-offsets.h"
-#include "linux-offsets-map.h"
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
 
-addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
+struct unixsocketmon_config
 {
-    switch (narg)
-    {
-        case 1:
-            return info->regs->rdi;
-        case 2:
-            return info->regs->rsi;
-        case 3:
-            return info->regs->rdx;
-        case 4:
-            return info->regs->rcx;
-        case 5:
-            return info->regs->r8;
-        case 6:
-            return info->regs->r9;
-    }
+    uint64_t print_max_size;
+};
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * 8
-    );
-
-    uint64_t ret;
-    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
-        return 0;
-    return ret;
-}
-
-addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+class unixsocketmon: public pluginex
 {
-    addr_t ret_addr;
-    if (VMI_FAILURE == vmi_read_addr_va(drakvuf->vmi, info->regs->rsp, 0, &ret_addr))
-        return 0;
-    return ret_addr;
-}
+public:
+    uint64_t print_max_size;
+    addr_t socket_ops;
+    addr_t proto_ops_family;
+    addr_t msghdr_msg_iter;
+    addr_t iov_iter_iov;
+    addr_t iovec_iov_base;
+    addr_t iovec_iov_len;
 
-bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
-{
-    return (info->proc_data.pid == pid)
-        && (info->proc_data.tid == tid)
-        && (!rsp || info->regs->rip == rsp);
-}
+    std::unique_ptr<libhook::SyscallHook> sockethook;
 
-bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
-{
-    json_object* kernel_json = vmi_get_kernel_json(drakvuf->vmi);
-    if (VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, rva))
-    {
-        bool find = false;
-        for (uint8_t i = 0; i < 255; i++)
-        {
-            char tmp[64];
-            snprintf(tmp, sizeof(tmp), "%s.isra.%d", function, i);
-            if (VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, tmp, rva))
-            {
-                find = true;
-                break;
-            }
-        }
-        if (!find)
-            return false;
-    }
-    return true;
-}
+    unixsocketmon(drakvuf_t drakvuf, const unixsocketmon_config* config, output_format_t output);
+    event_response_t sock_send_msg_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    std::vector<uint8_t> get_socket_message(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t* size);
+    bool get_socket_family_type(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* family_type);
+};
 
-/**
- * @brief Function for extract absolute path from "struct dentry"
- * https://elixir.bootlin.com/linux/v5.9.14/source/fs/d_path.c#L329
- *
- * @param drakvuf drakvuf instanse
- * @param dentry_addr address of "struct dentry"
- * @return char* - absolute path of filename
-*/
-char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
-{
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd);
-
-    addr_t parent;
-    GString* b = g_string_new(NULL);
-
-    ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
-    while (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &parent) && parent != dentry_addr)
-    {
-        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        gchar* tmp = vmi_read_str(drakvuf->vmi, &ctx);
-        if (tmp == NULL)
-            break;
-
-        // TODO: why vmi_read_str return 0x01?
-        // TODO: with "std::string dirname = tmp" works very well
-        if (tmp[0] != 0x01)
-        {
-            g_string_prepend(b, tmp);
-            g_string_prepend(b, "/");
-        }
-
-        g_free(tmp);
-
-        dentry_addr = parent;
-        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
-    }
-
-    return g_string_free(b, 0);
-}
-
-bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va)
-{
-    if (!linux_get_kernel_symbol_rva(drakvuf, function, va))
-        return false;
-
-    addr_t _text;
-    if (!linux_get_kernel_symbol_rva(drakvuf, "_text", &_text))
-        return false;
-
-    addr_t kaslr = drakvuf->kernbase - _text;
-    if (!kaslr)
-        return false;
-
-    *va += kaslr;
-    return true;
-}
-
-static bool find_kernbase(drakvuf_t drakvuf)
-{
-    if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
-        return 0;
-
-    return !!drakvuf->kernbase;
-}
-
-bool set_os_linux(drakvuf_t drakvuf)
-{
-    if ( !find_kernbase(drakvuf) )
-        return 0;
-
-    if ( !drakvuf->kpgd && VMI_FAILURE == vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd) )
-        return 0;
-
-    // Get the offsets from the Rekall profile
-    if ( !fill_kernel_offsets(drakvuf, __LINUX_OFFSETS_MAX, linux_offset_names) )
-        return 0;
-
-    drakvuf->osi.get_current_thread = linux_get_current_thread;
-    drakvuf->osi.get_current_process = linux_get_current_process;
-    drakvuf->osi.get_process_name = linux_get_process_name;
-    drakvuf->osi.get_current_process_name = linux_get_current_process_name;
-    drakvuf->osi.get_process_userid = linux_get_process_userid;
-    drakvuf->osi.get_current_process_userid = linux_get_current_process_userid;
-    drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
-    drakvuf->osi.get_process_pid = linux_get_process_pid;
-    drakvuf->osi.get_process_tid = linux_get_process_tid;
-    drakvuf->osi.get_process_ppid = linux_get_process_ppid;
-    drakvuf->osi.get_process_data = linux_get_process_data;
-    drakvuf->osi.get_process_dtb = linux_get_process_dtb;
-    drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
-    drakvuf->osi.export_lib_address = get_lib_address;
-    drakvuf->osi.get_function_argument = linux_get_function_argument;
-    drakvuf->osi.get_function_return_address = linux_get_function_return_address;
-    drakvuf->osi.check_return_context = linux_check_return_context;
-    drakvuf->osi.enumerate_processes = linux_enumerate_processes;
-    drakvuf->osi.get_current_process_environ = linux_get_current_process_environ;
-    drakvuf->osi.get_process_arguments = linux_get_process_arguments;
-    drakvuf->osi.get_kernel_symbol_rva = linux_get_kernel_symbol_rva;
-    drakvuf->osi.get_kernel_symbol_va = linux_get_kernel_symbol_va;
-    drakvuf->osi.get_filepath_from_dentry = linux_get_filepath_from_dentry;
-
-    return 1;
-}
+#endif

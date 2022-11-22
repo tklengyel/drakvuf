@@ -142,6 +142,7 @@ struct plugins_options
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
     bool disable_sysret;                // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
+    const char* crashdump_dir;          // PLUGIN_BSODMON
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON
     const char* ole32_profile;          // PLUGIN_WMIMON
     const char* wow_ole32_profile;      // PLUGIN_WMIMON
@@ -162,6 +163,7 @@ struct plugins_options
     const char* procdump_dir;           // PLUGIN_PROCDUMP
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     vmi_pid_t procdump_on_finish;       // PLUGIN_PROCDUMP2
+    bool procdump_new_processes_on_finish; // PLUGIN_PROCDUMP2
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
     const char* hal_profile;            // PLUGIN_PROCDUMP2
     bool procdump_disable_kideliverapc_hook; // PLUGIN_PROCDUMP2
@@ -187,6 +189,7 @@ struct plugins_options
     const char* services_profile;       // PLUGIN_DKOMMON
     const char* netio_profile;          // PLUGIN_CALLBACKMON
     uint64_t hidevm_delay;              // PLUGIN_HIDEVM
+    uint64_t unixsocketmon_max_size;    // PLUGIN_UNIXSOCKETMON
 };
 
 typedef enum drakvuf_plugin
@@ -231,6 +234,7 @@ typedef enum drakvuf_plugin
     PLUGIN_PTRACEMON,
     PLUGIN_EBPFMON,
     PLUGIN_MEMACCESSMON,
+    PLUGIN_UNIXSOCKETMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -276,6 +280,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_PTRACEMON] = "ptracemon",
     [PLUGIN_EBPFMON] = "ebpfmon",
     [PLUGIN_MEMACCESSMON] = "memaccessmon",
+    [PLUGIN_UNIXSOCKETMON] = "unixsocketmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -320,6 +325,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_PTRACEMON]    = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_EBPFMON]      = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_MEMACCESSMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_UNIXSOCKETMON]= { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
 };
 
 class plugin

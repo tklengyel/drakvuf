@@ -109,7 +109,7 @@
 #include <optional>
 #include "plugins/plugin_utils.h"
 #include "win.h"
-#include "linux.h"
+#include "plugins/plugins_ex.h"
 
 namespace filetracer_ns
 {
@@ -144,14 +144,28 @@ struct wrapper
     uint64_t desired_access;
 };
 
-struct linux_wrapper
+struct linux_data : PluginResult
 {
-    vmi_pid_t pid = 0;
-    uint32_t tid = 0;
-    uint64_t rsp = 0;
-    int permissions = 0;
+    linux_data()
+        : PluginResult()
+        , pid()
+        , tid()
+        , permissions()
+        , rsp()
+        , filename()
+        , flags()
+        , modes()
+        , uid()
+        , gid()
+        , args()
+    {
+    }
 
-    linux_filetracer* f;
+    vmi_pid_t pid;
+    uint32_t tid;
+    int permissions;
+    addr_t rsp;
+
     std::string filename;
     std::string flags;
     std::string modes;
@@ -567,8 +581,9 @@ enum
     _PATH_DENTRY,
     _DENTRY_D_NAME,
     _DENTRY_D_INODE,
+    _DENTRY_D_PARENT,
     _QSTR_NAME,
-    // _TIMESPEC64_TV_SEC,
+    _TIMESPEC64_TV_SEC,
 
     __LINUX_OFFSET_MAX,
 };
@@ -588,8 +603,9 @@ static const char* linux_offset_names[__OFFSET_MAX][2] =
     [_PATH_DENTRY] = {"path", "dentry"},
     [_DENTRY_D_NAME] = {"dentry", "d_name"},
     [_DENTRY_D_INODE] = {"dentry", "d_inode"},
+    [_DENTRY_D_PARENT] = {"dentry", "d_parent"},
     [_QSTR_NAME] = {"qstr", "name"},
-    // [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
+    [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
 };
 
 // Linux Inode Flags
@@ -688,6 +704,72 @@ static const flags_str_t linux_lseek_whence =
     REGISTER_FLAG(LSEEK_END),
     REGISTER_FLAG(LSEEK_DATA),
     REGISTER_FLAG(LSEEK_HOLE),
+};
+
+// Linux memfd flags
+static const flags_str_t linux_memfd_flags =
+{
+    REGISTER_FLAG(MFD_CLOEXEC),
+    REGISTER_FLAG(MFD_ALLOW_SEALING),
+    REGISTER_FLAG(MFD_HUGETLB)
+};
+
+enum linux_pt_regs
+{
+    PT_REGS_R15,
+    PT_REGS_R14,
+    PT_REGS_R13,
+    PT_REGS_R12,
+    PT_REGS_RBP,
+    PT_REGS_RBX,
+
+    PT_REGS_R11,
+    PT_REGS_R10,
+    PT_REGS_R9,
+    PT_REGS_R8,
+    PT_REGS_RAX,
+    PT_REGS_RCX,
+    PT_REGS_RDX,
+    PT_REGS_RSI,
+    PT_REGS_RDI,
+
+    PT_REGS_ORIG_RAX,
+
+    PT_REGS_RIP,
+    PT_REGS_CS,
+    PT_REGS_EFLAGS,
+    PT_REGS_RSP,
+    PT_REGS_SS,
+
+    __PT_REGS_MAX
+};
+
+static const char* linux_pt_regs_offsets_name[__PT_REGS_MAX][2] =
+{
+    [PT_REGS_R15]      = {"pt_regs", "r15"},
+    [PT_REGS_R14]      = {"pt_regs", "r14"},
+    [PT_REGS_R13]      = {"pt_regs", "r13"},
+    [PT_REGS_R12]      = {"pt_regs", "r12"},
+    [PT_REGS_RBP]      = {"pt_regs", "bp"},
+    [PT_REGS_RBX]      = {"pt_regs", "bx"},
+
+    [PT_REGS_R11]      = {"pt_regs", "r11"},
+    [PT_REGS_R10]      = {"pt_regs", "r10"},
+    [PT_REGS_R9]       = {"pt_regs", "r9"},
+    [PT_REGS_R8]       = {"pt_regs", "r8"},
+    [PT_REGS_RAX]      = {"pt_regs", "ax"},
+    [PT_REGS_RCX]      = {"pt_regs", "cx"},
+    [PT_REGS_RDX]      = {"pt_regs", "dx"},
+    [PT_REGS_RSI]      = {"pt_regs", "si"},
+    [PT_REGS_RDI]      = {"pt_regs", "di"},
+
+    [PT_REGS_ORIG_RAX] = {"pt_regs", "orig_ax"},
+
+    [PT_REGS_RIP]      = {"pt_regs", "ip"},
+    [PT_REGS_CS]       = {"pt_regs", "cs"},
+    [PT_REGS_EFLAGS]   = {"pt_regs", "flags"},
+    [PT_REGS_RSP]      = {"pt_regs", "sp"},
+    [PT_REGS_SS]       = {"pt_regs", "ss"},
 };
 
 }

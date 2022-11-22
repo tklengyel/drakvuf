@@ -1070,28 +1070,14 @@ void fileextractor::print_file_information(drakvuf_trap_info_t* info,
             break;
     }
 
-    if (this->format == OUTPUT_KV)
-    {
-        kvfmt::print("fileextractor", drakvuf, info,
-            keyval("FileName", fmt::Qstr(task.filename)),
-            keyval("Size", fmt::Nval(task.file_size)),
-            keyval("Flags", fmt::Xval(task.fo_flags)),
-            fmt::Rstr(flags),
-            keyval("SeqNum", fmt::Nval(task.idx)),
-            keyval("Reason", fmt::Qstr(r))
-        );
-    }
-    else
-    {
-        fmt::print(this->format, "fileextractor", drakvuf, info,
-            keyval("FileName", fmt::Qstr(task.filename)),
-            keyval("Size", fmt::Nval(task.file_size)),
-            keyval("Flags", fmt::Xval(task.fo_flags)),
-            keyval("FlagsExpanded", fmt::Qstr(flags)),
-            keyval("SeqNum", fmt::Nval(task.idx)),
-            keyval("Reason", fmt::Qstr(r))
-        );
-    }
+    fmt::print(this->format, "fileextractor", drakvuf, info,
+        keyval("FileName", fmt::Estr(task.filename)),
+        keyval("Size", fmt::Nval(task.file_size)),
+        keyval("Flags", fmt::Xval(task.fo_flags)),
+        flagsval("FlagsExpanded", flags),
+        keyval("SeqNum", fmt::Nval(task.idx)),
+        keyval("Reason", fmt::Qstr(r))
+    );
 }
 
 void fileextractor::print_extraction_failure(drakvuf_trap_info_t* info,

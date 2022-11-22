@@ -43,7 +43,7 @@
  *                                                                         *
  * This list is not exclusive, but is meant to clarify our interpretation  *
  * of derived works with some common examples.  Other people may interpret *
-* the plain GPL differently, so we consider this a special exception to   *
+ * the plain GPL differently, so we consider this a special exception to   *
  * the GPL that we apply to Covered Software.  Works which meet any of     *
  * these conditions must conform to all of the terms of this license,      *
  * particularly including the GPL Section 3 requirements of providing      *
@@ -102,192 +102,154 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdlib.h>
-#include <sys/prctl.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <limits.h>
-#include <glib.h>
+#ifndef UNIXSOCKETMON_PRIVATE_H
+#define UNIXSOCKETMON_PRIVATE_H
 
-#include "private.h"
-#include "linux-exports.h"
-#include "linux.h"
-#include "linux-offsets.h"
-#include "linux-offsets-map.h"
-
-addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
+typedef enum socket_family
 {
-    switch (narg)
+    AF_LOCAL                = 1,	/* POSIX name for AF_UNIX	*/
+    AF_INET                 = 2,	/* Internet IP Protocol 	*/
+    AF_AX25                 = 3,	/* Amateur Radio AX.25 		*/
+    AF_IPX                  = 4,	/* Novell IPX 			*/
+    AF_APPLETALK            = 5,	/* AppleTalk DDP 		*/
+    AF_NETROM               = 6,	/* Amateur Radio NET/ROM 	*/
+    AF_BRIDGE               = 7,	/* Multiprotocol bridge 	*/
+    AF_ATMPVC               = 8,	/* ATM PVCs			*/
+    AF_X25                  = 9,    /* Reserved for X.25 project 	*/
+    AF_INET6                = 10,	/* IP version 6			*/
+    AF_ROSE                 = 11,	/* Amateur Radio X.25 PLP	*/
+    AF_DECnet               = 12,	/* Reserved for DECnet project	*/
+    AF_NETBEUI              = 13,	/* Reserved for 802.2LLC project*/
+    AF_SECURITY             = 14,	/* Security callback pseudo AF */
+    AF_KEY                  = 15,   /* PF_KEY key management API */
+    AF_NETLINK              = 16,
+    AF_PACKET               = 17,	/* Packet family		*/
+    AF_ASH                  = 18,	/* Ash				*/
+    AF_ECONET               = 19,	/* Acorn Econet			*/
+    AF_ATMSVC               = 20,	/* ATM SVCs			*/
+    AF_RDS                  = 21,	/* RDS sockets 			*/
+    AF_SNA                  = 22,	/* Linux SNA Project (nutters!) */
+    AF_IRDA                 = 23,	/* IRDA sockets			*/
+    AF_PPPOX                = 24,	/* PPPoX sockets		*/
+    AF_WANPIPE              = 25,	/* Wanpipe API Sockets */
+    AF_LLC                  = 26,	/* Linux LLC			*/
+    AF_IB                   = 27,	/* Native InfiniBand address	*/
+    AF_MPLS                 = 28,	/* MPLS */
+    AF_CAN                  = 29,	/* Controller Area Network      */
+    AF_TIPC                 = 30,	/* TIPC sockets			*/
+    AF_BLUETOOTH            = 31,	/* Bluetooth sockets 		*/
+    AF_IUCV                 = 32,	/* IUCV sockets			*/
+    AF_RXRPC                = 33,	/* RxRPC sockets 		*/
+    AF_ISDN                 = 34,	/* mISDN sockets 		*/
+    AF_PHONET               = 35,	/* Phonet sockets		*/
+    AF_IEEE802154           = 36,	/* IEEE802154 sockets		*/
+    AF_CAIF                 = 37,	/* CAIF sockets			*/
+    AF_ALG                  = 38,	/* Algorithm sockets		*/
+    AF_NFC                  = 39,	/* NFC sockets			*/
+    AF_VSOCK                = 40,	/* vSockets			*/
+    AF_KCM                  = 41,	/* Kernel Connection Multiplexor*/
+    AF_QIPCRTR              = 42,	/* Qualcomm IPC Router */
+    AF_SMC                  = 43,	/* smc sockets: reserve number for PF_SMC protocol family that reuses AF_INET address family */
+    AF_XDP                  = 44,	/* XDP sockets */
+    AF_MCTP                 = 45,	/* Management component transport protocol */
+} socket_family_t;
+
+static inline const char* socket_family_to_str(socket_family_t family)
+{
+    switch (family)
     {
-        case 1:
-            return info->regs->rdi;
-        case 2:
-            return info->regs->rsi;
-        case 3:
-            return info->regs->rdx;
-        case 4:
-            return info->regs->rcx;
-        case 5:
-            return info->regs->r8;
-        case 6:
-            return info->regs->r9;
+        case AF_LOCAL:
+            return "AF_LOCAL";
+        case AF_INET:
+            return "AF_INET";
+        case AF_AX25:
+            return "AF_AX25";
+        case AF_IPX:
+            return "AF_IPX";
+        case AF_APPLETALK:
+            return "AF_APPLETALK";
+        case AF_NETROM:
+            return "AF_NETROM";
+        case AF_BRIDGE:
+            return "AF_BRIDGE";
+        case AF_ATMPVC:
+            return "AF_ATMPVC";
+        case AF_X25:
+            return "AF_X25";
+        case AF_INET6:
+            return "AF_INET6";
+        case AF_ROSE:
+            return "AF_ROSE";
+        case AF_DECnet:
+            return "AF_DECnet";
+        case AF_NETBEUI:
+            return "AF_NETBEUI";
+        case AF_SECURITY:
+            return "AF_SECURITY";
+        case AF_KEY:
+            return "AF_KEY";
+        case AF_NETLINK:
+            return "AF_NETLINK";
+        case AF_PACKET:
+            return "AF_PACKET";
+        case AF_ASH:
+            return "AF_ASH";
+        case AF_ECONET:
+            return "AF_ECONET";
+        case AF_ATMSVC:
+            return "AF_ATMSVC";
+        case AF_RDS:
+            return "AF_RDS";
+        case AF_SNA:
+            return "AF_SNA";
+        case AF_IRDA:
+            return "AF_IRDA";
+        case AF_PPPOX:
+            return "AF_PPPOX";
+        case AF_WANPIPE:
+            return "AF_WANPIPE";
+        case AF_LLC:
+            return "AF_LLC";
+        case AF_IB:
+            return "AF_IB";
+        case AF_MPLS:
+            return "AF_MPLS";
+        case AF_CAN:
+            return "AF_CAN";
+        case AF_TIPC:
+            return "AF_TIPC";
+        case AF_BLUETOOTH:
+            return "AF_BLUETOOTH";
+        case AF_IUCV:
+            return "AF_IUCV";
+        case AF_RXRPC:
+            return "AF_RXRPC";
+        case AF_ISDN:
+            return "AF_ISDN";
+        case AF_PHONET:
+            return "AF_PHONET";
+        case AF_IEEE802154:
+            return "AF_IEEE802154";
+        case AF_CAIF:
+            return "AF_CAIF";
+        case AF_ALG:
+            return "AF_ALG";
+        case AF_NFC:
+            return "AF_NFC";
+        case AF_VSOCK:
+            return "AF_VSOCK";
+        case AF_KCM:
+            return "AF_KCM";
+        case AF_QIPCRTR:
+            return "AF_QIPCRTR";
+        case AF_SMC:
+            return "AF_SMC";
+        case AF_XDP:
+            return "AF_XDP";
+        case AF_MCTP:
+            return "AF_MCTP";
     }
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * 8
-    );
-
-    uint64_t ret;
-    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
-        return 0;
-    return ret;
+    return NULL;
 }
 
-addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    addr_t ret_addr;
-    if (VMI_FAILURE == vmi_read_addr_va(drakvuf->vmi, info->regs->rsp, 0, &ret_addr))
-        return 0;
-    return ret_addr;
-}
-
-bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
-{
-    return (info->proc_data.pid == pid)
-        && (info->proc_data.tid == tid)
-        && (!rsp || info->regs->rip == rsp);
-}
-
-bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
-{
-    json_object* kernel_json = vmi_get_kernel_json(drakvuf->vmi);
-    if (VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, rva))
-    {
-        bool find = false;
-        for (uint8_t i = 0; i < 255; i++)
-        {
-            char tmp[64];
-            snprintf(tmp, sizeof(tmp), "%s.isra.%d", function, i);
-            if (VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, tmp, rva))
-            {
-                find = true;
-                break;
-            }
-        }
-        if (!find)
-            return false;
-    }
-    return true;
-}
-
-/**
- * @brief Function for extract absolute path from "struct dentry"
- * https://elixir.bootlin.com/linux/v5.9.14/source/fs/d_path.c#L329
- *
- * @param drakvuf drakvuf instanse
- * @param dentry_addr address of "struct dentry"
- * @return char* - absolute path of filename
-*/
-char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
-{
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd);
-
-    addr_t parent;
-    GString* b = g_string_new(NULL);
-
-    ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
-    while (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &parent) && parent != dentry_addr)
-    {
-        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        gchar* tmp = vmi_read_str(drakvuf->vmi, &ctx);
-        if (tmp == NULL)
-            break;
-
-        // TODO: why vmi_read_str return 0x01?
-        // TODO: with "std::string dirname = tmp" works very well
-        if (tmp[0] != 0x01)
-        {
-            g_string_prepend(b, tmp);
-            g_string_prepend(b, "/");
-        }
-
-        g_free(tmp);
-
-        dentry_addr = parent;
-        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
-    }
-
-    return g_string_free(b, 0);
-}
-
-bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va)
-{
-    if (!linux_get_kernel_symbol_rva(drakvuf, function, va))
-        return false;
-
-    addr_t _text;
-    if (!linux_get_kernel_symbol_rva(drakvuf, "_text", &_text))
-        return false;
-
-    addr_t kaslr = drakvuf->kernbase - _text;
-    if (!kaslr)
-        return false;
-
-    *va += kaslr;
-    return true;
-}
-
-static bool find_kernbase(drakvuf_t drakvuf)
-{
-    if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
-        return 0;
-
-    return !!drakvuf->kernbase;
-}
-
-bool set_os_linux(drakvuf_t drakvuf)
-{
-    if ( !find_kernbase(drakvuf) )
-        return 0;
-
-    if ( !drakvuf->kpgd && VMI_FAILURE == vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd) )
-        return 0;
-
-    // Get the offsets from the Rekall profile
-    if ( !fill_kernel_offsets(drakvuf, __LINUX_OFFSETS_MAX, linux_offset_names) )
-        return 0;
-
-    drakvuf->osi.get_current_thread = linux_get_current_thread;
-    drakvuf->osi.get_current_process = linux_get_current_process;
-    drakvuf->osi.get_process_name = linux_get_process_name;
-    drakvuf->osi.get_current_process_name = linux_get_current_process_name;
-    drakvuf->osi.get_process_userid = linux_get_process_userid;
-    drakvuf->osi.get_current_process_userid = linux_get_current_process_userid;
-    drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
-    drakvuf->osi.get_process_pid = linux_get_process_pid;
-    drakvuf->osi.get_process_tid = linux_get_process_tid;
-    drakvuf->osi.get_process_ppid = linux_get_process_ppid;
-    drakvuf->osi.get_process_data = linux_get_process_data;
-    drakvuf->osi.get_process_dtb = linux_get_process_dtb;
-    drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
-    drakvuf->osi.export_lib_address = get_lib_address;
-    drakvuf->osi.get_function_argument = linux_get_function_argument;
-    drakvuf->osi.get_function_return_address = linux_get_function_return_address;
-    drakvuf->osi.check_return_context = linux_check_return_context;
-    drakvuf->osi.enumerate_processes = linux_enumerate_processes;
-    drakvuf->osi.get_current_process_environ = linux_get_current_process_environ;
-    drakvuf->osi.get_process_arguments = linux_get_process_arguments;
-    drakvuf->osi.get_kernel_symbol_rva = linux_get_kernel_symbol_rva;
-    drakvuf->osi.get_kernel_symbol_va = linux_get_kernel_symbol_va;
-    drakvuf->osi.get_filepath_from_dentry = linux_get_filepath_from_dentry;
-
-    return 1;
-}
+#endif

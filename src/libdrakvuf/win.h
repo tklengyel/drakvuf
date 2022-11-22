@@ -201,6 +201,8 @@ bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callb
 bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
 uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+bool win_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+uint64_t win_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid);
@@ -211,6 +213,8 @@ bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* 
 bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
 
 bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
+
+addr_t win_get_rspbase(drakvuf_t dravkuf, drakvuf_trap_info_t* info);
 
 bool win_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva);
 

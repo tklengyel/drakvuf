@@ -147,6 +147,11 @@ struct DataPrinter
         return true;
     }
 
+    static bool print(std::ostream& os, const flagsval& flags, char sep)
+    {
+        return print_data(os, fmt::Rstr(flags.values), sep);
+    }
+
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Nval<Tv>& data, char)
     {
@@ -191,6 +196,13 @@ struct DataPrinter
     static bool print(std::ostream& os, const fmt::Estr<Tv>& data, char)
     {
         return print_escaped(os, data.value);
+    }
+
+    template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::BinaryString<Tv>& data, char)
+    {
+        data.format(os);
+        return true;
     }
 
     static bool print_escaped(std::ostream& os, const std::string& value)

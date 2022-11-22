@@ -220,6 +220,26 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return thread;
 }
 
+addr_t win_get_rspbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t rspbase = 0;
+    addr_t prcb = 0;
+    addr_t kpcr = 0;
+
+    if (!win_get_current_kpcr(drakvuf, info, &kpcr, &prcb))
+    {
+        return 0;
+    }
+
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_RSPBASE], 0, &rspbase))
+    {
+        return 0;
+    }
+
+    return rspbase;
+}
+
 addr_t win_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     vmi_instance_t vmi = drakvuf->vmi;
@@ -1541,6 +1561,7 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
             uint32_t flags1 = 0;
 
             out_mmvad->file_name_ptr = 0;
+            out_mmvad->node_addr = node_addr;
 
             if (is_win7)
             {
@@ -1671,6 +1692,7 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     mmvad.file_name_ptr = 0;
     mmvad.total_number_of_ptes = 0;
     mmvad.prototype_pte = 0;
+    mmvad.node_addr = node_addr;
 
     if (is_win7)
     {
@@ -1814,6 +1836,18 @@ uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_
 uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad)
 {
     int idx = MMVAD_FLAGS_VADTYPE;
+    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
+}
+
+bool win_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    int idx = MMVAD_FLAGS_PRIVATEMEMORY;
+    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
+}
+
+uint64_t win_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    int idx = MMVAD_FLAGS_PROTECTION;
     return win_mmvad_flag(drakvuf, mmvad->flags, idx);
 }
 

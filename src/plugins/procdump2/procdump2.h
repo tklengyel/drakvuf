@@ -120,8 +120,8 @@ struct procdump2_config
     uint32_t timeout;
     const char* procdump_dir;
     bool compress_procdumps;
-    vmi_pid_t procdump_on_finish;
-    std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
+    vmi_pid_t dump_process_on_finish;
+    bool dump_new_processes_on_finish;
     const char* hal_profile;
     bool disable_kideliverapc_hook;
     bool disable_kedelayexecutionthread_hook;
@@ -143,12 +143,11 @@ private:
     uint32_t                                             timeout{0};
     // TODO Use `std::filesystem::path`
     std::string const                                    procdump_dir;
-    // TODO Rename
-    vmi_pid_t                                            procdump_on_finish{0};
+    vmi_pid_t const                                      dump_process_on_finish;
+    bool const                                           dump_new_processes_on_finish;
     bool const                                           use_compression{false};
 
     /* Internal data */
-    drakvuf_t                                            drakvuf{nullptr};
     uint64_t                                             procdumps_count{0};
     std::unique_ptr<pool_manager>                        pools;
     std::map<vmi_pid_t, std::shared_ptr<procdump2_ctx>>  active;
@@ -174,11 +173,17 @@ private:
      * // TODO Move this long description into README at the end of development.
      */
     std::set<uint32_t> working_threads;
+    /* List of PIDs of running processes on plugin start.
+     *
+     * Used only with procdump_new_processes_on_finish.
+     */
+    std::vector<vmi_pid_t> running_processes_on_start;
 
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> terminate_process_hook;
     std::unique_ptr<libhook::SyscallHook> deliver_apc_hook;
     std::unique_ptr<libhook::SyscallHook> delay_execution_hook;
+    std::unique_ptr<libhook::SyscallHook> clean_process_memory_hook;
 
     /* VA of functions to be injected */
     addr_t malloc_va{0};
@@ -203,6 +208,7 @@ private:
     event_response_t deliver_apc_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t terminate_process_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t delay_execution_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t clean_process_memory_cb(drakvuf_t, drakvuf_trap_info_t*);
 
     /* Dispatchers */
     event_response_t dispatcher(drakvuf_trap_info_t*);
@@ -221,7 +227,11 @@ private:
     void delay_execution(drakvuf_trap_info_t*, return_ctx&, uint16_t msec = 100);
 
     /* Routines */
+    void check_stack_marker(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, return_ctx&);
     std::shared_ptr<procdump2_ctx> continues_task(drakvuf_trap_info_t*);
+    /* The function erases task context from "this->active".
+     * So be carefull while iterating over it.
+     */
     void finish_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     bool is_active_process(vmi_pid_t pid);
@@ -233,6 +243,8 @@ private:
     void restore(drakvuf_trap_info_t*, return_ctx&);
     void save_file_metadata(std::shared_ptr<procdump2_ctx>, proc_data_t*);
     bool start_copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void start_dump_process(vmi_pid_t pid);
+    std::vector<vmi_pid_t> get_running_processes();
 };
 
 #endif

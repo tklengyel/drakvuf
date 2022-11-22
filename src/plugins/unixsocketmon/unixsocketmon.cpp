@@ -43,7 +43,7 @@
  *                                                                         *
  * This list is not exclusive, but is meant to clarify our interpretation  *
  * of derived works with some common examples.  Other people may interpret *
-* the plain GPL differently, so we consider this a special exception to   *
+ * the plain GPL differently, so we consider this a special exception to   *
  * the GPL that we apply to Covered Software.  Works which meet any of     *
  * these conditions must conform to all of the terms of this license,      *
  * particularly including the GPL Section 3 requirements of providing      *
@@ -102,192 +102,171 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdlib.h>
-#include <sys/prctl.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <limits.h>
-#include <glib.h>
+#include <libdrakvuf/libdrakvuf.h>
+#include <libvmi/libvmi.h>
 
+#include "unixsocketmon.h"
 #include "private.h"
-#include "linux-exports.h"
-#include "linux.h"
-#include "linux-offsets.h"
-#include "linux-offsets-map.h"
+#include "plugins/output_format.h"
 
-addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
+bool unixsocketmon::get_socket_family_type(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* family_type)
 {
-    switch (narg)
-    {
-        case 1:
-            return info->regs->rdi;
-        case 2:
-            return info->regs->rsi;
-        case 3:
-            return info->regs->rdx;
-        case 4:
-            return info->regs->rcx;
-        case 5:
-            return info->regs->r8;
-        case 6:
-            return info->regs->r9;
-    }
+    addr_t sock = drakvuf_get_function_argument(drakvuf, info, 1);
 
+    auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * 8
+        .addr = sock + this->socket_ops
     );
 
-    uint64_t ret;
-    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
-        return 0;
-    return ret;
-}
-
-addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    addr_t ret_addr;
-    if (VMI_FAILURE == vmi_read_addr_va(drakvuf->vmi, info->regs->rsp, 0, &ret_addr))
-        return 0;
-    return ret_addr;
-}
-
-bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
-{
-    return (info->proc_data.pid == pid)
-        && (info->proc_data.tid == tid)
-        && (!rsp || info->regs->rip == rsp);
-}
-
-bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
-{
-    json_object* kernel_json = vmi_get_kernel_json(drakvuf->vmi);
-    if (VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, rva))
+    addr_t ops;
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ops))
     {
-        bool find = false;
-        for (uint8_t i = 0; i < 255; i++)
-        {
-            char tmp[64];
-            snprintf(tmp, sizeof(tmp), "%s.isra.%d", function, i);
-            if (VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, tmp, rva))
-            {
-                find = true;
-                break;
-            }
-        }
-        if (!find)
-            return false;
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to read proto_ops from socket struct\n");
+        return false;
     }
+
+    ctx.addr = ops + this->proto_ops_family;
+    if (VMI_FAILURE == vmi_read_32(vmi, &ctx, family_type))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get socket family type\n");
+        return false;
+    }
+
     return true;
 }
 
-/**
- * @brief Function for extract absolute path from "struct dentry"
- * https://elixir.bootlin.com/linux/v5.9.14/source/fs/d_path.c#L329
- *
- * @param drakvuf drakvuf instanse
- * @param dentry_addr address of "struct dentry"
- * @return char* - absolute path of filename
-*/
-char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
+std::vector<uint8_t> unixsocketmon::get_socket_message(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t* ret_size)
 {
+    addr_t msghdr = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd);
+        .dtb = info->regs->cr3
+    );
 
-    addr_t parent;
-    GString* b = g_string_new(NULL);
-
-    ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
-    while (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &parent) && parent != dentry_addr)
+    addr_t iovec;
+    ctx.addr = msghdr + this->msghdr_msg_iter + this->iov_iter_iov;
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &iovec))
     {
-        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        gchar* tmp = vmi_read_str(drakvuf->vmi, &ctx);
-        if (tmp == NULL)
-            break;
-
-        // TODO: why vmi_read_str return 0x01?
-        // TODO: with "std::string dirname = tmp" works very well
-        if (tmp[0] != 0x01)
-        {
-            g_string_prepend(b, tmp);
-            g_string_prepend(b, "/");
-        }
-
-        g_free(tmp);
-
-        dentry_addr = parent;
-        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iovec from msghdr\n");
+        return {};
     }
 
-    return g_string_free(b, 0);
+    addr_t buf;
+    ctx.addr = iovec + this->iovec_iov_base;
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &buf))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get buffer from iovec struct\n");
+        return {};
+    }
+
+    uint64_t size;
+    ctx.addr = iovec + this->iovec_iov_len;
+    if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &size))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get size of buffer\n");
+        return {};
+    }
+
+    auto print_size = std::min(size, this->print_max_size);
+
+    std::vector<uint8_t> data(print_size, 0);
+    ctx.addr = buf;
+    size_t bytes_read;
+    if (VMI_FAILURE == vmi_read(vmi, &ctx, print_size, data.data(), &bytes_read))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to read data\n");
+        return {};
+    }
+
+    data.resize(bytes_read);
+    if (ret_size) *ret_size = size;
+    return data;
 }
 
-bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va)
+event_response_t unixsocketmon::sock_send_msg_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    if (!linux_get_kernel_symbol_rva(drakvuf, function, va))
-        return false;
+    uint32_t family_type;
+    if (!get_socket_family_type(drakvuf, info, &family_type))
+        return VMI_EVENT_RESPONSE_NONE;
+    auto socket_family_str = socket_family_to_str((socket_family_t)family_type);
 
-    addr_t _text;
-    if (!linux_get_kernel_symbol_rva(drakvuf, "_text", &_text))
-        return false;
+    uint64_t size = 0;
+    auto message = get_socket_message(drakvuf, info, &size);
 
-    addr_t kaslr = drakvuf->kernbase - _text;
-    if (!kaslr)
-        return false;
+    unicode_string_t msg =
+    {
+        .length = message.size(),
+        .contents = message.data(),
+        .encoding = "UTF-8"
+    };
 
-    *va += kaslr;
-    return true;
+    unicode_string_t out;
+    status_t rc = vmi_convert_str_encoding(&msg, &out, "UTF-8");
+
+    if (VMI_FAILURE == rc)
+    {
+        fmt::print(this->m_output_format, "unixsocketmon", drakvuf, info,
+            keyval("Type", fmt::Rstr(socket_family_str)),
+            keyval("Size", fmt::Nval(size)),
+            keyval("Value", fmt::BinaryString(message.data(), message.size()))
+        );
+    }
+    else
+    {
+        fmt::print(this->m_output_format, "unixsocketmon", drakvuf, info,
+            keyval("Type", fmt::Rstr(socket_family_str)),
+            keyval("Size", fmt::Nval(size)),
+            keyval("Value", fmt::Estr(reinterpret_cast<char*>(out.contents)))
+        );
+    }
+
+    g_free(out.contents);
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
-static bool find_kernbase(drakvuf_t drakvuf)
+unixsocketmon::unixsocketmon(drakvuf_t drakvuf, const unixsocketmon_config* config, output_format_t output)
+    :pluginex(drakvuf, output), print_max_size{config->print_max_size}
 {
-    if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
-        return 0;
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "socket", "ops", &socket_ops))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get struct member\n");
+        return;
+    }
 
-    return !!drakvuf->kernbase;
-}
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "proto_ops", "family", &proto_ops_family))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get proto_ops family\n");
+        return;
+    }
 
-bool set_os_linux(drakvuf_t drakvuf)
-{
-    if ( !find_kernbase(drakvuf) )
-        return 0;
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "msghdr", "msg_iter", &msghdr_msg_iter))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get msg_iter\n");
+        return;
+    }
 
-    if ( !drakvuf->kpgd && VMI_FAILURE == vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd) )
-        return 0;
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "iov_iter", "iov", &iov_iter_iov))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iov_iter\n");
+        return;
+    }
 
-    // Get the offsets from the Rekall profile
-    if ( !fill_kernel_offsets(drakvuf, __LINUX_OFFSETS_MAX, linux_offset_names) )
-        return 0;
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "iovec", "iov_base", &iovec_iov_base))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iov_base\n");
+        return;
+    }
 
-    drakvuf->osi.get_current_thread = linux_get_current_thread;
-    drakvuf->osi.get_current_process = linux_get_current_process;
-    drakvuf->osi.get_process_name = linux_get_process_name;
-    drakvuf->osi.get_current_process_name = linux_get_current_process_name;
-    drakvuf->osi.get_process_userid = linux_get_process_userid;
-    drakvuf->osi.get_current_process_userid = linux_get_current_process_userid;
-    drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
-    drakvuf->osi.get_process_pid = linux_get_process_pid;
-    drakvuf->osi.get_process_tid = linux_get_process_tid;
-    drakvuf->osi.get_process_ppid = linux_get_process_ppid;
-    drakvuf->osi.get_process_data = linux_get_process_data;
-    drakvuf->osi.get_process_dtb = linux_get_process_dtb;
-    drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
-    drakvuf->osi.export_lib_address = get_lib_address;
-    drakvuf->osi.get_function_argument = linux_get_function_argument;
-    drakvuf->osi.get_function_return_address = linux_get_function_return_address;
-    drakvuf->osi.check_return_context = linux_check_return_context;
-    drakvuf->osi.enumerate_processes = linux_enumerate_processes;
-    drakvuf->osi.get_current_process_environ = linux_get_current_process_environ;
-    drakvuf->osi.get_process_arguments = linux_get_process_arguments;
-    drakvuf->osi.get_kernel_symbol_rva = linux_get_kernel_symbol_rva;
-    drakvuf->osi.get_kernel_symbol_va = linux_get_kernel_symbol_va;
-    drakvuf->osi.get_filepath_from_dentry = linux_get_filepath_from_dentry;
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "iovec", "iov_len", &iovec_iov_len))
+    {
+        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iov_base\n");
+        return;
+    }
 
-    return 1;
+    sockethook = createSyscallHook("sock_sendmsg", &unixsocketmon::sock_send_msg_cb);
 }

@@ -562,6 +562,16 @@ if test x$plugin_memaccessmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_MEMACCESSMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_unixsocketmon],
+  [AS_HELP_STRING([--disable-plugin-unixsocketmon],
+    [Enable the unixsocketmon plugin @<:@yes@:>@])],
+  [plugin_unixsocketmon="$enableval"],
+  [plugin_unixsocketmon="yes"])
+AM_CONDITIONAL([PLUGIN_UNIXSOCKETMON], [test x$plugin_unixsocketmon = xyes])
+if test x$plugin_unixsocketmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_UNIXSOCKETMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -627,6 +637,13 @@ AC_ARG_ENABLE([threadsafety],
 if test x$threadsafety = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_THREADSAFETY, 1, "")
 fi
+
+AC_ARG_ENABLE([output_buffering],
+  [AS_HELP_STRING([--disable-ouput-buffering],
+    [Disable TTY output buffering @<:@yes@:>@])],
+  [output_buffering="$enableval"],
+  [output_buffering="yes"])
+AM_CONDITIONAL([OUTPUT_BUFFERING], [test x$output_buffering = xyes])
 
 #####################################################
 # AUTOHARDEN START
@@ -868,12 +885,14 @@ Rootkitmon:    $plugin_rootkitmon
 Spraymon:      $plugin_spraymon
 Callbackmon:   $plugin_callbackmon
 HideVM:        $plugin_hidevm
+Unixsocketmon: $plugin_unixsocketmon
 Memaccessmon:  $plugin_memaccessmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
-WMIMon:        $plugin_wmimon
-Filedelete:    $plugin_filedelete
+WMIMon:             $plugin_wmimon
+Filedelete:         $plugin_filedelete
 -------------------------------------------------------------------------------
-REPL:          $repl
-Thread safe:   $threadsafety
+REPL:               $repl
+Thread safe:        $threadsafety
+Output buffering:   $output_buffering
 -------------------------------------------------------------------------------])

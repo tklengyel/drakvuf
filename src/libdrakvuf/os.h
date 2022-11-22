@@ -121,6 +121,9 @@ typedef struct os_interface
     addr_t (*get_current_thread_stackbase)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+    addr_t (*get_rspbase)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
@@ -216,6 +219,9 @@ typedef struct os_interface
     char* (*get_filename_from_object_attributes)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
 
+    char* (*get_filepath_from_dentry)
+    (drakvuf_t drakvuf, addr_t dentry_addr);
+
     bool (*is_wow64)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
@@ -254,6 +260,12 @@ typedef struct os_interface
 
     uint64_t (*mmvad_commit_charge)
     (drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
+
+    bool (*mmvad_private_memory)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
+
+    uint64_t (*mmvad_protection)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
 
     bool (*get_pid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);

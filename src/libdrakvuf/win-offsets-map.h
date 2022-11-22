@@ -228,6 +228,7 @@ static const char* win_bitfields_names[__WIN_OFFSETS_MAX][2] =
     [MMVAD_FLAGS_VADTYPE] = { "_MMVAD_FLAGS", "VadType" },
     [MMVAD_FLAGS_COMMITCHARGE] = { "_MMVAD_FLAGS", "CommitCharge" },
     [MMVAD_FLAGS1_COMMITCHARGE] = { "_MMVAD_FLAGS1", "CommitCharge" },
+    [MMVAD_FLAGS_PRIVATEMEMORY] = { "_MMVAD_FLAGS",  "PrivateMemory" },
 };
 
 #endif

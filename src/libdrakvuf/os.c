@@ -775,6 +775,20 @@ char* drakvuf_get_filename_from_object_attributes(drakvuf_t drakvuf, drakvuf_tra
     return ret;
 }
 
+char* drakvuf_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
+{
+    char* ret = NULL;
+
+    if (drakvuf->osi.get_filepath_from_dentry)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_filepath_from_dentry(drakvuf, dentry_addr);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     bool ret = false;
@@ -958,6 +972,34 @@ uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uin
     return ret;
 }
 
+bool drakvuf_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.mmvad_private_memory )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.mmvad_private_memory(drakvuf, mmvad);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+uint64_t drakvuf_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    uint64_t ret = 0;
+
+    if ( drakvuf->osi.mmvad_protection )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.mmvad_protection(drakvuf, mmvad);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
 {
     bool ret = false;
@@ -1050,6 +1092,20 @@ bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.check_return_context(info, pid, tid, rsp);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+addr_t drakvuf_get_rspbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t ret = 0;
+
+    if (drakvuf->osi.get_rspbase)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_rspbase(drakvuf, info);
         drakvuf_release_vmi(drakvuf);
     }
 

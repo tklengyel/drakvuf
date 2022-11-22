@@ -106,21 +106,20 @@
 #define FILETRACER_H
 
 #include "plugins/private.h"
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 #include "win.h"
 #include "linux.h"
 
-class filetracer: public plugin
+#include <memory>
+
+class filetracer : public pluginex
 {
 public:
-    os_t os;
-    win_filetracer* wf;
-    linux_filetracer* lf;
+    std::unique_ptr<win_filetracer> wf;
+    std::unique_ptr<linux_filetracer> lf;
+
     filetracer(drakvuf_t drakvuf, output_format_t output);
-    filetracer(const filetracer&) = delete;
-    filetracer& operator=(const filetracer&) = delete;
-    ~filetracer();
-    virtual bool stop_impl() override;
+    ~filetracer() = default;
 };
 
 #endif

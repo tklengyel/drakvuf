@@ -104,6 +104,7 @@
 #pragma once
 
 #include <string>
+#include <optional>
 #include <libhook/call_result.hpp>
 #include <libhook/hooks/base.hpp>
 
@@ -118,12 +119,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl)
-    -> std::unique_ptr<SyscallHook>;
-
-    template<typename Params = CallResult>
-    [[nodiscard]]
-    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::string& display_name)
+    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::optional<std::string>& display_name)
     -> std::unique_ptr<SyscallHook>;
 
     /**
@@ -135,71 +131,67 @@ public:
      * delete copy ctor, as this class has ownership via RAII
      */
     SyscallHook(const SyscallHook&) = delete;
-
-    /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    SyscallHook(SyscallHook&&) noexcept;
+    SyscallHook(SyscallHook&&) = delete;
 
     /**
      * delete copy assignment operator, as this class has ownership via RAII
      */
     SyscallHook& operator=(const SyscallHook&) = delete;
+    SyscallHook& operator=(SyscallHook&&) = delete;
 
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    SyscallHook& operator=(SyscallHook&&) noexcept;
-
-    std::string syscall_name_;
-    std::string display_name_;
+    const std::string syscall_name_;
+    const std::string display_name_;
     cb_wrapper_t callback_;
     drakvuf_trap_t* trap_;
+
+private:
+    [[nodiscard]]
+    static auto createWindowsTrap(drakvuf_t drakvuf, const std::string& syscall_name, uint64_t ttl)
+    -> drakvuf_trap_t*;
+
+    [[nodiscard]]
+    static auto createLinuxTrap(drakvuf_t drakvuf, const std::string& syscall_name, uint64_t ttl)
+    -> drakvuf_trap_t*;
 
 protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
-    SyscallHook(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb);
-    SyscallHook(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::string& display_name);
+    SyscallHook(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, const std::string& display_name);
 };
 
 template<typename Params>
-auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl)
+auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::optional<std::string>& opt_display_name)
 -> std::unique_ptr<SyscallHook>
 {
+    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
+
     PRINT_DEBUG("[LIBHOOK] creating syscall hook\n");
+
+    drakvuf_trap_t* trap = nullptr;
+
+    switch (drakvuf_get_os_type(drakvuf))
+    {
+        case VMI_OS_WINDOWS:
+            trap = createWindowsTrap(drakvuf, syscall_name, ttl);
+            break;
+        case VMI_OS_LINUX:
+            trap = createLinuxTrap(drakvuf, syscall_name, ttl);
+            break;
+        default:
+            PRINT_DEBUG("[LIBHOOK] Failed to create syscall hook for unsupported OS \n");
+            break;
+    }
+
+    if (!trap)
+        return {};
 
     // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<SyscallHook>(new SyscallHook(drakvuf, syscall_name, cb));
-    hook->trap_ = new drakvuf_trap_t();
-
-    if (!drakvuf_get_kernel_symbol_rva(hook->drakvuf_, hook->syscall_name_.c_str(), &hook->trap_->breakpoint.rva))
-    {
-        PRINT_DEBUG("[LIBHOOK] Failed to receive addr of function %s\n", hook->syscall_name_.c_str());
-        delete hook->trap_;
-        hook->trap_ = nullptr;
-        return std::unique_ptr<SyscallHook>();
-    }
-
-    hook->trap_->breakpoint.lookup_type = LOOKUP_PID;
-    hook->trap_->breakpoint.pid = 4;
-    hook->trap_->breakpoint.addr_type = ADDR_RVA;
-    hook->trap_->breakpoint.module = "ntoskrnl.exe";
-
-    hook->trap_->name = hook->syscall_name_.c_str();
-    hook->trap_->type = BREAKPOINT;
-    hook->trap_->ah_cb = nullptr;
-    hook->trap_->ttl = ttl;
-    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-    {
-        return GetTrapHook<SyscallHook>(info)->callback_(drakvuf, info);
-    };
-
-    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
-    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
+    const std::string& display_name = opt_display_name ? *opt_display_name : syscall_name;
+    auto hook = std::unique_ptr<SyscallHook>(new SyscallHook(drakvuf, syscall_name, cb, display_name));
+    hook->trap_ = trap;
+    hook->trap_->name = hook->display_name_.data();
 
     // populate backref
     auto* params = new Params();
@@ -213,67 +205,11 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
         hook->trap_->data = nullptr;
         delete hook->trap_;
         hook->trap_ = nullptr;
-        return std::unique_ptr<SyscallHook>();
+        return {};
     }
 
     PRINT_DEBUG("[LIBHOOK] return hook OK\n");
     return hook;
 }
 
-template<typename Params>
-auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::string& display_name)
--> std::unique_ptr<SyscallHook>
-{
-    PRINT_DEBUG("[LIBHOOK] creating syscall hook\n");
-
-    auto hook = std::unique_ptr<SyscallHook>(new SyscallHook(drakvuf, syscall_name, cb, ttl, display_name));
-    hook->trap_ = new drakvuf_trap_t();
-
-    if (!drakvuf_get_kernel_symbol_va(hook->drakvuf_, hook->syscall_name_.c_str(), &hook->trap_->breakpoint.addr))
-    {
-        PRINT_DEBUG("[LIBHOOK] Failed to receive addr of function %s\n", hook->syscall_name_.c_str());
-        delete hook->trap_;
-        hook->trap_ = nullptr;
-        return std::unique_ptr<SyscallHook>();
-    }
-
-    hook->trap_->breakpoint.lookup_type = LOOKUP_PID;
-    hook->trap_->breakpoint.pid = 0;
-    hook->trap_->breakpoint.addr_type = ADDR_VA;
-    hook->trap_->breakpoint.module = "linux";
-
-    if (!hook->display_name_.empty())
-        hook->trap_->name = hook->display_name_.c_str();
-    else
-        hook->trap_->name = hook->syscall_name_.c_str();
-    hook->trap_->type = BREAKPOINT;
-    hook->trap_->ah_cb = nullptr;
-    hook->trap_->ttl = ttl;
-    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-    {
-        return GetTrapHook<SyscallHook>(info)->callback_(drakvuf, info);
-    };
-
-    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
-    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
-
-    // populate backref
-    auto* params = new Params();
-    params->hook_ = hook.get();
-    hook->trap_->data = static_cast<void*>(params);
-
-    if (!drakvuf_add_trap(drakvuf, hook->trap_))
-    {
-        PRINT_DEBUG("[LIBHOOK] failed to create trap for syscall hook\n");
-        delete static_cast<CallResult*>(hook->trap_->data);
-        hook->trap_->data = nullptr;
-        delete hook->trap_;
-        hook->trap_ = nullptr;
-        return std::unique_ptr<SyscallHook>();
-    }
-
-    PRINT_DEBUG("[LIBHOOK] return hook OK\n");
-    return hook;
-}
-
-};  // namespace libhook
+}  // namespace libhook

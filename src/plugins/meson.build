@@ -195,6 +195,12 @@ if get_option('plugin-memaccessmon')
     config_h.set('ENABLE_PLUGIN_MEMACCESSMON', 1)
 endif
 
+if get_option('plugin-unixsocketmon')
+    plugin_sources += 'unixsocketmon/unixsocketmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_UNIXSOCKETMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -222,7 +228,11 @@ summary({
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon' : get_option('plugin-ebpfmon'),
+<<<<<<< HEAD
     'memaccessmon' : get_option('plugin-memaccessmon'),
+=======
+    'unixsocketmon' : get_option('plugin-unixsocketmon'),
+>>>>>>> master
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({

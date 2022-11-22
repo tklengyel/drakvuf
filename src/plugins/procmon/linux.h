@@ -105,19 +105,28 @@
 #ifndef PROCMON_LINUX_H
 #define PROCMON_LINUX_H
 
-#include "plugins/plugins_ex.h"
-#include "plugins/private.h"
+#include "private.h"
 
 class linux_procmon : public pluginex
 {
 public:
-    os_t os;
-    addr_t kaslr;
+    /* Symbols */
+    addr_t do_open_execat_addr = 0;
+    addr_t kernel_base = 0;
+    addr_t _text = 0;
+
+    /* Offsets */
+    std::array<size_t, procmon_ns::__LINUX_OFFSET_MAX> offsets;
+
+    /* Traps */
+    std::unordered_map<uint64_t, drakvuf_trap_t*> internal_traps;
+    std::unordered_map<uint64_t, drakvuf_trap_t*> internal_ret_traps;
 
     /* Hooks */
-    std::unique_ptr<libhook::SyscallHook> exechook;
-    std::unique_ptr<libhook::SyscallHook> exithook;
-    std::unique_ptr<libhook::SyscallHook> signalhook;
+    std::unique_ptr<libhook::SyscallHook> exec_hook;
+    std::unique_ptr<libhook::SyscallHook> exit_hook;
+    std::unique_ptr<libhook::SyscallHook> signal_hook;
+    std::unique_ptr<libhook::SyscallHook> kernel_clone_hook;
 
     /* Return hooks */
     std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
@@ -126,19 +135,19 @@ public:
     event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* Return callbacks */
     event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* Helper functions */
-    uint64_t make_hook_id(drakvuf_trap_info_t* info);
     void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     linux_procmon(drakvuf_t drakvuf, output_format_t output);
     linux_procmon(const linux_procmon&) = delete;
     linux_procmon& operator=(const linux_procmon&) = delete;
-
 };
 
 #endif

@@ -131,6 +131,15 @@ struct TimeVal
     glong tv_usec;
 };
 
+struct flagsval
+{
+    const char* name;
+    std::string values;
+
+    flagsval() = default;
+    flagsval(const char* n, std::string v) : name{n}, values{std::move(v)} {}
+};
+
 template<class Value>
 auto keyval(const char* key, Value&& value)
 {
@@ -145,6 +154,14 @@ struct ValHolder
 {
     T value;
     ValHolder(T v): value(std::move(v)) {}
+};
+
+template<class T>
+struct ArrayHolder
+{
+    T value;
+    size_t size;
+    ArrayHolder(T v, size_t _size): value(std::move(v)), size(_size) {}
 };
 
 /* numeric value */
@@ -280,6 +297,37 @@ struct Estr<T,
            >: Rstr<std::string>
 {
     Estr(T v): Rstr<std::string>(nullptr == v ? std::string("(null)") : std::string(v)) {}
+};
+
+/* format specific binary string value */
+template<class T, class = void>
+struct BinaryString
+{
+    BinaryString(T v, size_t _size)
+    {
+        static_assert(always_false<T>::value, "should be uint8_t*");
+    }
+};
+
+template<class T>
+struct BinaryString<T,
+           std::enable_if_t<
+           std::is_same_v<T, const uint8_t*>
+           || std::is_same_v<T, uint8_t*>,
+           void>
+           >: ArrayHolder<uint8_t*>
+{
+    BinaryString(T v, size_t size): ArrayHolder<uint8_t*>(const_cast<uint8_t*>(v), size) {}
+    void format(std::ostream& os) const
+    {
+        auto flags = os.flags();
+        os << std::hex;
+        for (size_t it = 0; it < size; it++)
+        {
+            os << static_cast<int>(value[it]);
+        }
+        os.setf(flags);
+    }
 };
 
 /* Any argument type */

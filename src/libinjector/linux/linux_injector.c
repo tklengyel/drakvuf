@@ -160,9 +160,10 @@ static bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* 
 
     if (info->regs->rip != info->trap->breakpoint.addr)
     {
-        PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)",
+        PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)\n",
             info->trap->breakpoint.addr, info->regs->rip);
-        assert(false);
+        if (is_child && !injector->execve)
+            PRINT_DEBUG("Trap child process in not execve stage\n");
     }
 
     return true;
@@ -218,7 +219,7 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
     return event;
 }
 
-static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
@@ -253,7 +254,7 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
         PRINT_DEBUG("Usermode Trap Addr: %lx\n", info->regs->rcx);
         injector->bp = bp;
 
-        // Unsubscribe from the CR3 trap
+        // Unsubscribe from the trap
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
     }
     else
@@ -268,6 +269,33 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static event_response_t kernel_panic_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // right now we are in kernel space
+    PRINT_DEBUG("Kernel panic. PID: %u PPID: %u TID: %u\n",
+        info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
+
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFKERNELPANIC);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t kernel_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    if (info->proc_data.pid != injector->target_pid || info->proc_data.tid != injector->target_tid)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    // right now we are in kernel space
+    PRINT_DEBUG("Target thread exit. PID: %u PPID: %u TID: %u\n",
+        info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
+
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFCRASH);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused)))
 {
     return drakvuf_is_interrupted(drakvuf);
@@ -275,17 +303,91 @@ static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused))
 
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
+    reg_t lstar;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool status = VMI_SUCCESS == vmi_get_vcpureg(vmi, &lstar, MSR_LSTAR, 0);
+    drakvuf_release_vmi(drakvuf);
+    if (!status)
+    {
+        fprintf(stderr, "Failed to get MSR_LSTAR\n");
+        return false;
+    }
+
     drakvuf_trap_t trap =
     {
-        .type = REGISTER,
-        .reg = CR3,
-        .cb = wait_for_target_process_cr3_cb,
-        .data = injector,
+        .type = BREAKPOINT,
+        .breakpoint.lookup_type = LOOKUP_KERNEL,
+        .breakpoint.addr_type = ADDR_VA,
+        .breakpoint.addr = lstar,
+        .name = "entry_SYSCALL_64",
+        .cb = wait_for_target_process_cb,
+        .data = injector
     };
 
     if (!drakvuf_add_trap(drakvuf, &trap))
     {
-        fprintf(stderr, "Failed to set trap wait_for_target_process_cr3_cb callback");
+        fprintf(stderr, "Failed to set trap wait_for_target_process_cb callback\n");
+        return false;
+    }
+
+    addr_t kernel_base = drakvuf_get_kernel_base(drakvuf);
+
+    addr_t _text;
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text) )
+    {
+        PRINT_DEBUG("Failed to get RVA of _text\n");
+        return false;
+    }
+
+    addr_t kaslr = kernel_base - _text;
+
+    addr_t panic;
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "panic", &panic) )
+    {
+        PRINT_DEBUG("Failed to get RVA of panic\n");
+        return false;
+    }
+
+    drakvuf_trap_t trap_panic =
+    {
+        .type = BREAKPOINT,
+        .breakpoint.lookup_type = LOOKUP_PID,
+        .breakpoint.pid = 0,
+        .breakpoint.addr_type = ADDR_VA,
+        .breakpoint.addr = panic + kaslr,
+        .name = "panic",
+        .cb = kernel_panic_cb,
+        .data = injector
+    };
+
+    if (!drakvuf_add_trap(drakvuf, &trap_panic))
+    {
+        fprintf(stderr, "Failed to set trap kernel_panic_cb callback\n");
+        return false;
+    }
+
+    addr_t exit;
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "do_exit", &exit) )
+    {
+        PRINT_DEBUG("Failed to get RVA of do_exit\n");
+        return false;
+    }
+
+    drakvuf_trap_t trap_exit =
+    {
+        .type = BREAKPOINT,
+        .breakpoint.lookup_type = LOOKUP_PID,
+        .breakpoint.pid = 0,
+        .breakpoint.addr_type = ADDR_VA,
+        .breakpoint.addr = exit + kaslr,
+        .name = "do_exit",
+        .cb = kernel_exit_cb,
+        .data = injector
+    };
+
+    if (!drakvuf_add_trap(drakvuf, &trap_exit))
+    {
+        fprintf(stderr, "Failed to set trap kernel_panic_cb callback\n");
         return false;
     }
 
@@ -295,6 +397,9 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         drakvuf_loop(drakvuf, is_interrupted, NULL);
         PRINT_DEBUG("Finished drakvuf loop\n");
     }
+
+    drakvuf_remove_trap(drakvuf, &trap_panic, NULL);
+    drakvuf_remove_trap(drakvuf, &trap_exit, NULL);
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
         injector->rc = INJECTOR_TIMEOUTED;

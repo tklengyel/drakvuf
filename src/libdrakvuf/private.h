@@ -193,6 +193,7 @@ struct drakvuf
     vmi_instance_t vmi;
 
     vmi_event_t cr3_event;
+    vmi_event_t cr4_event;
     vmi_event_t interrupt_event;
     vmi_event_t mem_event;
     vmi_event_t debug_event;

@@ -437,6 +437,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
 os_t drakvuf_get_os_type(drakvuf_t drakvuf) NOEXCEPT;
 page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf) NOEXCEPT;
 size_t drakvuf_get_address_width(drakvuf_t drakvuf) NOEXCEPT;
+uint64_t drakvuf_get_init_memsize(drakvuf_t drakvuf) NOEXCEPT;
 size_t drakvuf_get_process_address_width(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info) NOEXCEPT;
 int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
@@ -524,6 +525,8 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf,
     addr_t process_base,
     proc_data_t* proc_data) NOEXCEPT;
 
+addr_t drakvuf_get_rspbase(drakvuf_t dravkuf, drakvuf_trap_info_t* info);
+
 typedef struct _mmvad_info
 {
     uint64_t starting_vpn;
@@ -536,6 +539,7 @@ typedef struct _mmvad_info
     addr_t file_name_ptr;
     uint32_t total_number_of_ptes;
     addr_t prototype_pte;
+    addr_t node_addr;
 } mmvad_info_t;
 
 typedef bool (*mmvad_callback)(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data);
@@ -545,6 +549,8 @@ bool drakvuf_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback c
 bool drakvuf_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
 uint32_t drakvuf_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width) NOEXCEPT;
+bool drakvuf_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
+uint64_t drakvuf_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
 
 addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess) NOEXCEPT;
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx) NOEXCEPT;
@@ -620,6 +626,7 @@ typedef struct _module_info
     addr_t dtb ;                  /* DTB for the process where the module is currently loaded   */
     vmi_pid_t pid ;               /* PID of the process where the module is currently is loaded */
     addr_t base_addr ;            /* Module base address                                        */
+    addr_t size ;                 /* Size of Image                                              */
     unicode_string_t* full_name ; /* Module full name                                           */
     unicode_string_t* base_name ; /* Module base name                                           */
     bool is_wow ;                 /* Is WoW64 module?                                           */
@@ -706,6 +713,9 @@ char* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
 char* drakvuf_get_filename_from_object_attributes( drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     addr_t attrs ) NOEXCEPT;
+
+char* drakvuf_get_filepath_from_dentry(drakvuf_t drakvuf,
+    addr_t dentry_addr) NOEXCEPT;
 
 // Reads 'length' characters from array of UTF_16 charachters into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length) NOEXCEPT;

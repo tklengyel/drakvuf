@@ -446,7 +446,11 @@ err:
     return 0;
 }
 
-static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
+static bool setup_stack_32(
+    vmi_instance_t vmi,
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args)
 {
     addr_t addr = regs->rsp;
 
@@ -513,7 +517,11 @@ err:
     return 0;
 }
 
-static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
+static bool setup_stack_64(
+    vmi_instance_t vmi,
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args)
 {
     uint64_t nul64 = 0;
 
@@ -618,7 +626,11 @@ err:
     return 0;
 }
 
-static bool setup_linux_syscall(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
+static bool setup_linux_syscall(
+    vmi_instance_t vmi,
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args)
 {
     addr_t addr = regs->rsp;
 
@@ -668,17 +680,45 @@ err:
     return false;
 }
 
-bool setup_stack_locked(
+static void setup_stack_marker(
+    vmi_instance_t vmi,
+    x86_registers_t* regs,
+    uint64_t* stack_marker)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = regs->cr3,
+        .addr = regs->rsp - 0x8
+    );
+
+    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, stack_marker))
+    {
+        PRINT_DEBUG("Could not write marker %lx on stack\n", *stack_marker);
+        return;
+    }
+
+    // grow the stack
+    regs->rsp = ctx.addr;
+    *stack_marker = ctx.addr;
+}
+
+static bool setup_stack_marked_locked(
     drakvuf_t drakvuf,
     vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args)
+    int nb_args,
+    uint64_t* stack_marker)
 {
+    if (stack_marker)
+        setup_stack_marker(vmi, regs, stack_marker);
+
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
     {
         bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-        return is32bit ? setup_stack_32(vmi, regs, args, nb_args) : setup_stack_64(vmi, regs, args, nb_args);
+        return is32bit
+            ? setup_stack_32(vmi, regs, args, nb_args)
+            : setup_stack_64(vmi, regs, args, nb_args);
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
@@ -692,17 +732,37 @@ bool setup_stack_locked(
     }
 }
 
+static bool setup_stack_marked(
+    drakvuf_t drakvuf,
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args,
+    uint64_t* stack_marker)
+{
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool success = setup_stack_marked_locked(drakvuf, vmi, regs, args, nb_args, stack_marker);
+    drakvuf_release_vmi(drakvuf);
+    return success;
+}
+
+bool setup_stack_locked(
+    drakvuf_t drakvuf,
+    vmi_instance_t vmi,
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args)
+{
+    return setup_stack_marked_locked(drakvuf, vmi, regs, args, nb_args, NULL);
+}
+
 bool setup_stack(
     drakvuf_t drakvuf,
     x86_registers_t* regs,
     struct argument args[],
     int nb_args)
 {
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = setup_stack_locked(drakvuf, vmi, regs, args, nb_args);
-    drakvuf_release_vmi(drakvuf);
-    return success;
+    return setup_stack_marked(drakvuf, regs, args, nb_args, NULL);
 }
 
 bool inject_function_call(
@@ -712,7 +772,8 @@ bool inject_function_call(
     x86_registers_t* regs,
     struct argument args[],
     int nb_args,
-    addr_t function_addr)
+    addr_t function_addr,
+    uint64_t* stack_marker)
 {
     drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -722,7 +783,7 @@ bool inject_function_call(
         return false;
     }
 
-    if (!setup_stack(drakvuf, regs, args, nb_args))
+    if (!setup_stack_marked(drakvuf, regs, args, nb_args, stack_marker))
     {
         drakvuf_release_vmi(drakvuf);
         return false;

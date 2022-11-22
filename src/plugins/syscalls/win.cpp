@@ -118,6 +118,7 @@
 
 namespace syscalls_ns
 {
+static constexpr auto ki_syscall_user_ret_offset = 0x28;
 
 static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -202,6 +203,87 @@ static std::vector<uint64_t> extract_args(drakvuf_t drakvuf, drakvuf_trap_info_t
     return args;
 }
 
+static bool resolve_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* dllname, addr_t* base, addr_t* size)
+{
+    resolve_ctx_t ctx{ .name = dllname };
+
+    drakvuf_enumerate_process_modules(drakvuf, info->proc_data.base_addr,
+        [](drakvuf_t dravkuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
+    {
+        auto c = static_cast<resolve_ctx_t*>(ctx);
+
+        if (!strcmp((const char*)module_info->base_name->contents, c->name))
+        {
+            c->base    = module_info->base_addr;
+            c->size    = module_info->size;
+            *need_stop = true;
+        }
+        return true;
+    }, &ctx);
+
+    if (ctx.size && ctx.base)
+    {
+        *base = ctx.base;
+        *size = ctx.size;
+        return true;
+    }
+    return false;
+}
+
+static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, syscalls* s, const char* subsystem)
+{
+    // Only x64 nt syscalls are supported.
+    if (s->is32bit || !s->kernel_size || strcmp(subsystem, "nt"))
+        return false;
+
+    const addr_t rspbase = drakvuf_get_rspbase(drakvuf, info);
+    const addr_t diff    = rspbase - info->regs->rsp;
+    // Here we check if the call originated from usermode (syscall) or from other driver (iat call).
+    // KiSystemCall64 allocates 0x158 + 7 * 8 = 0x190 bytes. The qword at offset 0x28 - return address to usermode:
+    // -0x00:  mov     rsp, gs:1A8h
+    // -0x08:  push    2Bh
+    // -0x10:  push    qword ptr gs:10h
+    // -0x18:  push    r11
+    // -0x20:  push    33h
+    // -0x28:  push    rcx
+    // -0x28:  mov     rcx, r10
+    // -0x30:  sub     rsp, 8
+    // -0x38:  push    rbp
+    // -0x190: sub     rsp, 158h
+    // Since we hook Nt* functions, there are situations when the call originated from other driver and not from usermode.
+    // This checks if stack displacement is less than 0x190 + 8 (call instruction) + N (number of function arguments that are pushed on the stack).
+    if (diff > 0x220 || diff < 0x190)
+        return false;
+
+    addr_t user_ret_addr = 0;
+    addr_t func_ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    // Function return address should be within ntoskrnl.exe.
+    if (func_ret_addr < s->kernel_base || s->kernel_base + s->kernel_size < func_ret_addr)
+        return false;
+
+    // Read return address to usermode.
+    vmi_lock_guard vmi(drakvuf);
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, rspbase - ki_syscall_user_ret_offset, 0, &user_ret_addr))
+        return false;
+
+    // Resolve ntdll.dll.
+    if (!s->ntdll_base)
+    {
+        // Should never happen.
+        if (!resolve_dll(drakvuf, info, "ntdll.dll", &s->ntdll_base, &s->ntdll_size))
+            return false;
+    }
+    // Is return address outside ntdll.dll?
+    bool inlined = s->ntdll_base > user_ret_addr || user_ret_addr > s->ntdll_base + s->ntdll_size;
+    // Try to locate wow64cpu.dll at runtime. We can't check if its wow64 process because we are in kernel.
+    if (!s->wow64cpu_base && inlined)
+        resolve_dll(drakvuf, info, "wow64cpu.dll", &s->wow64cpu_base, &s->wow64cpu_size);
+    // The module is outsize ntdll.dll so we check for wow64cpu.dll.
+    if (s->wow64cpu_base && inlined)
+        inlined = inlined && (user_ret_addr < s->wow64cpu_base || user_ret_addr > s->wow64cpu_base + s->wow64cpu_size);
+    return inlined;
+}
+
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto s = get_trap_plugin<syscalls>(info);
@@ -210,7 +292,8 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     std::vector<uint64_t> args = extract_args(drakvuf, info, s->reg_size, sc ? sc->num_args : 0);
 
-    print_syscall(s, drakvuf, info, w->num, w->type, sc, args);
+    auto inlined = is_inlined_syscall(drakvuf, info, s, w->type);
+    print_syscall(s, drakvuf, info, w->num, w->type, sc, args, inlined);
 
     if ( s->disable_sysret || s->is_stopping() )
         return 0;
@@ -414,6 +497,44 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c)
     addr_t dtb;
     if ( VMI_FAILURE == vmi_pid_to_dtb(vmi, 0, &dtb) )
         throw -1;
+
+    s->ntdll_base    = 0;
+    s->ntdll_size    = 0;
+    s->wow64cpu_base = 0;
+    s->wow64cpu_size = 0;
+    s->kernel_size   = 0;
+    // Get ntoskrnl size.
+    pass_ctx_t pass;
+    pass.plugin = s;
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage", &pass.size_rva) ||
+        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "BaseDllName", &pass.name_rva))
+    {
+        PRINT_DEBUG("Failed to get _LDR_DATA_TABLE_ENTRY members rva\n");
+        throw -1;
+    }
+
+    drakvuf_enumerate_drivers(drakvuf, [](drakvuf_t drakvuf, addr_t ldr_entry, void* ctx)
+    {
+        pass_ctx_t* pass = static_cast<pass_ctx_t*>(ctx);
+
+        auto name = drakvuf_read_unicode_va(drakvuf, ldr_entry + pass->name_rva, 0);
+        if (name != nullptr)
+        {
+            if (!strcmp((const char*)name->contents, "ntoskrnl.exe"))
+            {
+                vmi_lock_guard vmi(drakvuf);
+                if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_entry + pass->size_rva, 0, &static_cast<syscalls*>(pass->plugin)->kernel_size))
+                    throw -1;
+            }
+            vmi_free_unicode_str(name);
+        }
+    }, &pass);
+
+    if (!s->kernel_size)
+    {
+        PRINT_DEBUG("Failed to get kernel image size\n");
+        throw -1;
+    }
 
 #ifdef DRAKVUF_DEBUG
     uint16_t ntbuild;
