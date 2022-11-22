@@ -139,7 +139,7 @@ enum linux_offsets
     VM_AREA_STRUCT_PGOFF,
     VM_AREA_STRUCT_FLAGS,
     VFSMOUNT_MNT_ROOT,
-    FILE_PATH,
+    FILE_F_PATH,
     PATH_DENTRY,
     PATH_MNT,
     DENTRY_D_NAME,

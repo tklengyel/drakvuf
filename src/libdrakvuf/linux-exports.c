@@ -179,7 +179,7 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
             goto next;
 
         addr_t path_dentry;
-        ctx.addr = file_address + drakvuf->offsets[FILE_PATH] + drakvuf->offsets[PATH_DENTRY];
+        ctx.addr = file_address + drakvuf->offsets[FILE_F_PATH] + drakvuf->offsets[PATH_DENTRY];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &path_dentry))
             goto next;
 
@@ -423,7 +423,7 @@ addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
             goto next;
 
         addr_t path_dentry;
-        ctx.addr = file_address + drakvuf->offsets[FILE_PATH] + drakvuf->offsets[PATH_DENTRY];
+        ctx.addr = file_address + drakvuf->offsets[FILE_F_PATH] + drakvuf->offsets[PATH_DENTRY];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &path_dentry))
             goto next;
 

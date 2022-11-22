@@ -186,6 +186,48 @@ bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t
     return true;
 }
 
+/**
+ * @brief Function for extract absolute path from "struct dentry"
+ * https://elixir.bootlin.com/linux/v5.9.14/source/fs/d_path.c#L329
+ *
+ * @param drakvuf drakvuf instanse
+ * @param dentry_addr address of "struct dentry"
+ * @return char* - absolute path of filename
+*/
+char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd);
+
+    addr_t parent;
+    GString* b = g_string_new(NULL);
+
+    ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
+    while (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &parent) && parent != dentry_addr)
+    {
+        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
+        gchar* tmp = vmi_read_str(drakvuf->vmi, &ctx);
+        if (tmp == NULL)
+            break;
+
+        // TODO: why vmi_read_str return 0x01?
+        // TODO: with "std::string dirname = tmp" works very well
+        if (tmp[0] != 0x01)
+        {
+            g_string_prepend(b, tmp);
+            g_string_prepend(b, "/");
+        }
+
+        g_free(tmp);
+
+        dentry_addr = parent;
+        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
+    }
+
+    return g_string_free(b, 0);
+}
+
 bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va)
 {
     if (!linux_get_kernel_symbol_rva(drakvuf, function, va))
@@ -245,6 +287,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_process_arguments = linux_get_process_arguments;
     drakvuf->osi.get_kernel_symbol_rva = linux_get_kernel_symbol_rva;
     drakvuf->osi.get_kernel_symbol_va = linux_get_kernel_symbol_va;
+    drakvuf->osi.get_filepath_from_dentry = linux_get_filepath_from_dentry;
 
     return 1;
 }
