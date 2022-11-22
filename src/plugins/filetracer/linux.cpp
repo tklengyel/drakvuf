@@ -131,52 +131,6 @@ uint64_t linux_filetracer::make_hook_id(drakvuf_trap_info_t* info)
 
 /* -----------------FILE INFO PARSING------------------ */
 
-std::string linux_filetracer::get_filepath_locked(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, addr_t dentry_addr)
-{
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3);
-
-    ctx.addr = dentry_addr + this->offsets[_DENTRY_D_NAME] + this->offsets[_QSTR_NAME] + 16;
-    gchar* p = vmi_read_str(vmi, &ctx);
-    if (p == NULL)
-        return {};
-    std::string path_name = p;
-    g_free(p);
-
-    if (path_name.empty() || path_name[0] == '[')
-        return {};
-
-    addr_t d_parent = 0;
-    std::string prev_dirname = path_name;
-
-    ctx.addr = dentry_addr + this->offsets[_DENTRY_D_PARENT];
-    while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &d_parent) && d_parent)
-    {
-        ctx.addr = d_parent + this->offsets[_DENTRY_D_NAME] + this->offsets[_QSTR_NAME] + 16;
-        gchar* tmp = vmi_read_str(vmi, &ctx);
-        if (tmp == NULL)
-            break;
-        std::string dirname = tmp;
-        g_free(tmp);
-
-        if (dirname.empty() || dirname == "/" || dirname == prev_dirname)
-            break;
-
-        prev_dirname = dirname;
-        path_name = dirname + "/" + path_name;
-        ctx.addr = d_parent + this->offsets[_DENTRY_D_PARENT];
-    }
-
-    return "/" + path_name;
-}
-
-std::string linux_filetracer::get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t dentry_addr)
-{
-    auto vmi = vmi_lock_guard(drakvuf);
-    return get_filepath_locked(drakvuf, info, vmi, dentry_addr);
-}
-
 bool linux_filetracer::get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t struct_addr, std::string struct_name)
 {
     if (!struct_addr || struct_name == "")
@@ -209,7 +163,10 @@ bool linux_filetracer::get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     if (!dentry_addr)
         return false;
 
-    params->filename = get_filepath_locked(drakvuf, info, vmi, dentry_addr);
+    char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, dentry_addr);
+    params->filename = tmp ?: "";
+    g_free(tmp);
+
     if (params->filename.empty())
         return false;
 
@@ -259,9 +216,15 @@ void linux_filetracer::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     for (auto& arg : params->args)
         extra_args.emplace_back(std::make_pair(arg.first, fmt::Rstr(arg.second)));
 
+    addr_t current_process = drakvuf_get_current_process(drakvuf, info);
+    const char* thread_name = drakvuf_get_process_name(drakvuf, current_process, false);
+
     fmt::print(this->m_output_format, "filetracer", drakvuf, info,
         keyval("Permissions", fmt::Rstr(to_oct_str(params->permissions))),
+        keyval("ThreadName", fmt::Rstr(thread_name)),
         extra_args);
+
+    g_free(const_cast<char*>(thread_name));
 }
 
 char* linux_filetracer::read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t fileaddr)
@@ -499,7 +462,10 @@ event_response_t linux_filetracer::rename_file_cb(drakvuf_t drakvuf, drakvuf_tra
     addr_t old_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t new_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 4);
 
-    auto old_name = get_filepath(drakvuf, info, old_dentry_addr);
+    char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, old_dentry_addr);
+    std::string old_name = tmp ?: "";
+    g_free(tmp);
+
     if (old_name.empty())
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -774,7 +740,9 @@ event_response_t linux_filetracer::link_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     addr_t old_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t new_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 3);
 
-    auto link_name = get_filepath(drakvuf, info, new_dentry_addr);
+    char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, new_dentry_addr);
+    std::string link_name = tmp ?: "";
+    g_free(tmp);
     if (link_name.empty())
         return VMI_EVENT_RESPONSE_NONE;
 

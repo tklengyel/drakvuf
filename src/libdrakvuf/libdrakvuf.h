@@ -714,6 +714,9 @@ char* drakvuf_get_filename_from_object_attributes( drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     addr_t attrs ) NOEXCEPT;
 
+char* drakvuf_get_filepath_from_dentry(drakvuf_t drakvuf,
+    addr_t dentry_addr) NOEXCEPT;
+
 // Reads 'length' characters from array of UTF_16 charachters into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length) NOEXCEPT;
 
