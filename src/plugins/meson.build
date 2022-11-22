@@ -228,11 +228,8 @@ summary({
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon' : get_option('plugin-ebpfmon'),
-<<<<<<< HEAD
     'memaccessmon' : get_option('plugin-memaccessmon'),
-=======
     'unixsocketmon' : get_option('plugin-unixsocketmon'),
->>>>>>> master
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
