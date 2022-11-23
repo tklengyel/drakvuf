@@ -423,8 +423,11 @@ int main(int argc, char** argv)
     bool procdump_on_finish = true;
     bool libdrakvuf_get_userid = true;
     std::set<uint64_t> ignored_processes;
-    bool bsodmon_ignore_stop = false;
     bool enable_active_callback_check = false;
+
+#ifdef ENABLE_PLUGIN_BSODMON
+    bool bsodmon_ignore_stop = false;
+#endif
 
     eprint_current_time();
 
