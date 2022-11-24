@@ -191,4 +191,3 @@ struct provider_t
     provider_t(etwmon* plugin, vmi_instance_t vmi, addr_t base);
 };
 };
-
