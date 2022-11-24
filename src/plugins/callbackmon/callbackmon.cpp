@@ -657,6 +657,7 @@ bool callbackmon::stop_impl()
     check_callbacks(this->emp_cb,       snapshot->emp_cb,        "EMP");
     check_callbacks(this->wfpcallouts,  snapshot->wfpcallouts,   "WfpCallouts");
     check_callouts (this->w32callouts,  snapshot->w32callouts);
+    check_ndis_cbs (this->ndis_protocol_cb, snapshot->ndis_protocol_cb);
 
     return true;
 }
