@@ -1,4 +1,4 @@
-# DRAKVUF&trade;
+# DRAKVUF&copy;
 
 ## Introduction
 
@@ -31,16 +31,17 @@ https://github.com/tklengyel/drakvuf-builds/releases
 DRAKVUF provides a perfect platform for stealthy malware analysis as its footprint is
 nearly undectebable from the malware's perspective. While DRAKVUF has been mainly
 developed with malware analysis in mind, it is certainly not limited to that task as it
-can be used to monitor the execution of arbitrary binaries.
+can be used to monitor the execution of anything that executes within a VM, including
+firmware, OS kernels and user-space processes.
 
 ## Graphical frontend
 
 If you would like a full-featured DRAKVUF GUI to setup as automated analysis sandbox, check out the
 [DRAKVUF Sandbox project](https://github.com/CERT-Polska/drakvuf-sandbox).
 
--------
+## Installation steps
 
-More information can be found on the project website: https://drakvuf.com
+Installation steps can be found on the project website: [https://drakvuf.com](https://drakvuf.com)
 
 [![ci](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml/badge.svg)](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml)
 <a href="https://scan.coverity.com/projects/tklengyel-drakvuf"><img alt="Coverity Scan Build Status" src="https://scan.coverity.com/projects/3238/badge.svg"/></a>
