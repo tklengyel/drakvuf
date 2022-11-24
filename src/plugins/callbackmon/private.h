@@ -116,7 +116,7 @@ enum
     __OFFSET_GENERIC_MAX
 };
 
-enum 
+enum
 {
     NDIS_OPEN_BLOCK_SENDHANDLER,
     NDIS_OPEN_BLOCK_WANSENDHANDLER,
@@ -261,7 +261,7 @@ static const char* offset_open_names_w10[__OFFSET_OPEN_MAX][2] =
     [NDIS_OPEN_BLOCK_SAVEDSENDHANDLER]               = { "_NDIS_COMMON_OPEN_BLOCK", "SavedSendHandler"               }
 };
 
-static const char* offset_miniport_names[__OFFSET_MINIPORT_MAX][2] = 
+static const char* offset_miniport_names[__OFFSET_MINIPORT_MAX][2] =
 {
     [NDIS_MINIPORT_BLOCK_NEXTCANCELSENDNETBUFFERLISTSHANDLER]      = { "_NDIS_MINIPORT_BLOCK", "NextCancelSendNetBufferListsHandler"      },
     [NDIS_MINIPORT_BLOCK_PACKETINDICATEHANDLER]                    = { "_NDIS_MINIPORT_BLOCK", "PacketIndicateHandler"                    },

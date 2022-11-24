@@ -379,9 +379,9 @@ void callbackmon::report(drakvuf_t drakvuf, const char* list_name, addr_t addr, 
 
 callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output)
     : pluginex(drakvuf, output), config{ *config }, format{ output },
-    generic_offsets(new size_t[__OFFSET_GENERIC_MAX]),
-    open_offsets(new size_t[__OFFSET_OPEN_MAX]),
-    miniport_offsets(new size_t[__OFFSET_MINIPORT_MAX])
+      generic_offsets(new size_t[__OFFSET_GENERIC_MAX]),
+      open_offsets(new size_t[__OFFSET_OPEN_MAX]),
+      miniport_offsets(new size_t[__OFFSET_MINIPORT_MAX])
 {
     const addr_t krnl_base = drakvuf_get_kernel_base(drakvuf);
     const size_t ptrsize   = drakvuf_get_address_width(drakvuf);
@@ -572,12 +572,12 @@ bool callbackmon::stop_impl()
     {
         snapshot = std::make_unique<callbackmon>(drakvuf, &config, format);
     }
-    catch(const std::exception& e)
+    catch (const std::exception& e)
     {
         PRINT_DEBUG("[CALLBACKMON] Failed to perform final analsys. err: %s\n", e.what());
         return true;
     }
-    
+
     uint16_t winver;
     {
         vmi_lock_guard vmi(drakvuf);
