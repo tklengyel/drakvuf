@@ -436,10 +436,10 @@ bool etwmon::is_supported(drakvuf_t drakvuf, bool quite = false)
 
 etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output), format{ output },
-    logger_cb_ctx_rva{}, etw_state_rva{}, hash_table_rva{},
-    logger_settings_rva{}, active_loggers_rva{}, silo_globals_va{},
-    bucket_size{}, list_entry_size{}, guid_list_head_va{},
-    etw_debugger_data_va{}, active_system_loggers{}
+      logger_cb_ctx_rva{}, etw_state_rva{}, hash_table_rva{},
+      logger_settings_rva{}, active_loggers_rva{}, silo_globals_va{},
+      bucket_size{}, list_entry_size{}, guid_list_head_va{},
+      etw_debugger_data_va{}, active_system_loggers{}
 {
     this->address_width = drakvuf_get_address_width(drakvuf);
 
@@ -512,16 +512,16 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
 
     switch (this->winver.version)
     {
-    case VMI_OS_WINDOWS_7:
-        handles_names   = &win7_global_handles;
-        callbacks_names = &win7_global_callbacks;
-        break;
-    case VMI_OS_WINDOWS_10:
-        handles_names   = &win10_global_handles;
-        callbacks_names = &win10_global_callbacks;
-        break;
-    default:
-        break;
+        case VMI_OS_WINDOWS_7:
+            handles_names   = &win7_global_handles;
+            callbacks_names = &win7_global_callbacks;
+            break;
+        case VMI_OS_WINDOWS_10:
+            handles_names   = &win10_global_handles;
+            callbacks_names = &win10_global_callbacks;
+            break;
+        default:
+            break;
     }
 
     if (handles_names)
@@ -575,7 +575,10 @@ bool etwmon::stop_impl()
 
         for (const auto& logger : this->loggers)
         {
-            auto n_logger = std::find_if(snapshot->loggers.begin(), snapshot->loggers.end(), [base=logger.base](const auto& l){ return l.base == base; });
+            auto n_logger = std::find_if(snapshot->loggers.begin(), snapshot->loggers.end(), [base=logger.base](const auto& l)
+            {
+                return l.base == base;
+            });
             if (n_logger != snapshot->loggers.end())
             {
                 if (logger.clock_fn != n_logger->clock_fn)
@@ -591,7 +594,10 @@ bool etwmon::stop_impl()
 
         for (const auto& provider : this->providers)
         {
-            auto n_provider = std::find_if(snapshot->providers.begin(), snapshot->providers.end(), [base=provider.base](const auto& p){ return p.base == base; });
+            auto n_provider = std::find_if(snapshot->providers.begin(), snapshot->providers.end(), [base=provider.base](const auto& p)
+            {
+                return p.base == base;
+            });
             if (n_provider != snapshot->providers.end())
             {
                 for (unsigned i = 0; i < sizeof(provider.enable_info) / sizeof(provider.enable_info[0]); i++)
@@ -605,7 +611,10 @@ bool etwmon::stop_impl()
 
                 for (const auto reg : provider.regs)
                 {
-                    auto n_reg = std::find_if(n_provider->regs.begin(), n_provider->regs.end(), [&](const reg_entry_t& r){ return r.base == reg.base; });
+                    auto n_reg = std::find_if(n_provider->regs.begin(), n_provider->regs.end(), [&](const reg_entry_t& r)
+                    {
+                        return r.base == reg.base;
+                    });
                     if (n_reg != n_provider->regs.end())
                     {
                         if (n_reg->callback != reg.callback)
