@@ -380,6 +380,7 @@ endif
 if PLUGIN_MEMACCESSMON
 sources += memaccessmon/memaccessmon.cpp
 sources += memaccessmon/memaccessmon.h
+sources += memaccessmon/private.h
 endif
 
 if PLUGIN_UNIXSOCKETMON
