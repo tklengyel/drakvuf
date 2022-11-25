@@ -188,6 +188,7 @@ struct plugins_options
     const char* ci_profile;             // PLUGIN_ROOTKITMON
     const char* services_profile;       // PLUGIN_DKOMMON
     const char* netio_profile;          // PLUGIN_CALLBACKMON
+    const char* ndis_profile;           // PLUGIN_CALLBACKMON
     uint64_t hidevm_delay;              // PLUGIN_HIDEVM
     uint64_t unixsocketmon_max_size;    // PLUGIN_UNIXSOCKETMON
 };

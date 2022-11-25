@@ -357,6 +357,7 @@ endif
 if PLUGIN_CALLBACKMON
 sources += callbackmon/callbackmon.cpp
 sources += callbackmon/callbackmon.h
+sources += callbackmon/private.h
 endif
 
 if PLUGIN_HIDEVM

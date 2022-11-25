@@ -108,12 +108,19 @@
 struct callbackmon_config
 {
     const char* netio_profile = nullptr;
+    const char* ndis_profile  = nullptr;
 };
+
+using api_bind_t    = std::pair<const char*, addr_t>;
+using protocol_cb_t = std::unordered_map<addr_t, std::vector<api_bind_t>>;
 
 class callbackmon : public pluginex
 {
 public:
     callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output);
+    ~callbackmon();
+
+    void report(drakvuf_t drakvuf, const char* list_name, addr_t addr, const char* action);
 
     const callbackmon_config config;
     const output_format_t format;
@@ -121,6 +128,10 @@ public:
     addr_t ldr_data_name_rva;
     addr_t ldr_data_base_rva;
     addr_t ldr_data_size_rva;
+
+    size_t* generic_offsets;
+    size_t* open_offsets;
+    size_t* miniport_offsets;
 
     std::vector<addr_t> process_cb;
     std::vector<addr_t> thread_cb;
@@ -143,6 +154,8 @@ public:
     std::vector<addr_t> pnp_class_cb;
     std::vector<addr_t> w32callouts;
     std::vector<addr_t> wfpcallouts;
+
+    std::unordered_map<addr_t, protocol_cb_t> ndis_protocol_cb;
 
     virtual bool stop_impl() override;
 };
