@@ -532,6 +532,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     callbackmon_config config =
                     {
                         .netio_profile = options->netio_profile,
+                        .ndis_profile  = options->ndis_profile
                     };
                     this->plugins[plugin_id] = std::make_unique<callbackmon>(this->drakvuf, &config, this->output);
                     break;
