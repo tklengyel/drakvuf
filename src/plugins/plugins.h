@@ -234,6 +234,7 @@ typedef enum drakvuf_plugin
     PLUGIN_PTRACEMON,
     PLUGIN_EBPFMON,
     PLUGIN_UNIXSOCKETMON,
+    PLUGIN_ETWMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -279,6 +280,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_PTRACEMON] = "ptracemon",
     [PLUGIN_EBPFMON] = "ebpfmon",
     [PLUGIN_UNIXSOCKETMON] = "unixsocketmon",
+    [PLUGIN_ETWMON] = "etwmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -323,6 +325,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_PTRACEMON]    = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_EBPFMON]      = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_UNIXSOCKETMON]= { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_ETWMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin

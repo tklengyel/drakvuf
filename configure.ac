@@ -562,6 +562,16 @@ if test x$plugin_unixsocketmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_UNIXSOCKETMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_etwmon],
+  [AS_HELP_STRING([--disable-plugin-etwmon],
+    [Enable the epbfmon plugin @<:@yes@:>@])],
+  [plugin_etwmon="$enableval"],
+  [plugin_etwmon="yes"])
+AM_CONDITIONAL([PLUGIN_ETWMON], [test x$plugin_etwmon = xyes])
+if test x$plugin_etwmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_ETWMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -875,6 +885,7 @@ Rootkitmon:         $plugin_rootkitmon
 Spraymon:           $plugin_spraymon
 Callbackmon:        $plugin_callbackmon
 HideVM:             $plugin_hidevm
+Etwmon:             $plugin_etwmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:             $plugin_wmimon

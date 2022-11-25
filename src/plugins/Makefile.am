@@ -383,6 +383,12 @@ sources += unixsocketmon/unixsocketmon.h
 sources += unixsocketmon/private.h
 endif
 
+if PLUGIN_ETWMON
+sources += etwmon/etwmon.cpp
+sources += etwmon/etwmon.h
+sources += etwmon/private.h
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
