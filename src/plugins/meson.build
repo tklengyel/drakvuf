@@ -195,6 +195,12 @@ if get_option('plugin-unixsocketmon')
     config_h.set('ENABLE_PLUGIN_UNIXSOCKETMON', 1)
 endif
 
+if get_option('plugin-etwmon')
+    plugin_sources += 'etwmon/etwmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_ETWMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -223,6 +229,7 @@ summary({
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon' : get_option('plugin-ebpfmon'),
     'unixsocketmon' : get_option('plugin-unixsocketmon'),
+    'etwmon' : get_option('plugin-etwmon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
