@@ -40,6 +40,7 @@ option('plugin-ptracemon', type : 'boolean', value : true)
 option('plugin-ebpfmon', type : 'boolean', value : true)
 option('plugin-memaccessmon', type : 'boolean', value : true)
 option('plugin-unixsocketmon', type : 'boolean', value : true)
+option('plugin-etwmon', type : 'boolean', value : true)
 
 # Disabled by default plugins
 option('plugin-libhooktest', type : 'boolean', value : 'false')

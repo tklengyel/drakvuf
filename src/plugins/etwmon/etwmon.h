@@ -58,7 +58,7 @@
  *                                                                         *
  * Because this license imposes special exceptions to the GPL, Covered     *
  * Work may not be combined (even as part of a larger work) with plain GPL *
- * software.  The terms, conditions, and exceptions of this license must   *
+ * saoftware.  The terms, conditions, and exceptions of this license must   *
  * be included as well.  This license is incompatible with some other open *
  * source licenses as well.  In some cases we can relicense portions of    *
  * DRAKVUF or grant special permissions to use it in other open source     *
@@ -104,128 +104,47 @@
 #pragma once
 
 #include "plugins/plugins_ex.h"
+#include "private.h"
 
-struct callbackmon_config
-{
-    const char* netio_profile = nullptr;
-    const char* ndis_profile  = nullptr;
-};
-
-using api_bind_t    = std::pair<const char*, addr_t>;
-using protocol_cb_t = std::unordered_map<addr_t, std::vector<api_bind_t>>;
-
-class callbackmon : public pluginex
+class etwmon : public pluginex
 {
 public:
-    callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output);
-    ~callbackmon();
-
-    void report(drakvuf_t drakvuf, const char* list_name, addr_t addr, const char* action);
-
-    const callbackmon_config config;
-    const output_format_t format;
-
-    addr_t ldr_data_name_rva;
-    addr_t ldr_data_base_rva;
-    addr_t ldr_data_size_rva;
-
-    size_t* generic_offsets;
-    size_t* open_offsets;
-    size_t* miniport_offsets;
-
-    std::vector<addr_t> process_cb;
-    std::vector<addr_t> thread_cb;
-    std::vector<addr_t> image_cb;
-    std::vector<addr_t> bugcheck_cb;
-    std::vector<addr_t> bcreason_cb;
-    std::vector<addr_t> registry_cb;
-    std::vector<addr_t> logon_cb;
-    std::vector<addr_t> power_cb;
-    std::vector<addr_t> shtdwn_cb;
-    std::vector<addr_t> shtdwn_lst_cb;
-    std::vector<addr_t> dbgprint_cb;
-    std::vector<addr_t> fschange_cb;
-    std::vector<addr_t> drvreinit_cb;
-    std::vector<addr_t> drvreinit2_cb;
-    std::vector<addr_t> nmi_cb;
-    std::vector<addr_t> priority_cb;
-    std::vector<addr_t> emp_cb;
-    std::vector<addr_t> pnp_prof_cb;
-    std::vector<addr_t> pnp_class_cb;
-    std::vector<addr_t> w32callouts;
-    std::vector<addr_t> wfpcallouts;
-
-    std::unordered_map<addr_t, protocol_cb_t> ndis_protocol_cb;
-
+    etwmon(drakvuf_t drakvuf, output_format_t output);
     virtual bool stop_impl() override;
+
+    etwmon(const etwmon& other);
+    void report(drakvuf_t drakvuf, const char* type, const char* name, const char* action);
+
+    bool is_supported(drakvuf_t drakvuf, bool quite);
+    void enumerate_loggers(vmi_instance_t vmi);
+    void enumerate_providers(vmi_instance_t vmi);
+    void enumerate_callbacks(vmi_instance_t vmi);
+    void enumerate_handles(vmi_instance_t vmi);
+
+    output_format_t format;
+    win_build_info_t winver;
+    size_t address_width;
+
+    std::array<size_t, etwmon_ns::__OFFSET_MAX> offsets;
+
+    addr_t logger_cb_ctx_rva;
+    addr_t etw_state_rva;
+    addr_t hash_table_rva;
+    addr_t logger_settings_rva;
+    addr_t active_loggers_rva;
+    addr_t silo_globals_va;
+    addr_t bucket_size;
+    addr_t list_entry_size;
+
+    addr_t guid_list_head_va;
+    addr_t etw_debugger_data_va;
+    uint32_t active_system_loggers;
+
+    std::vector<addr_t> global_handles_va;
+    std::vector<addr_t> global_callbacks_va;
+
+    std::vector<etwmon_ns::wmi_logger_t> loggers;
+    std::vector<etwmon_ns::provider_t>   providers;
+    std::vector<addr_t>                  global_handles;
+    std::vector<addr_t>                  global_callbacks;
 };
-
-/*
-process, thread, image:
-typedef struct _EX_CALLBACK_ROUTINE_BLOCK {
-    EX_RUNDOWN_REF RundownProtect;
-    PEX_CALLBACK_FUNCTION Function;
-    PVOID Context;
-} EX_CALLBACK_ROUTINE_BLOCK, *PEX_CALLBACK_ROUTINE_BLOCK;
-
-bugcheck:
-typedef struct _KBUGCHECK_CALLBACK_RECORD {
-    LIST_ENTRY Entry;
-    PKBUGCHECK_CALLBACK_ROUTINE CallbackRoutine;
-    __field_bcount_opt(Length) PVOID Buffer;
-    ULONG Length;
-    PUCHAR Component;
-    ULONG_PTR Checksum;
-    UCHAR State;
-} KBUGCHECK_CALLBACK_RECORD, *PKBUGCHECK_CALLBACK_RECORD;
-
-bugcheckreason:
-typedef struct _KBUGCHECK_REASON_CALLBACK_RECORD {
-    LIST_ENTRY Entry;
-    PKBUGCHECK_REASON_CALLBACK_ROUTINE CallbackRoutine;
-    PUCHAR Component;
-    ULONG_PTR Checksum;
-    KBUGCHECK_CALLBACK_REASON Reason;
-    UCHAR State;
-} KBUGCHECK_REASON_CALLBACK_RECORD, *PKBUGCHECK_REASON_CALLBACK_RECORD;
-
-registry:
-typedef struct _CM_CALLBACK_CONTEXT_BLOCK {
-    LIST_ENTRY CallbackListEntry;
-    LONG PreCallListCount;
-    LARGE_INTEGER Cookie;
-    PVOID CallerContext;
-    PEX_CALLBACK_FUNCTION Function;
-    UNICODE_STRING Altitude;
-    LIST_ENTRY ObjectContextListHead;
-} CM_CALLBACK_CONTEXT_BLOCK, *PCM_CALLBACK_CONTEXT_BLOCK;
-
-fschange:
-typedef struct _NOTIFICATION_PACKET {
-    LIST_ENTRY ListEntry;
-    PDRIVER_OBJECT DriverObject;
-    PDRIVER_FS_NOTIFICATION NotificationRoutine;
-} NOTIFICATION_PACKET, *PNOTIFICATION_PACKET;
-
-drvreinit, drvreinit2:
-typedef struct _REINIT_PACKET {
-    LIST_ENTRY ListEntry;
-    PDRIVER_OBJECT DriverObject;
-    PDRIVER_REINITIALIZE DriverReinitializationRoutine;
-    PVOID Context;
-} REINIT_PACKET, *PREINIT_PACKET;
-
-NMI:
-typedef struct _NMI_CALLBACK_BLOCK {
-    _NMI_CALLBACK_BLOCK* Next;
-    NMI_CALLBACK* CallbackRoutine;
-    PVOID Context;
-    _NMI_CALLBACK_BLOCK* Prev;
-};
-
-logon:
-typedef struct _SEP_LOGON_SESSION_TERMINATED_NOTIFICATION {
-    struct _SEP_LOGON_SESSION_TERMINATED_NOTIFICATION *Next;
-    PSE_LOGON_SESSION_TERMINATED_ROUTINE CallbackRoutine;
-} SEP_LOGON_SESSION_TERMINATED_NOTIFICATION, *PSEP_LOGON_SESSION_TERMINATED_NOTIFICATION;
-*/

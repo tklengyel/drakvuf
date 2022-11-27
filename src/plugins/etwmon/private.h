@@ -103,129 +103,91 @@
  ***************************************************************************/
 #pragma once
 
-#include "plugins/plugins_ex.h"
+#include <cstdint>
 
-struct callbackmon_config
+class etwmon;
+
+namespace etwmon_ns
 {
-    const char* netio_profile = nullptr;
-    const char* ndis_profile  = nullptr;
-};
-
-using api_bind_t    = std::pair<const char*, addr_t>;
-using protocol_cb_t = std::unordered_map<addr_t, std::vector<api_bind_t>>;
-
-class callbackmon : public pluginex
+enum
 {
-public:
-    callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output);
-    ~callbackmon();
-
-    void report(drakvuf_t drakvuf, const char* list_name, addr_t addr, const char* action);
-
-    const callbackmon_config config;
-    const output_format_t format;
-
-    addr_t ldr_data_name_rva;
-    addr_t ldr_data_base_rva;
-    addr_t ldr_data_size_rva;
-
-    size_t* generic_offsets;
-    size_t* open_offsets;
-    size_t* miniport_offsets;
-
-    std::vector<addr_t> process_cb;
-    std::vector<addr_t> thread_cb;
-    std::vector<addr_t> image_cb;
-    std::vector<addr_t> bugcheck_cb;
-    std::vector<addr_t> bcreason_cb;
-    std::vector<addr_t> registry_cb;
-    std::vector<addr_t> logon_cb;
-    std::vector<addr_t> power_cb;
-    std::vector<addr_t> shtdwn_cb;
-    std::vector<addr_t> shtdwn_lst_cb;
-    std::vector<addr_t> dbgprint_cb;
-    std::vector<addr_t> fschange_cb;
-    std::vector<addr_t> drvreinit_cb;
-    std::vector<addr_t> drvreinit2_cb;
-    std::vector<addr_t> nmi_cb;
-    std::vector<addr_t> priority_cb;
-    std::vector<addr_t> emp_cb;
-    std::vector<addr_t> pnp_prof_cb;
-    std::vector<addr_t> pnp_class_cb;
-    std::vector<addr_t> w32callouts;
-    std::vector<addr_t> wfpcallouts;
-
-    std::unordered_map<addr_t, protocol_cb_t> ndis_protocol_cb;
-
-    virtual bool stop_impl() override;
+    WMI_LOGGER_CONTEXT_LOGGERNAME,
+    WMI_LOGGER_CONTEXT_GETCPUCLOCK,
+    ETW_GUID_ENTRY_GUID,
+    ETW_GUID_ENTRY_REGLISTHEAD,
+    ETW_GUID_ENTRY_PROVENABLEINFO,
+    ETW_REG_ENTRY_CALLBACK,
+    ETW_REG_ENTRY_PROCESS,
+    __OFFSET_MAX
 };
 
-/*
-process, thread, image:
-typedef struct _EX_CALLBACK_ROUTINE_BLOCK {
-    EX_RUNDOWN_REF RundownProtect;
-    PEX_CALLBACK_FUNCTION Function;
-    PVOID Context;
-} EX_CALLBACK_ROUTINE_BLOCK, *PEX_CALLBACK_ROUTINE_BLOCK;
-
-bugcheck:
-typedef struct _KBUGCHECK_CALLBACK_RECORD {
-    LIST_ENTRY Entry;
-    PKBUGCHECK_CALLBACK_ROUTINE CallbackRoutine;
-    __field_bcount_opt(Length) PVOID Buffer;
-    ULONG Length;
-    PUCHAR Component;
-    ULONG_PTR Checksum;
-    UCHAR State;
-} KBUGCHECK_CALLBACK_RECORD, *PKBUGCHECK_CALLBACK_RECORD;
-
-bugcheckreason:
-typedef struct _KBUGCHECK_REASON_CALLBACK_RECORD {
-    LIST_ENTRY Entry;
-    PKBUGCHECK_REASON_CALLBACK_ROUTINE CallbackRoutine;
-    PUCHAR Component;
-    ULONG_PTR Checksum;
-    KBUGCHECK_CALLBACK_REASON Reason;
-    UCHAR State;
-} KBUGCHECK_REASON_CALLBACK_RECORD, *PKBUGCHECK_REASON_CALLBACK_RECORD;
-
-registry:
-typedef struct _CM_CALLBACK_CONTEXT_BLOCK {
-    LIST_ENTRY CallbackListEntry;
-    LONG PreCallListCount;
-    LARGE_INTEGER Cookie;
-    PVOID CallerContext;
-    PEX_CALLBACK_FUNCTION Function;
-    UNICODE_STRING Altitude;
-    LIST_ENTRY ObjectContextListHead;
-} CM_CALLBACK_CONTEXT_BLOCK, *PCM_CALLBACK_CONTEXT_BLOCK;
-
-fschange:
-typedef struct _NOTIFICATION_PACKET {
-    LIST_ENTRY ListEntry;
-    PDRIVER_OBJECT DriverObject;
-    PDRIVER_FS_NOTIFICATION NotificationRoutine;
-} NOTIFICATION_PACKET, *PNOTIFICATION_PACKET;
-
-drvreinit, drvreinit2:
-typedef struct _REINIT_PACKET {
-    LIST_ENTRY ListEntry;
-    PDRIVER_OBJECT DriverObject;
-    PDRIVER_REINITIALIZE DriverReinitializationRoutine;
-    PVOID Context;
-} REINIT_PACKET, *PREINIT_PACKET;
-
-NMI:
-typedef struct _NMI_CALLBACK_BLOCK {
-    _NMI_CALLBACK_BLOCK* Next;
-    NMI_CALLBACK* CallbackRoutine;
-    PVOID Context;
-    _NMI_CALLBACK_BLOCK* Prev;
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [WMI_LOGGER_CONTEXT_LOGGERNAME]  = {"_WMI_LOGGER_CONTEXT", "LoggerName"},
+    [WMI_LOGGER_CONTEXT_GETCPUCLOCK] = {"_WMI_LOGGER_CONTEXT", "GetCpuClock"},
+    [ETW_GUID_ENTRY_GUID]            = { "_ETW_GUID_ENTRY", "Guid" },
+    [ETW_GUID_ENTRY_REGLISTHEAD]     = { "_ETW_GUID_ENTRY", "RegListHead" },
+    [ETW_GUID_ENTRY_PROVENABLEINFO]  = { "_ETW_GUID_ENTRY", "ProviderEnableInfo" },
+    [ETW_REG_ENTRY_CALLBACK]         = { "_ETW_REG_ENTRY", "Callback" },
+    [ETW_REG_ENTRY_PROCESS]          = { "_ETW_REG_ENTRY", "Process" },
 };
 
-logon:
-typedef struct _SEP_LOGON_SESSION_TERMINATED_NOTIFICATION {
-    struct _SEP_LOGON_SESSION_TERMINATED_NOTIFICATION *Next;
-    PSE_LOGON_SESSION_TERMINATED_ROUTINE CallbackRoutine;
-} SEP_LOGON_SESSION_TERMINATED_NOTIFICATION, *PSEP_LOGON_SESSION_TERMINATED_NOTIFICATION;
-*/
+struct guid_t
+{
+    uint32_t data1;
+    uint16_t data2;
+    uint16_t data3;
+    uint8_t  data4[8];
+
+    std::string str() const
+    {
+        const int sz = 64;
+        char stream[sz] = { 0 };
+        snprintf(stream, sz, "{%08X-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}",
+            data1, data2, data3,
+            data4[0], data4[1], data4[2], data4[3],
+            data4[4], data4[5], data4[6], data4[7]);
+        return std::string(stream);
+    }
+} __attribute__((packed, aligned(4)));
+
+struct wmi_logger_t
+{
+    addr_t base;
+    addr_t clock_fn;
+    addr_t cb_ctx;
+
+    std::string name;
+
+    wmi_logger_t(etwmon* plugin, vmi_instance_t vmi, addr_t base);
+};
+
+struct reg_entry_t
+{
+    addr_t base;
+    addr_t callback;
+    addr_t process;
+};
+
+struct provider_t
+{
+    struct enable_info_t
+    {
+        uint8_t  level;
+        uint32_t enabled;
+    };
+
+    addr_t base;
+    guid_t guid;
+
+    /// @brief 1 for ProviderEnableInfo, 8 for EnableInfo.
+    ///
+    enable_info_t enable_info[9];
+
+    /// @brief _ETW_REG_ENTRY callback list.
+    ///
+    std::vector<reg_entry_t> regs;
+
+    provider_t(etwmon* plugin, vmi_instance_t vmi, addr_t base);
+};
+};

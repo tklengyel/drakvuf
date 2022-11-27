@@ -188,6 +188,7 @@ struct plugins_options
     const char* ci_profile;             // PLUGIN_ROOTKITMON
     const char* services_profile;       // PLUGIN_DKOMMON
     const char* netio_profile;          // PLUGIN_CALLBACKMON
+    const char* ndis_profile;           // PLUGIN_CALLBACKMON
     uint64_t hidevm_delay;              // PLUGIN_HIDEVM
     uint64_t unixsocketmon_max_size;    // PLUGIN_UNIXSOCKETMON
 };
@@ -235,6 +236,7 @@ typedef enum drakvuf_plugin
     PLUGIN_EBPFMON,
     PLUGIN_MEMACCESSMON,
     PLUGIN_UNIXSOCKETMON,
+    PLUGIN_ETWMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -281,6 +283,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_EBPFMON] = "ebpfmon",
     [PLUGIN_MEMACCESSMON] = "memaccessmon",
     [PLUGIN_UNIXSOCKETMON] = "unixsocketmon",
+    [PLUGIN_ETWMON] = "etwmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -326,6 +329,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_EBPFMON]      = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_MEMACCESSMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_UNIXSOCKETMON]= { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_ETWMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin

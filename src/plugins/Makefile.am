@@ -357,6 +357,7 @@ endif
 if PLUGIN_CALLBACKMON
 sources += callbackmon/callbackmon.cpp
 sources += callbackmon/callbackmon.h
+sources += callbackmon/private.h
 endif
 
 if PLUGIN_HIDEVM
@@ -387,6 +388,12 @@ if PLUGIN_UNIXSOCKETMON
 sources += unixsocketmon/unixsocketmon.cpp
 sources += unixsocketmon/unixsocketmon.h
 sources += unixsocketmon/private.h
+endif
+
+if PLUGIN_ETWMON
+sources += etwmon/etwmon.cpp
+sources += etwmon/etwmon.h
+sources += etwmon/private.h
 endif
 
 ###############################################################################
