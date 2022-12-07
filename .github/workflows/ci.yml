@@ -352,4 +352,6 @@ jobs:
 
           # scan-build
 
-          analyze-build-13 --cdb build/compile_commands.json --status-bugs -analyze-headers -disable-checker deadcode.DeadStores make -j2
+          analyze-build-13 --cdb build/compile_commands.json \
+            --status-bugs --analyze-headers \
+            --disable-checker deadcode.DeadStores
