@@ -11,6 +11,7 @@ jobs:
       matrix:
         os:
           - 'ubuntu-20.04'
+          - 'ubuntu-latest'
     env:
       CC: clang
       CXX: clang++
@@ -19,8 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
       - name: Get submodule hashes version
         id: get-hash
         run: |
@@ -88,6 +88,7 @@ jobs:
         matrix:
           os:
             - 'ubuntu-20.04'
+            - 'ubuntu-latest'
           flags:
             - ''
             - '--enable-debug'
@@ -103,8 +104,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
@@ -147,13 +147,13 @@ jobs:
         matrix:
           os:
             - 'ubuntu-20.04'
+            - 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -201,13 +201,13 @@ jobs:
         matrix:
           os:
             - 'ubuntu-20.04'
+            - 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build
+          sudo apt-get install -y clang build-essential libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -234,8 +234,8 @@ jobs:
 
       - name: Build with meson
         run: |
-          export CC=clang-10
-          export CXX=clang++-10
+          export CC=clang
+          export CXX=clang++
 
           meson build
           ninja -C build
@@ -251,6 +251,7 @@ jobs:
         language: ['cpp']
         os:
           - 'ubuntu-20.04'
+          - 'ubuntu-latest'
 
     steps:
     - name: Checkout repository
@@ -270,8 +271,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update -q
-        sudo apt-get remove -y clang
-        sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+        sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
 
     - name: Cache Xen debball
       uses: actions/cache@v3
@@ -311,6 +311,7 @@ jobs:
       matrix:
         os:
           - 'ubuntu-20.04'
+          - 'ubuntu-latest'
     needs:
       - init
     if: ${{ github.event_name == 'pull_request' }}
@@ -320,7 +321,7 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang-10 clang-tools-10 autoconf-archive flex bison libjson-c-dev
+          sudo apt-get install -y clang clang-tools autoconf-archive flex bison libjson-c-dev
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -348,11 +349,10 @@ jobs:
       - name: Scan build
         run: |
           # Set Exports
-          export PATH=/usr/lib/llvm-10/bin:$PATH
-          export CC=clang-10
-          export CXX=clang++-10
+          export CC=clang
+          export CXX=clang++
 
           # scan-build
           autoreconf -vif
-          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
-          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make -j2
+          scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+          scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores make -j2
