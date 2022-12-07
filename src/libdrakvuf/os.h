@@ -302,6 +302,9 @@ typedef struct os_interface
     bool (*get_kernel_symbol_rva)
     (drakvuf_t drakvuf, const char* function, addr_t* rva);
 
+    const kernel_version_t* (*get_kernel_version)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     bool (*get_kernel_symbol_va)
     (drakvuf_t drakvuf, const char* function, addr_t* va);
 

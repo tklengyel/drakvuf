@@ -153,6 +153,8 @@ bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t
 
 bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va);
 
+const kernel_version_t* linux_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
 char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr);
 
 #endif
