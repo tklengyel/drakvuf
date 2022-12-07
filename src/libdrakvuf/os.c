@@ -1139,3 +1139,17 @@ bool drakvuf_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_
 
     return ret;
 }
+
+const kernel_version_t* drakvuf_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    const kernel_version_t* ret = NULL;
+
+    if (drakvuf->osi.get_kernel_version)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_kernel_version(drakvuf, info);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}

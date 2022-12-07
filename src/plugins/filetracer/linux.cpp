@@ -115,6 +115,9 @@ using namespace filetracer_ns;
 
 /* -------------------HELPER FUNCTIONS------------------ */
 
+#define VERSION_GE(ver, x, y) \
+    ((ver) && ((ver)->major > (x) || ((ver)->major == (x) && (ver)->minor >= (y))))
+
 static std::string to_oct_str(uint64_t n)
 {
     std::stringstream ss;
@@ -645,12 +648,21 @@ event_response_t linux_filetracer::mkdir_cb(drakvuf_t drakvuf, drakvuf_trap_info
         struct dentry *dentry,
         umode_t mode
     )
+
+    in 5.12+:
+    int vfs_mkdir(
+        struct user_namespace *mnt_userns,
+        struct inode *dir,
+        struct dentry *dentry,
+        umode_t mode
+    )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
-    int64_t new_mode = drakvuf_get_function_argument(drakvuf, info, 3);
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
+    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 3 : 2);
+    int64_t new_mode = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 4 : 3);
 
     linux_data params;
     params.args["new_permissions"] = to_oct_str(new_mode & 0xfff);
@@ -669,11 +681,19 @@ event_response_t linux_filetracer::rmdir_cb(drakvuf_t drakvuf, drakvuf_trap_info
         struct inode *dir,
         struct dentry *dentry
     )
+
+    in 5.12+:
+    int vfs_rmdir(
+        struct user_namespace *mnt_userns,
+        struct inode *dir,
+        struct dentry *dentry
+    )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
+    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 3 : 2);
 
     linux_data params;
     if (get_file_info(drakvuf, info, &params, dentry_addr, "dentry"))
@@ -733,12 +753,22 @@ event_response_t linux_filetracer::link_file_cb(drakvuf_t drakvuf, drakvuf_trap_
         struct dentry *new_dentry,
         struct inode **delegated_inode
     )
+
+    in 5.12+:
+    int vfs_link(
+        struct dentry *old_dentry,
+        struct user_namespace *mnt_userns,
+        struct inode *dir,
+        struct dentry *new_dentry,
+        struct inode **delegated_inode
+    )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
     addr_t old_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 1);
-    addr_t new_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    addr_t new_dentry_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 4 : 3);
 
     char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, new_dentry_addr);
     std::string link_name = tmp ?: "";
@@ -762,11 +792,20 @@ event_response_t linux_filetracer::unlink_file_cb(drakvuf_t drakvuf, drakvuf_tra
         struct dentry *dentry,
         struct inode **delegated_inode
     )
+
+    in 5.12+:
+    int vfs_unlink(
+        struct user_namespace *mnt_userns,
+        struct inode *dir,
+        struct dentry *dentry,
+        struct inode **delegated_inode
+    )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
+    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 3 : 2);
 
     linux_data params;
     if (get_file_info(drakvuf, info, &params, dentry_addr, "dentry"))
@@ -783,12 +822,21 @@ event_response_t linux_filetracer::symbolic_link_file_cb(drakvuf_t drakvuf, drak
         struct dentry *dentry,
         const char *oldname
     )
+
+    in 5.12+:
+    int vfs_symlink(
+        struct user_namespace *mnt_userns,
+        struct inode *dir,
+        struct dentry *dentry,
+        const char *oldname
+    )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
-    addr_t oldname_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
+    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 3 : 2);
+    addr_t oldname_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 4 : 3);
 
     linux_data params;
     char* tmp = read_filename(drakvuf, info, oldname_addr);
