@@ -12,15 +12,12 @@ jobs:
         os:
           - 'ubuntu-20.04'
           - 'ubuntu-latest'
-    env:
-      CC: clang
-      CXX: clang++
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
       - name: Get submodule hashes version
         id: get-hash
         run: |
