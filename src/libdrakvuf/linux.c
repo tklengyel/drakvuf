@@ -245,6 +245,73 @@ bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t*
     return true;
 }
 
+#ifdef DRAKVUF_DEBUG
+static char* linux_get_banner(drakvuf_t drakvuf)
+{
+    addr_t linux_banner_addr;
+    if (!linux_get_kernel_symbol_va(drakvuf, "linux_banner", &linux_banner_addr))
+    {
+        PRINT_DEBUG("Failed to receive addr of linux banner\n");
+        return NULL;
+    }
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = linux_banner_addr);
+
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+#endif
+
+static char* linux_read_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t process_base = linux_get_current_process(drakvuf, info);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd);
+
+    ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_NSPROXY];
+    addr_t nsproxy_addr;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &nsproxy_addr))
+        return NULL;
+
+    ctx.addr = nsproxy_addr + drakvuf->offsets[NSPROXY_UTS_NS];
+    addr_t uts_ns_addr;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &uts_ns_addr))
+        return NULL;
+
+    ctx.addr = uts_ns_addr + drakvuf->offsets[UTS_NAMESPACE_NAME] + drakvuf->offsets[NEW_UTSNAME_RELEASE];
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+
+const kernel_version_t* linux_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if (!drakvuf->kernel_ver_initialized)
+    {
+        char* version = linux_read_kernel_version(drakvuf, info);
+        if (!version)
+        {
+            PRINT_DEBUG("Failed to extract linux kernel version\n");
+            return NULL;
+        }
+
+        int major, minor, patch;
+        int scanned = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
+        g_free(version);
+
+        if (scanned == 3)
+        {
+            drakvuf->kernel_ver.major = major;
+            drakvuf->kernel_ver.minor = minor;
+            drakvuf->kernel_ver.patch = patch;
+            drakvuf->kernel_ver_initialized = true;
+        }
+    }
+    return &drakvuf->kernel_ver;
+}
+
 static bool find_kernbase(drakvuf_t drakvuf)
 {
     if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
@@ -287,7 +354,10 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_process_arguments = linux_get_process_arguments;
     drakvuf->osi.get_kernel_symbol_rva = linux_get_kernel_symbol_rva;
     drakvuf->osi.get_kernel_symbol_va = linux_get_kernel_symbol_va;
+    drakvuf->osi.get_kernel_version = linux_get_kernel_version;
     drakvuf->osi.get_filepath_from_dentry = linux_get_filepath_from_dentry;
+
+    PRINT_DEBUG("LINUX BANNER: %s", linux_get_banner(drakvuf));
 
     return 1;
 }

@@ -123,6 +123,7 @@ static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
     [TASK_STRUCT_TASKS] = {"task_struct", "tasks"},
     [TASK_STRUCT_FS] = {"task_struct", "fs"},
     [TASK_STRUCT_NAMEIDATA] = {"task_struct", "nameidata"},
+    [TASK_STRUCT_NSPROXY] = {"task_struct", "nsproxy"},
     [TASK_STRUCT_MMSTRUCT] = {"task_struct", "mm"},
     [TASK_STRUCT_ACTIVE_MMSTRUCT] = {"task_struct", "active_mm"},
     [MM_STRUCT_MMAP] = {"mm_struct", "mmap"},
@@ -158,6 +159,9 @@ static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
     [ELF64RELA_ADDEND] = {"elf64_rela", "r_addend"},
     [ELF64RELA_INFO] = {"elf64_rela", "r_info"},
     [ELF64RELA_OFFSET] = {"elf64_rela", "r_offset"},
+    [NSPROXY_UTS_NS] = {"nsproxy", "uts_ns"},
+    [UTS_NAMESPACE_NAME] = {"uts_namespace", "name"},
+    [NEW_UTSNAME_RELEASE] = {"new_utsname", "release"},
 };
 
 #endif

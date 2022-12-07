@@ -207,6 +207,10 @@ struct drakvuf
 
     size_t* wow_offsets;
 
+    // Cache for extracted linux kernel version
+    kernel_version_t kernel_ver;
+    bool kernel_ver_initialized;
+
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests
     // in a list to be processed after all callbacks

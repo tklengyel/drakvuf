@@ -779,6 +779,15 @@ typedef enum
 void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf);
 void drakvuf_intercept_process_add(drakvuf_t drakvuf, char* process_name, vmi_pid_t pid, context_match_t strict);
 
+typedef struct
+{
+    int major;
+    int minor;
+    int patch;
+} kernel_version_t;
+
+const kernel_version_t* drakvuf_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info) NOEXCEPT;
+
 /*---------------------------------------------------------
  * Event FD functions
  */
