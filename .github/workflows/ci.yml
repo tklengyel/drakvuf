@@ -307,7 +307,6 @@ jobs:
     strategy:
       matrix:
         os:
-          - 'ubuntu-20.04'
           - 'ubuntu-latest'
     needs:
       - init
@@ -318,7 +317,7 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang clang-tools autoconf-archive flex bison libjson-c-dev
+          sudo apt-get install -y clang clang-tools-13 autoconf-archive flex bison libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -349,7 +348,8 @@ jobs:
           export CC=clang
           export CXX=clang++
 
+          meson build
+
           # scan-build
-          autoreconf -vif
-          scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
-          scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores make -j2
+
+          analyze-build-13 --cdb build/compile_commands.json --status-bugs -analyze-headers -disable-checker deadcode.DeadStores make -j2
