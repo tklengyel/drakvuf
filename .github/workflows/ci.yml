@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ steps.get-hash.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ steps.get-hash.outputs.XEN_HASH }}
 
       - name: Create Xen debball
         if: steps.cache-xen.outputs.cache-hit != 'true'
@@ -54,7 +54,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ steps.get-hash.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ steps.get-hash.outputs.LIBVMI_HASH }}
 
       - name: Build LibVMI
         if: steps.cache-libvmi.outputs.cache-hit != 'true'
@@ -111,13 +111,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
         uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -159,13 +159,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
         uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -213,13 +213,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
         uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -277,13 +277,13 @@ jobs:
       uses: actions/cache@v3
       with:
         path: xen/dist
-        key: xen-${{ needs.init.outputs.XEN_HASH }}
+        key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
     - name: Cache Libvmi files
       uses: actions/cache@v3
       with:
         path: libvmi/dist
-        key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+        key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
     - name: Install Xen debball
       run: |
@@ -327,13 +327,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
         uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
