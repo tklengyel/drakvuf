@@ -109,6 +109,7 @@
 #include <libinjector/debug_helpers.h>
 
 #include "linux_injector.h"
+#include "linux_private.h"
 #include <sys/mman.h>
 #include <fcntl.h>
 
@@ -209,7 +210,7 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
         return 0;
     }
     syscall_offset = syscall_substring_address - vdso_memory;
-    injector_t injector = info->trap->data;
+    linux_injector_t injector = info->trap->data;
     injector->syscall_addr = vdso + syscall_offset;
 
     PRINT_DEBUG("syscall offset: %d\n", syscall_offset);
@@ -221,7 +222,7 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
 
 bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr)
 {
-    injector_t injector = info->trap->data;
+    linux_injector_t injector = info->trap->data;
 
     injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
 
@@ -271,13 +272,13 @@ bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs)
     return success;
 }
 
-void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap)
+void free_bp_trap(drakvuf_t drakvuf, linux_injector_t injector, drakvuf_trap_t* trap)
 {
     drakvuf_remove_trap(drakvuf, trap, (drakvuf_trap_free_t)g_free);
     injector->bp = NULL;
 }
 
-void injector_free_linux(injector_t injector)
+void injector_free_linux(linux_injector_t injector)
 {
     if (!injector) return;
 
@@ -307,7 +308,7 @@ bool is_syscall_error(addr_t rax, const char* err)
     return false;
 }
 
-void print_linux_injection_info(output_format_t format, injector_t injector)
+void print_linux_injection_info(output_format_t format, linux_injector_t injector)
 {
     const char* process_name = injector->host_file;
     gchar* arguments = g_strjoinv(" ", (gchar**)injector->args);
@@ -320,7 +321,7 @@ void print_linux_injection_info(output_format_t format, injector_t injector)
     g_free(arguments);
 }
 
-GHashTable* get_injection_environ(injector_t injector, drakvuf_trap_info_t* info)
+GHashTable* get_injection_environ(linux_injector_t injector, drakvuf_trap_info_t* info)
 {
     GHashTable* env = NULL; // process "__environ" contents
 

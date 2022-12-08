@@ -142,9 +142,10 @@ static event_response_t wait_for_thread_exit_cb(drakvuf_t drakvuf, drakvuf_trap_
 event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
     event_response_t event;
 
-    if (injector->step == STEP1)
+    if (base_injector->step == STEP1)
     {
         // save registers
         PRINT_DEBUG("Saving registers\n");

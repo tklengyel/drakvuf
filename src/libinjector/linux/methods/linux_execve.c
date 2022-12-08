@@ -109,19 +109,20 @@
 
 #include "linux_execve.h"
 #include "linux_syscalls.h"
+#include "linux_private.h"
 
 /* FIXME Could break analysis in general case
  *
  * If there exists other child process for the parent in return path from the
  * same system call then it could break thing during STEP4 or STEP5.
  */
-static event_response_t cleanup(injector_t injector, x86_registers_t* regs);
-bool is_child_process(injector_t injector,  drakvuf_trap_info_t* info)
+static event_response_t cleanup(linux_injector_t injector, x86_registers_t* regs);
+bool is_child_process(linux_injector_t injector,  drakvuf_trap_info_t* info)
 {
     bool is_child = info->proc_data.pid == injector->child_data.pid;
     PRINT_DEBUG("Inside %s process: %d\n", is_child ? "child" : "parent",
         info->proc_data.pid);
-    PRINT_DEBUG("Step of injector: %d\n", injector->step + 1);
+    PRINT_DEBUG("Step of injector: %d\n", injector->base_injector.step + 1);
     return is_child;
 }
 
@@ -153,9 +154,10 @@ bool is_child_process(injector_t injector,  drakvuf_trap_info_t* info)
  */
 event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = (linux_injector_t)info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1: // Finds vdso and sets up mmap
         {
@@ -165,7 +167,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!init_syscalls(drakvuf, info))
             {
                 injector->injection_failed = true;
-                return override_step(injector, STEP5, VMI_EVENT_RESPONSE_NONE);
+                return override_step(base_injector, STEP5, VMI_EVENT_RESPONSE_NONE);
             }
 
             // don't remove the initial trap
@@ -176,7 +178,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 injector->injection_failed = true;
                 // clear post_syscall_trap
                 free_bp_trap(drakvuf, injector, injector->bp);
-                return override_step(injector, STEP5, VMI_EVENT_RESPONSE_NONE);
+                return override_step(base_injector, STEP5, VMI_EVENT_RESPONSE_NONE);
             }
 
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -232,7 +234,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 }
 
                 // this is being done so that the parent can also be cleared
-                return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+                return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
             }
             else
             {
@@ -287,11 +289,11 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
  * to exit in case of some error. For this, we will be going to STEP4. STEP4 handles the
  * cleanup of both the parent as well as the child process.
  */
-static event_response_t cleanup(injector_t injector, x86_registers_t* regs)
+static event_response_t cleanup(linux_injector_t injector, x86_registers_t* regs)
 {
     fprintf(stderr, "Doing premature cleanup\n");
 
     copy_gprs(regs, &injector->saved_regs);
 
-    return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return override_step(&injector->base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }

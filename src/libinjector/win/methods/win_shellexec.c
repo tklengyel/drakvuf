@@ -111,9 +111,9 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
-    event_response_t event;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1:
         {
@@ -128,8 +128,7 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             }
 
             info->regs->rip = injector->exec_func;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2:
         {
@@ -146,8 +145,7 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             drakvuf_interrupt(drakvuf, SIGINT);
 
             memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         default:
         {
@@ -156,7 +154,7 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
