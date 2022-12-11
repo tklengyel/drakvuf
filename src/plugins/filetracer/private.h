@@ -585,6 +585,9 @@ enum
     _QSTR_NAME,
     _TIMESPEC64_TV_SEC,
 
+    _RENAMEDATA_OLD_DENTRY,
+    _RENAMEDATA_NEW_DENTRY,
+
     __LINUX_OFFSET_MAX,
 };
 
@@ -606,6 +609,9 @@ static const char* linux_offset_names[__OFFSET_MAX][2] =
     [_DENTRY_D_PARENT] = {"dentry", "d_parent"},
     [_QSTR_NAME] = {"qstr", "name"},
     [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
+
+    [_RENAMEDATA_OLD_DENTRY] = {"renamedata", "old_dentry"},
+    [_RENAMEDATA_NEW_DENTRY] = {"renamedata", "new_dentry"},
 };
 
 // Linux Inode Flags
