@@ -592,7 +592,7 @@ enum
 };
 
 // Linux Offsets
-static const char* linux_offset_names[__OFFSET_MAX][2] =
+static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
 {
     [_FILE_F_FLAGS] = {"file", "f_flags"},
     [_FILE_F_PATH] = {"file", "f_path"},
