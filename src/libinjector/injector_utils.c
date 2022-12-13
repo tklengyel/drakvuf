@@ -143,6 +143,48 @@ event_response_t handle_gprs_registers(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     return event;
 }
 
+static gchar* kv_strescape(const gchar* str)
+{
+    const char hexdig[] = "0123456789ABCDEF";
+    size_t len = strlen(str);
+    gchar* ret = g_malloc0(len * 4 + 3);
+    if (!ret) return NULL;
+    size_t ret_pos = 0;
+    ret[ret_pos++] = '"';
+    for (size_t i = 0; i < len; ++i)
+    {
+        unsigned char c = str[i];
+        switch (c)
+        {
+            case '\r':
+                ret[ret_pos++] = '\\';
+                ret[ret_pos++] = 'r';
+                break;
+            case '\n':
+                ret[ret_pos++] = '\\';
+                ret[ret_pos++] = 'n';
+                break;
+            case '"':
+                ret[ret_pos++] = '\\';
+                ret[ret_pos++] = '"';
+                break;
+            default:
+                if (c < ' ')
+                {
+                    ret[ret_pos++] = '\\';
+                    ret[ret_pos++] = 'x';
+                    ret[ret_pos++] = hexdig[c >> 4];
+                    ret[ret_pos++] = hexdig[c & 0xF];
+                }
+                else
+                    ret[ret_pos++] = c;
+                break;
+        }
+    }
+    ret[ret_pos++] = '"';
+    return ret;
+}
+
 void print_injection_info(
     output_format_t format,
     injection_method_t injector_method,
@@ -150,7 +192,7 @@ void print_injection_info(
     uint32_t target_pid,
     uint32_t pid,
     uint32_t tid,
-    const char* orig_process_name,
+    const char* process_name,
     const char* arguments,
     const injection_error_t* error
 )
@@ -161,23 +203,32 @@ void print_injection_info(
     switch (injector_result)
     {
         case INJECT_RESULT_SUCCESS:
-        {
-            gchar* process_name = drakvuf_escape_str(orig_process_name);
-            gchar* escaped_arguments = drakvuf_escape_str(arguments);
-
             switch (format)
             {
                 case OUTPUT_CSV:
-                    printf("inject," FORMAT_TIMEVAL ",%s,Success,%u,%s,%s,%u,%u\n",
+                {
+                    gchar* escaped_arguments = drakvuf_escape_str(arguments);
+                    printf("inject," FORMAT_TIMEVAL ",%s,Success,%u,\"%s\",%s,%u,%u\n",
                         UNPACK_TIMEVAL(t), method, target_pid, process_name, escaped_arguments, pid, tid);
+                    g_free(escaped_arguments);
                     break;
+                }
 
                 case OUTPUT_KV:
+                {
+                    gchar* escaped_process_name = kv_strescape(process_name);
+                    gchar* escaped_arguments = kv_strescape(arguments);
                     printf("inject Time=" FORMAT_TIMEVAL ",Method=%s,Status=Success,PID=%u,ProcessName=%s,Arguments=%s,InjectedPid=%u,InjectedTid=%u\n",
-                        UNPACK_TIMEVAL(t), method, target_pid, process_name, escaped_arguments, pid, tid);
+                        UNPACK_TIMEVAL(t), method, target_pid, escaped_process_name, escaped_arguments, pid, tid);
+                    g_free(escaped_process_name);
+                    g_free(escaped_arguments);
                     break;
+                }
 
                 case OUTPUT_JSON:
+                {
+                    gchar* escaped_process_name = drakvuf_escape_str(process_name);
+                    gchar* escaped_arguments = drakvuf_escape_str(arguments);
                     printf( "{"
                         "\"Plugin\": \"inject\", "
                         "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
@@ -188,20 +239,24 @@ void print_injection_info(
                         "\"InjectedPid\": %d, "
                         "\"InjectedTid\": %d"
                         "}\n",
-                        UNPACK_TIMEVAL(t), method, process_name, escaped_arguments, pid, tid);
+                        UNPACK_TIMEVAL(t), method, escaped_process_name, escaped_arguments, pid, tid);
+                    g_free(escaped_process_name);
+                    g_free(escaped_arguments);
                     break;
+                }
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD:%s  STATUS:SUCCESS PID:%u FILE:%s ARGUMENTS:%s INJECTED_PID:%u INJECTED_TID:%u\n",
+                {
+                    gchar* escaped_arguments = drakvuf_escape_str(arguments);
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD:%s STATUS:SUCCESS PID:%u FILE:\"%s\" ARGUMENTS:%s INJECTED_PID:%u INJECTED_TID:%u\n",
                         UNPACK_TIMEVAL(t), method, target_pid, process_name, escaped_arguments, pid, tid);
+                    g_free(escaped_arguments);
                     break;
+                }
             }
-
-            g_free(process_name);
-            g_free(escaped_arguments);
             break;
-        }
+
         case INJECT_RESULT_TIMEOUT:
             switch (format)
             {
