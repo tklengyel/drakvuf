@@ -148,6 +148,7 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 {
     (void)drakvuf;
     injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     if ( info->proc_data.pid != injector->target_pid || ( injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid ))
     {
@@ -207,11 +208,11 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         }
     }
 
-    if (!injector->step_override)
-        injector->step+=1;
+    if (!base_injector->step_override)
+        base_injector->step+=1;
 
-    injector->step_override = false;
-    return handle_gprs_registers(drakvuf, info, event);
+    base_injector->step_override = false;
+    return handle_gprs_registers(drakvuf, info, base_injector, event);
 }
 
 static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -383,6 +384,7 @@ bool check_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     if (!check_int3_trap(injector, info))
         return VMI_EVENT_RESPONSE_NONE;
@@ -441,11 +443,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!injector->hijacked)
         return 0;
 
-    if (!injector->step_override)
-        injector->step+=1;
+    if (!base_injector->step_override)
+        base_injector->step+=1;
 
-    injector->step_override = false;
-    return handle_gprs_registers(drakvuf, info, event);
+    base_injector->step_override = false;
+    return handle_gprs_registers(drakvuf, info, base_injector, event);
 
 }
 
@@ -662,9 +664,9 @@ injector_status_t injector_start_app_on_win(
     injector->error_code.valid = false;
     injector->error_code.code = -1;
     injector->error_code.string = "<UNKNOWN>";
-    injector->step = STEP1;
-    injector->step_override = false;
-    injector->set_gprs_only = true;
+    injector->base_injector.step = STEP1;
+    injector->base_injector.step_override = false;
+    injector->base_injector.set_gprs_only = true;
 
     if (!initialize_injector_functions(drakvuf, injector, file))
     {
@@ -754,8 +756,8 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     injector->target_tid = injection_tid;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->terminate_pid = pid;
-    injector->step_override = false;
-    injector->step = STEP1;
+    injector->base_injector.step_override = false;
+    injector->base_injector.step = STEP1;
 
     if (!initialize_injector_functions(drakvuf, injector, NULL))
     {
@@ -784,8 +786,8 @@ void injector_exitthread_on_win(drakvuf_t drakvuf,
     injector->target_pid = injection_pid;
     injector->target_tid = injection_tid;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    injector->step_override = false;
-    injector->step = STEP1;
+    injector->base_injector.step_override = false;
+    injector->base_injector.step = STEP1;
 
     if (!initialize_injector_functions(drakvuf, injector, NULL))
     {

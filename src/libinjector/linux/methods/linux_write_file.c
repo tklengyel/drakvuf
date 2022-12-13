@@ -111,12 +111,13 @@
 
 #include "linux_write_file.h"
 #include "linux_syscalls.h"
+#include "linux_private.h"
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
 static bool write_buffer_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-static bool read_chunk(injector_t injector);
+static bool read_chunk(linux_injector_t injector);
 
-bool init_write_file_method(injector_t injector, const char* file)
+bool init_write_file_method(linux_injector_t injector, const char* file)
 {
     FILE* fp = fopen(file, "rb");
     if (!fp)
@@ -176,9 +177,10 @@ bool init_write_file_method(injector_t injector, const char* file)
  */
 event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = (linux_injector_t)info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1: // Finds vdso and sets up mmap
         {
@@ -249,8 +251,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                         injector->virtual_memory_addr, injector->buffer.len))
                     return cleanup(drakvuf, info, true);
 
-                injector->step_override = true;
-                injector->step = STEP4;
+                return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
             }
 
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -292,7 +293,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 }
 
-static bool read_chunk(injector_t injector)
+static bool read_chunk(linux_injector_t injector)
 {
     injector->buffer.len = fread(injector->buffer.data, 1, FILE_BUF_SIZE, injector->fp);
     if (ferror(injector->fp))
@@ -311,7 +312,8 @@ static bool read_chunk(injector_t injector)
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
 {
     PRINT_DEBUG("Doing premature cleanup\n");
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = (linux_injector_t)info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     // restore regs
     copy_gprs(info->regs, &injector->saved_regs);
@@ -320,17 +322,17 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bo
         free_bp_trap(drakvuf, injector, info->trap);
 
     // since we are jumping to some arbitrary step, we will set this
-    injector->step_override = true;
+    base_injector->step_override = true;
 
     // give the last step for cleanup
-    injector->step = STEP6;
+    base_injector->step = STEP6;
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
 static bool write_buffer_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = (linux_injector_t)info->trap->data;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,

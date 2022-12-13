@@ -121,6 +121,8 @@
 #include "minidump2.h"
 #include "plugins/output_format.h"
 
+using namespace procdump2_ns;
+
 /*****************************************************************************
  *                             Public interface                              *
  *****************************************************************************/
@@ -1031,6 +1033,7 @@ bool procdump2::dispatch_host_wakeup(
             delay_execution(info, ctx->host, 500);
             return true;
     }
+    return true;
 }
 
 bool procdump2::dispatch_target_wakeup(
@@ -1131,6 +1134,7 @@ bool procdump2::dispatch_target_wakeup(
             }
             return true;
     }
+    return true;
 }
 
 /*****************************************************************************

@@ -108,7 +108,15 @@
 #include <libdrakvuf/libdrakvuf.h>
 #include <libinjector/private.h>
 
-event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event);
-void fall_through_step(injector_t injector, const injector_step_t step);
-event_response_t handle_gprs_registers(drakvuf_t drakvuf, drakvuf_trap_info_t* info, event_response_t event);
+struct base_injector
+{
+    injector_step_t step;
+    bool step_override;
+    bool set_gprs_only;
+};
+typedef struct base_injector* base_injector_t;
+
+event_response_t override_step(base_injector_t injector, const injector_step_t step, event_response_t event);
+void fall_through_step(base_injector_t injector, const injector_step_t step);
+event_response_t handle_gprs_registers(drakvuf_t drakvuf, drakvuf_trap_info_t* info, base_injector_t injector, event_response_t event);
 #endif

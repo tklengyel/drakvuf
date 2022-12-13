@@ -108,11 +108,12 @@
 
 #include "linux_shellcode.h"
 #include "linux_syscalls.h"
+#include "linux_private.h"
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
 static bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-bool load_shellcode_from_file(injector_t injector, const char* file);
+bool load_shellcode_from_file(linux_injector_t injector, const char* file);
 
 /* This function handles the shellcode injection, it does so in total of 5 steps
  *
@@ -148,11 +149,12 @@ bool load_shellcode_from_file(injector_t injector, const char* file);
  */
 event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     event_response_t event;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1: // Finds vdso and sets up mmap
         {
@@ -233,7 +235,8 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
 {
     fprintf(stderr, "Doing premature cleanup\n");
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     // restore regs
     copy_gprs(info->regs, &injector->saved_regs);
@@ -242,17 +245,13 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bo
         free_bp_trap(drakvuf, injector, info->trap);
 
     // since we are jumping to some arbitrary step, we will set this
-    injector->step_override = true;
-
     // give the last step
-    injector->step = STEP5;
-
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    return override_step(base_injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }
 
 static bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = info->trap->data;
+    linux_injector_t injector = info->trap->data;
 
     injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
 
@@ -281,7 +280,7 @@ static bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = info->trap->data;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -309,7 +308,7 @@ static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_inf
     return true;
 }
 
-bool load_shellcode_from_file(injector_t injector, const char* file)
+bool load_shellcode_from_file(linux_injector_t injector, const char* file)
 {
     FILE* fp = fopen(file, "rb");
     if (!fp)

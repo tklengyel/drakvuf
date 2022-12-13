@@ -137,11 +137,7 @@
 
 struct injector
 {
-    // common in win and linux
-    // KEEP THESE IN TOP and in sync with the order in injector_utils.c
-    injector_step_t step;
-    bool step_override; // set this as true for jumping to some arbitrary step
-    bool set_gprs_only;
+    struct base_injector base_injector;
 
     // Inputs:
     unicode_string_t* target_file_us;
@@ -201,6 +197,7 @@ struct injector
     uint32_t pid, tid;
     uint64_t hProc, hThr;
 };
+typedef struct injector* injector_t;
 
 
 struct startup_info_32

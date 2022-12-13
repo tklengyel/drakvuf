@@ -355,7 +355,6 @@ next:
 
     // Mapping symbol name to address in dynsym table
 
-    addr_t value;
     offset = dynsym_offset;
     while (true)
     {
@@ -364,16 +363,16 @@ next:
         if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &key))
             return -1;
 
+        addr_t value = 0;
         ctx.addr =  offset + drakvuf->offsets[ELF64SYM_VALUE];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &value))
             return -1;
 
         if (key == symbol_offset)
-            break;
+            return text_segment_address + value;
 
         offset += dynsym_entry_size;
     }
-    return text_segment_address + value;
 }
 
 addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
