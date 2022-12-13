@@ -109,6 +109,6 @@
 #define LINUX_WRITE_FILE_H
 #include "linux_utils.h"
 
-bool init_write_file_method(injector_t injector, const char* file);
+bool init_write_file_method(linux_injector_t injector, const char* file);
 event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 #endif

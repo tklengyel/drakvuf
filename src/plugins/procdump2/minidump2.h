@@ -124,6 +124,9 @@ using rva64_t = uint64_t;
 #define MDMP_MAX_MEMORY_RANGES 256
 #define MDMP_MAX_THREADS 1
 
+namespace procdump2_ns
+{
+
 enum mdmp_type
 {
     MiniDumpNormal         = 0,
@@ -684,4 +687,6 @@ struct __attribute__ ((packed, aligned(4))) minidump
     }
 };
 
-#endif // PROCDUMP_MINIDUMP_H
+}
+
+#endif // PROCDUMP2_MINIDUMP_H

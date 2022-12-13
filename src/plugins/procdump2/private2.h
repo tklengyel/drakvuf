@@ -108,6 +108,7 @@
 #include "writer.h"
 
 using namespace std::string_literals;
+using namespace procdump2_ns;
 
 using std::string;
 

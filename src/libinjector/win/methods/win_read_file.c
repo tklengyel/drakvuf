@@ -112,9 +112,9 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
-    event_response_t event;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1: // allocate virtual memory
         {
@@ -129,8 +129,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             }
 
             info->regs->rip = injector->exec_func;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2: // write payload to virtual memory
         {
@@ -146,8 +145,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             }
 
             info->regs->rip = injector->memset;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP3: // expand env in memory
         {
@@ -159,8 +157,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             }
 
             info->regs->rip = injector->expand_env;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP4: // open file handle
         {
@@ -181,8 +178,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                 return cleanup(drakvuf, info);
 
             info->regs->rip = injector->create_file;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP5: // verify file handle and open host file
         {
@@ -205,8 +201,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             }
 
             info->regs->rip = injector->read_file;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP6: // read chunk from guest and write to host
         {
@@ -230,7 +225,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                 }
 
                 info->regs->rip = injector->read_file;
-                return override_step(injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
+                return override_step(base_injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
             }
             else
             {
@@ -244,8 +239,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                 info->regs->rip = injector->close_handle;
             }
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP7: // close file handle
         {
@@ -262,8 +256,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             drakvuf_interrupt(drakvuf, SIGINT);
 
             memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         default:
         {
@@ -272,7 +265,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

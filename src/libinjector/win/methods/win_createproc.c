@@ -115,9 +115,9 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
-    event_response_t event;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1:
         {
@@ -133,8 +133,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             injector->target_rsp = info->regs->rsp;
             info->regs->rip = injector->exec_func;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2:
         {
@@ -165,8 +164,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 return cleanup(drakvuf, info);
 
             info->regs->rip = injector->resume_thread;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP3: // We are now in the return path from ResumeThread
         {
@@ -183,8 +181,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
 
             injector->resumed = true;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP4: // exit loop
         {
@@ -198,8 +195,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 drakvuf_remove_trap(drakvuf, info->trap, NULL);
                 drakvuf_interrupt(drakvuf, SIGINT);
             }
-            return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
-            break;
+            return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
         }
         default:
         {
@@ -208,7 +204,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

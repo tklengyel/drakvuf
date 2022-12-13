@@ -112,7 +112,7 @@
 #include "methods/linux_read_file.h"
 #include "methods/linux_execve.h"
 
-static bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
+static bool check_userspace_int3_trap(linux_injector_t injector, drakvuf_trap_info_t* info)
 {
     // check CPL
     short CPL = info->regs->cs_sel & 3;
@@ -171,7 +171,8 @@ static bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* 
 
 event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = info->trap->data;
+    linux_injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
         info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
@@ -180,7 +181,7 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
         return VMI_EVENT_RESPONSE_NONE;
 
     // reset the override on every run
-    injector->step_override = false;
+    base_injector->step_override = false;
 
     event_response_t event;
     switch (injector->method)
@@ -213,15 +214,15 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
     }
 
     // increase the step only if there is no manual override
-    if (!injector->step_override)
-        injector->step += 1;
+    if (!base_injector->step_override)
+        base_injector->step += 1;
 
     return event;
 }
 
 static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = info->trap->data;
+    linux_injector_t injector = info->trap->data;
 
     // right now we are in kernel space
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u TID: %u\n",
@@ -282,7 +283,7 @@ static event_response_t kernel_panic_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
 static event_response_t kernel_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = info->trap->data;
+    linux_injector_t injector = info->trap->data;
 
     if (info->proc_data.pid != injector->target_pid || info->proc_data.tid != injector->target_tid)
         return VMI_EVENT_RESPONSE_NONE;
@@ -301,7 +302,7 @@ static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused))
     return drakvuf_is_interrupted(drakvuf);
 }
 
-static bool inject(drakvuf_t drakvuf, injector_t injector)
+static bool inject(drakvuf_t drakvuf, linux_injector_t injector)
 {
     reg_t lstar;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -407,7 +408,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     return true;
 }
 
-static bool init_injector(injector_t injector)
+static bool init_injector(linux_injector_t injector)
 {
     switch (injector->method)
     {
@@ -478,7 +479,8 @@ injector_status_t injector_start_app_on_linux(
     vmi_pid_t* injected_pid
 )
 {
-    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
+    linux_injector_t injector = (linux_injector_t)g_malloc0(sizeof(struct linux_injector));
+    base_injector_t base_injector = &injector->base_injector;
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
@@ -503,7 +505,7 @@ injector_status_t injector_start_app_on_linux(
     for ( int i = 0; i<args_count; i++ )
         injector->args[i] = args[i];
     injector->method = method;
-    injector->step = STEP1;
+    base_injector->step = STEP1;
 
     if (!init_injector(injector))
     {

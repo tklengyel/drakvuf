@@ -106,7 +106,7 @@ h_sources = libinjector.h private.h debug_helpers.h injector_utils.h \
 	win/win_private.h win/win_injector.h win/win_utils.h win/win_functions.h \
 	win/method_helpers.h win/methods/win_read_file.h win/methods/win_write_file.h win/methods/win_createproc.h \
 	win/methods/win_shellexec.h win/methods/win_shellcode.h win/methods/win_terminate.h win/methods/win_exitthread.h \
-	linux/linux_injector.h linux/linux_utils.h linux/linux_syscalls.h \
+	linux/linux_private.h linux/linux_injector.h linux/linux_utils.h linux/linux_syscalls.h \
 	linux/methods/linux_shellcode.h linux/methods/linux_write_file.h linux/methods/linux_read_file.h linux/methods/linux_execve.h
 c_sources = injector.c  injector_stack.c debug_helpers.c injector_utils.c \
 	win/win_injector.c win/win_utils.c win/win_functions.c \

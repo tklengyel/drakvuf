@@ -106,6 +106,9 @@
 
 #include <memory>
 
+namespace procdump2_ns
+{
+
 class ProcdumpWriter
 {
 public:
@@ -120,3 +123,5 @@ class ProcdumpWriterFactory
 public:
     static std::unique_ptr<ProcdumpWriter> build(std::string const& path, bool use_compression);
 };
+
+}

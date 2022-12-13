@@ -275,7 +275,7 @@ void injector_exitthread(drakvuf_t drakvuf,
     uint32_t injection_tid);
 
 
-void injector_free(drakvuf_t drakvuf, injector_t injector);
+void injector_free_win(injector_t injector);
 
 const char* injection_method_name(injection_method_t method);
 

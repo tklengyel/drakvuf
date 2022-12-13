@@ -106,24 +106,14 @@
 
 #include <assert.h>
 
-// a dummy stub which should be compatible with the extended definitions of win_injector as well as linux_injector
-// since c doesn't support inheritance, this is how it is being done for now ¯\_(ツ)_/¯
-// NOTE: sync the variables with linux and windows injector if this stub is updated
-struct injector
-{
-    injector_step_t step;
-    bool step_override;
-    bool set_gprs_only;
-};
-
-event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event)
+event_response_t override_step(base_injector_t injector, const injector_step_t step, event_response_t event)
 {
     injector->step_override = true;
     injector->step = step;
     return event;
 }
 
-void fall_through_step(injector_t injector, const injector_step_t step)
+void fall_through_step(base_injector_t injector, const injector_step_t step)
 {
     injector->step = step;
 }
@@ -135,10 +125,8 @@ void fall_through_step(injector_t injector, const injector_step_t step)
 // would point to KPCR of vCPU0.
 // Hence, the safe way is to only modify the general purpose registers
 // which won't affect the kernel structures
-event_response_t handle_gprs_registers(drakvuf_t drakvuf, drakvuf_trap_info_t* info, event_response_t event)
+event_response_t handle_gprs_registers(drakvuf_t drakvuf, drakvuf_trap_info_t* info, base_injector_t injector, event_response_t event)
 {
-    injector_t injector = info->trap->data;
-
     if (injector->set_gprs_only && event == VMI_EVENT_RESPONSE_SET_REGISTERS)
     {
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);

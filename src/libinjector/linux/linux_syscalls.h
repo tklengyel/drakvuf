@@ -113,23 +113,23 @@
 // use this in STEP1 for initializing the syscalls
 bool init_syscalls(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size);
-bool setup_open_syscall(injector_t injector, x86_registers_t* regs,
+bool setup_mmap_syscall(linux_injector_t injector, x86_registers_t* regs, size_t size);
+bool setup_open_syscall(linux_injector_t injector, x86_registers_t* regs,
     const char* target_file, int flags, int mode);
-bool setup_close_syscall(injector_t injector, x86_registers_t* regs, int fd);
-bool setup_write_syscall(injector_t injector, x86_registers_t* regs,
+bool setup_close_syscall(linux_injector_t injector, x86_registers_t* regs, int fd);
+bool setup_write_syscall(linux_injector_t injector, x86_registers_t* regs,
     int fd, addr_t buffer_addr, size_t amount);
-bool setup_read_syscall(injector_t injector, x86_registers_t* regs,
+bool setup_read_syscall(linux_injector_t injector, x86_registers_t* regs,
     int fd, addr_t buffer_addr, size_t amount);
-bool setup_exit_syscall(injector_t injector, x86_registers_t* regs, uint64_t rc);
+bool setup_exit_syscall(linux_injector_t injector, x86_registers_t* regs, uint64_t rc);
 // note: void return type for vfork syscall
-void setup_vfork_syscall(injector_t injector, x86_registers_t* regs, char* proc_name, vmi_pid_t parent_pid);
-bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char* binary_file, const GHashTable* environ);
+void setup_vfork_syscall(linux_injector_t injector, x86_registers_t* regs, char* proc_name, vmi_pid_t parent_pid);
+bool setup_execve_syscall(linux_injector_t injector, x86_registers_t* regs, const char* binary_file, const GHashTable* environ);
 
-bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_vfork_syscall_cb(injector_t injector, x86_registers_t* regs, vmi_pid_t pid, uint32_t tid);
-bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs, size_t size);
+bool call_read_syscall_cb(linux_injector_t injector, x86_registers_t* regs);
+bool call_vfork_syscall_cb(linux_injector_t injector, x86_registers_t* regs, vmi_pid_t pid, uint32_t tid);
+bool call_write_syscall_cb(linux_injector_t injector, x86_registers_t* regs);
+bool call_open_syscall_cb(linux_injector_t injector, x86_registers_t* regs);
+bool call_mmap_syscall_cb(linux_injector_t injector, x86_registers_t* regs, size_t size);
 
 #endif

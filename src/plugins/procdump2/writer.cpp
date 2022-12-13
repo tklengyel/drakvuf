@@ -115,6 +115,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+using namespace procdump2_ns;
+
 namespace
 {
 
