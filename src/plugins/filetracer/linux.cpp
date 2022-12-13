@@ -434,11 +434,21 @@ event_response_t linux_filetracer::mknod_file_cb(drakvuf_t drakvuf, drakvuf_trap
         umode_t mode,
         dev_t dev
     )
+
+    in 5.12+:
+    int vfs_mknod(
+        struct user_namespace *mnt_userns,
+        struct inode *dir,
+        struct dentry *dentry,
+        umode_t mode,
+        dev_t dev
+    )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
+    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 3 : 2);
 
     linux_data params;
     if (get_file_info(drakvuf, info, &params, dentry_addr, "dentry"))
@@ -458,12 +468,52 @@ event_response_t linux_filetracer::rename_file_cb(drakvuf_t drakvuf, drakvuf_tra
         struct inode **delegated_inode,
         unsigned int flags
     )
+
+    in 5.12:
+    int vfs_rename(
+        struct renamedata *rd
+    )
+    struct renamedata {
+        struct user_namespace *old_mnt_userns;
+        struct inode *old_dir;
+        struct dentry *old_dentry;
+        struct user_namespace *new_mnt_userns;
+        struct inode *new_dir;
+        struct dentry *new_dentry;
+        struct inode **delegated_inode;
+        unsigned int flags;
+    } __randomize_layout;
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t old_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
-    addr_t new_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 4);
+    addr_t old_dentry_addr;
+    addr_t new_dentry_addr;
+
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
+    if (VERSION_GE(ver, 5, 12))
+    {
+        addr_t struct_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+
+        auto vmi = vmi_lock_guard(drakvuf);
+
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3);
+
+        ctx.addr = struct_addr + this->offsets[_RENAMEDATA_OLD_DENTRY];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &old_dentry_addr))
+            return VMI_EVENT_RESPONSE_NONE;
+
+        ctx.addr = struct_addr + this->offsets[_RENAMEDATA_NEW_DENTRY];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &new_dentry_addr))
+            return VMI_EVENT_RESPONSE_NONE;
+    }
+    else
+    {
+        old_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+        new_dentry_addr = drakvuf_get_function_argument(drakvuf, info, 4);
+    }
 
     char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, old_dentry_addr);
     std::string old_name = tmp ?: "";
@@ -617,10 +667,11 @@ event_response_t linux_filetracer::utimes_file_cb(drakvuf_t drakvuf, drakvuf_tra
 
 event_response_t linux_filetracer::access_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    // long do_faccessat(
+    // static long do_faccessat(
     //     int dfd,
     //     const char __user *filename,
-    //     int mode
+    //     int mode,
+    //     int flags
     // )
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
@@ -874,8 +925,7 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output) : 
 {
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_offset_names, this->offsets.size(), this->offsets.data()))
     {
-        PRINT_DEBUG("[FILETRACER] Failed to get offsets\n");
-        return;
+        PRINT_DEBUG("[FILETRACER] Failed to get some offsets\n");
     }
 
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_pt_regs_offsets_name, this->regs.size(), this->regs.data()))
