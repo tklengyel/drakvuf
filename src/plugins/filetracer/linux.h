@@ -184,7 +184,9 @@ public:
     void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params);
 
     /* File info parsing */
-    bool get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t struct_addr = 0, std::string struct_name = "");
+    bool get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t struct_addr);
+    bool get_path_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t struct_addr);
+    bool get_dentry_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t struct_addr);
     std::string get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t dentry_addr);
     std::string get_filepath_locked(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, addr_t dentry_addr);
     char* read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t fileaddr);
