@@ -275,15 +275,23 @@ static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString* b
             return;
         }
 
-        // End of cicle
+        // End of cycle
         if (dentry == mnt_mnt_root || dentry == dentry_parent)
             break;
 
-        ctx.addr = dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
+        addr_t qname_addr;
+        ctx.addr = dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME];
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &qname_addr))
+        {
+            PRINT_DEBUG("Can't read path->dentry->qstr->name pointer\n");
+            return;
+        }
+
+        ctx.addr = qname_addr;
         gchar* res = vmi_read_str(drakvuf->vmi, &ctx);
         if (!res)
         {
-            PRINT_DEBUG("Can't read path->dentry->qstr data\n");
+            PRINT_DEBUG("Can't read path->dentry->qstr->name string\n");
             return;
         }
 
