@@ -317,7 +317,7 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang clang-tools-13 autoconf-archive flex bison libjson-c-dev meson ninja-build
+          sudo apt-get install -y clang clang-tools-13 autoconf-archive flex bison libjson-c-dev meson ninja-build z3
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -350,8 +350,7 @@ jobs:
 
           meson build
 
-          # scan-build
-
           analyze-build-13 --cdb build/compile_commands.json \
+            --analyzer-config crosscheck-with-z3=true \
             --status-bugs --analyze-headers \
             --disable-checker deadcode.DeadStores
