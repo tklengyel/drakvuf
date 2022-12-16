@@ -4,6 +4,8 @@ on:
     branches: [ master ]
   push:
     branches: [ master ]
+permissions:
+  contents: read
 jobs:
   init:
     runs-on: ${{ matrix.os }}
