@@ -5,7 +5,9 @@ on:
   push:
     branches: [ master ]
 permissions:
+  actions: read
   contents: read
+  security-events: write
 jobs:
   init:
     runs-on: ${{ matrix.os }}
