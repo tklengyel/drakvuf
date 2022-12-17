@@ -251,7 +251,6 @@ jobs:
       matrix:
         language: ['cpp']
         os:
-          - 'ubuntu-20.04'
           - 'ubuntu-latest'
 
     steps:
@@ -362,10 +361,9 @@ jobs:
             --disable-checker deadcode.DeadStores \
             --sarif --output result
 
-          r=$(find ./result -name 'results-merged.sarif')
-          mv $r results.sarif
+          npx -y @microsoft/sarif-multitool merge csa/*/*.sarif
 
       - name: upload scan result
         uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: results.sarif
+          sarif_file: merged.sarif
