@@ -353,9 +353,19 @@ jobs:
           export CXX=clang++
 
           meson build
+          mkdir result
 
           # scan-build
 
           analyze-build-13 --cdb build/compile_commands.json \
-            --status-bugs --analyze-headers \
-            --disable-checker deadcode.DeadStores
+            --analyze-headers \
+            --disable-checker deadcode.DeadStores \
+            --sarif --output result
+
+          r=$(find ./result -name 'results-merged.sarif')
+          mv $r results.sarif
+
+      - name: upload scan result
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: results.sarif
