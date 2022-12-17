@@ -153,7 +153,6 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mmap))
         return -1;
 
-    char* libname = "";
     addr_t vm_next, nullp = 0;
 
     addr_t text_segment_address = 0;
@@ -183,10 +182,6 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &path_dentry))
             goto next;
 
-        ctx.addr = path_dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        libname = vmi_read_str(vmi, &ctx);
-        PRINT_DEBUG("LIB NAME is: %s \n", libname);
-
         addr_t pgoffset;
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_PGOFF];
         if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &pgoffset))
@@ -198,7 +193,16 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_flags))
             goto next;
 
-        if (strncmp(libname, lib, strlen(lib)) == 0 )
+        addr_t libname_addr;
+        ctx.addr = path_dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &libname_addr))
+            goto next;
+
+        ctx.addr = libname_addr;
+        char* libname = vmi_read_str(vmi, &ctx);
+        PRINT_DEBUG("LIB NAME is: %s \n", libname);
+
+        if (libname && strncmp(libname, lib, strlen(lib)) == 0 )
         {
             ctx.addr = vm_start;
             uint32_t elf_header;
@@ -207,6 +211,8 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
                 if (elf_header == ELF_HEADER)
                     text_segment_address = vm_start;
         }
+
+        g_free(libname);
 
 next:
         mmap = vm_next;
@@ -398,7 +404,6 @@ addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mmap))
         return -1;
 
-    char* libname = "";
     addr_t vm_next, nullp = 0;
     do
     {
@@ -426,12 +431,21 @@ addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &path_dentry))
             goto next;
 
-        ctx.addr = path_dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        libname = vmi_read_str(vmi, &ctx);
-        PRINT_DEBUG("LIB NAME is: %s \n", libname);
+        addr_t libname_addr;
+        ctx.addr = path_dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &libname_addr))
+            goto next;
 
-        if (strncmp(libname, lib, strlen(lib)) == 0)
-            return vm_start;
+        ctx.addr = libname_addr;
+        char* libname = vmi_read_str(vmi, &ctx);
+        PRINT_DEBUG("LIB NAME is: %s\n", libname);
+        if (libname)
+        {
+            int strncmp_ret = strncmp(libname, lib, strlen(lib));
+            g_free(libname);
+            if (strncmp_ret == 0)
+                return vm_start;
+        }
 
 next:
         mmap = vm_next;
