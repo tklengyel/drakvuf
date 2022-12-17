@@ -4,6 +4,8 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+permissions:
+  contents: read
 concurrency:
   group: environment-${{ github.ref }}
   cancel-in-progress: true

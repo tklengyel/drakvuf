@@ -4,7 +4,8 @@ on:
     - cron: '0 18 * * *' # Daily at 18:00 UTC
   push:
     branches: master
-
+permissions:
+  contents: read
 jobs:
   latest:
     runs-on: ubuntu-20.04

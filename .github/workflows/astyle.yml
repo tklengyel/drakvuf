@@ -2,6 +2,8 @@ name: astyle
 on:
   pull_request:
     branches: [ master ]
+permissions:
+  contents: read
 jobs:
   astyle:
     runs-on: ubuntu-latest
