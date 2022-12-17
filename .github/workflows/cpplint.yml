@@ -2,6 +2,8 @@ name: cpplint
 on:
   pull_request:
     branches: [ master ]
+permissions:
+  contents: read
 jobs:
   cpplint:
     runs-on: ubuntu-latest
