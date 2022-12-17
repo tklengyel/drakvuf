@@ -579,10 +579,7 @@ enum
     _INODE_I_FLAGS,
 
     _PATH_DENTRY,
-    _DENTRY_D_NAME,
     _DENTRY_D_INODE,
-    _DENTRY_D_PARENT,
-    _QSTR_NAME,
     _TIMESPEC64_TV_SEC,
 
     _RENAMEDATA_OLD_DENTRY,
@@ -604,10 +601,7 @@ static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
     [_INODE_I_FLAGS] = {"inode", "i_flags"},
 
     [_PATH_DENTRY] = {"path", "dentry"},
-    [_DENTRY_D_NAME] = {"dentry", "d_name"},
     [_DENTRY_D_INODE] = {"dentry", "d_inode"},
-    [_DENTRY_D_PARENT] = {"dentry", "d_parent"},
-    [_QSTR_NAME] = {"qstr", "name"},
     [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
 
     [_RENAMEDATA_OLD_DENTRY] = {"renamedata", "old_dentry"},

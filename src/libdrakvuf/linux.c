@@ -206,20 +206,22 @@ char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
     ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
     while (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &parent) && parent != dentry_addr)
     {
-        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        gchar* tmp = vmi_read_str(drakvuf->vmi, &ctx);
-        if (tmp == NULL)
-            break;
-
-        // TODO: why vmi_read_str return 0x01?
-        // TODO: with "std::string dirname = tmp" works very well
-        if (tmp[0] != 0x01)
+        gchar* name = NULL;
+        addr_t qstr_str_addr;
+        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME];
+        if (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &qstr_str_addr))
         {
-            g_string_prepend(b, tmp);
-            g_string_prepend(b, "/");
+            ctx.addr = qstr_str_addr;
+            name = vmi_read_str(drakvuf->vmi, &ctx);
         }
 
-        g_free(tmp);
+        if (name == NULL)
+            break;
+
+        g_string_prepend(b, name);
+        g_string_prepend(b, "/");
+
+        g_free(name);
 
         dentry_addr = parent;
         ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
