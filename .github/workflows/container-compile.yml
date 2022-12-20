@@ -37,7 +37,7 @@ jobs:
     - name: Get Xen version
       id: get-xen-hash
       run: |
-        echo ::set-output name=XEN_HASH::${{ matrix.container }}_$(git submodule | grep xen | awk '{ print $1 }')
+        echo XEN_HASH=${{ matrix.container }}_$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
 
     - name: Cache Xen debball
       id: cache-xen
