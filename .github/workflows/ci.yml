@@ -25,8 +25,8 @@ jobs:
       - name: Get submodule hashes version
         id: get-hash
         run: |
-          echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
-          echo ::set-output name=LIBVMI_HASH::$(git submodule | grep libvmi | awk '{ print $1 }')
+          echo XEN_HASH=$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
+          echo LIBVMI_HASH=$(git submodule | grep libvmi | awk '{ print $1 }') >> $GITHUB_OUTPUT
 
       - name: Cache Xen debball
         id: cache-xen
