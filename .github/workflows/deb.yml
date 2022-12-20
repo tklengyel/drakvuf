@@ -76,7 +76,7 @@ jobs:
           if [ -f release-tag.txt ]; then
             RELEASE_TAG=$(cat release-tag.txt)
             echo "Release tag: $RELEASE_TAG"
-            echo "release_tag=${RELEASE_TAG} >> $GITHUB_OUTPUT
+            echo release_tag=${RELEASE_TAG} >> $GITHUB_OUTPUT
           fi
       - name: Cache Xen intermediate
         uses: actions/cache@v3
