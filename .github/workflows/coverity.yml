@@ -25,7 +25,7 @@ jobs:
       - name: Get Xen version
         id: get-xen-hash
         run: |
-          echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
+          echo XEN_HASH=$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
       - name: Cache Xen debball
         id: cache-xen
         uses: actions/cache@v3
@@ -68,8 +68,7 @@ jobs:
         id: hash
         run: |
           wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
-          hash=$(cat coverity_tool.md5)
-          echo ::set-output name=hash::$hash
+          echo hash=$(cat coverity_tool.md5) >> $GITHUB_OUTPUT
 
       - uses: actions/cache@v3
         id: cache-coverity
@@ -99,6 +98,8 @@ jobs:
         run: |
           export PATH=`pwd`/coverity/bin:$PATH
           cov-build --dir cov-int make
+          cov-analyze --dir cov-int --ticker-mode none --strip-path $PWD --all
+          cov-format-errors --dir cov-int --json-output-v7 coverity-results.json
 
       - name: Submit the result to Coverity Scan
         run: |
@@ -110,3 +111,15 @@ jobs:
             --form version=master \
             --form description="`git describe --always`" \
             https://scan.coverity.com/builds?project=tklengyel%2Fdrakvuf
+
+    - name: Convert Coverity Results to SARIF
+      uses: tklengyel/coverity-scan-results-to-sarif@1.0.0
+      with:
+        pipeline-results-json: coverity-results.json
+        output-results-sarif: coverity-results.sarif
+        
+    - name: Upload SARIF file to GitHub UI
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: coverity-results.sarif
+        category: coverity
