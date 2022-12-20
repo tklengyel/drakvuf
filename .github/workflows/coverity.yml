@@ -117,7 +117,7 @@ jobs:
       with:
         pipeline-results-json: coverity-results.json
         output-results-sarif: coverity-results.sarif
-        
+
     - name: Upload SARIF file to GitHub UI
       uses: github/codeql-action/upload-sarif@v2
       with:
