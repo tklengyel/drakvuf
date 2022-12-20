@@ -67,7 +67,7 @@ jobs:
       - name: Download Coverity hash
         id: hash
         run: |
-          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
           echo hash=$(cat coverity_tool.md5) >> $GITHUB_OUTPUT
 
       - uses: actions/cache@v3
@@ -79,7 +79,7 @@ jobs:
       - name: Download Coverity Build Tool
         if: steps.cache-coverity.outputs.cache-hit != 'true'
         run: |
-          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf" -O coverity_tool.tgz
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf" -O coverity_tool.tgz
           mkdir -p coverity
           tar xzf coverity_tool.tgz --strip 1 -C coverity
 
@@ -98,8 +98,6 @@ jobs:
         run: |
           export PATH=`pwd`/coverity/bin:$PATH
           cov-build --dir cov-int make
-          cov-analyze --dir cov-int --ticker-mode none --strip-path $PWD --all
-          cov-format-errors --dir cov-int --json-output-v7 coverity-results.json
 
       - name: Submit the result to Coverity Scan
         run: |
@@ -111,15 +109,3 @@ jobs:
             --form version=master \
             --form description="`git describe --always`" \
             https://scan.coverity.com/builds?project=tklengyel%2Fdrakvuf
-
-      - name: Convert Coverity Results to SARIF
-        uses: tklengyel/coverity-scan-results-to-sarif@1.0.0
-        with:
-          pipeline-results-json: coverity-results.json
-          output-results-sarif: coverity-results.sarif
-
-      - name: Upload SARIF file to GitHub UI
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: coverity-results.sarif
-          category: coverity
