@@ -72,7 +72,7 @@ jobs:
           echo artifact_prefix=${ARTIFACT_PREFIX} >> $GITHUB_OUTPUT
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
           echo "Xen commit: $XEN_COMMIT"
-          echo xen_commit::${XEN_COMMIT} >> $GITHUB_OUTPUT
+          echo xen_commit=${XEN_COMMIT} >> $GITHUB_OUTPUT
           if [ -f release-tag.txt ]; then
             RELEASE_TAG=$(cat release-tag.txt)
             echo "Release tag: $RELEASE_TAG"
