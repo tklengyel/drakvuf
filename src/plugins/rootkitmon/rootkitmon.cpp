@@ -563,7 +563,7 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t driver, void* ctx)
 
     // Map 1 4KB page with PE header
     void* module = nullptr;
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module) || !module )
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to map guest VA 0x%lx\n", a_ctx.addr);
         return;
