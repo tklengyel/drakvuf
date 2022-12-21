@@ -359,3 +359,52 @@ jobs:
           analyze-build-13 --cdb build/compile_commands.json \
             --status-bugs --analyze-headers \
             --disable-checker deadcode.DeadStores
+
+  clang-tidy:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - 'ubuntu-latest'
+    needs:
+      - init
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          # Install packages
+          sudo apt-get update -q
+          sudo apt-get install -y clang clang-tidy-13 autoconf-archive flex bison libjson-c-dev meson ninja-build
+
+      - name: Cache Xen debball
+        uses: actions/cache@v3
+        with:
+          path: xen/dist
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v3
+        with:
+          path: libvmi/dist
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
+          sudo ldconfig
+          cd ../..
+
+      - name: run-clang-tidy
+        run: |
+          # Set Exports
+          export CC=clang
+          export CXX=clang++
+
+          meson build
+          run-clang-tidy-13
