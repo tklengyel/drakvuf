@@ -275,7 +275,7 @@ std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint6
 
     auto vmi = vmi_lock_guard(drakvuf);
     if (vmi_read(vmi, &ctx, sizeof(guid), &guid, nullptr) != VMI_SUCCESS)
-        memset(&guid, 0, sizeof(guid));
+        memset_s(&guid, sizeof(guid), 0, sizeof(guid));
 
     const int sz = 64;
     char stream[sz] = {0};

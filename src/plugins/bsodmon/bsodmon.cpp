@@ -211,7 +211,7 @@ static void dump_system(
     {
         // Memory mapped deviced could not be read so skip them
         if (VMI_SUCCESS != vmi_read_pa(vmi, addr, VMI_PS_4KB, buf, &bytes_read))
-            memset(buf, 0, VMI_PS_4KB);
+            memset_s(buf, sizeof(buf), 0, VMI_PS_4KB);
 
         fwrite(buf, VMI_PS_4KB, 1, fp);
     }

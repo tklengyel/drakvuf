@@ -936,7 +936,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
                 if (!is_known)
                 {
                     struct winsta* w = (struct winsta*) malloc(sizeof(struct winsta));
-                    memset(w, 0, sizeof(struct winsta));
+                    memset_s(w, sizeof(*w), 0, sizeof(struct winsta));
                     populate_winsta(vmi, w, cur_pwinsta, pid);
                     g_array_append_val(winstas, w);
                 }

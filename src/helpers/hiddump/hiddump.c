@@ -158,7 +158,7 @@ static int install_signal_handler(const int signum)
 {
     struct sigaction act;
 
-    memset(&act, 0, sizeof act);
+    memset_s(&act, sizeof(act), 0, sizeof(act));
     sigemptyset(&act.sa_mask);
     act.sa_handler = handle_signal;
     act.sa_flags = 0;

@@ -953,7 +953,7 @@ static unicode_string_t* _drakvuf_read_wchar_array(drakvuf_t drakvuf, const acce
     {
         if (out->contents)
             free(out->contents);
-        memset((void*) out, 0, sizeof(*out));
+        memset_s((void*) out, sizeof(*out), 0, sizeof(*out));
         free(out);
         return NULL;
     }

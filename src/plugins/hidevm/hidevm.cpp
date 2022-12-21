@@ -437,7 +437,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
             guid_object_name = vmi_read_unicode_str(vmi, &ctx);
             if (guid_object_name)
             {
-                memset(&guid_object_name_utf8, 0, sizeof(guid_object_name_utf8));
+                memset_s(&guid_object_name_utf8, sizeof(guid_object_name_utf8), 0, sizeof(guid_object_name_utf8));
                 if (VMI_FAILURE == vmi_convert_str_encoding(guid_object_name, &guid_object_name_utf8, "UTF-8"))
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK): Failed to convert Guid ObjectName to UTF-8\n");

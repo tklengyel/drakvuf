@@ -178,7 +178,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
         return -1;
     }
 
-    memset(qc->buf, 0, sizeof(qc->buf));
+    memset_s(qc->buf, sizeof(qc->buf), 0, sizeof(qc->buf));
 
     /* Exits capabilities negotiation mode */
     ret = write(qc->fd, QMP_EXEC_CAPABILITIES, strlen(QMP_EXEC_CAPABILITIES));
@@ -258,7 +258,7 @@ int qmp_communicate(qmp_connection* qc, const char* in, char** out)
     if (out)
         *out = strndup(qc->buf, BUF_SIZE);
 
-    memset(qc->buf, 0, sizeof(qc->buf));
+    memset_s(qc->buf, sizeof(qc->buf), 0, sizeof(qc->buf));
 
     return 0;
 }

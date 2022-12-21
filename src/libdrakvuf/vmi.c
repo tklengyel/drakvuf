@@ -408,9 +408,9 @@ static void fill_common_event_trap_info(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     proc_data_priv_t* proc_data, proc_data_priv_t* attached_proc_data,
     vmi_event_t* event)
 {
-    memset(proc_data, 0, sizeof(proc_data_priv_t));
-    memset(attached_proc_data, 0, sizeof(proc_data_priv_t));
-    memset(trap_info, 0, sizeof(drakvuf_trap_info_t));
+    memset_s(proc_data, sizeof(*proc_data), 0, sizeof(proc_data_priv_t));
+    memset_s(attached_proc_data, sizeof(*attached_proc_data), 0, sizeof(proc_data_priv_t));
+    memset_s(trap_info, sizeof(*trap_info), 0, sizeof(drakvuf_trap_info_t));
 
     trap_info->regs = event->x86_regs;
     trap_info->vcpu = event->vcpu_id;
