@@ -321,6 +321,7 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
+          # analyze-build is only present in clang-tools-13
           sudo apt-get install -y clang clang-tools-13 autoconf-archive flex bison libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
@@ -375,7 +376,7 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang clang-tidy-13 autoconf-archive flex bison libjson-c-dev meson ninja-build
+          sudo apt-get install -y clang clang-tidy autoconf-archive flex bison libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -408,4 +409,4 @@ jobs:
 
           meson build
           cd build
-          run-clang-tidy-13
+          run-clang-tidy 2>&1 | tee clang-tidy.log
