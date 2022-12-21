@@ -103,6 +103,7 @@
 ***************************************************************************/
 
 #include <sys/stat.h>
+#include <string.h>
 #include <libdrakvuf/libdrakvuf.h>
 
 #include "bsodmon.h"

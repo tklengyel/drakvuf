@@ -105,9 +105,9 @@
 #include "printers.hpp"
 #include "utils.hpp"
 #include <array>
-#include <string>
 #include <sstream>
 #include <iomanip>
+#include <string.h>
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 #include "plugins/plugins.h"

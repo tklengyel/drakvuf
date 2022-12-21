@@ -106,7 +106,7 @@
 #include <glib.h>
 #include <inttypes.h>
 #include <algorithm>
-#include <string>
+#include <string.h>
 #include <libvmi/libvmi.h>
 #include <assert.h>
 #include <libdrakvuf/json-util.h>
