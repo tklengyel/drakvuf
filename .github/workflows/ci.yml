@@ -407,4 +407,5 @@ jobs:
           export CXX=clang++
 
           meson build
+          cd build
           run-clang-tidy-13
