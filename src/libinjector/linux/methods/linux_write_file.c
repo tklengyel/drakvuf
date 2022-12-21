@@ -184,7 +184,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         case STEP1: // Finds vdso and sets up mmap
         {
-            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+            memcpy_s(&injector->saved_regs, sizeof(injector->saved_regs), info->regs, sizeof(x86_registers_t));
 
             if (!init_syscalls(drakvuf, info))
                 return cleanup(drakvuf, info, false);

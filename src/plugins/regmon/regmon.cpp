@@ -301,7 +301,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
         for (size_t i = 0 ; i < data_bytes.size() ; i += 2)
         {
             uint16_t value_word;
-            memcpy(&value_word, &data_bytes[i], sizeof(value_word));
+            memcpy_s(&value_word, sizeof(value_word), &data_bytes[i], sizeof(value_word));
 
             if (value_word == 0)
             {
@@ -318,7 +318,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
             if (data_bytes.size() - i >= 4)
             {
                 uint32_t value_dword;
-                memcpy(&value_dword, &data_bytes[i], sizeof(value_dword));
+                memcpy_s(&value_dword, sizeof(value_dword), &data_bytes[i], sizeof(value_dword));
                 if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
                     break;
             }

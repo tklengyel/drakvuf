@@ -1037,7 +1037,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     injector->target_tid = info->attached_proc_data.tid;
     injector->finish_status = false;
 
-    memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&injector->saved_regs, sizeof(injector->saved_regs), info->regs, sizeof(x86_registers_t));
 
     if (inject_queryvolumeinfo(drakvuf, info, vmi, injector))
     {
@@ -1046,7 +1046,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return START_READFILE_SUCCEED;
     }
 
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+    memcpy_s(info->regs, sizeof(*info->regs), &injector->saved_regs, sizeof(x86_registers_t));
     return START_READFILE_ERROR;
 }
 

@@ -154,7 +154,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         pool_type = info->regs->rcx;
         size = info->regs->rdx;
-        memcpy(tag, &info->regs->r8, sizeof(uint32_t));
+        memcpy_s(tag, 5, &info->regs->r8, sizeof(uint32_t));
     }
     else
     {
@@ -165,7 +165,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &_tag) )
             return 0;
 
-        memcpy(tag, &_tag, sizeof(uint32_t));
+        memcpy_s(tag, 5, &_tag, sizeof(uint32_t));
 
         ctx.addr = info->regs->rsp+8;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&size) )

@@ -416,7 +416,7 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
     for (size_t i = 0; i < bytes_read; i += stack_width)
     {
         uint64_t stack_val = 0;
-        memcpy(&stack_val, buf+i, stack_width);
+        memcpy_s(&stack_val, sizeof(stack_val), buf+i, stack_width);
 
         mmvad_info_t mmvad;
         if (!drakvuf_find_mmvad(drakvuf, info->attached_proc_data.base_addr, stack_val, &mmvad))

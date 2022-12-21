@@ -117,7 +117,7 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     addr_t* stack_pointer)
 {
     x86_registers_t regs;
-    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&regs, sizeof(regs), info->regs, sizeof(x86_registers_t));
 
     uint64_t buffer = 0;
     uint64_t read_bytes = 0;
@@ -209,7 +209,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
         }
 
         PRINT_DEBUG("[USERHOOK] Start processing this dll_meta\n");
-        memcpy(&dll_meta->regs, info->regs, sizeof(x86_registers_t));
+        memcpy_s(&dll_meta->regs, sizeof(dll_meta->regs), info->regs, sizeof(x86_registers_t));
         dll_meta->in_progress = true;
 
         breakpoint_by_dtb_searcher bp;

@@ -213,15 +213,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code) )
             goto done;
 
-        memcpy(&eip, trap_frame+e->offsets[KTRAP_FRAME_EIP], sizeof(uint32_t));
-        memcpy(&eax, trap_frame+e->offsets[KTRAP_FRAME_EAX], sizeof(uint32_t));
-        memcpy(&ebx, trap_frame+e->offsets[KTRAP_FRAME_EBX], sizeof(uint32_t));
-        memcpy(&ecx, trap_frame+e->offsets[KTRAP_FRAME_ECX], sizeof(uint32_t));
-        memcpy(&edx, trap_frame+e->offsets[KTRAP_FRAME_EDX], sizeof(uint32_t));
-        memcpy(&edi, trap_frame+e->offsets[KTRAP_FRAME_EDI], sizeof(uint32_t));
-        memcpy(&esi, trap_frame+e->offsets[KTRAP_FRAME_ESI], sizeof(uint32_t));
-        memcpy(&ebp, trap_frame+e->offsets[KTRAP_FRAME_EBP], sizeof(uint32_t));
-        memcpy(&hwesp, trap_frame+e->offsets[KTRAP_FRAME_HWESP], sizeof(uint32_t));
+        memcpy_s(&eip, sizeof(eip), trap_frame+e->offsets[KTRAP_FRAME_EIP], sizeof(uint32_t));
+        memcpy_s(&eax, sizeof(eax), trap_frame+e->offsets[KTRAP_FRAME_EAX], sizeof(uint32_t));
+        memcpy_s(&ebx, sizeof(ebx), trap_frame+e->offsets[KTRAP_FRAME_EBX], sizeof(uint32_t));
+        memcpy_s(&ecx, sizeof(ecx), trap_frame+e->offsets[KTRAP_FRAME_ECX], sizeof(uint32_t));
+        memcpy_s(&edx, sizeof(edx), trap_frame+e->offsets[KTRAP_FRAME_EDX], sizeof(uint32_t));
+        memcpy_s(&edi, sizeof(edi), trap_frame+e->offsets[KTRAP_FRAME_EDI], sizeof(uint32_t));
+        memcpy_s(&esi, sizeof(esi), trap_frame+e->offsets[KTRAP_FRAME_ESI], sizeof(uint32_t));
+        memcpy_s(&ebp, sizeof(ebp), trap_frame+e->offsets[KTRAP_FRAME_EBP], sizeof(uint32_t));
+        memcpy_s(&hwesp, sizeof(hwesp), trap_frame+e->offsets[KTRAP_FRAME_HWESP], sizeof(uint32_t));
 
         if (previous_mode == 1)
             proc_name_opt = fmt::Qstr(info->attached_proc_data.base_addr ? info->attached_proc_data.name : "NOPROC");
@@ -262,19 +262,19 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance) )
             goto done;
 
-        memcpy(&rip, trap_frame+e->offsets[KTRAP_FRAME_RIP], sizeof(uint64_t));
-        memcpy(&rax, trap_frame+e->offsets[KTRAP_FRAME_RAX], sizeof(uint64_t));
-        memcpy(&rbx, trap_frame+e->offsets[KTRAP_FRAME_RBX], sizeof(uint64_t));
-        memcpy(&rcx, trap_frame+e->offsets[KTRAP_FRAME_RCX], sizeof(uint64_t));
-        memcpy(&rdx, trap_frame+e->offsets[KTRAP_FRAME_RDX], sizeof(uint64_t));
-        memcpy(&rsp, trap_frame+e->offsets[KTRAP_FRAME_RSP], sizeof(uint64_t));
-        memcpy(&rbp, trap_frame+e->offsets[KTRAP_FRAME_RBP], sizeof(uint64_t));
-        memcpy(&rsi, trap_frame+e->offsets[KTRAP_FRAME_RSI], sizeof(uint64_t));
-        memcpy(&rdi, trap_frame+e->offsets[KTRAP_FRAME_RDI], sizeof(uint64_t));
-        memcpy(&r8, trap_frame+e->offsets[KTRAP_FRAME_R8], sizeof(uint64_t));
-        memcpy(&r9, trap_frame+e->offsets[KTRAP_FRAME_R9], sizeof(uint64_t));
-        memcpy(&r10, trap_frame+e->offsets[KTRAP_FRAME_R10], sizeof(uint64_t));
-        memcpy(&r11, trap_frame+e->offsets[KTRAP_FRAME_R11], sizeof(uint64_t));
+        memcpy_s(&rip, sizeof(rip), trap_frame+e->offsets[KTRAP_FRAME_RIP], sizeof(uint64_t));
+        memcpy_s(&rax, sizeof(rax), trap_frame+e->offsets[KTRAP_FRAME_RAX], sizeof(uint64_t));
+        memcpy_s(&rbx, sizeof(rbx), trap_frame+e->offsets[KTRAP_FRAME_RBX], sizeof(uint64_t));
+        memcpy_s(&rcx, sizeof(rcx), trap_frame+e->offsets[KTRAP_FRAME_RCX], sizeof(uint64_t));
+        memcpy_s(&rdx, sizeof(rdx), trap_frame+e->offsets[KTRAP_FRAME_RDX], sizeof(uint64_t));
+        memcpy_s(&rsp, sizeof(rsp), trap_frame+e->offsets[KTRAP_FRAME_RSP], sizeof(uint64_t));
+        memcpy_s(&rbp, sizeof(rbp), trap_frame+e->offsets[KTRAP_FRAME_RBP], sizeof(uint64_t));
+        memcpy_s(&rsi, sizeof(rsi), trap_frame+e->offsets[KTRAP_FRAME_RSI], sizeof(uint64_t));
+        memcpy_s(&rdi, sizeof(rdi), trap_frame+e->offsets[KTRAP_FRAME_RDI], sizeof(uint64_t));
+        memcpy_s(&r8, sizeof(r8), trap_frame+e->offsets[KTRAP_FRAME_R8], sizeof(uint64_t));
+        memcpy_s(&r9, sizeof(r9), trap_frame+e->offsets[KTRAP_FRAME_R9], sizeof(uint64_t));
+        memcpy_s(&r10, sizeof(r10), trap_frame+e->offsets[KTRAP_FRAME_R10], sizeof(uint64_t));
+        memcpy_s(&r11, sizeof(r11), trap_frame+e->offsets[KTRAP_FRAME_R11], sizeof(uint64_t));
 
         auto previous_mode = info->regs->r9 & 0xfful;
         if (previous_mode == 1)

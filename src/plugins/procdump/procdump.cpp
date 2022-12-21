@@ -833,7 +833,7 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
     }
 
     // Save registers to restore process/thread state
-    memcpy(&ctx->saved_regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&ctx->saved_regs, sizeof(ctx->saved_regs), info->regs, sizeof(x86_registers_t));
     if (dump_next_dlls(drakvuf, info, ctx))
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     else
@@ -928,7 +928,7 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     }
 
     // Save registers to restore process/thread state
-    memcpy(&ctx->saved_regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&ctx->saved_regs, sizeof(ctx->saved_regs), info->regs, sizeof(x86_registers_t));
     ctx->bp = (drakvuf_trap_t*)g_slice_new0(drakvuf_trap_t);
     ctx->pool = find_pool(plugin->pools);
     ctx->bp->type = BREAKPOINT;

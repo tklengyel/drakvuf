@@ -189,7 +189,7 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
         PRINT_DEBUG("Could not allocate buffer\n");
         return 0;
     }
-    memcpy(buf, str, str_len);
+    memcpy_s(buf, buf_len, str, str_len);
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,

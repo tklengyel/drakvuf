@@ -246,7 +246,7 @@ event_response_t hook_process_cb(
         if (!drakvuf_check_return_context(drakvuf, info, rh_data->target_process_pid, rh_data->target_process_tid, rh_data->target_process_rsp))
             return VMI_EVENT_RESPONSE_NONE;
 
-        memcpy(info->regs, &rh_data->regs, sizeof(x86_registers_t));
+        memcpy_s(info->regs, sizeof(*info->regs), &rh_data->regs, sizeof(x86_registers_t));
         rh_data->inject_in_progress = false;
     }
 #else
@@ -305,7 +305,7 @@ event_response_t hook_process_cb(
 #ifndef LIBUSERMODE_USE_INJECTION
             if (VMI_SUCCESS == vmi_request_page_fault(vmi, info->vcpu, rh_data->func_addr, 0))
 #else
-            memcpy(&rh_data->regs, info->regs, sizeof(x86_registers_t));
+            memcpy_s(&rh_data->regs, sizeof(rh_data->regs), info->regs, sizeof(x86_registers_t));
             rh_data->target_process_tid = info->proc_data.tid;
             rh_data->target_process_rsp = info->regs->rsp;
             rh_data->inject_in_progress = true;

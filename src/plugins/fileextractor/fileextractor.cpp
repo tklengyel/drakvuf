@@ -435,7 +435,7 @@ fileextractor::error fileextractor::dispatch_pending(
     if (this->is_stopping())
         return error::none;
 
-    memcpy(&task.target.regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&task.target.regs, sizeof(task.target.regs), info->regs, sizeof(x86_registers_t));
 
     if (!get_file_object_flags(info, vmi, task.handle, &task.fo_flags))
         return error::error;

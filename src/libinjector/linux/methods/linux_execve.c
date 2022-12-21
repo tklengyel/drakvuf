@@ -162,7 +162,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         case STEP1: // Finds vdso and sets up mmap
         {
             injector->target_process = info->proc_data.base_addr;
-            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+            memcpy_s(&injector->saved_regs, sizeof(injector->saved_regs), info->regs, sizeof(x86_registers_t));
 
             if (!init_syscalls(drakvuf, info))
             {

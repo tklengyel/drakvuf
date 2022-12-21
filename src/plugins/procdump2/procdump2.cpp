@@ -813,7 +813,7 @@ bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<proc
         );
         ctx->stage(procdump_stage::suspend);
         // TODO Move to function ... START
-        memcpy(&ctx->working.regs, info->regs, sizeof(x86_registers_t));
+        memcpy_s(&ctx->working.regs, sizeof(ctx->working.regs), info->regs, sizeof(x86_registers_t));
         ctx->working.restored = false;
         this->working_threads.insert(info->attached_proc_data.tid);
         // ... END
@@ -840,7 +840,7 @@ bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<proc
                 , ctx->target_process_pid, to_int(ctx->stage())
             );
             // TODO Move to function ... START
-            memcpy(&ctx->working.regs, info->regs, sizeof(x86_registers_t));
+            memcpy_s(&ctx->working.regs, sizeof(ctx->working.regs), info->regs, sizeof(x86_registers_t));
             ctx->working.restored = false;
             this->working_threads.insert(info->attached_proc_data.tid);
             // ... END
@@ -851,7 +851,7 @@ bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<proc
             return false;
 
         // TODO Move to function ... START
-        memcpy(&ctx->working.regs, info->regs, sizeof(x86_registers_t));
+        memcpy_s(&ctx->working.regs, sizeof(ctx->working.regs), info->regs, sizeof(x86_registers_t));
         ctx->working.restored = false;
         this->working_threads.insert(info->attached_proc_data.tid);
         // ... END
@@ -974,7 +974,7 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
         );
         ctx->stage(procdump_stage::need_suspend);
         ctx->host_process_base = info->attached_proc_data.base_addr;
-        memcpy(&ctx->host.regs, info->regs, sizeof(x86_registers_t));
+        memcpy_s(&ctx->host.regs, sizeof(ctx->host.regs), info->regs, sizeof(x86_registers_t));
         delay_execution(info, ctx->host, 500);
     }
     else
@@ -985,7 +985,7 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , ctx->target_process_pid, to_int(ctx->stage())
         );
-        memcpy(&ctx->target.regs, info->regs, sizeof(x86_registers_t));
+        memcpy_s(&ctx->target.regs, sizeof(ctx->target.regs), info->regs, sizeof(x86_registers_t));
         suspend(info, ctx->target_process_base, ctx->target);
     }
 
@@ -1146,7 +1146,7 @@ void procdump2::allocate_pool(
     std::shared_ptr<procdump2_ctx> ctx)
 {
     x86_registers_t regs;
-    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&regs, sizeof(regs), info->regs, sizeof(x86_registers_t));
 
     std::array<argument, 3> args{};
     init_int_argument(&args[0], 0); // NonPagedPool
@@ -1174,7 +1174,7 @@ void procdump2::copy_memory(drakvuf_trap_info_t* info,
     std::shared_ptr<procdump2_ctx> ctx, addr_t addr, size_t size)
 {
     x86_registers_t regs;
-    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&regs, sizeof(regs), info->regs, sizeof(x86_registers_t));
 
     uint64_t read_bytes = 0;
     std::array<argument, 7> args{};
@@ -1209,7 +1209,7 @@ void procdump2::copy_memory(drakvuf_trap_info_t* info,
 void procdump2::get_irql(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx> ctx)
 {
     x86_registers_t regs;
-    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&regs, sizeof(regs), info->regs, sizeof(x86_registers_t));
 
     // TODO We should check if CR8 probing would be sufficient and leave comment here.
     if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, nullptr, 0, current_irql_va, ctx->working.set_stack_marker()))
@@ -1232,7 +1232,7 @@ void procdump2::get_irql(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ct
 void procdump2::resume(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx> ctx)
 {
     x86_registers_t regs;
-    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&regs, sizeof(regs), info->regs, sizeof(x86_registers_t));
 
     std::array<argument, 1> args{};
     init_int_argument(&args[0], ctx->target_process_base);
@@ -1264,7 +1264,7 @@ void procdump2::resume(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx>
 void procdump2::suspend(drakvuf_trap_info_t* info, addr_t target_process_base, return_ctx& ctx)
 {
     x86_registers_t regs;
-    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&regs, sizeof(regs), info->regs, sizeof(x86_registers_t));
 
     std::array<argument, 1> args{};
     init_int_argument(&args[0], target_process_base);
@@ -1289,7 +1289,7 @@ void procdump2::delay_execution(drakvuf_trap_info_t* info,
     uint16_t msec)
 {
     x86_registers_t regs;
-    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+    memcpy_s(&regs, sizeof(regs), info->regs, sizeof(x86_registers_t));
 
     std::array<argument, 3> args{};
     int64_t interval = -10000 * static_cast<int64_t>(msec);

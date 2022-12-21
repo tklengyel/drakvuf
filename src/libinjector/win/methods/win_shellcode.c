@@ -120,7 +120,7 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
         {
             // save registers
             PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+            memcpy_s(&injector->x86_saved_regs, sizeof(injector->x86_saved_regs), info->regs, sizeof(x86_registers_t));
 
             if (!setup_virtual_alloc_stack(injector, info->regs))
             {
@@ -162,7 +162,7 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
             drakvuf_interrupt(drakvuf, SIGINT);
 
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+            memcpy_s(info->regs, sizeof(*info->regs), &injector->x86_saved_regs, sizeof(x86_registers_t));
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         default:
@@ -187,7 +187,7 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
     drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-    memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+    memcpy_s(info->regs, sizeof(*info->regs), &injector->x86_saved_regs, sizeof(x86_registers_t));
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
