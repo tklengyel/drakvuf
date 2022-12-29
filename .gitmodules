@@ -4,11 +4,11 @@
 	ignore = dirty
 [submodule "libvmi"]
 	path = libvmi
-	url = https://github.com/tklengyel/libvmi
+	url = https://github.com/libvmi/libvmi
 	ignore = dirty
 [submodule "volatility3"]
 	path = volatility3
-	url = https://github.com/tklengyel/volatility3
+	url = https://github.com/volatilityfoundation/volatility3
 	ignore = dirty
 [submodule "dwarf2json"]
 	path = dwarf2json
