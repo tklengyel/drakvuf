@@ -108,13 +108,13 @@
 struct unicode_string
 {
     explicit unicode_string(drakvuf_t drakvuf, addr_t str_addr, vmi_pid_t pid = 0)
-        : drakvuf{drakvuf}, str_addr{str_addr}, pid{pid}, raw{drakvuf_read_unicode_va(drakvuf, str_addr, pid)}
+        : raw{drakvuf_read_unicode_va(drakvuf, str_addr, pid)}
     {}
 
     operator std::string() const
     {
         if (!content)
-            content = std::string(static_cast<const char*>(raw->contents));
+            content = std::string(reinterpret_cast<const char*>(raw->contents));
         return content;
     }
 
@@ -124,9 +124,6 @@ struct unicode_string
     }
 
 private:
-    drakvuf_t drakvuf;
-    addr_t str_addr;
-    vmi_pid_t pid;
     unicode_string_t* raw;
     std::string content;
 };
