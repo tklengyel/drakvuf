@@ -104,7 +104,7 @@
 
 AC_PREREQ([2.60])
 AC_INIT([DRAKVUF],
-        m4_join([], [1.0-git],
+        m4_join([], [1.1-git],
             m4_esyscmd_s([git log -1 --date=format:%Y%m%d%H%M%S --pretty=format:%cd]), [+], m4_esyscmd_s([git describe --always]), [-1]),
         [tamas@tklengyel.com], [],
         [https://drakvuf.com])
