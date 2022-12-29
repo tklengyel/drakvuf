@@ -1,5 +1,11 @@
 # DRAKVUF&copy;
 
+
+[![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/6836/badge)](https://bestpractices.coreinfrastructure.org/projects/6836)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/tklengyel/drakvuf/badge)](https://api.securityscorecards.dev/projects/github.com/tklengyel/drakvuf)
+[![ci](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml/badge.svg)](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml)
+[![Coverity](https://scan.coverity.com/projects/3238/badge.svg)](https://scan.coverity.com/projects/tklengyel-drakvuf)
+
 ## Introduction
 
 DRAKVUF is a virtualization based agentless black-box binary analysis system. DRAKVUF
@@ -41,9 +47,4 @@ If you would like a full-featured DRAKVUF GUI to setup as automated analysis san
 
 ## Installation steps
 
-Installation steps can be found on the project website: [https://drakvuf.com](https://drakvuf.com)
-
-[![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/6836/badge)](https://bestpractices.coreinfrastructure.org/projects/6836)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/tklengyel/drakvuf/badge)](https://api.securityscorecards.dev/projects/github.com/tklengyel/drakvuf)
-[![ci](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml/badge.svg)](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml)
-<a href="https://scan.coverity.com/projects/tklengyel-drakvuf"><img alt="Coverity Scan Build Status" src="https://scan.coverity.com/projects/3238/badge.svg"/></a>
+Installation steps can be found on the project website: [https://drakvuf.com](https://drakvuf.com
