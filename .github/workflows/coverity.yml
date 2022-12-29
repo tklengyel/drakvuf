@@ -106,6 +106,6 @@ jobs:
             --form token=$TOKEN \
             --form email=tamas.k.lengyel@gmail.com \
             --form file=@drakvuf.tgz \
-            --form version=master \
+            --form version=main \
             --form description="`git describe --always`" \
             https://scan.coverity.com/builds?project=tklengyel%2Fdrakvuf
