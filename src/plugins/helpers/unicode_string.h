@@ -116,7 +116,7 @@ struct unicode_string
     {
         if (!content)
             content = std::string(reinterpret_cast<const char*>(raw->contents));
-        return content;
+        return *content;
     }
 
     ~unicode_string()
