@@ -3,7 +3,7 @@ on:
   schedule:
     - cron: '0 18 * * *' # Daily at 18:00 UTC
   push:
-    branches: master
+    branches: main
 permissions:
   contents: read
 jobs:
