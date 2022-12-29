@@ -1,7 +1,7 @@
 name: whitespace
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 permissions:
   contents: read
 jobs:
