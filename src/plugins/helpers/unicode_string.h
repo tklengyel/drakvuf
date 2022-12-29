@@ -111,7 +111,7 @@ struct unicode_string
         : raw{drakvuf_read_unicode_va(drakvuf, str_addr, pid)}
     {}
 
-    operator std::string() const
+    operator std::string()
     {
         if (!content)
             content = std::string(reinterpret_cast<const char*>(raw->contents));
