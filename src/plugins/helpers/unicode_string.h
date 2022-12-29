@@ -104,6 +104,7 @@
 #pragma once
 #include <libdrakvuf/libdrakvuf.h>
 #include <string>
+#include <optional>
 
 struct unicode_string
 {
@@ -125,5 +126,5 @@ struct unicode_string
 
 private:
     unicode_string_t* raw;
-    std::string content;
+    std::optional<std::string> content;
 };
