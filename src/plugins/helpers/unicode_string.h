@@ -108,7 +108,7 @@
 struct unicode_string
 {
     explicit unicode_string(drakvuf_t drakvuf, addr_t str_addr, vmi_pid_t pid = 0)
-        : drakvuf{drakvuf}, str_addr{str_addr}, pid{pid}, content{drakvuf_read_unicode_va(drakvuf, str_addr, pid)}
+        : drakvuf{drakvuf}, str_addr{str_addr}, pid{pid}, raw{drakvuf_read_unicode_va(drakvuf, str_addr, pid)}
     {}
 
     operator std::string() const
