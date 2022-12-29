@@ -1,5 +1,5 @@
 project('DRAKVUF (C) Tamas K Lengyel 2014-2022', 'c', 'cpp',
-        version : '1.0',
+        version : '1.1',
         default_options : [
             'cpp_std=c++17',
             'buildtype=release',
