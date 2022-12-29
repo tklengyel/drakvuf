@@ -13,4 +13,4 @@ jobs:
         run: |
           git remote add upstream https://github.com/$GITHUB_REPOSITORY
           git fetch upstream
-          git diff --check upstream/master
+          git diff --check upstream/main
