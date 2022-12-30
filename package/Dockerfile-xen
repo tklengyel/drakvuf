@@ -29,4 +29,6 @@ RUN cd /build-xen && \
     make -j$(nproc) install-xen && \
     make -j$(nproc) install-tools && \
     mv /build-xen/dist/install /dist-xen && \
+    mkdir -p /dist-xen/usr/share/doc/xen && \
+    mv /build-xen/LICENSES/* /dist-xen/usr/share/doc/xen && \
     rm -rf /build-xen
