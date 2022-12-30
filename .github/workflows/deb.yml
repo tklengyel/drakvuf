@@ -83,7 +83,7 @@ jobs:
         with:
           path: |
             package/cache
-          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v2
+          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v3
       - name: Build package
         id: build_drakvuf_deb
         run: |
@@ -114,3 +114,18 @@ jobs:
         run: |
           cp ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
           gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }} -R tklengyel/drakvuf-builds
+  install:
+    needs: [deb]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - "debian:10-slim"
+          - "debian:11-slim"
+          - "ubuntu:focal"
+          - "ubuntu:jammy"
+    steps:
+      - uses: actions/checkout@v3
+      - name: install
+        run: sudo ./install.sh
