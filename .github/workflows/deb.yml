@@ -114,6 +114,13 @@ jobs:
         run: |
           cp ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
           gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }} -R tklengyel/drakvuf-builds
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.container }}-debs
+          path: |
+            ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
+            ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
+
   install:
     needs: [deb]
     runs-on: ubuntu-latest
@@ -125,7 +132,15 @@ jobs:
           - "debian:11-slim"
           - "ubuntu:focal"
           - "ubuntu:jammy"
+    container:
+      image: ${{ matrix.container }}
     steps:
       - uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ matrix.container }}-debs
+          path: ~/debs
+
       - name: install
-        run: sudo ./install.sh
+        run: sudo ./scripts/install.sh ~/debs

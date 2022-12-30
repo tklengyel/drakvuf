@@ -42,6 +42,10 @@ get_packages() {
     DISTRO=$(cat /etc/os-release | grep ID)
     VERSION=$(cat /etc/os-release | grep VERSION_CODENAME)
 
+    DIR=$PWD
+    mkdir -p debs
+    cd debs
+
     case $DISTRO in
     ubuntu)
         get_ubuntu $VERSION
@@ -52,25 +56,31 @@ get_packages() {
         ;;
 
     *)
+        cd $DIR
         echo "This script only supports Debian or Ubuntu"
         exit 1
         ;;
     esac
 
+    cd $DIR
 }
 
 #################
-
-# Install dependencies
-sudo package/depends.sh
+OPT=${1:"-"}
 
 # Grab latest debs
-get_packages
+if [ ! -d $OPT ]; then
+    get_packages
+fi
 
 # Install
-sudo dpkg -i ./*xen*.deb
-sudo dpkg -i ./*drakvuf-bundle*.deb
+sudo apt-get update
+for p in $(dpkg -I debs/*.deb | grep Depends | awk -F':' '{ print $2 }' | tr -d ',' | tr -d '|'); do
+    sudo apt-get --quiet --yes install $p || :
+done
 
+sudo dpkg -i debs/*xen*.deb
+sudo dpkg -i debs/*drakvuf-bundle*.deb
 
 echo "DRAKVUF was successfully installed"
 echo "You should reboot your system now and pick Xen in your GRUB menu"
