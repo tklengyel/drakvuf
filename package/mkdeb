@@ -100,7 +100,15 @@ cp -avr /build/usr/lib/* deb/usr/lib/
 mkdir -p deb/usr/include/
 cp -avr /build/usr/include/* deb/usr/include/
 
+mkdir -p deb/usr/share/doc/dwarf2json
+cp -avr /build/dwarf2json/LICENSE.txt deb/usr/share/doc/dwarf2json
 cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
+
+mkdir -p deb/usr/share/doc/libvmi
+cp -avr /build/libvmi/COPYING deb/usr/share/doc/libvmi
+
+mkdir -p deb/usr/share/doc/drakvuf
+cp -avr /build/drakvuf/COPYING deb/usr/share/doc/drakvuf
 
 # Package it up
 chown -R root:root deb
