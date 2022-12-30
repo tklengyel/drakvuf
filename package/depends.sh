@@ -19,8 +19,7 @@ fi
 
 apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev libsystemd-dev nasm bc libx11-dev ninja-build
 
-apt-cache show gcc-9 > /dev/null 2>&1
-if [ $? -eq 0 ]; then
+if [ $(apt-cache show gcc-9 2>/dev/null | wc -l) -gt 0 ]; then
     apt-get --quiet --yes install gcc-9
 fi
 
