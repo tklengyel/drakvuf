@@ -108,7 +108,7 @@ mkdir -p deb/usr/share/doc/libvmi
 cp -avr /build/libvmi/COPYING deb/usr/share/doc/libvmi
 
 mkdir -p deb/usr/share/doc/drakvuf
-cp -avr /build/drakvuf/COPYING deb/usr/share/doc/drakvuf
+cp -avr /build/COPYING deb/usr/share/doc/drakvuf
 
 # Package it up
 chown -R root:root deb
