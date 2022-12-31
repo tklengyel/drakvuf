@@ -40,12 +40,13 @@ get_ubuntu() {
 
 get_packages() {
     TARGET=$1
+    PACKAGE_DIR=$2
     DISTRO=$(cat /etc/os-release | grep ID)
     VERSION=$(cat /etc/os-release | grep VERSION_CODENAME)
 
     DIR=$PWD
-    mkdir -p debs
-    cd debs
+    mkdir -p $PACKAGE_DIR
+    cd packages
 
     if [ $TARGET == "LATEST" ]; then
         debs=$(curl -s https://api.github.com/repos/tklengyel/drakvuf-builds/releases/latest | grep "browser_download_url.*deb" | awk '{ print $2 }' | tr -d '"')
@@ -79,11 +80,14 @@ get_packages() {
 }
 
 #################
-OPT=${1:"STABLE"}
+VERSION=${1:"STABLE"}
+PACKAGE_DIR=packages
 
 # Grab latest debs
-if [ ! -d $OPT ]; then
-    get_packages $OPT
+if [ ! -d $VERSION ]; then
+    get_packages $OPT $PACKAGE_DIR
+else
+    PACKAGE_DIR=$OPT
 fi
 
 # Install
@@ -95,8 +99,8 @@ done
 sudo apt-get --quiet --yes install python3-pip
 sudo pip3 install pefile construct
 
-sudo dpkg -i debs/*xen*.deb
-sudo dpkg -i debs/*drakvuf-bundle*.deb
+sudo dpkg -i $PACKAGE_DIR/*xen*.deb
+sudo dpkg -i $PACKAGE_DIR/*drakvuf-bundle*.deb
 
 echo "DRAKVUF was successfully installed"
 echo "You should reboot your system now and pick Xen in your GRUB menu"
