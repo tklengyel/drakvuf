@@ -3,14 +3,6 @@ FROM xen-intermediate
 COPY . /build
 RUN cd /build/dwarf2json && \
     /usr/local/go/bin/go build
-RUN PYTHON_VERSION=$(python3 --version | awk '{ print $2 }') && \
-    export INSTALL_PATH="/build/usr" && \
-    export PYTHONPATH=${INSTALL_PATH}/local/lib/python${PYTHON_VERSION}/site-packages/ && \
-    pip3 install --upgrade pip && \
-    pip3 install --upgrade setuptools pefile construct && \
-    cd /build/volatility3 && \
-    python3 ./setup.py build && \
-    python3 ./setup.py install --prefix=$INSTALL_PATH
 RUN export INSTALL_PATH="/build/usr" && \
     cd /build/libvmi && \
     autoreconf -vif && \
