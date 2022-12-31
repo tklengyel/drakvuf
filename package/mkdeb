@@ -84,7 +84,7 @@ Source: drakvuf-bundle
 Version: $version
 Architecture: $arch
 Maintainer: Unmaintained snapshot
-Depends: libglib2.0-0, libjson-c3 | libjson-c4, python3, libx11-6
+Depends: libglib2.0-0, libjson-c3 | libjson-c4 | libjson-c5, python3, libx11-6
 Section: admin
 Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
