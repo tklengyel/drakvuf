@@ -148,4 +148,4 @@ jobs:
           path: ~/debs
 
       - name: install
-        run: sudo ./scripts/install.sh ~/debs
+        run: ./scripts/install.sh ~/debs
