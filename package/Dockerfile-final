@@ -4,10 +4,10 @@ COPY . /build
 RUN cd /build/dwarf2json && \
     /usr/local/go/bin/go build
 RUN export INSTALL_PATH="/build/usr" && \
-    sudo pip3 install pefile construct && \
+    pip3 install pefile construct && \
     cd /build/volatility3 && \
     python3 ./setup.py build && \
-    sudo python3 ./setup.py install --prefix=$INSTALL_PATH
+    python3 ./setup.py install --prefix=$INSTALL_PATH
 RUN export INSTALL_PATH="/build/usr" && \
     cd /build/libvmi && \
     autoreconf -vif && \
