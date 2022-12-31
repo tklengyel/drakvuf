@@ -49,8 +49,8 @@ Source: xen-hypervisor
 Version: $xenversion
 Architecture: $arch
 Maintainer: Unmaintained snapshot
-Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7, libgnutls30, libfdt1, libyajl2, libaio1
-Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64
+Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7 | libnettle8, libgnutls30, libfdt1, libyajl2, libaio1, libncurses6, libc6, libtinfo6, libgnutls28-dev, systemd
+Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64, xen-hypervisor-4.13-amd64, xen-hypervisor-4.14-amd64, xen-hypervisor-4.15-amd64, xen-hypervisor-4.16-amd64
 Section: admin
 Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
@@ -84,7 +84,7 @@ Source: drakvuf-bundle
 Version: $version
 Architecture: $arch
 Maintainer: Unmaintained snapshot
-Depends: libglib2.0-dev, libjson-c3 | libjson-c4
+Depends: libglib2.0-0, libjson-c3 | libjson-c4 | libjson-c5, python3, libx11-6
 Section: admin
 Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
@@ -100,7 +100,20 @@ cp -avr /build/usr/lib/* deb/usr/lib/
 mkdir -p deb/usr/include/
 cp -avr /build/usr/include/* deb/usr/include/
 
+mkdir -p deb/usr/share/doc/dwarf2json
+cp -avr /build/dwarf2json/LICENSE.txt deb/usr/share/doc/dwarf2json
 cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
+
+mkdir -p deb/usr/share/doc/volatility3
+cp -avr /build/usr/local/lib/* deb/usr/lib/ || :
+cp -avr /build/volatility3/LICENSE.txt deb/usr/share/doc/volatility3
+cp -avr /build/volatility3/requirements.txt deb/usr/share/doc/volatility3
+
+mkdir -p deb/usr/share/doc/libvmi
+cp -avr /build/libvmi/COPYING deb/usr/share/doc/libvmi
+
+mkdir -p deb/usr/share/doc/drakvuf
+cp -avr /build/COPYING deb/usr/share/doc/drakvuf
 
 # Package it up
 chown -R root:root deb

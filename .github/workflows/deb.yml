@@ -49,8 +49,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:10-slim"
-          - "debian:11-slim"
+          - "debian:buster"
+          - "debian:bullseye"
           - "ubuntu:focal"
           - "ubuntu:jammy"
     steps:
@@ -78,12 +78,14 @@ jobs:
             echo "Release tag: $RELEASE_TAG"
             echo release_tag=${RELEASE_TAG} >> $GITHUB_OUTPUT
           fi
+          CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
+          echo "container=$CONTAINER" >> $GITHUB_OUTPUT
       - name: Cache Xen intermediate
         uses: actions/cache@v3
         with:
           path: |
             package/cache
-          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v2
+          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v5
       - name: Build package
         id: build_drakvuf_deb
         run: |
@@ -93,24 +95,57 @@ jobs:
           XEN_DEB_PATH=$(find package/out/xen*.deb | head -n1)
           XEN_DEB_NAME=$(basename "$XEN_DEB_PATH")
           if [ ! -z $DRAKVUF_DEB_PATH ]; then
-            echo drakvuf_deb_path=${DRAKVUF_DEB_PATH} >> $GITHUB_OUTPUT
-            echo drakvuf_deb_name=${{ steps.gen_vars.outputs.artifact_prefix }}_${DRAKVUF_DEB_NAME} >> $GITHUB_OUTPUT
+            NEWNAME=${{ steps.gen_vars.outputs.artifact_prefix }}_${DRAKVUF_DEB_NAME}
+            echo drakvuf_deb_name=$NEWNAME >> $GITHUB_OUTPUT
+            cp $DRAKVUF_DEB_PATH ${{ github.workspace}}/$NEWNAME
           fi
           if [ ! -z $XEN_DEB_PATH ]; then
-            echo xen_deb_path=${XEN_DEB_PATH} >> $GITHUB_OUTPUT
-            echo xen_deb_name=${{ steps.gen_vars.outputs.artifact_prefix }}_${XEN_DEB_NAME} >> $GITHUB_OUTPUT
+            NEWNAME=${{ steps.gen_vars.outputs.artifact_prefix }}_${XEN_DEB_NAME}
+            echo xen_deb_name=$NEWNAME >> $GITHUB_OUTPUT
+            cp $XEN_DEB_PATH ${{ github.workspace }}/$NEWNAME
           fi
       - name: Upload DRAKVUF asset
-        if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.drakvuf_deb_path != ''
+        if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.drakvuf_deb_name != ''
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          cp ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_path }} ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
-          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }} -R tklengyel/drakvuf-builds
+          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ github.workspace }}/${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }} -R tklengyel/drakvuf-builds
       - name: Upload Xen asset
-        if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.xen_deb_path != ''
+        if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.xen_deb_name != ''
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          cp ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
-          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }} -R tklengyel/drakvuf-builds
+          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ github.workspace }}/${{ steps.build_drakvuf_deb.outputs.xen_deb_name }} -R tklengyel/drakvuf-builds
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.gen_vars.outputs.container }}-debs
+          path: ${{ github.workspace }}/*.deb
+
+  install:
+    needs: [deb]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - "debian:buster"
+          - "debian:bullseye"
+          - "ubuntu:focal"
+          - "ubuntu:jammy"
+    container:
+      image: ${{ matrix.container}}
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: gen_vars
+        run: |
+          CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
+          echo "container=$CONTAINER" >> $GITHUB_OUTPUT
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ steps.gen_vars.outputs.container }}-debs
+          path: ~/debs
+
+      - name: install
+        run: ./scripts/install.sh ~/debs
