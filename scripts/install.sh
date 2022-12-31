@@ -79,7 +79,7 @@ for p in $(dpkg -I debs/*.deb | grep Depends | awk -F':' '{ print $2 }' | tr -d 
     sudo apt-get --quiet --yes install $p || :
 done
 
-sudo apt-get install python3 python3-pip
+sudo apt-get --quiet --yes install python3-pip
 sudo pip3 install pefile construct
 
 sudo dpkg -i debs/*xen*.deb
