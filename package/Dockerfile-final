@@ -4,6 +4,11 @@ COPY . /build
 RUN cd /build/dwarf2json && \
     /usr/local/go/bin/go build
 RUN export INSTALL_PATH="/build/usr" && \
+    sudo pip3 install pefile construct && \
+    cd /build/volatility3 && \
+    python3 ./setup.py build && \
+    sudo python3 ./setup.py install --prefix=$INSTALL_PATH
+RUN export INSTALL_PATH="/build/usr" && \
     cd /build/libvmi && \
     autoreconf -vif && \
     ./configure --prefix=$INSTALL_PATH --disable-static --disable-kvm --disable-file --disable-bareflank --disable-safety-checks --enable-vmi-debug && \
@@ -20,7 +25,7 @@ RUN export INSTALL_PATH="/build/usr" && \
     export LDFLAGS="-L$INSTALL_PATH/lib" && \
     export CFLAGS="-I$INSTALL_PATH/include" && \
     autoreconf -vif && \
-    ./configure --prefix=$INSTALL_PATH --enable-debug && \
+    ./configure --prefix=$INSTALL_PATH && \
     make -j$(nproc) && \
     make install
 

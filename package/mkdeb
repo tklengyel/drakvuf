@@ -104,6 +104,9 @@ mkdir -p deb/usr/share/doc/dwarf2json
 cp -avr /build/dwarf2json/LICENSE.txt deb/usr/share/doc/dwarf2json
 cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
 
+mkdir -p deb/usr/share/doc/volatility3
+cp -avr /build/volatility3/LICENSE.txt deb/usr/share/doc/volatility3
+
 mkdir -p deb/usr/share/doc/libvmi
 cp -avr /build/libvmi/COPYING deb/usr/share/doc/libvmi
 
