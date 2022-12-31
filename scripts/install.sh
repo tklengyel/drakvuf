@@ -95,8 +95,10 @@ apt-get update
 apt-get --yes remove xen* libxen*
 apt-get -f --yes install
 
-for p in $(dpkg -I $PACKAGE_DIR/*.deb | grep Depends | awk -F':' '{ print $2 }' | tr -d ',' | tr -d '|'); do
-    apt-get --quiet --yes install $p || :
+for deb in $(ls $PACKAGE_DIR/*.deb); do
+    for p in $(dpkg -I $deb | grep Depends | awk -F':' '{ print $2 }' | tr -d ',' | tr -d '|'); do
+        apt-get --quiet --yes install $p || :
+    done
 done
 
 dpkg -i $PACKAGE_DIR/*xen*.deb
@@ -104,7 +106,6 @@ dpkg -i $PACKAGE_DIR/*drakvuf-bundle*.deb
 
 apt-get -f --yes install
 apt-get --quiet --yes install python3-pip
-pip3 install --upgrade pip
 pip3 install -r /usr/share/doc/volatility3/requirements.txt
 
 echo "DRAKVUF was successfully installed"
