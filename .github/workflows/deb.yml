@@ -105,21 +105,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          cp ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_path }} ~/${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
-          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ~/${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }} -R tklengyel/drakvuf-builds
+          cp ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_path }} ${{ github.workspace }}/${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
+          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ github.workspace }}/${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }} -R tklengyel/drakvuf-builds
       - name: Upload Xen asset
         if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.xen_deb_path != ''
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          cp ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }} ~/${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
-          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ~/${{ steps.build_drakvuf_deb.outputs.xen_deb_name }} -R tklengyel/drakvuf-builds
+          cp ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }} ${{ github.workspace }}/${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
+          gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ github.workspace }}/${{ steps.build_drakvuf_deb.outputs.xen_deb_name }} -R tklengyel/drakvuf-builds
       - uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.container }}-debs
-          path: |
-            ~/${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
-            ~/${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
+          path: ${{ github.workspace }}/*.deb
 
   install:
     needs: [deb]
