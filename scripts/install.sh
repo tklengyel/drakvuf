@@ -80,7 +80,7 @@ get_packages() {
 }
 
 #################
-VERSION=${1:"STABLE"}
+VERSION=${1:-"STABLE"}
 PACKAGE_DIR=packages
 
 # Grab latest debs
@@ -91,17 +91,18 @@ else
 fi
 
 # Install
-sudo apt-get update
-for p in $(dpkg -I debs/*.deb | grep Depends | awk -F':' '{ print $2 }' | tr -d ',' | tr -d '|'); do
-    sudo apt-get --quiet --yes install $p || :
+apt-get update
+for p in $(dpkg -I $PACKAGE_DIR/*.deb | grep Depends | awk -F':' '{ print $2 }' | tr -d ',' | tr -d '|'); do
+    apt-get --quiet --yes install $p || :
 done
 
-sudo apt-get --quiet --yes install python3-pip
-sudo pip3 install --upgrade pip
-sudo pip3 install -r /usr/share/doc/volatility3/requirements.txt
+dpkg -i $PACKAGE_DIR/*xen*.deb
+dpkg -i $PACKAGE_DIR/*drakvuf-bundle*.deb
 
-sudo dpkg -i $PACKAGE_DIR/*xen*.deb
-sudo dpkg -i $PACKAGE_DIR/*drakvuf-bundle*.deb
+apt-get -f --yes install
+apt-get --quiet --yes install python3-pip
+pip3 install --upgrade pip
+pip3 install -r /usr/share/doc/volatility3/requirements.txt
 
 echo "DRAKVUF was successfully installed"
 echo "You should reboot your system now and pick Xen in your GRUB menu"
