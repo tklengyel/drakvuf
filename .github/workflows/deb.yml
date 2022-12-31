@@ -85,7 +85,7 @@ jobs:
         with:
           path: |
             package/cache
-          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}
+          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v5
       - name: Build package
         id: build_drakvuf_deb
         run: |
