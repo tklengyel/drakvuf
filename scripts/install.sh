@@ -85,13 +85,16 @@ PACKAGE_DIR=packages
 
 # Grab latest debs
 if [ ! -d $VERSION ]; then
-    get_packages $OPT $PACKAGE_DIR
+    get_packages $VERSION $PACKAGE_DIR
 else
-    PACKAGE_DIR=$OPT
+    PACKAGE_DIR=$VERSION
 fi
 
 # Install
 apt-get update
+apt-get --yes remove xen* libxen*
+apt-get -f --yes install
+
 for p in $(dpkg -I $PACKAGE_DIR/*.deb | grep Depends | awk -F':' '{ print $2 }' | tr -d ',' | tr -d '|'); do
     apt-get --quiet --yes install $p || :
 done
