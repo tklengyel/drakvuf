@@ -5,15 +5,15 @@ get_debian() {
 
     case $VERSION in
     buster)
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_10-slim_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_10-slim_xen-hypervisor-4.17.0-generic-amd64.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_10-slim_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_10-slim_xen-hypervisor-4.17.0-generic-amd64.deb
         ;;
     bullseye)
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_11-slim_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_11-slim_xen-hypervisor-4.17.0-generic-amd64.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_11-slim_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/debian_11-slim_xen-hypervisor-4.17.0-generic-amd64.deb
         ;;
     *)
-        echo "Unsupported Debian version"
+        echo "Unsupported Debian version: $VERSION"
         exit 1
         ;;
     esac
@@ -24,21 +24,22 @@ get_ubuntu() {
 
     case $VERSION in
     focal)
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_focal_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_focal_xen-hypervisor-4.17.0-generic-amd64.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_focal_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_focal_xen-hypervisor-4.17.0-generic-amd64.deb
         ;;
     jammy)
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_jammy_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
-        wget https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_jammy_xen-hypervisor-4.17.0-generic-amd64.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_jammy_drakvuf-bundle-1.0-git20221220221439+068b10f-1-generic.deb
+        wget -q https://github.com/tklengyel/drakvuf/releases/download/1.0/ubuntu_jammy_xen-hypervisor-4.17.0-generic-amd64.deb
         ;;
     *)
-        echo "Unsupported Ubuntu version"
+        echo "Unsupported Ubuntu version: $VERSION"
         exit 1
         ;;
     esac
 }
 
 get_packages() {
+    TARGET=$1
     DISTRO=$(cat /etc/os-release | grep ID)
     VERSION=$(cat /etc/os-release | grep VERSION_CODENAME)
 
@@ -46,31 +47,43 @@ get_packages() {
     mkdir -p debs
     cd debs
 
-    case $DISTRO in
-    ubuntu)
-        get_ubuntu $VERSION
-        ;;
+    if [ $TARGET == "LATEST" ]; then
+        debs=$(curl -s https://api.github.com/repos/tklengyel/drakvuf-builds/releases/latest | grep "browser_download_url.*deb" | awk '{ print $2 }' | tr -d '"')
+        for deb in $debs; do
+            if [ $(echo $deb | grep $DISTRO | grep $VERSION | wc -l) -ne 0 ]; then
+                wget -q $deb
+            fi
+        done
 
-    debian)
-        get_debian $VERSION
-        ;;
+        if [ $(ls -la *.deb 2>/dev/null | wc -l ) -eq 0 ]; then
+            echo "$DISTRO $VERSION is not supported by this script"
+            exit 1
+        fi
+    fi
 
-    *)
-        cd $DIR
-        echo "This script only supports Debian or Ubuntu"
-        exit 1
-        ;;
-    esac
+    if [ $TARGET == "STABLE" ]; then
+        case $DISTRO in
+        ubuntu)
+            get_ubuntu $VERSION
+            ;;
+        ubuntu)
+            get_debian $VERSION
+            ;;
+        *)
+            echo "Unsupported distribution: $DISTRO"
+            exit 1
+        esac
+    fi
 
     cd $DIR
 }
 
 #################
-OPT=${1:"-"}
+OPT=${1:"STABLE"}
 
 # Grab latest debs
 if [ ! -d $OPT ]; then
-    get_packages
+    get_packages $OPT
 fi
 
 # Install
@@ -87,3 +100,4 @@ sudo dpkg -i debs/*drakvuf-bundle*.deb
 
 echo "DRAKVUF was successfully installed"
 echo "You should reboot your system now and pick Xen in your GRUB menu"
+exit 0

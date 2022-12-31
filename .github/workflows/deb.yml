@@ -49,8 +49,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:10-slim"
-          - "debian:11-slim"
+          - "debian:buster"
+          - "debian:bullseye"
           - "ubuntu:focal"
           - "ubuntu:jammy"
     steps:
@@ -128,8 +128,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:10-slim"
-          - "debian:11-slim"
+          - "debian:buster"
+          - "debian:bullseye"
           - "ubuntu:focal"
           - "ubuntu:jammy"
     container:
