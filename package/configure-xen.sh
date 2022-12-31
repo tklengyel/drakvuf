@@ -4,7 +4,7 @@
 # Unfortunately we can't just set CC in the environment because the edk2 build system is insane
 
 GCC_VERSION=$(gcc --version | head -n1 | awk '{ print $4 }' | awk -F'.' '{ print $1 }')
-if [ ${GCC_VERSION} -ne 9 ]; then
+if [ ${GCC_VERSION} -gt 9 ]; then
     rm /usr/bin/gcc
     ln -s /usr/bin/gcc-9 /usr/bin/gcc
 fi
