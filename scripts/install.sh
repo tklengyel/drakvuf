@@ -97,7 +97,8 @@ for p in $(dpkg -I debs/*.deb | grep Depends | awk -F':' '{ print $2 }' | tr -d 
 done
 
 sudo apt-get --quiet --yes install python3-pip
-sudo pip3 install pefile construct
+sudo pip3 install --upgrade pip
+sudo pip3 install -r /usr/share/doc/volatility3/requirements.txt
 
 sudo dpkg -i $PACKAGE_DIR/*xen*.deb
 sudo dpkg -i $PACKAGE_DIR/*drakvuf-bundle*.deb
