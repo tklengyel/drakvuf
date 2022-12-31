@@ -49,7 +49,7 @@ Source: xen-hypervisor
 Version: $xenversion
 Architecture: $arch
 Maintainer: Unmaintained snapshot
-Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7 | libnettle8, libgnutls30, libfdt1, libyajl2, libaio1
+Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7 | libnettle8, libgnutls30, libfdt1, libyajl2, libaio1, libncurses6, libc6, libtinfo6, libgnutls28-dev
 Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64, xen-hypervisor-4.13-amd64, xen-hypervisor-4.14-amd64, xen-hypervisor-4.15-amd64, xen-hypervisor-4.16-amd64
 Section: admin
 Priority: optional
