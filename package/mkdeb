@@ -105,7 +105,7 @@ cp -avr /build/dwarf2json/LICENSE.txt deb/usr/share/doc/dwarf2json
 cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
 
 mkdir -p deb/usr/share/doc/volatility3
-cp -avr /build/usr/local/lib/* deb/usr/lib/
+cp -avr /build/usr/local/lib/* deb/usr/lib/ || :
 cp -avr /build/volatility3/LICENSE.txt deb/usr/share/doc/volatility3
 cp -avr /build/volatility3/requirements.txt deb/usr/share/doc/volatility3
 
