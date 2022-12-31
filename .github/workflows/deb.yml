@@ -78,6 +78,8 @@ jobs:
             echo "Release tag: $RELEASE_TAG"
             echo release_tag=${RELEASE_TAG} >> $GITHUB_OUTPUT
           fi
+          CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
+          echo "container=$CONTAINER" >> $GITHUB_OUTPUT
       - name: Cache Xen intermediate
         uses: actions/cache@v3
         with:
@@ -116,7 +118,7 @@ jobs:
           gh release upload ${{ steps.gen_vars.outputs.release_tag }} ${{ github.workspace }}/${{ steps.build_drakvuf_deb.outputs.xen_deb_name }} -R tklengyel/drakvuf-builds
       - uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.container }}-debs
+          name: ${{ steps.gen_vars.outputs.container }}-debs
           path: ${{ github.workspace }}/*.deb
 
   install:
@@ -131,13 +133,18 @@ jobs:
           - "ubuntu:focal"
           - "ubuntu:jammy"
     container:
-      image: ${{ matrix.container }}
+      image: ${{ matrix.container}}
     steps:
       - uses: actions/checkout@v3
 
+      - id: gen_vars
+        run: |
+          CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
+          echo "container=$CONTAINER" >> $GITHUB_OUTPUT
+
       - uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.container }}-debs
+          name: ${{ steps.gen_vars.outputs.container }}-debs
           path: ~/debs
 
       - name: install
