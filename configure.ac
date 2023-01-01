@@ -796,10 +796,8 @@ AS_IF([test x$plugin_procdump == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
 AS_IF([test x$plugin_procdump2 == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
-PKG_CHECK_MODULES([LIBXC], [xencontrol], [], [AC_ERROR([libxc not found])])
-PKG_CHECK_MODULES([LIBXL], [xenlight], [], [AC_ERROR([libxl not found])])
-PKG_CHECK_MODULES([XENFMEM], [xenforeignmemory], [], [AC_ERROR([xenforeignmemory not found])])
-PKG_CHECK_MODULES([XENTOOLLOG], [xentoollog], [], [AC_ERROR([xentoollog not found])])
+
+AC_CHECK_HEADERS([xenctrl.h libxl_utils.h libxl.h xenforeignmemory.h])
 
 if test x$repl = xyes; then
   PKG_CHECK_MODULES([PYTHON3], [python3])
@@ -825,6 +823,8 @@ fi
 
 PKG_CHECK_MODULES([X11], [x11], [lx11=1], [lx11=0])
 AM_CONDITIONAL([HAVE_LIBX11], [test x$lx11 = x1])
+
+AC_CHECK_LIB(dl, dlopen, [], [AC_ERROR([No dl found, dynamic linking isn't possible.])])
 
 #####################################################
 

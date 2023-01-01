@@ -150,6 +150,7 @@ summary({
     'Hardening': get_option('hardening'),
     'XTF': get_option('xtf'),
     'REPL': get_option('repl'),
+    'IPT': get_option('ipt'),
 }, section: 'Configuration')
 
 summary({
