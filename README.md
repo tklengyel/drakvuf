@@ -47,4 +47,4 @@ If you would like a full-featured DRAKVUF GUI to setup as automated analysis san
 
 ## Installation steps
 
-Installation steps can be found on the project website: [https://drakvuf.com](https://drakvuf.com
+Installation steps can be found on the project website: [https://drakvuf.com](https://drakvuf.com)
