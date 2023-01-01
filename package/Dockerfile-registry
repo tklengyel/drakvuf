@@ -1,0 +1,11 @@
+FROM debian:bullseye
+
+COPY ./debs/*.deb /tmp
+
+RUN apt-get update && \
+    dpkg -i /tmp/*.deb && \
+    apt-get -f install && \
+    ldconfig && \
+    rm /tmp/*.deb
+
+CMD /bin/bash
