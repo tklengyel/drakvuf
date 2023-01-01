@@ -1,4 +1,15 @@
 #!/bin/bash
+set -e
+trap error EXIT
+
+error() {
+    apt-get --yes remove xen* || :
+    apt-get --yes remove libxen* || :
+    apt-get --yes remove drakvuf* || :
+
+    echo "An error was encountered while trying to install DRAKVUF"
+    exit 1
+}
 
 get_debian() {
     VERSION=$1
@@ -83,6 +94,11 @@ get_packages() {
 VERSION=${1:-"STABLE"}
 PACKAGE_DIR=packages
 
+if [ $1 == "--help" ] || [ $1 == "-h" ]; then
+    echo "./scripts/install.sh {STABLE|LATEST|<folder>}"
+    exit 0
+fi
+
 # Grab latest debs
 if [ ! -d $VERSION ]; then
     get_packages $VERSION $PACKAGE_DIR
@@ -106,8 +122,13 @@ dpkg -i $PACKAGE_DIR/*drakvuf-bundle*.deb
 
 apt-get -f --yes install
 apt-get --quiet --yes install python3-pip
-pip3 install -r /usr/share/doc/volatility3/requirements.txt
+
+cd /opt/volatility3
+python3 setup.py build
+python3 -m pip install .
+pip3 install pefile construct
 
 echo "DRAKVUF was successfully installed"
 echo "You should reboot your system now and pick Xen in your GRUB menu"
+trap - EXIT
 exit 0
