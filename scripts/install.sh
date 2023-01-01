@@ -125,6 +125,8 @@ apt-get --quiet --yes install python3-pip
 
 cd /opt/volatility3
 python3 setup.py build
+python3 -m pip install .
+pip3 install pefile construct
 
 echo "DRAKVUF was successfully installed"
 echo "You should reboot your system now and pick Xen in your GRUB menu"
