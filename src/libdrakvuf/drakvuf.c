@@ -230,10 +230,10 @@ bool drakvuf_init(
         goto err;
 
     /* register the main VMI event callback */
-    drakvuf_event_fd_add(drakvuf, drakvuf->xen->evtchn_fd, drakvuf_vmi_event_callback, drakvuf);
+    drakvuf_event_fd_add(drakvuf, xen_get_evtchn_fd(drakvuf->xen), drakvuf_vmi_event_callback, drakvuf);
     PRINT_DEBUG("drakvuf_init: adding event_fd done\n");
 
-    get_dom_info(drakvuf->xen, domain, &drakvuf->domID, &drakvuf->dom_name);
+    xen_get_dom_info(drakvuf->xen, domain, &drakvuf->domID, &drakvuf->dom_name);
     domid_t test = ~0;
     if ( drakvuf->domID == test )
         goto err;

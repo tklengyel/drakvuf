@@ -114,6 +114,7 @@
 #include <sys/inotify.h>
 #include <signal.h>
 #include <time.h>
+#include <poll.h>
 #include <config.h>
 
 #include "../xen_helper/xen_helper.h"
@@ -171,7 +172,7 @@ make_clone(xen_interface_t* xen, domid_t* cloneID, uint16_t vlan, char** clone_n
     char* output = NULL;
     g_spawn_command_line_sync(command, &output, NULL, NULL, NULL);
     g_free(command);
-    get_dom_info(xen, output, cloneID, clone_name);
+    xen_get_dom_info(xen, output, cloneID, clone_name);
     g_free(output);
 }
 

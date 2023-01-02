@@ -1370,9 +1370,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         remapped_gfn->o = current_gfn;
         remapped_gfn->r = ++(drakvuf->max_gpfn);
 
-        int rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
+        int rc = xen_populate_physmap(drakvuf->xen, drakvuf->domID, &remapped_gfn->r);
         PRINT_DEBUG("Physmap populated? %i\n", rc);
-        if (rc < 0)
+        if (!rc)
         {
             g_slice_free(struct remapped_gfn, remapped_gfn);
             remapped_gfn = NULL;
@@ -1802,7 +1802,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
 
     init_data->count = 1;
     init_data->entry[0].type = VMI_INIT_DATA_XEN_EVTCHN;
-    init_data->entry[0].data = (void*) drakvuf->xen->evtchn;
+    init_data->entry[0].data = (void*) xen_get_evtchn(drakvuf->xen);
 
     PRINT_DEBUG("init_vmi on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
@@ -1824,7 +1824,8 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
     drakvuf->init_memsize = xen_get_maxmemkb(drakvuf->xen, drakvuf->domID);
 
-    if ( xc_domain_maximum_gpfn(drakvuf->xen->xc, drakvuf->domID, &drakvuf->max_gpfn) < 0 )
+    drakvuf->max_gpfn = vmi_get_max_physical_address(drakvuf->vmi) >> XC_PAGE_SHIFT;
+    if ( !drakvuf->max_gpfn )
         return 0;
 
     PRINT_DEBUG("Max GPFN: 0x%lx\n", drakvuf->max_gpfn);
@@ -1863,16 +1864,16 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     }
 
     /* domain->max_pages is mostly just an annoyance that we can safely ignore */
-    rc = xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, ~0);
+    rc = xen_set_maxmemkb(drakvuf->xen, drakvuf->domID, ~0);
     PRINT_DEBUG("Max mem set? %i\n", rc);
     if (rc < 0)
         return 0;
 
     drakvuf->sink_page_gfn = ++(drakvuf->max_gpfn);
 
-    rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->sink_page_gfn);
+    rc = xen_populate_physmap(drakvuf->xen, drakvuf->domID, &drakvuf->sink_page_gfn);
     PRINT_DEBUG("Physmap populated? %i\n", rc);
-    if (rc < 0)
+    if (!rc)
         return 0;
 
     uint8_t fmask[VMI_PS_4KB] = {[0 ... VMI_PS_4KB-1] = 0xFF};
@@ -1882,8 +1883,13 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
         return 0;
     }
 
-    bool altp2m = xen_enable_altp2m(drakvuf->xen, drakvuf->domID);
-    PRINT_DEBUG("Altp2m enabled? %i\n", altp2m);
+    bool altp2m = xen_set_altp2m_params(drakvuf->xen, drakvuf->domID);
+    PRINT_DEBUG("Altp2m params set: %i\n", altp2m);
+    if (!altp2m)
+        return 0;
+
+    altp2m = vmi_slat_set_domain_state(drakvuf->vmi, 1) == VMI_SUCCESS;
+    PRINT_DEBUG("Altp2m enabled: %i\n", altp2m);
     if (!altp2m)
         return 0;
 
@@ -2053,7 +2059,7 @@ void close_vmi(drakvuf_t drakvuf)
         struct remapped_gfn* remapped_gfn = NULL;
         ghashtable_foreach(drakvuf->remapped_gfns, i, key, remapped_gfn)
         {
-            xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &remapped_gfn->r);
+            xen_decrease_reservation(drakvuf->xen, drakvuf->domID, &remapped_gfn->r);
         }
 
         g_hash_table_destroy(drakvuf->remapped_gfns);
@@ -2104,8 +2110,8 @@ void close_vmi(drakvuf_t drakvuf)
     }
 
     if (drakvuf->sink_page_gfn)
-        xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->sink_page_gfn);
-    xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->init_memsize);
+        xen_decrease_reservation(drakvuf->xen, drakvuf->domID, &drakvuf->sink_page_gfn);
+    xen_set_maxmemkb(drakvuf->xen, drakvuf->domID, drakvuf->init_memsize);
 
     drakvuf->altp2m_idx = 0;
     drakvuf->altp2m_idr = 0;

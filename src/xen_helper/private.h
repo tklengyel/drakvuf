@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,60 +102,193 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef XEN_HELPER_H
-#define XEN_HELPER_H
+#ifndef XEN_HELPER_PRIVATE_H
+#define XEN_HELPER_PRIVATE_H
 
+#define LIBXL_API_VERSION 0x040500
 #define XC_WANT_COMPAT_EVTCHN_API 1
 #define XC_WANT_COMPAT_MAP_FOREIGN_API 1
 
-#include <stdbool.h>
+#include <dlfcn.h>
 #include <xenctrl.h>
+#include <libxl_utils.h>
+#include <libxl.h>
 #include <xenforeignmemory.h>
 
-#define MSR_RTIT_CTL 0x00000570
-#define RTIT_CTL_OS        (1 <<  2)
-#define RTIT_CTL_USR       (1 <<  3)
-#define RTIT_CTL_DIS_RETC  (1 << 11)
-#define RTIT_CTL_BRANCH_EN (1 << 13)
-
-typedef struct xen_interface xen_interface_t;
-typedef struct ipt_state
+static const char* xc_functions[] =
 {
-    uint8_t* buf;
-    size_t size;
+    "xc_interface_open",
+    "xc_interface_close",
+    "xc_evtchn_open",
+    "xc_evtchn_close",
+    "xc_evtchn_fd",
+    "xc_domain_getinfo",
+    "xc_domctl",
+    "xc_domain_pause",
+    "xc_domain_unpause",
+    "xc_vcpu_getcontext",
+    "xc_vcpu_setcontext",
+    "xc_hvm_param_set",
+    "xc_hvm_param_get",
+    "xc_domain_setmaxmem",
+    "xc_domain_decrease_reservation_exact",
+    "xc_domain_populate_physmap_exact",
+    "xc_vmtrace_enable",
+    "xc_vmtrace_disable",
+    "xc_vmtrace_reset_and_enable",
+    "xc_vmtrace_output_position",
+    "xc_vmtrace_get_option",
+    "xc_vmtrace_set_option",
+};
 
-    uint64_t offset;
-    uint64_t last_offset;
+struct xenlibwrapper
+{
+    void* xc_handle;
 
-    xenforeignmemory_resource_handle* fres;
-} ipt_state_t;
+    union
+    {
+        struct
+        {
+            xc_interface* (*xc_interface_open)
+            (xentoollog_logger* logger, xentoollog_logger* dombuild_logger, unsigned open_flags);
 
-bool xen_init_interface(xen_interface_t** xen);
-void xen_free_interface(xen_interface_t* xen);
+            int (*xc_interface_close)
+            (xc_interface* xch);
 
-int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID, char** name);
-xc_evtchn* xen_get_evtchn(xen_interface_t* xen);
-int xen_get_evtchn_fd(xen_interface_t* xen);
+            xc_evtchn* (*xc_evtchn_open)
+            (xentoollog_logger* logger, unsigned open_flags);
 
-uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID);
-bool xen_set_maxmemkb(xen_interface_t* xen, domid_t domID, uint64_t mem);
+            int (*xc_evtchn_close)
+            (xc_evtchn* xce);
 
-bool xen_pause(xen_interface_t* xen, domid_t domID);
-void xen_resume(xen_interface_t* xen, domid_t domID);
-void xen_force_resume(xen_interface_t* xen, domid_t domID);
-int xen_send_qemu_monitor_command(xen_interface_t* xen, domid_t domID, const char* command_line, char** output);
-bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID);
-int xen_version(void);
-bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
-bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
+            int (*xc_evtchn_fd)
+            (xc_evtchn* xce);
 
-bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
-bool xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
-bool xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value);
-bool xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value);
-bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
+            int (*xc_domain_getinfo)
+            (xc_interface* xch, uint32_t first_domid, unsigned int max_doms, xc_dominfo_t* info);
 
-bool xen_decrease_reservation(xen_interface_t* xen, domid_t domID, xen_pfn_t* r);
-bool xen_populate_physmap(xen_interface_t* xen, domid_t domID, xen_pfn_t* r);
+            int (*xc_domctl)
+            (xc_interface* xch, struct xen_domctl* domctl);
+
+            int (*xc_domain_pause)
+            (xc_interface* xch, uint32_t domid);
+
+            int (*xc_domain_unpause)
+            (xc_interface* xch, uint32_t domid);
+
+            int (*xc_vcpu_getcontext)
+            (xc_interface* xch, uint32_t domid, uint32_t vcpu, vcpu_guest_context_any_t* ctxt);
+
+            int (*xc_vcpu_setcontext)
+            (xc_interface* xch, uint32_t domid, uint32_t vcpu, vcpu_guest_context_any_t* ctxt);
+
+            int (*xc_hvm_param_set)
+            (xc_interface* handle, uint32_t dom, uint32_t param, uint64_t value);
+
+            int (*xc_hvm_param_get)
+            (xc_interface* handle, uint32_t dom, uint32_t param, uint64_t* value);
+
+            int (*xc_domain_setmaxmem)
+            (xc_interface* xch, uint32_t domid, uint64_t max_memkb);
+
+            int (*xc_domain_decrease_reservation_exact)
+            (xc_interface* xch, uint32_t domid, unsigned long nr_extents,
+                unsigned int extent_order, xen_pfn_t* extent_start);
+
+            int (*xc_domain_populate_physmap_exact)(xc_interface* xch,
+                uint32_t domid,
+                unsigned long nr_extents,
+                unsigned int extent_order,
+                unsigned int mem_flags,
+                xen_pfn_t* extent_start);
+
+            int (*xc_vmtrace_enable)
+            (xc_interface* xch, uint32_t domid, uint32_t vcpu);
+
+            int (*xc_vmtrace_disable)
+            (xc_interface* xch, uint32_t domid, uint32_t vcpu);
+
+            int (*xc_vmtrace_reset_and_enable)
+            (xc_interface* xch, uint32_t domid,
+                uint32_t vcpu);
+
+            int (*xc_vmtrace_output_position)
+            (xc_interface* xch, uint32_t domid,
+                uint32_t vcpu, uint64_t* pos);
+
+            int (*xc_vmtrace_get_option)
+            (xc_interface* xch, uint32_t domid,
+                uint32_t vcpu, uint64_t key, uint64_t* value);
+
+            int (*xc_vmtrace_set_option)
+            (xc_interface* xch, uint32_t domid,
+                uint32_t vcpu, uint64_t key, uint64_t value);
+
+        };
+
+        void* p[22];
+    };
+
+    void* xtl_handle;
+
+    xentoollog_logger_stdiostream* (*xtl_createlogger_stdiostream)
+    (FILE* f, xentoollog_level min_level, unsigned flags);
+
+    void (*xtl_logger_destroy)
+    (struct xentoollog_logger* logger);
+
+    void* xl_handle;
+
+    int (*libxl_ctx_alloc)
+    (libxl_ctx** pctx, int version, unsigned flags, xentoollog_logger* lg);
+
+    int (*libxl_ctx_free)
+    (libxl_ctx* ctx);
+
+    int (*libxl_name_to_domid)
+    (libxl_ctx* ctx, const char* name, uint32_t* domid);
+
+    char* (*libxl_domid_to_name)
+    (libxl_ctx* ctx, uint32_t domid);
+
+    int (*libxl_qemu_monitor_command)
+    (libxl_ctx* ctx, uint32_t domid,
+        const char* command_line, char** output,
+        const libxl_asyncop_how* ao_how);
+
+    void* xfm_handle;
+
+    xenforeignmemory_handle* (*xenforeignmemory_open)
+    (struct xentoollog_logger* logger, unsigned open_flags);
+
+    int (*xenforeignmemory_close)
+    (xenforeignmemory_handle* fmem);
+
+    int (*xenforeignmemory_resource_size)
+    (xenforeignmemory_handle* fmem, domid_t domid, unsigned int type,
+        unsigned int id, size_t* size);
+
+    xenforeignmemory_resource_handle* (*xenforeignmemory_map_resource)
+    (xenforeignmemory_handle* fmem, domid_t domid, unsigned int type,
+        unsigned int id, unsigned long frame, unsigned long nr_frames,
+        void** paddr, int prot, int flags);
+
+    int (*xenforeignmemory_unmap_resource)
+    (xenforeignmemory_handle* fmem, xenforeignmemory_resource_handle* fres);
+};
+
+struct xen_interface
+{
+    //struct xs_handle *xsh;
+    xc_interface* xc;
+    libxl_ctx* xl_ctx;
+    xentoollog_logger* xl_logger;
+    xc_evtchn* evtchn;             // the Xen event channel
+    int evtchn_fd;                 // its FD
+
+    xenforeignmemory_handle* fmem;
+
+    struct xenlibwrapper xlw;
+};
 
 #endif
