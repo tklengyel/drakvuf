@@ -127,7 +127,7 @@ bool xen_init_interface(xen_interface_t** xen)
 
     for (unsigned int i=0; i<sizeof(xc_functions)/sizeof(char*); i++)
     {
-        if ( !(_xen->xlw.p[i] = dlsym(_xen->xlw.xc_handle, xc_functions[i]) )
+        if ( !(_xen->xlw.p[i] = dlsym(_xen->xlw.xc_handle, xc_functions[i])) )
             goto err;
     }
 
@@ -140,7 +140,7 @@ bool xen_init_interface(xen_interface_t** xen)
     }
 
     _xen->xlw.xtl_handle = dlopen ("libxentoollog.so", RTLD_NOW | RTLD_GLOBAL);
-    if ( !_xen->xlw.xlt_handle )
+    if ( !_xen->xlw.xtl_handle )
         goto err;
 
     _xen->xlw.xtl_createlogger_stdiostream = dlsym(_xen->xlw.xtl_handle, "xtl_createlogger_stdiostream");
