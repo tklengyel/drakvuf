@@ -1,4 +1,5 @@
 option('hardening', type : 'boolean', value : true)
+option('ipt', type : 'boolean', value : true)
 
 option('release', type : 'boolean', value : false)
 option('xtf', type : 'boolean', value : 'false')
@@ -40,10 +41,10 @@ option('plugin-ptracemon', type : 'boolean', value : true)
 option('plugin-ebpfmon', type : 'boolean', value : true)
 option('plugin-unixsocketmon', type : 'boolean', value : true)
 option('plugin-etwmon', type : 'boolean', value : true)
+option('plugin-ipt', type : 'boolean', value : true)
 
 # Disabled by default plugins
 option('plugin-libhooktest', type : 'boolean', value : 'false')
-option('plugin-ipt', type : 'boolean', value : 'false')
 option('plugin-procdump2', type : 'boolean', value : true)
 
 # Deprecated plugins

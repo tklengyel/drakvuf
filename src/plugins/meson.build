@@ -201,6 +201,12 @@ if get_option('plugin-etwmon')
     config_h.set('ENABLE_PLUGIN_ETWMON', 1)
 endif
 
+if get_option('plugin-ipt')
+    plugin_sources += 'ipt/ipt.cpp'
+
+    config_h.set('ENABLE_PLUGIN_IPT', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -230,6 +236,7 @@ summary({
     'ebpfmon' : get_option('plugin-ebpfmon'),
     'unixsocketmon' : get_option('plugin-unixsocketmon'),
     'etwmon' : get_option('plugin-etwmon'),
+    'ipt' : get_option('plugin-ipt'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({

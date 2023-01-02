@@ -102,7 +102,7 @@
 #                                                                         #
 #*************************************************************************#
 
-h_sources = xen_helper.h
+h_sources = xen_helper.h private.h
 c_sources = xen_helper.c
 
 AM_CPPFLAGS = -I$(top_srcdir)

@@ -102,10 +102,12 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <config.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <sys/mman.h>
 
+#include "private.h"
 #include "xen_helper.h"
 
 #ifndef XEN_ALTP2M_external
@@ -116,51 +118,87 @@
 
 bool xen_init_interface(xen_interface_t** xen)
 {
+    xen_interface_t* _xen = (xen_interface_t*)g_try_malloc0(sizeof(xen_interface_t));
 
-    *xen = (xen_interface_t*)g_try_malloc0(sizeof(xen_interface_t));
+    _xen->xlw.xc_handle = dlopen ("libxenctrl.so", RTLD_NOW | RTLD_GLOBAL);
 
-    /* We create an xc interface to test connection to it */
-    (*xen)->xc = xc_interface_open(0, 0, 0);
+    if ( !_xen->xlw.xc_handle )
+        goto err;
 
-    if ((*xen)->xc == NULL)
+    for (unsigned int i=0; i<sizeof(xc_functions)/sizeof(char*); i++)
+    {
+        if ( !(_xen->xlw.p[i] = dlsym(_xen->xlw.xc_handle, xc_functions[i])) )
+            goto err;
+    }
+
+    _xen->xc = _xen->xlw.xc_interface_open(0, 0, 0);
+
+    if (!_xen->xc)
     {
         fprintf(stderr, "xc_interface_open() failed!\n");
         goto err;
     }
 
-    /* We don't need this at the moment, but just in case */
-    //xen->xsh=xs_open(XS_OPEN_READONLY);
-    (*xen)->xl_logger = (xentoollog_logger*) xtl_createlogger_stdiostream(
-            stderr, XTL_PROGRESS, 0);
-
-    if (!(*xen)->xl_logger)
-    {
+    _xen->xlw.xtl_handle = dlopen ("libxentoollog.so", RTLD_NOW | RTLD_GLOBAL);
+    if ( !_xen->xlw.xtl_handle )
         goto err;
-    }
 
-    if (libxl_ctx_alloc(&(*xen)->xl_ctx, LIBXL_VERSION, 0,
-            (*xen)->xl_logger))
+    _xen->xlw.xtl_createlogger_stdiostream = dlsym(_xen->xlw.xtl_handle, "xtl_createlogger_stdiostream");
+    _xen->xlw.xtl_logger_destroy = dlsym(_xen->xlw.xtl_handle, "xtl_logger_destroy");
+
+    _xen->xl_logger = (xentoollog_logger*) _xen->xlw.xtl_createlogger_stdiostream(stderr, XTL_PROGRESS, 0);
+
+    if (!_xen->xl_logger)
+        goto err;
+
+    _xen->xlw.xl_handle = dlopen ("libxenlight.so", RTLD_NOW | RTLD_GLOBAL);
+    if ( !_xen->xlw.xl_handle )
+        goto err;
+
+    _xen->xlw.libxl_ctx_alloc = dlsym(_xen->xlw.xl_handle, "libxl_ctx_alloc");
+    _xen->xlw.libxl_ctx_free = dlsym(_xen->xlw.xl_handle, "libxl_ctx_free");
+    _xen->xlw.libxl_name_to_domid = dlsym(_xen->xlw.xl_handle, "libxl_name_to_domid");
+    _xen->xlw.libxl_domid_to_name = dlsym(_xen->xlw.xl_handle, "libxl_domid_to_name");
+    _xen->xlw.libxl_qemu_monitor_command = dlsym(_xen->xlw.xl_handle, "libxl_qemu_monitor_command");
+
+    if (_xen->xlw.libxl_ctx_alloc(&_xen->xl_ctx, LIBXL_VERSION, 0, _xen->xl_logger))
     {
         fprintf(stderr, "libxl_ctx_alloc() failed!\n");
         goto err;
     }
 
-    (*xen)->evtchn = xc_evtchn_open(NULL, 0);
-    if (!(*xen)->evtchn)
+    _xen->evtchn = _xen->xlw.xc_evtchn_open(NULL, 0);
+    if (!_xen->evtchn)
     {
         printf("xc_evtchn_open() could not build event channel!\n");
         goto err;
     }
-    (*xen)->evtchn_fd = xc_evtchn_fd((*xen)->evtchn);
+    _xen->evtchn_fd = _xen->xlw.xc_evtchn_fd(_xen->evtchn);
 
 #ifdef ENABLE_IPT
-    (*xen)->fmem = xenforeignmemory_open(0, 0);
+    _xen->xlw.xfm_handle = dlopen ("libxenforeignmemory.so", RTLD_NOW | RTLD_GLOBAL);
+    if ( !_xen->xlw.xfm_handle )
+        goto err;
+
+    _xen->xlw.xenforeignmemory_open = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_open");
+    _xen->xlw.xenforeignmemory_close = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_close");
+    _xen->xlw.xenforeignmemory_resource_size = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_resource_size");
+    _xen->xlw.xenforeignmemory_map_resource = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_map_resource");
+    _xen->xlw.xenforeignmemory_unmap_resource = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_unmap_resource");
+    _xen->fmem = _xen->xlw.xenforeignmemory_open(0, 0);
+
+    if ( !_xen->fmem )
+        goto err;
 #endif
 
+    *xen = _xen;
     return 1;
 
 err:
-    xen_free_interface(*xen);
+    if ( _xen && _xen->xlw.xc_handle ) dlclose(_xen->xlw.xc_handle);
+    if ( _xen && _xen->xlw.xtl_handle ) dlclose(_xen->xlw.xtl_handle);
+    if ( _xen && _xen->xlw.xl_handle ) dlclose(_xen->xlw.xl_handle);
+    xen_free_interface(_xen);
     *xen = NULL;
     return 0;
 }
@@ -170,21 +208,39 @@ void xen_free_interface(xen_interface_t* xen)
     if (xen)
     {
         if (xen->xl_ctx)
-            libxl_ctx_free(xen->xl_ctx);
+            xen->xlw.libxl_ctx_free(xen->xl_ctx);
         if (xen->xl_logger)
-            xtl_logger_destroy(xen->xl_logger);
+            xen->xlw.xtl_logger_destroy(xen->xl_logger);
         //if (xen->xsh) xs_close(xen->xsh);
         if (xen->xc)
-            xc_interface_close(xen->xc);
+            xen->xlw.xc_interface_close(xen->xc);
         if (xen->evtchn)
-            xc_evtchn_close(xen->evtchn);
+            xen->xlw.xc_evtchn_close(xen->evtchn);
         if (xen->fmem)
-            xenforeignmemory_close(xen->fmem);
+            xen->xlw.xenforeignmemory_close(xen->fmem);
+        if ( xen->xlw.xc_handle )
+            dlclose(xen->xlw.xc_handle);
+        if ( xen->xlw.xtl_handle )
+            dlclose(xen->xlw.xtl_handle);
+        if ( xen->xlw.xl_handle )
+            dlclose(xen->xlw.xl_handle);
+        if ( xen->xlw.xfm_handle )
+            dlclose(xen->xlw.xfm_handle);
         g_free(xen);
     }
 }
 
-int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
+xc_evtchn* xen_get_evtchn(xen_interface_t* xen)
+{
+    return xen->evtchn;
+}
+
+int xen_get_evtchn_fd(xen_interface_t* xen)
+{
+    return xen->evtchn_fd;
+}
+
+int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
     char** name)
 {
     uint32_t _domID;
@@ -200,7 +256,7 @@ int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
     if (_domID == ~0U)
     {
         _name = strdup(input);
-        libxl_name_to_domid(xen->xl_ctx, input, &_domID);
+        xen->xlw.libxl_name_to_domid(xen->xl_ctx, input, &_domID);
         if (!_domID || _domID == ~0U)
         {
             printf("Domain is not running, failed to get domID from name!\n");
@@ -217,10 +273,10 @@ int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
 
         xc_dominfo_t info = { 0 };
 
-        if ( 1 == xc_domain_getinfo(xen->xc, _domID, 1, &info)
+        if ( 1 == xen->xlw.xc_domain_getinfo(xen->xc, _domID, 1, &info)
             && info.domid == _domID)
         {
-            _name = libxl_domid_to_name(xen->xl_ctx, _domID);
+            _name = xen->xlw.libxl_domid_to_name(xen->xl_ctx, _domID);
         }
         else
         {
@@ -238,16 +294,21 @@ uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID)
 {
     xc_dominfo_t info = { 0 };
 
-    if ( 1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID)
+    if ( 1 == xen->xlw.xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID)
         return info.max_memkb;
 
     return 0;
 }
 
+bool xen_set_maxmemkb(xen_interface_t* xen, domid_t domID, uint64_t mem)
+{
+    return xen->xlw.xc_domain_setmaxmem(xen->xc, domID, mem) == 0;
+}
+
 /* Increments Xen's pause count if paused */
 bool xen_pause(xen_interface_t* xen, domid_t domID)
 {
-    int rc = xc_domain_pause(xen->xc, domID);
+    int rc = xen->xlw.xc_domain_pause(xen->xc, domID);
     if ( rc < 0 )
         return 0;
 
@@ -257,7 +318,7 @@ bool xen_pause(xen_interface_t* xen, domid_t domID)
 /* Decrements Xen's pause count and only resumes when it reaches 0 */
 void xen_resume(xen_interface_t* xen, domid_t domID)
 {
-    xc_domain_unpause(xen->xc, domID);
+    xen->xlw.xc_domain_unpause(xen->xc, domID);
 }
 
 void xen_force_resume(xen_interface_t* xen, domid_t domID)
@@ -266,8 +327,8 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
     {
         xc_dominfo_t info = {0};
 
-        if (1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID && info.paused)
-            xc_domain_unpause(xen->xc, domID);
+        if (1 == xen->xlw.xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID && info.paused)
+            xen->xlw.xc_domain_unpause(xen->xc, domID);
         else
             break;
 
@@ -284,20 +345,15 @@ int xen_send_qemu_monitor_command(xen_interface_t* xen, domid_t domID, const cha
         return -1;
     }
 
-#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
-    /* Uses the deprecated function signature, if an old version of libxl is used */
-    return libxl_qemu_monitor_command(xen->xl_ctx, (uint32_t) domID, command_line, output);
-#else
     /* Performs only synchronous calling by setting libxl_asyncop_how to NULL for now */
-    return libxl_qemu_monitor_command(xen->xl_ctx, (uint32_t) domID, command_line, output, NULL);
-#endif
+    return xen->xlw.libxl_qemu_monitor_command(xen->xl_ctx, (uint32_t) domID, command_line, output, NULL);
 }
 
-bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID)
+bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID)
 {
     uint64_t param_altp2m;
 
-    int rc = xc_hvm_param_get(xen->xc, domID, HVM_PARAM_ALTP2M, &param_altp2m);
+    int rc = xen->xlw.xc_hvm_param_get(xen->xc, domID, HVM_PARAM_ALTP2M, &param_altp2m);
     if (rc < 0)
     {
         fprintf(stderr, "Failed to get HVM_PARAM_ALTP2M, RC: %i\n", rc);
@@ -306,17 +362,13 @@ bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID)
 
     if (param_altp2m != XEN_ALTP2M_external)
     {
-        rc = xc_hvm_param_set(xen->xc, domID, HVM_PARAM_ALTP2M, XEN_ALTP2M_external);
+        rc = xen->xlw.xc_hvm_param_set(xen->xc, domID, HVM_PARAM_ALTP2M, XEN_ALTP2M_external);
         if (rc < 0)
         {
             fprintf(stderr, "Failed to set HVM_PARAM_ALTP2M, RC: %i\n", rc);
             return 0;
         }
     }
-
-    rc = xc_altp2m_set_domain_state(xen->xc, domID, 1);
-    if (rc < 0)
-        return 0;
 
     return 1;
 }
@@ -342,12 +394,22 @@ int xen_version(void)
 
 bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* ctx)
 {
-    return xc_vcpu_getcontext(xen->xc, domID, vcpu, ctx) == 0;
+    return xen->xlw.xc_vcpu_getcontext(xen->xc, domID, vcpu, ctx) == 0;
 }
 
 bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* ctx)
 {
-    return xc_vcpu_setcontext(xen->xc, domID, vcpu, ctx) == 0;
+    return xen->xlw.xc_vcpu_setcontext(xen->xc, domID, vcpu, ctx) == 0;
+}
+
+bool xen_decrease_reservation(xen_interface_t* xen, domid_t domID, xen_pfn_t* r)
+{
+    return xen->xlw.xc_domain_decrease_reservation_exact(xen->xc, domID, 1, 0, r) == 0;
+}
+
+bool xen_populate_physmap(xen_interface_t* xen, domid_t domID, xen_pfn_t* r)
+{
+    return xen->xlw.xc_domain_populate_physmap_exact(xen->xc, domID, 1, 0, 0, r) == 0;
 }
 
 #ifdef ENABLE_IPT
@@ -355,7 +417,7 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
 {
     int rc;
 
-    rc = xenforeignmemory_resource_size(
+    rc = xen->xlw.xenforeignmemory_resource_size(
             xen->fmem, domID, XENMEM_resource_vmtrace_buf, vcpu, &ipt_state->size);
     if (rc)
     {
@@ -363,7 +425,7 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
         return false;
     }
 
-    ipt_state->fres = xenforeignmemory_map_resource(
+    ipt_state->fres = xen->xlw.xenforeignmemory_map_resource(
             xen->fmem, domID, XENMEM_resource_vmtrace_buf,
             /* vcpu: */ vcpu,
             /* frame: */ 0,
@@ -377,7 +439,7 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
         return false;
     }
 
-    rc = xc_vmtrace_reset_and_enable(xen->xc, domID, vcpu);
+    rc = xen->xlw.xc_vmtrace_reset_and_enable(xen->xc, domID, vcpu);
 
     if (rc)
     {
@@ -388,7 +450,7 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
     return true;
 
 unmap:
-    xenforeignmemory_unmap_resource(xen->fmem, ipt_state->fres);
+    xen->xlw.xenforeignmemory_unmap_resource(xen->fmem, ipt_state->fres);
     return false;
 }
 
@@ -397,7 +459,7 @@ bool xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, 
     uint64_t offset;
     int rc;
 
-    rc = xc_vmtrace_output_position(xen->xc, domID, vcpu, &offset);
+    rc = xen->xlw.xc_vmtrace_output_position(xen->xc, domID, vcpu, &offset);
 
     if (rc == ENODATA)
     {
@@ -418,17 +480,17 @@ bool xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, 
 
 bool xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value)
 {
-    return xc_vmtrace_set_option(xen->xc, domID, vcpu, key, value) == 0;
+    return xen->xlw.xc_vmtrace_set_option(xen->xc, domID, vcpu, key, value) == 0;
 }
 
 bool xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value)
 {
-    return xc_vmtrace_get_option(xen->xc, domID, vcpu, key, value) == 0;
+    return xen->xlw.xc_vmtrace_get_option(xen->xc, domID, vcpu, key, value) == 0;
 }
 
 bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
-    int rc = xenforeignmemory_unmap_resource(xen->fmem, ipt_state->fres);
+    int rc = xen->xlw.xenforeignmemory_unmap_resource(xen->fmem, ipt_state->fres);
 
     if (rc)
     {
@@ -436,7 +498,7 @@ bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt
         return false;
     }
 
-    rc = xc_vmtrace_disable(xen->xc, domID, vcpu);
+    rc = xen->xlw.xc_vmtrace_disable(xen->xc, domID, vcpu);
 
     if (rc)
     {

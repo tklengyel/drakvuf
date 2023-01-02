@@ -67,6 +67,7 @@ if get_option('hardening')
     hardened_link_args += '-Wl,-z,noexecstack'
     hardened_link_args += '-Wl,-z,relro'
     hardened_link_args += '-Wl,-z,now'
+    config_h.set('HARDENING', 1)
 endif
 
 summary({
@@ -81,6 +82,10 @@ subdir('src/libusermode')
 subdir('src/libhook')
 subdir('src/librepl')
 subdir('src/plugins')
+
+if get_option('ipt')
+    config_h.set('ENABLE_IPT', 1)
+endif
 
 # Generate config.h
 configure_file(output : 'config.h',
@@ -145,6 +150,7 @@ summary({
     'Hardening': get_option('hardening'),
     'XTF': get_option('xtf'),
     'REPL': get_option('repl'),
+    'IPT': get_option('ipt'),
 }, section: 'Configuration')
 
 summary({
