@@ -109,6 +109,7 @@ sources += hooks/return.hpp hooks/return.cpp
 sources += hooks/cr3.hpp hooks/cr3.cpp
 sources += hooks/cpuid.hpp hooks/cpuid.cpp
 sources += hooks/catchall.hpp hooks/catchall.cpp
+sources += hooks/memaccess.hpp hooks/memaccess.cpp
 sources += call_result.hpp
 sources += libhook.hpp
 

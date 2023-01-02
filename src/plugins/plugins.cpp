@@ -475,12 +475,12 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     codemon_config_struct config =
                     {
-                        .codemon_dump_dir = options->codemon_dump_dir,
-                        .codemon_filter_executable = options->codemon_filter_executable,
-                        .codemon_log_everything = options->codemon_log_everything,
-                        .codemon_dump_vad = options->codemon_dump_vad,
-                        .codemon_analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
-                        .codemon_default_benign = options->codemon_default_benign,
+                        .dump_dir = options->codemon_dump_dir,
+                        .filter_executable = options->codemon_filter_executable,
+                        .log_everything = options->codemon_log_everything,
+                        .dump_vad = options->codemon_dump_vad,
+                        .analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
+                        .default_benign = options->codemon_default_benign,
                     };
                     this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
                     break;
