@@ -153,6 +153,7 @@ jobs:
   registry:
     needs: [deb]
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v3
 
@@ -170,8 +171,10 @@ jobs:
           name: debianbullseye-debs
           path: debs
 
-      -
-        name: Build and push
+      - name: remove xen
+        run: rm debs/*xen*
+
+      - name: Build and push
         uses: docker/build-push-action@v3
         with:
           context: .
