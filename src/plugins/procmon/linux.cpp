@@ -110,7 +110,7 @@
 
 #include "linux.h"
 #include "plugins/output_format.h"
-#include "plugins/hook_helpers.h"
+#include "plugins/helpers/hooks.h"
 
 using namespace procmon_ns;
 

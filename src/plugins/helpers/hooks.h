@@ -101,74 +101,43 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <libvmi/libvmi.h>
+#include <libhook/libhook.hpp>
+#include "../plugins.h"
 
-#include "plugins/helpers/hooks.h"
-#include "plugins/output_format.h"
-#include "ptracemon.h"
-#include "private.h"
+/*
+ * These 2 templates convert member-function-pointer to class type.
+ * It is required to properly call member-function-pointer.
+ * Read more in <libhook/libhook.hpp>.
+ */
+template <typename T>
+struct class_type;
 
-using namespace ptracemon_ns;
-
-event_response_t ptracemon::ptrace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+template <typename T, typename R, typename... Args>
+struct class_type<R (T::*)(Args...)>
 {
-    auto vmi = vmi_lock_guard(drakvuf);
-    addr_t pt_regs = drakvuf_get_function_argument(drakvuf, info, 1);
+    using type = T;
+};
 
-    uint64_t request;
-    if (VMI_FAILURE == vmi_read_64_va(vmi, pt_regs + this->offsets[PT_REGS_RDI], 0, &request))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get rdi from pt_regs\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    auto request_str = ptrace_request_to_str((ptrace_request_t)request);
-
-    uint64_t pid;
-    if (VMI_FAILURE == vmi_read_64_va(vmi, pt_regs + this->offsets[PT_REGS_RSI], 0, &pid))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get rsi from pt_regs\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    addr_t target_process_base, dtb;
-    if (!drakvuf_get_process_by_pid(drakvuf, (vmi_pid_t)pid, &target_process_base, &dtb))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get target process\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    proc_data_t target_process_data;
-    if (!drakvuf_get_process_data(drakvuf, target_process_base, &target_process_data))
-    {
-        PRINT_DEBUG("[PTRACEMON] Probably process already died\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    fmt::print(this->m_output_format, "ptracemon", drakvuf, info,
-        keyval("Type", fmt::Rstr(request_str)),
-        keyval("TargetPID", fmt::Nval(target_process_data.pid)),
-        keyval("TargetProcessName", fmt::Estr(target_process_data.name))
-    );
-
-    g_free(const_cast<char*>(target_process_data.name));
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-ptracemon::ptracemon(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output)
+/**
+ * This class is only needed for better backwards compatibility.
+ * The new hooking interface prefers to use member-functions as callbacks
+ * which provides `this`.
+ */
+class PluginResult : public libhook::CallResult
 {
-    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, pt_regs_offsets_name, this->offsets.size(), this->offsets.data()))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get offsets\n");
-        return;
-    }
+public:
+    PluginResult()
+        : libhook::CallResult()
+    {};
 
-    syshook = createSyscallHook("__x64_sys_ptrace", &ptracemon::ptrace_cb, "ptrace");
-    if (nullptr == syshook)
-    {
-        PRINT_DEBUG("[PTRACEMON] Method __x64_sys_ptrace not found\n");
-        return;
-    }
+    class pluginex* plugin_ = nullptr;
+};
+
+template<typename Plugin>
+Plugin* GetTrapPlugin(const drakvuf_trap_info_t* info)
+{
+    static_assert(std::is_base_of_v<pluginex, Plugin>, "Plugin must derive from pluginex");
+    return dynamic_cast<Plugin*>(libhook::GetTrapParams<PluginResult>(info)->plugin_);
 }

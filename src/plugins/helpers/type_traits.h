@@ -102,73 +102,60 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <libvmi/libvmi.h>
+#ifndef DRAKVUF_PLUGINS_HELPERS_TYPE_TRAITS_H
+#define DRAKVUF_PLUGINS_HELPERS_TYPE_TRAITS_H
+#pragma once
 
-#include "plugins/helpers/hooks.h"
-#include "plugins/output_format.h"
-#include "ptracemon.h"
-#include "private.h"
+#include <type_traits>
 
-using namespace ptracemon_ns;
+template<class T>
+struct always_false: std::false_type {};
 
-event_response_t ptracemon::ptrace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto vmi = vmi_lock_guard(drakvuf);
-    addr_t pt_regs = drakvuf_get_function_argument(drakvuf, info, 1);
+/**/
 
-    uint64_t request;
-    if (VMI_FAILURE == vmi_read_64_va(vmi, pt_regs + this->offsets[PT_REGS_RDI], 0, &request))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get rdi from pt_regs\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    auto request_str = ptrace_request_to_str((ptrace_request_t)request);
+template <class T, class = void>
+struct has_begin_helper : std::false_type {};
 
-    uint64_t pid;
-    if (VMI_FAILURE == vmi_read_64_va(vmi, pt_regs + this->offsets[PT_REGS_RSI], 0, &pid))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get rsi from pt_regs\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+template <class T>
+struct has_begin_helper<T, std::void_t<decltype(std::begin(std::declval<T>()))>> : std::true_type {};
 
-    addr_t target_process_base, dtb;
-    if (!drakvuf_get_process_by_pid(drakvuf, (vmi_pid_t)pid, &target_process_base, &dtb))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get target process\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+template <class T, class = void>
+struct has_end_helper : std::false_type {};
 
-    proc_data_t target_process_data;
-    if (!drakvuf_get_process_data(drakvuf, target_process_base, &target_process_data))
-    {
-        PRINT_DEBUG("[PTRACEMON] Probably process already died\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+template <class T>
+struct has_end_helper<T, std::void_t<decltype(std::end(std::declval<T>()))>> : std::true_type {};
 
-    fmt::print(this->m_output_format, "ptracemon", drakvuf, info,
-        keyval("Type", fmt::Rstr(request_str)),
-        keyval("TargetPID", fmt::Nval(target_process_data.pid)),
-        keyval("TargetProcessName", fmt::Estr(target_process_data.name))
-    );
 
-    g_free(const_cast<char*>(target_process_data.name));
+template <class T, class = void>
+struct is_iterable_helper : std::false_type {};
 
-    return VMI_EVENT_RESPONSE_NONE;
-}
+template <class T>
+struct is_iterable_helper<T, std::enable_if_t<has_begin_helper<T>::value&& has_end_helper<T>::value, void>> : std::true_type {};
 
-ptracemon::ptracemon(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output)
-{
-    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, pt_regs_offsets_name, this->offsets.size(), this->offsets.data()))
-    {
-        PRINT_DEBUG("[PTRACEMON] Failed to get offsets\n");
-        return;
-    }
+template <class T>
+struct is_iterable : is_iterable_helper<T> {};
 
-    syshook = createSyscallHook("__x64_sys_ptrace", &ptracemon::ptrace_cb, "ptrace");
-    if (nullptr == syshook)
-    {
-        PRINT_DEBUG("[PTRACEMON] Method __x64_sys_ptrace not found\n");
-        return;
-    }
-}
+/**/
+
+template <class T, class = void>
+struct is_printable_helper : std::false_type {};
+
+template <class T>
+struct is_printable_helper<T, std::void_t<decltype(std::declval<std::ostream>().operator<<(std::declval<T>()))>> : std::true_type {};
+
+template <class T>
+struct is_printable : is_printable_helper<T> {};
+
+/**/
+
+template <class T>
+std::true_type has_mapped_type_helper(typename T::mapped_type*);
+
+template <class>
+std::false_type has_mapped_type_helper(...);
+
+template <class T>
+struct has_mapped_type : decltype(has_mapped_type_helper<T>(nullptr))
+{};
+
+#endif // DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H

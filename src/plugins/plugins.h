@@ -119,6 +119,9 @@
 #include <libdrakvuf/libdrakvuf.h>
 #include <libdrakvuf/json-util.h>
 
+#include "helpers/vmi_lock_guard.h"
+#include "helpers/unicode_string.h"
+
 #if defined(LIBDRAKVUF_PRIVATE_GUARD)
 #error You should never include libdrakvuf/private.h in a plugin
 #endif
@@ -373,29 +376,6 @@ public:
     drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
     int start(drakvuf_plugin_t plugin, const plugins_options* config);
     int stop(drakvuf_plugin_t plugin);
-};
-
-/***************************************************************************/
-
-struct vmi_lock_guard
-{
-    explicit vmi_lock_guard(drakvuf_t drakvuf) : drakvuf{drakvuf}, vmi{drakvuf_lock_and_get_vmi(drakvuf)}
-    {
-    }
-
-    operator vmi_instance_t() const
-    {
-        return vmi;
-    }
-
-    ~vmi_lock_guard()
-    {
-        drakvuf_release_vmi(drakvuf);
-    }
-
-private:
-    drakvuf_t drakvuf;
-    vmi_instance_t vmi;
 };
 
 #endif
