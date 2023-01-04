@@ -110,6 +110,7 @@
 #include <libhook/hooks/syscall.hpp>
 #include <libhook/hooks/cr3.hpp>
 #include <libhook/hooks/cpuid.hpp>
+#include <libhook/hooks/catchall.hpp>
 
 /**
  * A brief information about caveats of libhook.

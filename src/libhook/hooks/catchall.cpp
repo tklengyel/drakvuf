@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -101,191 +101,53 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#include <libhook/hooks/catchall.hpp>
 
-#include <array>
-#include <sstream>
-#include <filesystem>
-#include <inttypes.h>
-#include <sys/stat.h>
-
-#include "plugins/output_format.h"
-
-#include "ipt.h"
-#include "private.h"
-
-uint64_t pack_payload(uint32_t cmd, uint32_t data)
+namespace libhook
 {
-    return (static_cast<uint64_t>(cmd) << 32) | data;
-}
 
-void emit_ptwrite64(std::ofstream& stream, uint64_t payload)
+CatchAllHook::~CatchAllHook()
 {
-    // ptwrite packet
-    stream.put(0x02);
-    // no FUP, 8 bytes of payload
-    stream.put(0x32);
-    stream.write(reinterpret_cast<char*>(&payload), sizeof(payload));
-}
-
-void ipt_vcpu::annotate(uint64_t payload)
-{
-    emit_ptwrite64(this->output_stream, payload);
-}
-
-void ipt_vcpu::flush(uint64_t offset)
-{
-    // update last offset
-    uint64_t prev = this->last_offset;
-    this->last_offset = offset;
-
-    PRINT_DEBUG("[IPT] Flushing vCPU %d offset: %" PRIx64 " last offset: %" PRIx64 "\n",
-        id, offset, prev);
-
-    if (!this->output_stream.good())
+    if (this->drakvuf_ && this->trap_)
     {
-        throw -1;
-    }
-
-    // Cast uint8_t* to char* to satisfy std::ofstream requirements
-    // https://stackoverflow.com/questions/16260033/reinterpret-cast-between-char-and-stduint8-t-safe
-    auto data = reinterpret_cast<char*>(this->buf);
-    if (offset > prev)
-    {
-        // Normal case, some data was appended to buffer
-        this->output_stream.write(data + prev, offset - prev);
-    }
-    else if (offset < prev)
-    {
-        // Buffer wrapped - write from last offset to the end of the buffer
-        // and then from the beginning to last written packet
-        // This assumes that IPT buffer is large enough to not overflow between
-        // calls to ipt_annotate
-        this->output_stream.write(data + prev, this->size - prev);
-        this->output_stream.write(data, offset);
+        PRINT_DEBUG("[LIBHOOK] destroying CatchAll hook...\n");
+        // read in libhook.hpp why this happens
+        this->trap_->cb = [](drakvuf_t, drakvuf_trap_info_t*) -> event_response_t
+        {
+            PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        };
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+        {
+            delete static_cast<CallResult*>(trap->data);
+            delete trap;
+        });
     }
     else
     {
-        PRINT_DEBUG("[IPT] flush_ipt_stream() called but no new IPT data is present\n");
-        // In theory this should be unreachable, since it's hard to generate
-        // no data between events. Handle this, just in case something is wrong
-        this->annotate(pack_payload(PTW_ERROR_EMPTY, 0));
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as CatchAll hook was moved from\n");
     }
 }
 
-event_response_t ipt::cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+CatchAllHook::CatchAllHook(CatchAllHook&& rhs) noexcept
+    : BaseHook(std::forward<BaseHook>(rhs))
 {
-    auto& vcpu = this->vcpus[info->vcpu];
-
-    vcpu.flush(info->regs->vmtrace_pos);
-
-    vcpu.annotate(pack_payload(PTW_CURRENT_CR3, info->regs->cr3));
-    vcpu.annotate(pack_payload(PTW_CURRENT_TID, info->proc_data.tid));
-
-    return VMI_EVENT_RESPONSE_NONE;
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
 }
 
-event_response_t ipt::catchall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+CatchAllHook& CatchAllHook::operator=(CatchAllHook&& rhs) noexcept
 {
-    auto& vcpu = this->vcpus[info->vcpu];
-
-    vcpu.flush(info->regs->vmtrace_pos);
-    vcpu.annotate(pack_payload(PTW_EVENT_ID, info->event_uid));
-
-    return VMI_EVENT_RESPONSE_NONE;
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+    return *this;
 }
 
-ipt::ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output)
-    : pluginex(drakvuf, output)
-    , num_vcpus_{0}
-    , drakvuf_{drakvuf}
-{
-    if (!config.ipt_dir)
-    {
-        PRINT_DEBUG("[IPT] Target directory not provided, not activating IPT plugin\n");
-        return;
-    }
+CatchAllHook::CatchAllHook(drakvuf_t drakvuf, cb_wrapper_t cb)
+    : BaseHook(drakvuf),
+      callback_(cb)
+{}
 
-    auto ipt_dir = std::filesystem::path(config.ipt_dir);
-    if (!std::filesystem::is_directory(ipt_dir))
-    {
-        PRINT_DEBUG("[IPT] Target directory doesn't exist. Creating...\n");
-        if (!std::filesystem::create_directory(ipt_dir))
-        {
-            PRINT_DEBUG("[IPT] Failed to create %s directory\n", ipt_dir.c_str());
-            throw -1;
-        }
-    }
-
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        num_vcpus_ = vmi_get_num_vcpus(vmi);
-    }
-
-    // This is a DRAKVUF limitation
-    if (num_vcpus_ > MAX_DRAKVUF_VCPU)
-    {
-        PRINT_DEBUG("[IPT] Only first %d vCPUs will be traced\n", MAX_DRAKVUF_VCPU);
-        num_vcpus_ = MAX_DRAKVUF_VCPU;
-    }
-
-    // Always trace code branches, traces become kinda boring without them
-    // Ret compression may be sometimes problematic to reconstruct, disable it
-    uint64_t ipt_flags = DRAKVUF_IPT_BRANCH_EN | DRAKVUF_IPT_DIS_RETC;
-
-    if (config.trace_os)
-    {
-        PRINT_DEBUG("[IPT] Tracing OS\n");
-        ipt_flags |= DRAKVUF_IPT_TRACE_OS;
-    }
-
-    if (config.trace_user)
-    {
-        PRINT_DEBUG("[IPT] Tracing userspace\n");
-        ipt_flags |= DRAKVUF_IPT_TRACE_USR;
-    }
-
-    for (int i = 0; i < num_vcpus_; i++)
-    {
-        auto& vcpu = this->vcpus[i];
-        vcpu.id = i;
-        vcpu.last_offset = 0;
-        if (!drakvuf_enable_ipt(drakvuf, i, &vcpu.buf, &vcpu.size, ipt_flags))
-        {
-            PRINT_DEBUG("[IPT] Failed to enable IPT on vCPU %d\n", i);
-            throw -1;
-        }
-
-        std::stringstream ss;
-        ss << "ipt_stream_vcpu" << i;
-        auto stream_path = ipt_dir / ss.str();
-
-        vcpu.output_stream = std::ofstream(stream_path, std::ios::binary);
-        if (!vcpu.output_stream.is_open())
-        {
-            PRINT_DEBUG("Failed to open stream file for vCPU %d\n", i);
-            throw -1;
-        }
-    }
-
-    this->cr3_hook = createCr3Hook(&ipt::cr3_cb);
-    if (!this->cr3_hook)
-    {
-        PRINT_DEBUG("[IPT] Failed to register CR3 trap");
-        throw -1;
-    }
-
-    this->catchall_hook = createCatchAllHook(&ipt::catchall_cb);
-    if (!this->catchall_hook)
-    {
-        PRINT_DEBUG("[IPT] Failed to register catchall trap");
-        throw -1;
-    }
-}
-
-ipt::~ipt()
-{
-    for (int i = 0; i < num_vcpus_; i++)
-    {
-        drakvuf_disable_ipt(drakvuf_, i);
-    }
-}
+} // namespace libhook
