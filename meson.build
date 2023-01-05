@@ -1,4 +1,4 @@
-project('DRAKVUF (C) Tamas K Lengyel 2014-2022', 'c', 'cpp',
+project('DRAKVUF (C) Tamas K Lengyel 2014-2023', 'c', 'cpp',
         version : '1.1',
         default_options : [
             'cpp_std=c++17',
