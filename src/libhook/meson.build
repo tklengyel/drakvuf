@@ -8,6 +8,7 @@ libhook = static_library('hook',
     'hooks/return.cpp',
     'hooks/cr3.cpp',
     'hooks/cpuid.cpp',
+    'hooks/catchall.cpp',
 
     dependencies : deps,
     include_directories : libhook_h,
