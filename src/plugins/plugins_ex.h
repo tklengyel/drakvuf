@@ -531,6 +531,22 @@ public:
     [[nodiscard]]
     std::unique_ptr<libhook::CpuidHook> createCpuidHook(Callback cb, int ttl);
 
+    template<typename Params = PluginResult>
+    [[nodiscard]]
+    std::unique_ptr<libhook::CatchAllHook> createCatchAllHook(hook_cb_t cb);
+
+    template<typename Params = PluginResult>
+    [[nodiscard]]
+    std::unique_ptr<libhook::CatchAllHook> createCatchAllHook(hook_cb_t cb, int ttl);
+
+    template<typename Params = PluginResult, typename Callback>
+    [[nodiscard]]
+    std::unique_ptr<libhook::CatchAllHook> createCatchAllHook(Callback cb);
+
+    template<typename Params = PluginResult, typename Callback>
+    [[nodiscard]]
+    std::unique_ptr<libhook::CatchAllHook> createCatchAllHook(Callback cb, int ttl);
+
     /************************************
      *        Legacy hooking API        *
      ************************************/
@@ -760,6 +776,45 @@ std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, int t
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
     auto hook = libhook::CpuidHook::create<Params>(this->drakvuf, [=](auto&& ...args) -> event_response_t
+    {
+        return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
+    }, ttl);
+    if (hook)
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    else
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
+    return hook;
+}
+
+template<typename Params>
+std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(hook_cb_t cb)
+{
+    return createCatchAllHook<Params>(cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+}
+
+template<typename Params>
+std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(hook_cb_t cb, int ttl)
+{
+    static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
+    auto hook = libhook::CatchAllHook::create<Params>(this->drakvuf, cb, ttl);
+    if (hook)
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    else
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
+    return hook;
+}
+
+template<typename Params, typename Callback>
+std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb)
+{
+    return createCatchAllHook<Params, Callback>(cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+}
+
+template<typename Params, typename Callback>
+std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb, int ttl)
+{
+    static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
+    auto hook = libhook::CatchAllHook::create<Params>(this->drakvuf, [=](auto&& ...args) -> event_response_t
     {
         return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
     }, ttl);

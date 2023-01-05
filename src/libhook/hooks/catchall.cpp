@@ -101,53 +101,53 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#pragma once
-
-#include <libhook/call_result.hpp>
-#include <libhook/hooks/base.hpp>
-#include <libhook/hooks/manual.hpp>
-#include <libhook/hooks/return.hpp>
-#include <libhook/hooks/syscall.hpp>
-#include <libhook/hooks/cr3.hpp>
-#include <libhook/hooks/cpuid.hpp>
 #include <libhook/hooks/catchall.hpp>
 
-/**
- * A brief information about caveats of libhook.
- *
- * There are few things libhook provides:
- *  1) RAII containers around libdrakvuf traps
- *  2) Trap API unification
- *  3) ability to use non-static class-member-functions as callbacks
- *
- * 1) I spent over 2 days debugging this issue, so I'm going to note it down here (for future reference).
- *
- * If we delete a hook, we call dctor of the hook object, where we call drakvuf_remove_trap.
- * The problem is that drakvuf doesn't immediately remove those traps, but waits for entire drakvuf loop
- * to pass. This means that drakvuf might call hook, which has been already free'd.
- *
- * To avoid this we overwrite hook->trap_->cb with nullstub, which is a more "sane" (what user expects to happen).
- *
- *
- * 2) Well. this was quite easy, libhook introduces factory functions for that :)
- *
- *
- * 3a) We need to call
- *
- *    event_response_t (Dummy::*)(drakvuf_t, drakvuf_trap_info*)
- *
- * but our `this` reference has signature of `BetterPlugin*`. Problem is solved
- * by clever use of `subject_type` SFINAE (shoutout to @dekrain and @KrzaQ for helping).
- * It obtains class type (in this case `Dummy`, which needs to inherit from `pluginex`)
- * from member-function-pointer and casts `this` to it. Then we just need a standard `std::invoke`.
- *
- * 3b) Since we capture `this` in a lambda, we can at most store it in `std::function`
- * while libdrakvuf traps only contain plain C function pointer.
- *
- * That's why hooks in libhook contain callbacks as `std::function`, while using non-capture
- * lambda as trap's callback.
- *
- * The lambda has to:
- *  - get hook from trap
- *  - call callback stored in hook
- */
+namespace libhook
+{
+
+CatchAllHook::~CatchAllHook()
+{
+    if (this->drakvuf_ && this->trap_)
+    {
+        PRINT_DEBUG("[LIBHOOK] destroying CatchAll hook...\n");
+        // read in libhook.hpp why this happens
+        this->trap_->cb = [](drakvuf_t, drakvuf_trap_info_t*) -> event_response_t
+        {
+            PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        };
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+        {
+            delete static_cast<CallResult*>(trap->data);
+            delete trap;
+        });
+    }
+    else
+    {
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as CatchAll hook was moved from\n");
+    }
+}
+
+CatchAllHook::CatchAllHook(CatchAllHook&& rhs) noexcept
+    : BaseHook(std::forward<BaseHook>(rhs))
+{
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+}
+
+CatchAllHook& CatchAllHook::operator=(CatchAllHook&& rhs) noexcept
+{
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+    return *this;
+}
+
+CatchAllHook::CatchAllHook(drakvuf_t drakvuf, cb_wrapper_t cb)
+    : BaseHook(drakvuf),
+      callback_(cb)
+{}
+
+} // namespace libhook

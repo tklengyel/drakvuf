@@ -113,9 +113,6 @@
 #include "ipt.h"
 #include "private.h"
 
-namespace
-{
-
 uint64_t pack_payload(uint32_t cmd, uint32_t data)
 {
     return (static_cast<uint64_t>(cmd) << 32) | data;
@@ -129,34 +126,6 @@ void emit_ptwrite64(std::ofstream& stream, uint64_t payload)
     stream.put(0x32);
     stream.write(reinterpret_cast<char*>(&payload), sizeof(payload));
 }
-
-
-event_response_t ipt_cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = get_trap_plugin<ipt>(info);
-    auto& vcpu = plugin->vcpus[info->vcpu];
-
-    vcpu.flush(info->regs->vmtrace_pos);
-
-    vcpu.annotate(pack_payload(PTW_CURRENT_CR3, info->regs->cr3));
-    vcpu.annotate(pack_payload(PTW_CURRENT_TID, info->proc_data.tid));
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-event_response_t ipt_catchall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = get_trap_plugin<ipt>(info);
-    auto& vcpu = plugin->vcpus[info->vcpu];
-
-    vcpu.flush(info->regs->vmtrace_pos);
-
-    vcpu.annotate(pack_payload(PTW_EVENT_ID, info->event_uid));
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-} // unnamed namespace
 
 void ipt_vcpu::annotate(uint64_t payload)
 {
@@ -203,26 +172,26 @@ void ipt_vcpu::flush(uint64_t offset)
     }
 }
 
-
-drakvuf_trap_t* ipt::reg_cr3_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap)
+event_response_t ipt::cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    trap->type = REGISTER;
-    trap->reg = CR3;
+    auto& vcpu = this->vcpus[info->vcpu];
 
-    if (!drakvuf_add_trap(drakvuf, trap))
-        return nullptr;
+    vcpu.flush(info->regs->vmtrace_pos);
 
-    return trap;
+    vcpu.annotate(pack_payload(PTW_CURRENT_CR3, info->regs->cr3));
+    vcpu.annotate(pack_payload(PTW_CURRENT_TID, info->proc_data.tid));
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
-drakvuf_trap_t* ipt::reg_catchall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap)
+event_response_t ipt::catchall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    trap->type = CATCHALL_BREAKPOINT;
+    auto& vcpu = this->vcpus[info->vcpu];
 
-    if (!drakvuf_add_trap(drakvuf, trap))
-        return nullptr;
+    vcpu.flush(info->regs->vmtrace_pos);
+    vcpu.annotate(pack_payload(PTW_EVENT_ID, info->event_uid));
 
-    return trap;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 ipt::ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output)
@@ -250,13 +219,13 @@ ipt::ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output)
     {
         auto vmi = vmi_lock_guard(drakvuf);
         num_vcpus_ = vmi_get_num_vcpus(vmi);
+    }
 
-        // This is a DRAKVUF limitation
-        if (num_vcpus_ > MAX_DRAKVUF_VCPU)
-        {
-            PRINT_DEBUG("[IPT] Only first %d vCPUs will be traced\n", MAX_DRAKVUF_VCPU);
-            num_vcpus_ = MAX_DRAKVUF_VCPU;
-        }
+    // This is a DRAKVUF limitation
+    if (num_vcpus_ > MAX_DRAKVUF_VCPU)
+    {
+        PRINT_DEBUG("[IPT] Only first %d vCPUs will be traced\n", MAX_DRAKVUF_VCPU);
+        num_vcpus_ = MAX_DRAKVUF_VCPU;
     }
 
     // Always trace code branches, traces become kinda boring without them
@@ -268,6 +237,7 @@ ipt::ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output)
         PRINT_DEBUG("[IPT] Tracing OS\n");
         ipt_flags |= DRAKVUF_IPT_TRACE_OS;
     }
+
     if (config.trace_user)
     {
         PRINT_DEBUG("[IPT] Tracing userspace\n");
@@ -297,18 +267,15 @@ ipt::ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output)
         }
     }
 
-
-    auto tr1 = register_trap(nullptr, &::ipt_cr3_cb, ipt::reg_cr3_trap, "ipt_cr3", UNLIMITED_TTL);
-
-    if (!tr1)
+    this->cr3_hook = createCr3Hook(&ipt::cr3_cb);
+    if (!this->cr3_hook)
     {
         PRINT_DEBUG("[IPT] Failed to register CR3 trap");
         throw -1;
     }
 
-    auto tr2 = register_trap(nullptr, &::ipt_catchall_cb, ipt::reg_catchall_trap, "ipt_catchall", UNLIMITED_TTL);
-
-    if (!tr2)
+    this->catchall_hook = createCatchAllHook(&ipt::catchall_cb);
+    if (!this->catchall_hook)
     {
         PRINT_DEBUG("[IPT] Failed to register catchall trap");
         throw -1;
