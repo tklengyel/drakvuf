@@ -148,8 +148,8 @@ public:
      */
     CatchAllHook& operator=(CatchAllHook&&) noexcept;
 
-    cb_wrapper_t callback_;
-    drakvuf_trap_t* trap_;
+    cb_wrapper_t callback_ = nullptr;
+    drakvuf_trap_t* trap_ = nullptr;
 
 protected:
     /**
