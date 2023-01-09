@@ -279,7 +279,7 @@ struct drakvuf_trap
 
         register_t reg;
     };
-
+    uint32_t msr;
     // How many times trap can be hit in TRAP_TTL_RESET_INTERVAL_SEC interval,
     // before it gets discarded. Protects against api-hammering.
     // 0 for infinity.

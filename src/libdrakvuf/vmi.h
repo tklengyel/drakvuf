@@ -150,4 +150,5 @@ bool control_cr4_trap(drakvuf_t drakvuf, bool toggle);
 bool control_debug_trap(drakvuf_t drakvuf, bool toggle);
 bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle);
 bool control_msr_trap(drakvuf_t drakvuf, bool toggle);
+bool control_msr_trap_any(drakvuf_t drakvuf, bool toggle, uint32_t index);
 #endif
