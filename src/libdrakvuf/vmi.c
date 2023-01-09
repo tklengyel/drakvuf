@@ -894,6 +894,8 @@ static event_response_t _cr4_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
     flush_vmi(drakvuf);
 #ifdef DRAKVUF_DEBUG
+    /* This is very verbose and always on so we only print debug information
+     * when there is a subscriber trap */
     if (drakvuf->cr4)
         PRINT_DEBUG("CR4 cb on vCPU %u: 0x%" PRIx64 "\n", event->vcpu_id, event->reg_event.value);
 #endif
@@ -1691,6 +1693,36 @@ bool control_msr_trap(drakvuf_t drakvuf, bool toggle)
     drakvuf->msr_event.type = VMI_EVENT_REGISTER;
     drakvuf->msr_event.reg_event.reg = MSR_ALL;
     drakvuf->msr_event.reg_event.in_access = VMI_REGACCESS_W;
+    drakvuf->msr_event.data = drakvuf;
+    drakvuf->msr_event.callback = msr_cb;
+
+    if ( toggle )
+    {
+        if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->msr_event))
+        {
+            fprintf(stderr, "Failed to register MSR event\n");
+            return 0;
+        }
+    }
+    else
+    {
+        if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->msr_event, NULL))
+        {
+            fprintf(stderr, "Failed to clear MSR event\n");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+bool control_msr_trap_any(drakvuf_t drakvuf, bool toggle, uint32_t index)
+{
+    drakvuf->msr_event.version = VMI_EVENTS_VERSION;
+    drakvuf->msr_event.type = VMI_EVENT_REGISTER;
+    drakvuf->msr_event.reg_event.reg = MSR_ANY;
+    drakvuf->msr_event.reg_event.in_access = VMI_REGACCESS_W;
+    drakvuf->msr_event.reg_event.msr = index;
     drakvuf->msr_event.data = drakvuf;
     drakvuf->msr_event.callback = msr_cb;
 
