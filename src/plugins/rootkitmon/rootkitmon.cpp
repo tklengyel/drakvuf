@@ -921,7 +921,7 @@ event_response_t rootkitmon::cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t
 {
     rootkitmon* plugin = static_cast<rootkitmon*>(info->trap->data);
 
-    std::printf("[ROOTKITMON] CR4: %lx -> %lx\n", info->reg->previous, info->reg->value);
+    PRINT_DEBUG("[ROOTKITMON] CR4: %lx -> %lx\n", info->reg->previous, info->reg->value);
     if (VMI_GET_BIT(info->reg->previous, cr4_smep_mask_bitoffset) == 1 && VMI_GET_BIT(info->reg->value, cr4_smep_mask_bitoffset) == 0)
     {
         report(drakvuf, plugin->format, "SecurityFeature", "CR4.SMEP", "Disabled");
