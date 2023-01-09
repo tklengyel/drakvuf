@@ -208,3 +208,14 @@ memaccessmon::memaccessmon(drakvuf_t drakvuf, output_format_t output)
     this->readHook = createSyscallHook("NtReadVirtualMemory", &memaccessmon::readwrite_cb);
     this->writeHook = createSyscallHook("NtWriteVirtualMemory", &memaccessmon::readwrite_cb);
 }
+
+memaccessmon::~memaccessmon()
+{
+    for (auto& [pid, info] : vads)
+    {
+        for (auto& vad : info)
+        {
+            g_free(const_cast<char*>(vad.process_name));
+        }
+    }
+}

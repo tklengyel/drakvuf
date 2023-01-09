@@ -113,7 +113,7 @@ public:
     memaccessmon(drakvuf_t drakvuf, output_format_t output);
     event_response_t readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     void print_result(MMVAD_ENTRY* mmvad, drakvuf_trap_info_t* info);
-    ~memaccessmon()=default;
+    ~memaccessmon();
 
     output_format_t format;
     std::unique_ptr<libhook::SyscallHook> readHook;
