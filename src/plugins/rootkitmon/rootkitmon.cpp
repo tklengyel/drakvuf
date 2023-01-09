@@ -291,16 +291,6 @@ static event_response_t wfp_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 }
 
 /**
- * This is the callback of the fltmgr.sys function FltRegisterFilter.
-*/
-static event_response_t flt_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = static_cast<rootkitmon*>(info->trap->data);
-    report(drakvuf, plugin->format, "Function", "FltRegisterFilter", "Called");
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-/**
  * This is the callback of the memory trap.
  * If an instruction writes into the page where HalPrivateDispatchTable located, this callback is executed.
 */
@@ -411,9 +401,7 @@ static void initialize_ob_checks(vmi_instance_t vmi, rootkitmon* plugin)
         // } CALLBACK_REGISTRATION, *PCALLBACK_REGISTRATION;
         const addr_t callback_fn_off = plugin->guest_ptr_size * 3;
         // Read list head
-        addr_t head{ 0 };
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, object + callbacks_off, 4, & head))
-            return out;
+        addr_t head = object + callbacks_off;
         // Read flink entry
         addr_t entry{ 0 };
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 4, &entry))
@@ -421,10 +409,13 @@ static void initialize_ob_checks(vmi_instance_t vmi, rootkitmon* plugin)
         while (entry != head && entry)
         {
             addr_t callback{ 0 };
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry + callback_fn_off, 4, &callback) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 4, &entry))
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry + callback_fn_off, 0, &callback) ||
+                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
                 return out;
-            if (callback) out.push_back(callback);
+            if (callback)
+            {
+                out.push_back(callback);
+            }
         }
         return out;
     };
@@ -563,7 +554,7 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t driver, void* ctx)
 
     // Map 1 4KB page with PE header
     void* module = nullptr;
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module) || !module )
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module))
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to map guest VA 0x%lx\n", a_ctx.addr);
         return;
@@ -747,13 +738,6 @@ void rootkitmon::check_descriptors(drakvuf_t drakvuf)
             }
         }
     }
-    for (const auto& [vcpu, lstar] : this->msr_lstar)
-    {
-        if (past_lstar[vcpu] != lstar)
-        {
-            report(drakvuf, this->format, "SystemRegister", "LSTAR", "Modified");
-        }
-    }
 }
 
 void rootkitmon::check_objects(drakvuf_t drakvuf)
@@ -853,6 +837,102 @@ void rootkitmon::check_ci(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         report(drakvuf, format, "SystemStruct", "g_CiCallbacks", "Modified");
     }
+}
+
+void rootkitmon::check_filter_callbacks(drakvuf_t drakvuf)
+{
+    if (!this->do_flt_checks)
+        return;
+
+    vmi_lock_guard vmi(drakvuf);
+
+    auto old_callbacks = this->flt_callbacks;
+    this->flt_callbacks.clear();
+
+    enumerate_filter_callbacks(vmi);
+
+    for (const auto& [volume, callbacks] : old_callbacks)
+    {
+        if (this->flt_callbacks.count(volume))
+        {
+            const auto& new_callbacks = this->flt_callbacks[volume];
+            if (callbacks != new_callbacks)
+            {
+                report(drakvuf, format, "SystemStruct", "VolumeFilterCallbacks", "Modified");
+            }
+        }
+    }
+}
+
+/**
+ *  Callback to check if EFLAGS.SMAP were edited. If we've reached this point, MSR_LSTAR was changed and we've been redirected
+ *  to custom syscall callback instead of default.
+ */
+event_response_t rootkitmon::rop_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    rootkitmon* plugin = static_cast<rootkitmon*>(info->trap->data);
+    vmi_lock_guard vmi(drakvuf);
+    uint64_t rflag;
+    if (VMI_SUCCESS == vmi_get_vcpureg(vmi, &rflag, RFLAGS, info->vcpu))
+    {
+
+        if (rflag & ac_smap_mask)
+        {
+            report(drakvuf, plugin->format, "SecurityFeature", "EFLAGS.SMAP", "Disabled");
+        }
+        // Release memory hook. If EFLAGS.SMAP wasn't set at this point, we don't need this bp anymore
+        plugin->rop_hooks.erase(info->trap->breakpoint.addr);
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+/**
+ *  Callback to check if MSR_LSTAR were edited to redirect syscall to a custom user-defined callback,
+ *  it's the first point before setting FLAGS.SMAP(AC) to disable SMAP technology before syscall
+ */
+event_response_t rootkitmon::msr_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    rootkitmon* plugin = static_cast<rootkitmon*>(info->trap->data);
+    if (plugin->msr_lstar[info->vcpu] == info->reg->value)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+    report(drakvuf, plugin->format, "SystemRegister", "LSTAR", "Modified");
+    auto trap = new drakvuf_trap_t
+    {
+        .type = BREAKPOINT,
+        .breakpoint.lookup_type = LOOKUP_PID,
+        .breakpoint.pid = info->proc_data.pid,
+        .breakpoint.addr_type = ADDR_VA,
+        .breakpoint.addr = (addr_t)info->reg->value,
+        .data = (void*)plugin,
+        .cb = rootkitmon::rop_callback,
+    };
+    plugin->rop_hooks[info->reg->value] = plugin->createManualHook(trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t rootkitmon::cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    rootkitmon* plugin = static_cast<rootkitmon*>(info->trap->data);
+
+    std::printf("[ROOTKITMON] CR4: %lx -> %lx\n", info->reg->previous, info->reg->value);
+    if (VMI_GET_BIT(info->reg->previous, cr4_smep_mask_bitoffset) == 1 && VMI_GET_BIT(info->reg->value, cr4_smep_mask_bitoffset) == 0)
+    {
+        report(drakvuf, plugin->format, "SecurityFeature", "CR4.SMEP", "Disabled");
+    }
+
+    if (VMI_GET_BIT(info->reg->previous, cr4_smap_mask_bitoffset) == 1 && VMI_GET_BIT(info->reg->value, cr4_smap_mask_bitoffset) == 0)
+    {
+        report(drakvuf, plugin->format, "SecurityFeature", "CR4.SMAP", "Disabled");
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
@@ -1080,8 +1160,66 @@ device_stack_t rootkitmon::enumerate_driver_stacks(vmi_instance_t vmi, addr_t dr
     return stacks;
 }
 
+void rootkitmon::enumerate_filter_callbacks(vmi_instance_t vmi)
+{
+    if (is32bit)
+        return;
+
+    auto walk_list = [&](addr_t head, auto cb)
+    {
+        addr_t entry{};
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 0, &entry))
+            return;
+
+        while (entry && entry != head)
+        {
+            cb(entry);
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
+                break;
+        }
+    };
+
+    addr_t frame_list_head = this->flt_globals_va + this->flt_offsets[FLT_GLOBALS_FRAMELIST] + this->flt_offsets[FLT_RESOURCE_LIST_HEAD_RLIST];
+
+    walk_list(frame_list_head, [&](addr_t frame)
+    {
+        // 0: kd> dt _FLTP_FRAME
+        // FLTMGR!_FLTP_FRAME
+        //    +0x000 Type             : _FLT_TYPE
+        //    +0x008 Links            : _LIST_ENTRY
+        addr_t volume_list_head = frame - 8 + this->flt_offsets[FLTP_FRAME_ATTACHEDVOLUMES] + this->flt_offsets[FLT_RESOURCE_LIST_HEAD_RLIST];
+        walk_list(volume_list_head, [&](addr_t volume)
+        {
+            // 0: kd> dt _FLT_OBJECT
+            // FLTMGR!_FLT_OBJECT
+            //    +0x000 Flags            : _FLT_OBJECT_FLAGS
+            //    +0x004 PointerCount     : Uint4B
+            //    +0x008 RundownRef       : _EX_RUNDOWN_REF
+            //    +0x010 PrimaryLink      : _LIST_ENTRY
+            this->flt_callbacks[volume - 0x10] = {};
+            // 0: kd> dt _CALLBACK_CTRL
+            // FLTMGR!_CALLBACK_CTRL
+            //    +0x000 OperationLists   : [50] _LIST_ENTRY
+            for (int i = 0; i < 50; i++)
+            {
+                addr_t cb_list_head = volume - 0x10 + this->flt_offsets[FLT_VOLUME_CALLBACKS] + this->flt_offsets[FLT_CALLBACK_CTRL_LISTS] + i * this->guest_ptr_size * 2;
+                walk_list(cb_list_head, [&](addr_t cb_node)
+                {
+                    addr_t pre{}, post{};
+                    if (VMI_SUCCESS != vmi_read_addr_va(vmi, cb_node + this->flt_offsets[CALLBACKNODE_PREOPERATION], 0, &pre) ||
+                        VMI_SUCCESS != vmi_read_addr_va(vmi, cb_node + this->flt_offsets[CALLBACKNODE_POSTOPERATION], 0, &post))
+                    {
+                        return;
+                    }
+                    this->flt_callbacks[volume - 0x10][i].push_back({ pre, post });
+                });
+            }
+        });
+    });
+}
+
 rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, output_format_t output)
-    : pluginex(drakvuf, output), format(output), done_final_analysis(false)
+    : pluginex(drakvuf, output), format(output)
 {
     if (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E)
     {
@@ -1111,9 +1249,51 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
         manual_hooks.push_back(register_profile_hook(drakvuf, config->fwpkclnt_profile, "fwpkclnt.sys", "FwpmCalloutAdd0", wfp_cb));
 
     if (!config->fltmgr_profile)
+    {
         PRINT_DEBUG("[ROOTKITMON] No profile for fltmgr.sys was given!\n");
+        this->do_flt_checks = false;
+    }
     else
-        manual_hooks.push_back(register_profile_hook(drakvuf, config->fltmgr_profile, "fltmgr.sys", "FltRegisterFilter", flt_cb));
+    {
+        auto profile_json = json_object_from_file(config->fltmgr_profile);
+        if (!profile_json)
+        {
+            PRINT_DEBUG("[ROOTKITMON] Failed to load JSON debug info for fltmgr.sys\n");
+            throw -1;
+        }
+        if (!json_get_symbol_rva(drakvuf, profile_json, "FltGlobals", &this->flt_globals_va))
+        {
+            PRINT_DEBUG("[ROOTKITMON] Failed to find FltGlobals RVA in json for fltmgr.sys\n");
+            throw -1;
+        }
+
+        if (!json_get_struct_members_array_rva(drakvuf, profile_json, flt_offset_names, __FLT_OFFSET_MAX, flt_offsets.data()))
+        {
+            PRINT_DEBUG("[ROOTKITMON] Failed to resolve flt offsets\n");
+            throw -1;
+        }
+        json_object_put(profile_json);
+
+        vmi_lock_guard vmi(drakvuf);
+        addr_t list_head{};
+        if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head))
+        {
+            PRINT_DEBUG("[ROOTKITMON] Failed to read PsLoadedModuleList\n");
+            throw -1;
+        }
+
+        addr_t fltmgr_base{};
+        if (!drakvuf_get_module_base_addr(drakvuf, list_head, "fltmgr.sys", &fltmgr_base))
+        {
+            PRINT_DEBUG("[ROOTKITMON] Failed to resolve fltmgr.sys\n");
+            throw -1;
+        }
+        this->flt_globals_va += fltmgr_base;
+
+        enumerate_filter_callbacks(vmi);
+
+        this->do_flt_checks = true;
+    }
 
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, this->offsets.size(), this->offsets.data()))
     {
@@ -1181,6 +1361,31 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
         PRINT_DEBUG("[ROOTKITMON] Failed to enumerate descriptors\n");
         throw -1;
     }
+
+    // MSR hook
+    auto trap = new drakvuf_trap_t();
+    trap->type = REGISTER;
+    trap->reg = MSR_ANY;
+    trap->msr = msr_lstar_index;
+    trap->data = (void*)this;
+    trap->ah_cb = nullptr;
+    trap->cb = &rootkitmon::msr_callback;
+    this->msr_hook = createManualHook(trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
+
+    // cr4 hook
+    auto cr4_trap = new drakvuf_trap_t();
+    cr4_trap->type = REGISTER;
+    cr4_trap->reg = CR4;
+    cr4_trap->data = (void*)this;
+    cr4_trap->ah_cb = nullptr;
+    cr4_trap->cb = &rootkitmon::cr4_callback;
+    this->cr4_hook = createManualHook(cr4_trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
 }
 
 bool rootkitmon::stop_impl()
@@ -1190,5 +1395,6 @@ bool rootkitmon::stop_impl()
     check_descriptors(drakvuf);
     check_objects(drakvuf);
     check_ci(drakvuf, nullptr);
+    check_filter_callbacks(drakvuf);
     return pluginex::stop_impl();
 }
