@@ -378,6 +378,12 @@ sources += ebpfmon/ebpfmon.h
 sources += ebpfmon/private.h
 endif
 
+if PLUGIN_MEMACCESSMON
+sources += memaccessmon/memaccessmon.cpp
+sources += memaccessmon/memaccessmon.h
+sources += memaccessmon/private.h
+endif
+
 if PLUGIN_UNIXSOCKETMON
 sources += unixsocketmon/unixsocketmon.cpp
 sources += unixsocketmon/unixsocketmon.h
