@@ -202,7 +202,7 @@ int main(int argc, char** argv)
     drakvuf_trap_t inject_trap =
     {
         .type = REGISTER,
-        .reg = CR3,
+        .regaccess.type = CR3,
         .cb = &repl_start,
         .name = "repl_trap",
     };
