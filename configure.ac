@@ -552,6 +552,16 @@ if test x$plugin_ebpfmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EBPFMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_memaccessmon],
+  [AS_HELP_STRING([--disable-plugin-memaccessmon],
+    [Enable memaccessmon plugin @<:@yes@:>@])],
+  [plugin_memaccessmon="$enableval"],
+  [plugin_memaccessmon="yes"])
+AM_CONDITIONAL([PLUGIN_MEMACCESSMON], [test x$plugin_memaccessmon = xyes])
+if test x$plugin_memaccessmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_MEMACCESSMON, 1, "")
+fi
+
 AC_ARG_ENABLE([plugin_unixsocketmon],
   [AS_HELP_STRING([--disable-plugin-unixsocketmon],
     [Enable the unixsocketmon plugin @<:@yes@:>@])],
@@ -886,6 +896,8 @@ Spraymon:           $plugin_spraymon
 Callbackmon:        $plugin_callbackmon
 HideVM:             $plugin_hidevm
 Etwmon:             $plugin_etwmon
+Memaccessmon:       $plugin_memaccessmon
+Unixsocketmon:      $plugin_unixsocketmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:             $plugin_wmimon

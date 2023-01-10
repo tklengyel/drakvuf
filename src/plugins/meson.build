@@ -189,6 +189,12 @@ if get_option('plugin-ebpfmon')
     config_h.set('ENABLE_PLUGIN_EBPFMON', 1)
 endif
 
+if get_option('plugin-memaccessmon')
+    plugin_sources += 'memaccessmon/memaccessmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_MEMACCESSMON', 1)
+endif
+
 if get_option('plugin-unixsocketmon')
     plugin_sources += 'unixsocketmon/unixsocketmon.cpp'
 
@@ -234,6 +240,7 @@ summary({
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon' : get_option('plugin-ebpfmon'),
+    'memaccessmon' : get_option('plugin-memaccessmon'),
     'unixsocketmon' : get_option('plugin-unixsocketmon'),
     'etwmon' : get_option('plugin-etwmon'),
     'ipt' : get_option('plugin-ipt'),
