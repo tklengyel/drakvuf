@@ -554,7 +554,7 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t driver, void* ctx)
 
     // Map 1 4KB page with PE header
     void* module = nullptr;
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module) || !module )
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to map guest VA 0x%lx\n", a_ctx.addr);
         return;
@@ -1365,8 +1365,8 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
     // MSR hook
     auto trap = new drakvuf_trap_t();
     trap->type = REGISTER;
-    trap->reg = MSR_ANY;
-    trap->msr = msr_lstar_index;
+    trap->regaccess.type = MSR_ANY;
+    trap->regaccess.msr = msr_lstar_index;
     trap->data = (void*)this;
     trap->ah_cb = nullptr;
     trap->cb = &rootkitmon::msr_callback;
@@ -1378,7 +1378,7 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
     // cr4 hook
     auto cr4_trap = new drakvuf_trap_t();
     cr4_trap->type = REGISTER;
-    cr4_trap->reg = CR4;
+    cr4_trap->regaccess.type = CR4;
     cr4_trap->data = (void*)this;
     cr4_trap->ah_cb = nullptr;
     cr4_trap->cb = &rootkitmon::cr4_callback;

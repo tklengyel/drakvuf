@@ -170,7 +170,7 @@ auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
 
     hook->trap_->name = "libhook cr3";
     hook->trap_->type = REGISTER;
-    hook->trap_->reg = CR3;
+    hook->trap_->regaccess.type = CR3;
     hook->trap_->ttl = ttl;
     hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {

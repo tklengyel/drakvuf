@@ -160,7 +160,7 @@ event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
         drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
         trap->type = REGISTER;
-        trap->reg = CR3;
+        trap->regaccess.type = CR3;
         trap->cb = wait_for_thread_exit_cb;
         trap->data = injector;
         if (!drakvuf_add_trap(injector->drakvuf, trap))

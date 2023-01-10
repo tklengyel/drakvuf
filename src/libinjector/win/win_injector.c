@@ -463,7 +463,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     drakvuf_trap_t trap =
     {
         .type = REGISTER,
-        .reg = CR3,
+        .regaccess.type = CR3,
         .cb = wait_for_target_process_cb,
         .data = injector,
     };
@@ -473,7 +473,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     drakvuf_trap_t trap_crashreporter =
     {
         .type = REGISTER,
-        .reg = CR3,
+        .regaccess.type = CR3,
         .cb = wait_for_crash_of_target_process,
         .data = injector,
     };

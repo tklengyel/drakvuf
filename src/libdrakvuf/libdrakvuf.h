@@ -277,9 +277,12 @@ struct drakvuf_trap
             memaccess_type_t type;
         } memaccess;
 
-        register_t reg;
+        struct
+        {
+            register_t type;
+            uint32_t msr;
+        } regaccess;
     };
-    uint32_t msr;
     // How many times trap can be hit in TRAP_TTL_RESET_INTERVAL_SEC interval,
     // before it gets discarded. Protects against api-hammering.
     // 0 for infinity.
