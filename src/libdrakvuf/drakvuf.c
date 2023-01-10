@@ -458,7 +458,7 @@ static bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 static bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-    if (CR3 == trap->reg)
+    if (CR3 == trap->regaccess.type)
     {
         if ( !drakvuf->cr3 && !drakvuf->enable_cr3_based_interception && !control_cr3_trap(drakvuf, 1) )
             return 0;
@@ -466,7 +466,7 @@ static bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         drakvuf->cr3 = g_slist_prepend(drakvuf->cr3, trap);
         return 1;
     }
-    else if (CR4 == trap->reg)
+    else if (CR4 == trap->regaccess.type)
     {
         if ( !drakvuf->cr4 && !control_cr4_trap(drakvuf, 1) )
             return 0;
@@ -474,7 +474,7 @@ static bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         drakvuf->cr4 = g_slist_prepend(drakvuf->cr4, trap);
         return 1;
     }
-    else if (MSR_ALL == trap->reg)
+    else if (MSR_ALL == trap->regaccess.type)
     {
         if ( !drakvuf->msr && !control_msr_trap(drakvuf, 1) )
             return 0;
@@ -482,9 +482,9 @@ static bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         drakvuf->msr = g_slist_prepend(drakvuf->msr, trap);
         return 1;
     }
-    else if (MSR_ANY == trap->reg)
+    else if (MSR_ANY == trap->regaccess.type)
     {
-        if ( !drakvuf->msr && !control_msr_trap_any(drakvuf, 1, trap->msr) )
+        if ( !drakvuf->msr && !control_msr_trap_any(drakvuf, 1, trap->regaccess.msr) )
             return 0;
 
         drakvuf->msr = g_slist_prepend(drakvuf->msr, trap);

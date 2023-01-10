@@ -354,7 +354,7 @@ static bool setup_wait_for_injected_process_trap(injector_t injector)
 {
     drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
     trap->type = REGISTER;
-    trap->reg = CR3;
+    trap->regaccess.type = CR3;
     trap->cb = wait_for_injected_process_cb;
     trap->data = injector;
     if (!drakvuf_add_trap(injector->drakvuf, trap))

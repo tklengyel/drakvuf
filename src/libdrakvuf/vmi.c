@@ -1232,13 +1232,13 @@ void remove_trap(drakvuf_t drakvuf,
         }
         case REGISTER:
         {
-            if (CR3 == trap->reg)
+            if (CR3 == trap->regaccess.type)
             {
                 drakvuf->cr3 = g_slist_remove(drakvuf->cr3, trap);
                 if ( !drakvuf->cr3 && !drakvuf->enable_cr3_based_interception )
                     control_cr3_trap(drakvuf, 0);
             }
-            else if (MSR_ALL == trap->reg)
+            else if (MSR_ALL == trap->regaccess.type)
             {
                 drakvuf->msr = g_slist_remove(drakvuf->msr, trap);
                 if (!drakvuf->msr)
