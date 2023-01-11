@@ -307,11 +307,11 @@ constexpr bool print_data(std::ostream& os, const T& data, const Ts& ... rest)
 
 /**/
 
-inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
     if (info)
     {
-        proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+        const proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
         const char* method = info->trap->name ?: "";
         std::string procname = "\"";
         procname += proc_data->name ?: "NOPROC";
@@ -322,7 +322,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
             keyval("VCPU", fmt::Nval(info->vcpu)),
             keyval("CR3", fmt::Xval(info->regs->cr3)),
             keyval(procname.c_str(), fmt::Rstr(method)),
-            keyval(USERIDSTR(drakvuf), fmt::Nval(info->proc_data.userid)),
+            keyval(USERIDSTR(drakvuf), fmt::Nval(proc_data->userid)),
             keyval("PID", fmt::Nval(proc_data->pid)),
             keyval("PPID", fmt::Nval(proc_data->ppid))
         );
@@ -330,7 +330,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
 }
 
 template<class... Args>
-void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t* info, const Args& ... args)
 {
     std::string up_name(plugin_name);
     std::transform(up_name.begin(), up_name.end(), up_name.begin(),

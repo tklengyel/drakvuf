@@ -109,7 +109,7 @@ namespace fmt
 {
 
 template<class... Args>
-void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t* info, const Args& ... args)
 {
     switch (format)
     {

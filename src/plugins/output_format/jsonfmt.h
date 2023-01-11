@@ -429,20 +429,20 @@ constexpr bool print_data(std::ostream& os, char sep, Ts&& ... args)
 
 /**/
 
-inline auto get_common_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+inline auto get_common_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
     std::optional<fmt::Qstr<decltype(info->trap->name)>> method;
     if (info->trap->name)
         method = fmt::Qstr(info->trap->name);
 
-    proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+    const proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
     return std::make_tuple(
             keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
             keyval("PID", fmt::Nval(proc_data->pid)),
             keyval("PPID", fmt::Nval(proc_data->ppid)),
             keyval("TID", fmt::Nval(proc_data->tid)),
             keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
-            keyval("UserId", fmt::Nval(info->proc_data.userid)),
+            keyval("UserId", fmt::Nval(proc_data->userid)),
             keyval("ProcessName", fmt::Qstr(proc_data->name)),
             keyval("Method", method),
             keyval("EventUID", fmt::Xval(info->event_uid))
@@ -450,7 +450,7 @@ inline auto get_common_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 }
 
 template<class... Args>
-void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t* info, const Args& ... args)
 {
     constexpr char sep = ',';
 
