@@ -322,7 +322,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf
             keyval("VCPU", fmt::Nval(info->vcpu)),
             keyval("CR3", fmt::Xval(info->regs->cr3)),
             keyval(procname.c_str(), fmt::Rstr(method)),
-            keyval(USERIDSTR(drakvuf), fmt::Nval(proc_data.userid)),
+            keyval(USERIDSTR(drakvuf), fmt::Nval(proc_data->userid)),
             keyval("PID", fmt::Nval(proc_data->pid)),
             keyval("PPID", fmt::Nval(proc_data->ppid))
         );

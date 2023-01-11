@@ -304,7 +304,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf
             keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
             keyval("VCPU", fmt::Nval(info->vcpu)),
             keyval("CR3", fmt::Xval(info->regs->cr3)),
-            keyval("UserId", fmt::Nval(proc_data.userid)),
+            keyval("UserId", fmt::Nval(proc_data->userid)),
             keyval("PID", fmt::Nval(proc_data->pid)),
             keyval("PPID", fmt::Nval(proc_data->ppid)),
             keyval("TID", fmt::Nval(proc_data->tid)),
