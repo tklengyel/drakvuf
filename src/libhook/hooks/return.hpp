@@ -149,7 +149,7 @@ public:
      */
     ReturnHook& operator=(ReturnHook&&) noexcept;
 
-    cb_wrapper_t callback_;
+    cb_wrapper_t callback_ = nullptr;
     drakvuf_trap_t* trap_ = nullptr;
 
 protected:

@@ -139,10 +139,10 @@ public:
     SyscallHook& operator=(const SyscallHook&) = delete;
     SyscallHook& operator=(SyscallHook&&) = delete;
 
-    const std::string syscall_name_;
-    const std::string display_name_;
-    cb_wrapper_t callback_;
-    drakvuf_trap_t* trap_;
+    const std::string syscall_name_ = "";
+    const std::string display_name_ = "";
+    cb_wrapper_t callback_ = nullptr;
+    drakvuf_trap_t* trap_ = nullptr;
 
 private:
     [[nodiscard]]
