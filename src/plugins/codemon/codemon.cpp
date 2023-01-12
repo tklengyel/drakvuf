@@ -305,7 +305,6 @@ bool dump_memory_region(vmi_instance_t vmi, codemon* plugin, access_context_t* c
     bool dump_success = false;
 
     void** access_ptrs = nullptr;
-    FILE* fp = nullptr;
 
     addr_t aligned_addr;
     addr_t intra_page_offset;
@@ -693,7 +692,7 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
         //Make sure the two file stems match
         if (strcmp(memory_hash_identifier->second.c_str(), dump_metadata->file_stem) == 0)
         {
-            PRINT_DEBUG("[CODEMON] Skipping dump as it %llx_%s exists\n", (unsigned long long) ctx_memory_dump.addr, ctx_memory_dump->file_stem);
+            PRINT_DEBUG("[CODEMON] Skipping dump as it %llx_%s exists\n", (unsigned long long) ctx_memory_dump.addr, dump_metadata->file_stem);
             //Increase the dump counter in this special case
             ++this->dump_id;
             return malware;
@@ -713,7 +712,7 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
     //If malware was detected or manually switched to always dump
     if (malware)
     {
-        PRINT_DEBUG("[CODEMON] dumping memory to %llx_%s\n", (unsigned long long) ctx_memory_dump.addr, ctx_memory_dump->file_stem);
+        PRINT_DEBUG("[CODEMON] dumping memory to %llx_%s\n", (unsigned long long) ctx_memory_dump.addr, dump_metadata->file_stem);
 
         // Comment from memdump.cpp:
         // The file name format for the memory dump file is:
