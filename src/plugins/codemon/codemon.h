@@ -119,10 +119,10 @@
 struct codemon_config_struct
 {
     //Dir to save extracted frames to
-    const std::string dump_dir;
+    const char* dump_dir;
 
     //Executable to filter
-    const std::string filter_executable;
+    const char* filter_executable;
 
     //Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not.
     bool log_everything;

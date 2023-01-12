@@ -1051,10 +1051,10 @@ codemon::codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_
     : pluginex(drakvuf, output)
 {
     //Check if the dump directory parameter was provided
-    if (config->dump_dir.empty())
+    if (!config->dump_dir)
     {
         PRINT_DEBUG("[CODEMON] Output directory for dumps not provided, not activating codemon plugin\n");
-        return;
+        throw -1;
     }
 
     this->dump_dir = std::filesystem::path(config->dump_dir);
@@ -1075,7 +1075,7 @@ codemon::codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_
     if (!std::filesystem::create_directory(this->dump_dir))
     {
         PRINT_DEBUG("[CODEMON] Failed to create dump directory %s\n", this->dump_dir.c_str());
-        return;
+        throw -1;
     }
 
     //Create the default dump file name
@@ -1086,6 +1086,8 @@ codemon::codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_
     dump_vad = config->dump_vad;
     analyse_system_dll_vad = config->analyse_system_dll_vad;
     default_benign = config->default_benign;
+    if (config->filter_executable)
+        this->filter_executable = config->filter_executable;
 
     this->mmAccessFaultHook = createSyscallHook("MmAccessFault", &codemon::mm_access_fault_hook_cb);
     if (!this->mmAccessFaultHook)
