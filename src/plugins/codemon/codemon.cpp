@@ -893,7 +893,7 @@ event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drak
                 if (!first_try)
                 {
                     // if this isn't the first time, then we've already tried page faulting and it didn't help
-                    PRINT_DEBUG("[CODEMON] failed to load page via page fauilting, CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
+                    PRINT_DEBUG("[CODEMON] failed to load page via page fauilt, CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
                     this->mmAccessFaultReturnHook.reset();
                     return VMI_EVENT_RESPONSE_NONE;
                 }
@@ -901,7 +901,7 @@ event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drak
                 // this is our first try, so we page fault
                 if (vmi_request_page_fault(vmi, trap_info->vcpu, params->page_va, 0) == VMI_SUCCESS)
                 {
-                    PRINT_DEBUG("[CODEMON] Failed to request page, performing Page fault for CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
+                    PRINT_DEBUG("[CODEMON] Failed to request page, performing page fault for CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
                     this->pf_in_progress.insert(std::make_pair(params->target_pid, params->target_tid));
                     return VMI_EVENT_RESPONSE_NONE;
                 }
