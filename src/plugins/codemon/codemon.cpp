@@ -1064,7 +1064,7 @@ codemon::codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_
         PRINT_DEBUG("[CODEMON] Output directory doesn't exist. Creating...\n");
         if (!std::filesystem::create_directory(this->dump_dir))
         {
-            PRINT_DEBUG("[CODEMON] Failed to create dump directory %s\n", this->dump_dir.c_str());
+            PRINT_DEBUG("[CODEMON] Failed to create output directory %s\n", this->dump_dir.c_str());
             throw -1;
         }
     }
@@ -1073,10 +1073,14 @@ codemon::codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_
     this->dump_dir /= "dumps";
 
     //Creates the dump folder
-    if (!std::filesystem::create_directory(this->dump_dir))
+    if (!std::filesystem::is_directory(this->dump_dir))
     {
-        PRINT_DEBUG("[CODEMON] Failed to create dump directory %s\n", this->dump_dir.c_str());
-        throw -1;
+        PRINT_DEBUG("[CODEMON] Dumps directory doesn't exist. Creating...\n");
+        if (!std::filesystem::create_directory(this->dump_dir))
+        {
+            PRINT_DEBUG("[CODEMON] Failed to create dump directory %s\n", this->dump_dir.c_str());
+            throw -1;
+        }
     }
 
     //Create the default dump file name
