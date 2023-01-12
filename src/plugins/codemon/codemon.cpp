@@ -888,12 +888,13 @@ event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drak
             {
                 // If we're in here that means we can't access page
                 // check if this is the first time we're here for this address
-                bool first_try = this->pf_in_progress.find(std::make_pair(params->target_pid, params->target_tid)) != this->pf_in_progress.end();
+                bool first_try = this->pf_in_progress.find(std::make_pair(params->target_pid, params->target_tid)) == this->pf_in_progress.end();
 
                 if (!first_try)
                 {
                     // if this isn't the first time, then we've already tried page faulting and it didn't help
-                    PRINT_DEBUG("[CODEMON] failed to load page via page fauilt, CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
+                    PRINT_DEBUG("[CODEMON] Failed to load page via page fault, CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
+                    this->pf_in_progress.erase(std::make_pair(params->target_pid, params->target_tid));
                     this->mmAccessFaultReturnHook.reset();
                     return VMI_EVENT_RESPONSE_NONE;
                 }
