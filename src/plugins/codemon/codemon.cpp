@@ -133,6 +133,7 @@
 #include <vector>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 
 #include <libdrakvuf/json-util.h>
 #include "codemon.h"
@@ -163,10 +164,12 @@ static bool default_benign = false;
  */
 void codemon::save_file_metadata(const drakvuf_trap_info_t* trap_info, const dump_metadata_struct* dump_metadata, addr_t page_va)
 {
-    //Opens the meta file
-    FILE* fp = fopen(dump_metadata->meta_file, "w");
-    if (!fp)
+    auto output_file = std::ofstream{dump_metadata->meta_file};
+    if (!output_file)
+    {
+        PRINT_DEBUG("[CODEMON] ERROR: failed to open metadata file (%s), this shouldn't happen!\n", dump_metadata->meta_file);
         return;
+    }
 
     //Determines the string that shall be printed as vad_name
     char* actual_vad_name;
@@ -195,9 +198,8 @@ void codemon::save_file_metadata(const drakvuf_trap_info_t* trap_info, const dum
     json_object_object_add(json_object, "DumpID", json_object_new_int(this->dump_id));
     json_object_object_add(json_object, "TrapPA", json_object_new_string_fmt("0x%" PRIx64, trap_info->trap_pa));
     json_object_object_add(json_object, "GFN", json_object_new_string_fmt("0x%" PRIx64, trap_info->trap->memaccess.gfn));
-    fprintf(fp, "%s\n", json_object_get_string(json_object));
-    fclose(fp);
 
+    output_file << json_object_get_string(json_object);
     json_object_put(json_object);
 }
 
@@ -338,43 +340,42 @@ bool dump_memory_region(vmi_instance_t vmi, codemon* plugin, access_context_t* c
         goto error;
     }
 
-    //w just overrides the current file, if there is one.
-    fp = fopen(plugin->tmp_file_path.c_str(), "w");
-
-    if (!fp)
     {
-        PRINT_DEBUG("[CODEMON] Failed to open dump.tmp file\n");
-        goto error;
+        // add scope to close file, since we want to rename it
+        auto output_file = std::ofstream{plugin->tmp_file_path.c_str()};
+        if (!output_file)
+        {
+            PRINT_DEBUG("[CODEMON] ERROR: Failed to open tmp dump file (%s), this shouldn't happen!\n", plugin->tmp_file_path.c_str());
+            goto error;
+        }
+
+        for (size_t i = 0; i < num_pages; i++)
+        {
+            // sometimes we are supposed to write less than the whole page
+            size_t write_length = tmp_len_bytes;
+
+            if (write_length > VMI_PS_4KB - intra_page_offset)
+            {
+                write_length = VMI_PS_4KB - intra_page_offset;
+            }
+
+            if (access_ptrs[i])
+            {
+                output_file.write((char*) access_ptrs[i] + intra_page_offset, write_length);
+                munmap(access_ptrs[i], VMI_PS_4KB);
+            }
+            else
+            {
+                // inaccessible page, pad with zeros to ensure proper alignment of the data
+                uint8_t zeros[VMI_PS_4KB] = {};
+                output_file.write(zeros + intra_page_offset, write_length);
+            }
+
+            // this applies only to the first page
+            intra_page_offset = 0;
+            tmp_len_bytes -= write_length;
+        }
     }
-
-    for (size_t i = 0; i < num_pages; i++)
-    {
-        // sometimes we are supposed to write less than the whole page
-        size_t write_length = tmp_len_bytes;
-
-        if (write_length > VMI_PS_4KB - intra_page_offset)
-        {
-            write_length = VMI_PS_4KB - intra_page_offset;
-        }
-
-        if (access_ptrs[i])
-        {
-            fwrite((char*) access_ptrs[i] + intra_page_offset, write_length, 1, fp);
-            munmap(access_ptrs[i], VMI_PS_4KB);
-        }
-        else
-        {
-            // inaccessible page, pad with zeros to ensure proper alignment of the data
-            uint8_t zeros[VMI_PS_4KB] = {};
-            fwrite(zeros + intra_page_offset, write_length, 1, fp);
-        }
-
-        // this applies only to the first page
-        intra_page_offset = 0;
-        tmp_len_bytes -= write_length;
-    }
-
-    fclose(fp);
 
     if (rename(plugin->tmp_file_path.c_str(), dump_metadata->dump_file) != 0)
     {
