@@ -692,7 +692,7 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
         //Make sure the two file stems match
         if (strcmp(memory_hash_identifier->second.c_str(), dump_metadata->file_stem) == 0)
         {
-            PRINT_DEBUG("[CODEMON] Skipping dump as it already exists\n");
+            PRINT_DEBUG("[CODEMON] Skipping dump as it %llx_%s exists\n", (unsigned long long) ctx_memory_dump.addr, ctx_memory_dump.file_stem);
             //Increase the dump counter in this special case
             ++this->dump_id;
             return malware;
@@ -712,7 +712,7 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
     //If malware was detected or manually switched to always dump
     if (malware)
     {
-        PRINT_DEBUG("[CODEMON] dumping memory from %llx\n", (unsigned long long) ctx_memory_dump.addr);
+        PRINT_DEBUG("[CODEMON] dumping memory to %llx_%s\n", (unsigned long long) ctx_memory_dump.addr, ctx_memory_dump.file_stem);
 
         // Comment from memdump.cpp:
         // The file name format for the memory dump file is:
@@ -812,7 +812,7 @@ void codemon::remove_memaccess_hook(drakvuf_trap_info_t* trap_info)
 event_response_t codemon::execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
     auto params = libhook::GetTrapParams<AccessFaultResult>(trap_info);
-    PRINT_DEBUG("[CODEMON] Caught X on PA 0x%lx, frame VA %lx, CR3 %lx\n", trap_info->trap_pa, trap_info->regs->rip, trap_info->regs->cr3);
+    PRINT_DEBUG("[CODEMON] Caught X on PA 0x%lx, frame VA 0x%lx, CR3 0x%lx\n", trap_info->trap_pa, trap_info->regs->rip, trap_info->regs->cr3);
 
     // Verify the program leading to the execution of this trap is the one we are filtering for (if we do).
     // The filtering could limit (and therefore focus) the monitoring and gives a speedup in such possibly uninteresting cases.
@@ -983,14 +983,14 @@ event_response_t codemon::mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_tra
 
     //The first argument is the FaultStatus, and the second (rdx) the VirtualAddress which caused the fault.
     addr_t fault_va = drakvuf_get_function_argument(drakvuf, trap_info, 2);
-    PRINT_DEBUG("[CODEMON] Caught MmAccessFault(%d, %lx)\n", pid, fault_va);
+    PRINT_DEBUG("[CODEMON] Caught MmAccessFault(%d, 0x%lx)\n", pid, fault_va);
 
     //The kernel space starts with 0xFFFF... and higher.  User space is within 0x0000F... and below. If the trap was created by a kernel module we don't mind as we assume the integrity of the kernel.
     //https://www.codemachine.com/article_x64kvas.html: The upper 16 bits of virtual addresses are always set to 0x0 for user mode addresses and to 0xF for kernel mode addresses
     //Checks if the highest bit (bit 64) = 1000...000 is one or not. If it is one, this must be part of the kernel, since it would has to be 0 for the user mode.
     if (fault_va & (1ULL << 63))
     {
-        PRINT_DEBUG("[CODEMON] Don't trap in kernel %d %lx\n", pid, fault_va);
+        PRINT_DEBUG("[CODEMON] Don't trap in kernel %d 0x%lx\n", pid, fault_va);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
