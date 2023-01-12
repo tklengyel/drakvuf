@@ -835,7 +835,8 @@ event_response_t codemon::execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         log_all_to_console(trap_info, dump_metadata.get(), params->page_va);
 
     auto write_hook = createMemAccessHook(&codemon::write_faulted_cb, trap_info->trap->memaccess.gfn, POST, VMI_MEMACCESS_W);
-    if (!write_hook) {
+    if (!write_hook)
+    {
         PRINT_DEBUG("[CODEMON] Failed to create write hook. Keeping execute hook on GFN 0x%lx\n", trap_info->trap->memaccess.gfn);
         free_all(dump_metadata.get());
         return VMI_EVENT_RESPONSE_NONE;
