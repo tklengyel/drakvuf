@@ -692,6 +692,7 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
         //Make sure the two file stems match
         if (strcmp(memory_hash_identifier->second.c_str(), dump_metadata->file_stem) == 0)
         {
+            PRINT_DEBUG("[CODEMON] Skipping dump as it already exists\n");
             //Increase the dump counter in this special case
             ++this->dump_id;
             return malware;
@@ -711,6 +712,8 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
     //If malware was detected or manually switched to always dump
     if (malware)
     {
+        PRINT_DEBUG("[CODEMON] dumping memory from %llx\n", (unsigned long long) ctx_memory_dump.addr);
+
         // Comment from memdump.cpp:
         // The file name format for the memory dump file is:
         // <dump base address>_<16 chars of hash>
@@ -741,6 +744,11 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
         //If the dump of the memory was successful write all gathered data to a metadata file
         this->save_file_metadata(trap_info, dump_metadata, page_va);
     }
+    else
+    {
+        PRINT_DEBUG("[CODEMON] not dumping from %llx as it's not considered as malware\n", (unsigned long long) ctx_memory_dump.addr);
+    }
+
     return malware;
 }
 
