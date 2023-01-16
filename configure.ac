@@ -737,6 +737,43 @@ LD="$saved_LD"
 #####################################################
 
 #####################################################
+# OPTIMIZATION LEVEL START
+
+saved_CC="$CC"
+saved_CXX="$CXX"
+saved_LD="$LD"
+flag_wrap="$srcdir/scripts/wrap-compiler-for-flag-check"
+CC="$flag_wrap $CC"
+CXX="$flag_wrap $CXX"
+LD="$flag_wrap $LD"
+
+OPTIMIZATION_CFLAGS=""
+OPTIMIZATION_CXXFLAGS=""
+
+AS_IF([test x"$hardening" != x"yes"], [
+  check_cc_cxx_flag([-O3],
+     [OPTIMIZATION_CFLAGS="$OPTIMIZATION_CFLAGS -O3"
+      OPTIMIZATION_CXXFLAGS="$OPTIMIZATION_CXXFLAGS -O3"])
+  check_cc_cxx_flag([-g -ggdb3],
+     [OPTIMIZATION_CFLAGS="$OPTIMIZATION_CFLAGS -g -ggdb3"
+      OPTIMIZATION_CXXFLAGS="$OPTIMIZATION_CXXFLAGS -g -ggdb3"])
+  # FIXME Link error: "error adding symbols: file format not recognized" for "la"
+  # check_cc_cxx_flag([-flto],
+  #    [OPTIMIZATION_CFLAGS="$OPTIMIZATION_CFLAGS -flto"
+  #     OPTIMIZATION_CFLAGS="$OPTIMIZATION_CFLAGS -flto"])
+])
+
+AC_SUBST([OPTIMIZATION_CFLAGS])
+AC_SUBST([OPTIMIZATION_CXXFLAGS])
+
+# End of flag tests.
+CC="$saved_CC"
+CXX="$saved_CXX"
+LD="$saved_LD"
+# OPTIMIZATION LEVEL END
+#####################################################
+
+#####################################################
 # AUTOSANITIZE START
 
 saved_CC="$CC"
