@@ -678,8 +678,11 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output) : plugin
 
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, "__do_open_execat", &do_open_execat_addr))
     {
-        PRINT_DEBUG("[PROCMON] Failed to get symbol of do_open_execat.\n");
-        return;
+        if (!drakvuf_get_kernel_symbol_rva(drakvuf, "do_open_execat", &do_open_execat_addr))
+        {
+            PRINT_DEBUG("[PROCMON] Failed to get symbol of do_open_execat.\n");
+            return;
+        }
     }
 
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text))
