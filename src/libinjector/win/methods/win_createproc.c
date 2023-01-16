@@ -342,8 +342,10 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
     }
     else
     {
+        PRINT_DEBUG("Target process detected\n");
         injector->rc = INJECTOR_SUCCEEDED;
         injector->detected = true;
+        drakvuf_interrupt(drakvuf, SIGINT);
     }
 
     return 0;
