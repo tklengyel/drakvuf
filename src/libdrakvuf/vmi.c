@@ -689,6 +689,13 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     proc_data_priv_t attached_proc_data;
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
     trap_info.trap_pa = pa;
+    /* Used to optimize "single stepping" during injection.
+     *
+     * If the execution flow changed from the address trapped then there is no
+     * need to perform single stepping because the INT3 at the hooked address
+     * would not be executed until injection finish.
+     */
+    bool avoid_singlestep = false;
 
     if (s->traps)
         trap_info.event_uid = ++drakvuf->event_counter;
@@ -716,6 +723,14 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
         {
             if (VMI_EVENT_RESPONSE_SET_REGISTERS & rsp)
                 PRINT_DEBUG("[LIBDRAKVUF] FATAL ERROR! Undefined behavior on invalid VM state!\n");
+
+            /* Check that RIP has changed.
+             *
+             * During injection this is normal to change the RIP to function other than hooked.
+             * Though it is possible that just the same function been injected.
+             * In this case the single step is essential to be able to run this function.
+             */
+            avoid_singlestep = trap_info.regs->rip != drakvuf->regs_modified[trap_info.vcpu].rip;
 
             drakvuf->vmi_response_set_registers[trap_info.vcpu] = false;
             drakvuf_copy_gpr_registers(trap_info.regs, &drakvuf->regs_modified[trap_info.vcpu]);
@@ -756,7 +771,7 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     process_free_requests(drakvuf);
 
     // Check if we have traps still active on this breakpoint
-    if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa)) )
+    if ( !avoid_singlestep && g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa)) )
     {
         PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u\n", event->vcpu_id);
         event->slat_id = 0;
