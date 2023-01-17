@@ -208,6 +208,13 @@ struct dll_t
     uint64_t m_stack_marker;
 };
 
+struct protect_virtual_memory_result_t : public call_result_t
+{
+    protect_virtual_memory_result_t() : call_result_t(), base_address() {}
+
+    addr_t base_address;
+};
+
 struct map_view_of_section_result_t : public call_result_t
 {
     map_view_of_section_result_t() : call_result_t(), section_handle(), process_handle(), base_address_ptr() {}
@@ -241,6 +248,7 @@ public:
     std::vector<usermode_cb_registration> plugins;
     // map pid -> list of hooked dlls
     std::map<vmi_pid_t, std::vector<dll_t>> loaded_dlls;
+    std::map<vmi_pid_t, bool> proc_ntdll_hooked;
 
 #ifndef LIBUSERMODE_USE_INJECTION
     std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
