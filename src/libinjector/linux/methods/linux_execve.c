@@ -252,6 +252,8 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (is_child_process(injector, info))
             {
                 fprintf(stderr, "Assertion: Child process alive. Wait parent for cleanup\n");
+                // this is being done so that the parent can also handle the state
+                override_step(base_injector, STEP5, VMI_EVENT_RESPONSE_NONE);
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
