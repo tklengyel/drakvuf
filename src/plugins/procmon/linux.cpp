@@ -580,7 +580,7 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     params->rsp = ret_addr;
 
     // Save data about target process
-    params->target_process_name = target_proc_data.name;
+    params->target_process_name = target_proc_data.name ?: "";
     params->target_thread_name = target_thread_name ?: "";
     params->target_pid = target_proc_data.pid;
     params->target_tid = target_proc_data.tid;
