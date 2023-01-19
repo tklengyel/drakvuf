@@ -301,15 +301,24 @@ void setup_linux(drakvuf_t drakvuf, syscalls* s)
 
     for ( int i=0; i<__PT_REGS_MAX; i++ )
         if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "pt_regs", linux_pt_regs_names[i], &s->offsets[i]) )
+        {
+            PRINT_DEBUG("[SYSCALLS] Failed to get RVA of pt_regs!%s (idx %d)\n", linux_pt_regs_names[i], i);
             throw -1;
+        }
 
     addr_t _text;
     if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text) )
+    {
+        PRINT_DEBUG("[SYSCALLS] Failed to get RVA of _text\n");
         throw -1;
+    }
 
     addr_t syscall64;
     if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "do_syscall_64", &syscall64) )
+    {
+        PRINT_DEBUG("[SYSCALLS] Failed to get RVA of do_syscall_64\n");
         throw -1;
+    }
 
     addr_t kaslr = s->kernel_base - _text;
 
@@ -334,6 +343,7 @@ void setup_linux(drakvuf_t drakvuf, syscalls* s)
     else
     {
         free_trap(trap);
+        PRINT_DEBUG("[SYSCALLS] Failed to hook syscall64 entry\n");
         throw -1;
     }
 }
