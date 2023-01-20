@@ -204,6 +204,7 @@ char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
     GString* b = g_string_new(NULL);
 
     ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
+    // TODO Bound this loop
     while (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &parent) && parent != dentry_addr)
     {
         gchar* name = NULL;
@@ -218,8 +219,12 @@ char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
         if (name == NULL)
             break;
 
-        g_string_prepend(b, name);
-        g_string_prepend(b, "/");
+        // This strlen is bounded by `vmi_read_str` implementation
+        if (strlen(name) > 0)
+        {
+            g_string_prepend(b, name);
+            g_string_prepend(b, "/");
+        }
 
         g_free(name);
 
