@@ -1242,6 +1242,12 @@ void remove_trap(drakvuf_t drakvuf,
                 if (!drakvuf->msr)
                     control_msr_trap(drakvuf, 0);
             }
+            else if (MSR_ANY == trap->regaccess.type)
+            {
+                drakvuf->msr = g_slist_remove(drakvuf->msr, trap);
+                if (!drakvuf->msr)
+                    control_msr_trap_any(drakvuf, 0, 0);
+            }
             break;
         }
         case DEBUG:
