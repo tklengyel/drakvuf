@@ -424,7 +424,7 @@ void userhook::request_userhook_on_running_process(
 
     drakvuf_trap_t* trap = new drakvuf_trap_t();
     trap->type = REGISTER;
-    trap->reg = CR3;
+    trap->regaccess.type = CR3;
     trap->cb = wait_for_target_process_cb;
     trap->data = new rh_data_t(this, target_process, target_pid, dll_name, func_name, cb, extra);
     if (!add_running_rh_trap(drakvuf, trap))

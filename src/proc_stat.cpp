@@ -177,7 +177,7 @@ int main(int argc, char** argv)
     /* Some local variables */
     drakvuf_trap_t trap;
     trap.type = REGISTER;
-    trap.reg = CR3;
+    trap.regaccess.type = CR3;
     trap.cb = cr3_cb;
     trap.ttl = UNLIMITED_TTL;
     trap.ah_cb = nullptr;
