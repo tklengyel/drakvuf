@@ -1230,17 +1230,23 @@ void remove_trap(drakvuf_t drakvuf,
         }
         case REGISTER:
         {
-            if (CR3 == trap->reg)
+            if (CR3 == trap->regaccess.type)
             {
                 drakvuf->cr3 = g_slist_remove(drakvuf->cr3, trap);
                 if ( !drakvuf->cr3 && !drakvuf->enable_cr3_based_interception )
                     control_cr3_trap(drakvuf, 0);
             }
-            else if (MSR_ALL == trap->reg)
+            else if (MSR_ALL == trap->regaccess.type)
             {
                 drakvuf->msr = g_slist_remove(drakvuf->msr, trap);
                 if (!drakvuf->msr)
                     control_msr_trap(drakvuf, 0);
+            }
+            else if (MSR_ANY == trap->regaccess.type)
+            {
+                drakvuf->msr = g_slist_remove(drakvuf->msr, trap);
+                if (!drakvuf->msr)
+                    control_msr_trap_any(drakvuf, 0, 0);
             }
             break;
         }
@@ -1691,6 +1697,36 @@ bool control_msr_trap(drakvuf_t drakvuf, bool toggle)
     drakvuf->msr_event.type = VMI_EVENT_REGISTER;
     drakvuf->msr_event.reg_event.reg = MSR_ALL;
     drakvuf->msr_event.reg_event.in_access = VMI_REGACCESS_W;
+    drakvuf->msr_event.data = drakvuf;
+    drakvuf->msr_event.callback = msr_cb;
+
+    if ( toggle )
+    {
+        if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->msr_event))
+        {
+            fprintf(stderr, "Failed to register MSR event\n");
+            return 0;
+        }
+    }
+    else
+    {
+        if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->msr_event, NULL))
+        {
+            fprintf(stderr, "Failed to clear MSR event\n");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+bool control_msr_trap_any(drakvuf_t drakvuf, bool toggle, uint32_t index)
+{
+    drakvuf->msr_event.version = VMI_EVENTS_VERSION;
+    drakvuf->msr_event.type = VMI_EVENT_REGISTER;
+    drakvuf->msr_event.reg_event.reg = MSR_ANY;
+    drakvuf->msr_event.reg_event.in_access = VMI_REGACCESS_W;
+    drakvuf->msr_event.reg_event.msr = index;
     drakvuf->msr_event.data = drakvuf;
     drakvuf->msr_event.callback = msr_cb;
 
