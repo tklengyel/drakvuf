@@ -120,7 +120,7 @@ private:
     drakvuf_trap_t trap =
     {
         .type = REGISTER,
-        .reg = CR3,
+        .regaccess.type = CR3,
         .data = this,
     };
 };
