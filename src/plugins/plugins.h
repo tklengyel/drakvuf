@@ -194,6 +194,7 @@ struct plugins_options
     const char* ndis_profile;           // PLUGIN_CALLBACKMON
     uint64_t hidevm_delay;              // PLUGIN_HIDEVM
     uint64_t unixsocketmon_max_size;    // PLUGIN_UNIXSOCKETMON
+    bool rebootmon_abort_on_power_off;  // PLUGIN_REBOOTMON
 };
 
 typedef enum drakvuf_plugin
@@ -240,6 +241,7 @@ typedef enum drakvuf_plugin
     PLUGIN_MEMACCESSMON,
     PLUGIN_UNIXSOCKETMON,
     PLUGIN_ETWMON,
+    PLUGIN_REBOOTMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -287,6 +289,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_MEMACCESSMON] = "memaccessmon",
     [PLUGIN_UNIXSOCKETMON] = "unixsocketmon",
     [PLUGIN_ETWMON] = "etwmon",
+    [PLUGIN_REBOOTMON] = "rebootmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -333,6 +336,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_MEMACCESSMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_UNIXSOCKETMON]= { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_ETWMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_REBOOTMON]    = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
 };
 
 class plugin

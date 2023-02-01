@@ -582,6 +582,16 @@ if test x$plugin_etwmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_ETWMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_rebootmon],
+  [AS_HELP_STRING([--disable-plugin-rebootmon],
+    [Enable the power off monitoring plugin @<:@yes@:>@])],
+  [plugin_rebootmon="$enableval"],
+  [plugin_rebootmon="yes"])
+AM_CONDITIONAL([PLUGIN_REBOOTMON], [test x$plugin_rebootmon = xyes])
+if test x$plugin_rebootmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_REBOOTMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -898,6 +908,7 @@ HideVM:             $plugin_hidevm
 Etwmon:             $plugin_etwmon
 Memaccessmon:       $plugin_memaccessmon
 Unixsocketmon:      $plugin_unixsocketmon
+Rebootmon:          $plugin_rebootmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:             $plugin_wmimon

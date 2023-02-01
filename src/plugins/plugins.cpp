@@ -146,6 +146,7 @@
 #include "memaccessmon/memaccessmon.h"
 #include "unixsocketmon/unixsocketmon.h"
 #include "etwmon/etwmon.h"
+#include "rebootmon/rebootmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -303,6 +304,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_CRASHMON:
                     this->plugins[plugin_id] = std::make_unique<crashmon>(this->drakvuf, this->output);
                     break;
+#endif
+#ifdef ENABLE_PLUGIN_REBOOTMON
+                case PLUGIN_REBOOTMON:
+                {
+                    rebootmon_config config =
+                    {
+                        .abort_on_power_off = options->rebootmon_abort_on_power_off,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<rebootmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_CLIPBOARDMON
                 case PLUGIN_CLIPBOARDMON:

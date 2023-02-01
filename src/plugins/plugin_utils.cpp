@@ -217,3 +217,11 @@ std::string parse_flags(uint64_t flags, const flags_str_t& flags_map, output_for
 
     return output;
 }
+
+std::string parse_enum(uint64_t value, const flags_str_t& enum_map)
+{
+    auto it = enum_map.find(value);
+    if (it != enum_map.end())
+        return it->second;
+    return std::to_string(value);
+}

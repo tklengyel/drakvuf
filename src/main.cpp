@@ -380,6 +380,10 @@ static void print_usage()
         "\t --unixsocketmon-max-size-print <size>\n"
         "\t                           Max message size (in bytes) to print\n"
 #endif
+#ifdef ENABLE_PLUGIN_REBOOTMON
+        "\t --rebootmon-abort-on-power-off\n"
+        "\t                           Exit from execution as soon as we detect power off\n"
+#endif
         "\t --libdrakvuf-not-get-userid\n"
         "\t                           Don't collect user id in get process data\n"
         "\t -h, --help                Show this help\n"
@@ -511,6 +515,7 @@ int main(int argc, char** argv)
         opt_enable_active_callback_check,
         opt_exit_injection_thread,
         opt_unixsocketmon_max_size,
+        opt_rebootmon_abort_on_power_off,
     };
     const option long_opts[] =
     {
@@ -590,6 +595,7 @@ int main(int argc, char** argv)
         {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
         {"exit-injection-thread", no_argument, NULL, opt_exit_injection_thread},
         {"unixsocketmon-max-size-print", required_argument, NULL, opt_unixsocketmon_max_size},
+        {"rebootmon-abort-on-power-off", no_argument, NULL, opt_rebootmon_abort_on_power_off},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hFC";
@@ -947,6 +953,11 @@ int main(int argc, char** argv)
                 options.unixsocketmon_max_size = strtoull(optarg, NULL, 0);
                 break;
 #endif
+#ifdef ENABLE_PLUGIN_REBOOTMON
+            case opt_rebootmon_abort_on_power_off:
+                options.rebootmon_abort_on_power_off = true;
+                break;
+#endif
             case 'h':
                 print_usage();
                 return drakvuf_exit_code_t::SUCCESS;
@@ -1100,6 +1111,9 @@ int main(int argc, char** argv)
     {
         case SIGDRAKVUFKERNELPANIC:
             return drakvuf_exit_code_t::KERNEL_PANIC;
+        case SIGDRAKVUFPOWEROFF:
+            PRINT_DEBUG("Exit on power off\n");
+            return drakvuf_exit_code_t::POWER_OFF;
         default:
             break;
     }

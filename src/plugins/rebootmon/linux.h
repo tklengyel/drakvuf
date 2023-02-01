@@ -104,18 +104,32 @@
 
 #pragma once
 
-enum drakvuf_exit_code_t
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
+#include "linux-private.h"
+
+using namespace rebootmon_ns;
+
+struct rebootmon_config;
+
+class linux_rebootmon : public pluginex
 {
-    SUCCESS = 0,
-    FAIL = 1,
-    INJECTION_TIMEOUT = 2,
-    INJECTION_ERROR = 3, // Injection failed due to implementation error
-    INJECTION_UNSUCCESSFUL = 4, /* Injection has been done correctly, but
-                                 * the sample could not be started
-                                 * (corrupted, arch mismatch and so on) */
-    WRITE_FILE_TIMEOUT = 5,
-    WRITE_FILE_ERROR = 6,
-    PLUGINS_STOP_TIMEOUT = 7,
-    KERNEL_PANIC = 10,
-    POWER_OFF = 11,
+private:
+    /* Hooks */
+    std::unique_ptr<libhook::SyscallHook> reboot_hook;
+    std::unique_ptr<libhook::SyscallHook> machine_restart_hook;
+    std::unique_ptr<libhook::SyscallHook> machine_halt_hook;
+    std::unique_ptr<libhook::SyscallHook> machine_power_off_hook;
+
+    /* Callbacks */
+    event_response_t reboot_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t machine_restart_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t machine_power_off_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    const bool abort_on_power_off;
+
+public:
+    linux_rebootmon(drakvuf_t drakvuf, const rebootmon_config* c, output_format_t output);
+    linux_rebootmon(const linux_rebootmon&) = delete;
+    linux_rebootmon& operator=(const linux_rebootmon&) = delete;
 };

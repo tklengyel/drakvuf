@@ -396,6 +396,14 @@ sources += etwmon/etwmon.h
 sources += etwmon/private.h
 endif
 
+if PLUGIN_REBOOTMON
+sources += rebootmon/rebootmon.cpp
+sources += rebootmon/rebootmon.h
+sources += rebootmon/linux.cpp
+sources += rebootmon/linux.h
+sources += rebootmon/linux-private.h
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h

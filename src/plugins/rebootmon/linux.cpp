@@ -102,20 +102,97 @@
  *                                                                         *
  ***************************************************************************/
 
-#pragma once
+#include <libvmi/libvmi.h>
 
-enum drakvuf_exit_code_t
+#include "rebootmon.h"
+#include "linux.h"
+#include "plugins/output_format.h"
+#include "plugins/helpers/hooks.h"
+
+using namespace rebootmon_ns;
+
+event_response_t linux_rebootmon::reboot_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
-    SUCCESS = 0,
-    FAIL = 1,
-    INJECTION_TIMEOUT = 2,
-    INJECTION_ERROR = 3, // Injection failed due to implementation error
-    INJECTION_UNSUCCESSFUL = 4, /* Injection has been done correctly, but
-                                 * the sample could not be started
-                                 * (corrupted, arch mismatch and so on) */
-    WRITE_FILE_TIMEOUT = 5,
-    WRITE_FILE_ERROR = 6,
-    PLUGINS_STOP_TIMEOUT = 7,
-    KERNEL_PANIC = 10,
-    POWER_OFF = 11,
-};
+    /*
+    long sys_reboot(
+        int magic1,
+        int magic2,
+        unsigned int cmd,
+        void __user *arg
+    );
+    */
+    uint32_t magic1 = drakvuf_get_function_argument(drakvuf, info, 1);
+    uint32_t magic2 = drakvuf_get_function_argument(drakvuf, info, 2);
+    uint32_t cmd = drakvuf_get_function_argument(drakvuf, info, 3);
+    addr_t arg = drakvuf_get_function_argument(drakvuf, info, 4);
+    std::optional<fmt::Estr<std::string>> opt_arg;
+    if (arg)
+    {
+        auto s = drakvuf_read_ascii_str(drakvuf, info, arg);
+        opt_arg = std::string(s ?: "");
+        g_free(s);
+    }
+
+    fmt::print(this->m_output_format, "rebootmon", drakvuf, info,
+        keyval("Magic1", fmt::Rstr(parse_enum(magic1, reboot_magics))),
+        keyval("Magic2", fmt::Rstr(parse_enum(magic2, reboot_magics))),
+        keyval("Cmd", fmt::Rstr(parse_enum(cmd, reboot_commands))),
+        keyval("Arg", opt_arg));
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t linux_rebootmon::machine_restart_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+{
+    /*
+    void machine_restart(char *cmd)
+    */
+    addr_t cmd_ptr = drakvuf_get_function_argument(drakvuf, info, 1);
+    char* cmd = drakvuf_read_ascii_str(drakvuf, info, cmd_ptr);
+
+    fmt::print(this->m_output_format, "rebootmon", drakvuf, info,
+        keyval("Cmd", fmt::Estr(cmd ?: "")));
+
+    g_free(cmd);
+
+    if (this->abort_on_power_off)
+        drakvuf_interrupt( drakvuf, SIGDRAKVUFPOWEROFF);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t linux_rebootmon::machine_power_off_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+{
+    /*
+    void machine_halt(void)
+    void machine_power_off(void)
+    */
+
+    fmt::print(this->m_output_format, "rebootmon", drakvuf, info);
+
+    if (this->abort_on_power_off)
+        drakvuf_interrupt( drakvuf, SIGDRAKVUFPOWEROFF);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+linux_rebootmon::linux_rebootmon(drakvuf_t drakvuf, const rebootmon_config* c, output_format_t output) :
+    pluginex(drakvuf, output), abort_on_power_off(c->abort_on_power_off)
+{
+#define REGISTER_HOOK_EX(name, syscall, cb, alias) \
+    name ## _hook = createSyscallHook(#syscall, &linux_rebootmon::cb, #alias); \
+    if (!name ## _hook) \
+    { \
+        PRINT_DEBUG("[REBOOTMON] Method " #syscall " does not found.\n"); \
+        throw -1; \
+    }
+#define REGISTER_HOOK(name, cb) REGISTER_HOOK_EX(name, name, cb, name)
+
+    REGISTER_HOOK_EX(reboot, __do_sys_reboot, reboot_cb, sys_reboot)
+    REGISTER_HOOK(machine_restart, machine_restart_cb)
+    REGISTER_HOOK(machine_halt, machine_power_off_cb)
+    REGISTER_HOOK(machine_power_off, machine_power_off_cb)
+
+#undef REGISTER_HOOK
+#undef REGISTER_HOOK_EX
+}

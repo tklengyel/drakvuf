@@ -88,7 +88,7 @@
  * otherwise) that you are offering unlimited, non-exclusive right to      *
  * reuse, modify, and relicense the code.  DRAKVUF will always be          *
  * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
+* relicense code has caused devastating problems for other Free Software  *
  * projects (such as KDE and NASM).                                        *
  * To specify special license conditions of your contributions, just say   *
  * so when you send them.                                                  *
@@ -104,18 +104,22 @@
 
 #pragma once
 
-enum drakvuf_exit_code_t
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
+#include "linux.h"
+
+#include <memory>
+
+struct rebootmon_config
 {
-    SUCCESS = 0,
-    FAIL = 1,
-    INJECTION_TIMEOUT = 2,
-    INJECTION_ERROR = 3, // Injection failed due to implementation error
-    INJECTION_UNSUCCESSFUL = 4, /* Injection has been done correctly, but
-                                 * the sample could not be started
-                                 * (corrupted, arch mismatch and so on) */
-    WRITE_FILE_TIMEOUT = 5,
-    WRITE_FILE_ERROR = 6,
-    PLUGINS_STOP_TIMEOUT = 7,
-    KERNEL_PANIC = 10,
-    POWER_OFF = 11,
+    bool abort_on_power_off;
+};
+
+class rebootmon : public pluginex
+{
+public:
+    std::unique_ptr<linux_rebootmon> l_impl;
+
+    rebootmon(drakvuf_t drakvuf, const rebootmon_config* c, output_format_t output);
+    ~rebootmon() = default;
 };

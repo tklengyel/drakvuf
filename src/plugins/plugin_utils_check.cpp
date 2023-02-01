@@ -147,7 +147,22 @@ START_TEST(test_parse_64bit_flags)
 }
 END_TEST
 
-Suite* parse_flags_suite(void)
+
+START_TEST(test_parse_known_enum_value)
+{
+    uint64_t value = ATTRIBUTE_1;
+    ck_assert(parse_enum(value, flags_and_attrs) == std::string("ATTRIBUTE_1"));
+}
+END_TEST
+
+START_TEST(test_parse_unknown_enum_value)
+{
+    uint64_t value = ATTRIBUTE_1 | ATTRIBUTE_2;
+    ck_assert(parse_enum(value, flags_and_attrs) == std::to_string(value));
+}
+END_TEST
+
+static Suite* parse_flags_suite(void)
 {
     Suite* s;
     TCase* tc_core;
@@ -166,6 +181,23 @@ Suite* parse_flags_suite(void)
     return s;
 }
 
+static Suite* parse_enum_suite(void)
+{
+    Suite* s;
+    TCase* tc_core;
+
+    s = suite_create("Stringify enum values");
+
+    /* Core test case */
+    tc_core = tcase_create("Core");
+
+    tcase_add_test(tc_core, test_parse_known_enum_value);
+    tcase_add_test(tc_core, test_parse_unknown_enum_value);
+    suite_add_tcase(s, tc_core);
+
+    return s;
+}
+
 int main(void)
 {
     int number_failed;
@@ -174,6 +206,7 @@ int main(void)
 
     s = parse_flags_suite();
     sr = srunner_create(s);
+    srunner_add_suite(sr, parse_enum_suite());
 
     srunner_run_all(sr, CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
