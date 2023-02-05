@@ -78,7 +78,7 @@ get_packages() {
         ubuntu)
             get_ubuntu $VERSION
             ;;
-        ubuntu)
+        debian)
             get_debian $VERSION
             ;;
         *)
