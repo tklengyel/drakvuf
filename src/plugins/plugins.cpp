@@ -208,7 +208,10 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     fileextractor_config config =
                     {
+                        .timeout = options->fileextractor_timeout,
                         .dump_folder = options->dump_folder,
+                        .hash_size = options->fileextractor_hash,
+                        .extract_size = options->fileextractor_extract,
                     };
                     this->plugins[plugin_id] = std::make_unique<fileextractor>(this->drakvuf, &config, this->output);
                     break;

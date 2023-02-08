@@ -108,7 +108,12 @@
 #include "../plugin_utils.h"
 
 #define FILE_DISPOSITION_INFORMATION 13
+#define FILE_END_OF_FILE_INFORMATION 20
 #define FILE_DELETE_ON_CLOSE 0x1000
+#define FILE_WRITE_DATA 2
+#define FILE_APPEND_DATA 4
+#define FILE_WRITE_TO_END_OF_FILE 0xffffffff
+#define FILE_USE_FILE_POINTER_POSITION 0xfffffffe
 
 enum offset
 {
@@ -116,6 +121,7 @@ enum offset
     FILE_OBJECT_FLAGS,
     FILE_OBJECT_FILENAME,
     FILE_OBJECT_SECTIONOBJECTPOINTER,
+    FILE_OBJECT_CURRENTBYTEOFFSET,
     SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
     SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
     SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT,
@@ -183,6 +189,7 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [FILE_OBJECT_FLAGS] = {"_FILE_OBJECT", "Flags"},
     [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
     [FILE_OBJECT_SECTIONOBJECTPOINTER] = {"_FILE_OBJECT", "SectionObjectPointer"},
+    [FILE_OBJECT_CURRENTBYTEOFFSET] = {"_FILE_OBJECT", "CurrentByteOffset"},
     [SECTIONOBJECTPOINTER_DATASECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "DataSectionObject"},
     [SECTIONOBJECTPOINTER_SHAREDCACHEMAP] = {"_SECTION_OBJECT_POINTERS", "SharedCacheMap"},
     [SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "ImageSectionObject"},
@@ -234,6 +241,10 @@ static const flags_str_t fo_flags_map =
 
 struct task_t
 {
+private:
+    uint64_t m_stack_marker{0};
+
+public:
     enum class stage_t
     {
         pending,
@@ -259,6 +270,7 @@ struct task_t
     enum class task_reason
     {
         write,
+        createsection,
         del,
         invalid,
     };
@@ -274,12 +286,31 @@ struct task_t
     const addr_t file_obj{0};
     uint64_t fo_flags{0};
     uint64_t file_size{0};
+    std::string file_sha256{""};
     uint64_t file_offset{0};
+    uint64_t write_offset{0};
     uint64_t bytes_to_read{0};
     handle_t section_handle{0};
+    uint64_t currentbyteoffset{0};
     addr_t view_base{0};
+    uint64_t pid{0};
+    uint64_t ppid{0};
+    std::string process_name{0};
+
+    // information that is used after extracting the file to complete first NtWriteFile.
+    addr_t first_len{0};
+    addr_t first_offset{0};
+    addr_t first_str{0};
+    uint64_t first_cr3{0};
+
+    uint64_t new_eof{0};
 
     int idx{0};
+
+    bool extracted{false}; // indicates whether the file has been extracted from the guest system.
+    bool append{false};    // indicates whether the file was opened with only the FILE_APPEND_DATA flag. If so, ByteOffset is ignored.
+    bool closed{false};    // indicates whether the file handle was closed.
+    bool error{false};    // indicates whether error occurred.
 
     union
     {
@@ -323,17 +354,55 @@ struct task_t
         , reason(reason_)
         , file_obj(file_obj_)
     {}
+
+    uint64_t stack_marker()
+    {
+        // TODO Set initial random value and print this to log
+        return 0x48711e5248711e52;
+    }
+
+    uint64_t* set_stack_marker()
+    {
+        m_stack_marker = stack_marker();
+        return &m_stack_marker;
+    }
+
+    uint64_t stack_marker_va()
+    {
+        return m_stack_marker;
+    }
 };
 
 struct createfile_result_t : public PluginResult
 {
     createfile_result_t()
         : PluginResult(),
-          handle()
+          handle(),
+          append(),
+          del()
     {
     }
 
     addr_t handle;
+    bool append; // FILE_APPEND_DATA flag
+    bool del; // FILE_DELETE_ON_CLOSE flag
+};
+
+struct writefile_result_t : public PluginResult
+{
+    writefile_result_t()
+        : PluginResult(),
+          len(),
+          str(),
+          byteoffset(),
+          idx()
+    {
+    }
+
+    uint64_t len;
+    uint64_t str;
+    uint64_t byteoffset;
+    int idx;
 };
 
 struct IO_STATUS_BLOCK_32

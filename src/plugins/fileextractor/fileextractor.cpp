@@ -134,10 +134,14 @@ event_response_t fileextractor::openfile_cb(drakvuf_t drakvuf,
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t create_options = drakvuf_get_function_argument(drakvuf, info, 6);
 
-    if (create_options & FILE_DELETE_ON_CLOSE)
-        createfile_cb_impl(drakvuf, info, handle);
+    bool append = (desired_access & FILE_APPEND_DATA ) && !(desired_access & FILE_WRITE_DATA );
+    bool del = create_options & FILE_DELETE_ON_CLOSE;
+
+    if (del || append)
+        createfile_cb_impl(drakvuf, info, handle, del, append);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -149,23 +153,28 @@ event_response_t fileextractor::createfile_cb(drakvuf_t drakvuf,
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t create_options = drakvuf_get_function_argument(drakvuf, info, 9);
+    bool append = (desired_access & FILE_APPEND_DATA ) && !(desired_access & FILE_WRITE_DATA );
+    bool del = create_options & FILE_DELETE_ON_CLOSE;
 
-    if (create_options & FILE_DELETE_ON_CLOSE)
-        createfile_cb_impl(drakvuf, info, handle);
+    if (del || append)
+        createfile_cb_impl(drakvuf, info, handle, del, append);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 void fileextractor::createfile_cb_impl(drakvuf_t,
     drakvuf_trap_info_t* info,
-    addr_t handle)
+    addr_t handle, bool del, bool append)
 {
     auto hook_id = make_hook_id(info);
     auto hook = createReturnHook<createfile_result_t>(info,
             &fileextractor::createfile_ret_cb);
     auto params = libhook::GetTrapParams<createfile_result_t>(hook->trap_);
     params->handle = handle;
+    params->append = append;
+    params->del = del;
 
     createfile_ret_hooks[hook_id] = std::move(hook);
 }
@@ -190,7 +199,7 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
 
     vmi_lock_guard vmi(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
-        PRINT_DEBUG("[FILEDELETE] "
+        PRINT_DEBUG("[FILEEXTRACTOR] "
             "Failed to read pHandle at 0x%lx (PID %d, TID %d)\n",
             params->handle,
             params->target_pid,
@@ -201,14 +210,20 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
         auto id = make_task_id(info->attached_proc_data.pid, handle);
         if (tasks.find(id) == tasks.end())
         {
+            auto reason = params->del ?
+                task_t::task_reason::del : task_t::task_reason::write;
             addr_t file = 0;
             auto filename = get_file_name(vmi, info, handle, &file, nullptr);
-            if (filename.empty()) filename = "<UNKNOWN>";
 
             tasks[id] = std::make_unique<task_t>(handle,
                     filename,
-                    task_t::task_reason::del,
+                    reason,
                     file);
+            // save some process info
+            tasks[id]->pid = info->attached_proc_data.pid;
+            tasks[id]->ppid = info->attached_proc_data.ppid;
+            tasks[id]->process_name = info->proc_data.name;
+            tasks[id]->append = params->append;
         }
     }
 
@@ -216,6 +231,23 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
     createfile_ret_hooks.erase(hook_id);
 
     return VMI_EVENT_RESPONSE_NONE;
+}
+
+static std::string get_filename(std::string dump_folder, int task_idx, std::string ext)
+{
+    std::stringstream file;
+    file << dump_folder << "/file." << std::setw(6) << std::setfill('0') << task_idx << "." << ext;
+    return file.str();
+}
+
+static std::string get_data_filename(std::string dump_folder, int task_idx)
+{
+    return get_filename(dump_folder, task_idx, "mm");
+}
+
+static std::string get_metadata_filename(std::string dump_folder, int task_idx)
+{
+    return get_filename(dump_folder, task_idx, "metadata");
 }
 
 /*
@@ -233,71 +265,450 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
  *  BOOLEAN DeleteFile;
  * }
  */
+
 event_response_t fileextractor::setinformation_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
 {
     if (this->is_stopping())
         return VMI_EVENT_RESPONSE_NONE;
 
+
+    if (drakvuf_lookup_injection(drakvuf, info))
+        drakvuf_remove_injection(drakvuf, info);
+
+    fileextractor::error status{fileextractor::error::error};
+
     vmi_lock_guard vmi(drakvuf);
 
-    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
-    uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
-
-    if (fileinfoclass == FILE_DISPOSITION_INFORMATION && is_handle_valid(handle))
-    {
-        uint8_t del = 0;
-        ACCESS_CONTEXT(ctx);
-        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-        ctx.dtb = info->regs->cr3;
-        ctx.addr = fileinfo;
-
-        if ( VMI_SUCCESS == vmi_read_8(vmi, &ctx, &del) && del)
+    // checking the call context
+    // if returned from the injected call, then we continue extracting file
+    // else we make a new task, or update extracted file
+    task_t* task = nullptr;
+    for (auto& i: tasks)
+        if (drakvuf_check_return_context(drakvuf,
+                info,
+                i.second->target.ret_pid,
+                i.second->target.ret_tid,
+                i.second->target.ret_rsp))
         {
-            auto id = make_task_id(info->attached_proc_data.pid, handle);
-            if (tasks.find(id) == tasks.end())
-            {
-                addr_t file = 0;
-                auto filename = get_file_name(vmi, info, handle, &file, nullptr);
-                if (filename.empty()) filename = "<UNKNOWN>";
+            task = i.second.get();
+            break;
+        }
 
-                tasks[id] = std::make_unique<task_t>(handle,
-                        filename,
-                        task_t::task_reason::del,
-                        file);
+    if (!task)
+    {
+        addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+        addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
+        uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
+
+        if (fileinfoclass == FILE_DISPOSITION_INFORMATION && is_handle_valid(handle))
+        {
+            uint8_t del = 0;
+            ACCESS_CONTEXT(ctx);
+            ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+            ctx.dtb = info->regs->cr3;
+            ctx.addr = fileinfo;
+
+            if ( VMI_SUCCESS == vmi_read_8(vmi, &ctx, &del) && del)
+            {
+                auto id = make_task_id(info->attached_proc_data.pid, handle);
+                if (tasks.find(id) == tasks.end())
+                {
+                    addr_t file = 0;
+                    auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+                    tasks[id] = std::make_unique<task_t>(handle,
+                            filename,
+                            task_t::task_reason::del,
+                            file);
+                    // save some process info
+                    tasks[id]->pid = info->attached_proc_data.pid;
+                    tasks[id]->ppid = info->attached_proc_data.ppid;
+                    tasks[id]->process_name = info->proc_data.name;
+                }
+                task = tasks.find(id)->second.get();
             }
+        }
+
+        if (fileinfoclass == FILE_END_OF_FILE_INFORMATION && is_handle_valid(handle))
+        {
+
+            uint64_t eof = 0;
+            ACCESS_CONTEXT(ctx);
+            ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+            ctx.dtb = info->regs->cr3;
+            ctx.addr = fileinfo;
+
+            if ( VMI_SUCCESS == vmi_read_64(vmi, &ctx, &eof) )
+            {
+
+                auto id = make_task_id(info->attached_proc_data.pid, handle);
+                if (tasks.find(id) == tasks.end())
+                {
+                    addr_t file = 0;
+                    auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+                    tasks[id] = std::make_unique<task_t>(handle,
+                            filename,
+                            task_t::task_reason::write,
+                            file);
+                    // save some process info
+                    tasks[id]->pid = info->attached_proc_data.pid;
+                    tasks[id]->ppid = info->attached_proc_data.ppid;
+                    tasks[id]->process_name = info->proc_data.name;
+                }
+                task = tasks.find(id)->second.get();
+                task->new_eof = eof;
+            }
+        }
+    }
+
+    if (task)
+    {
+        // file extraction
+        if (!task->extracted)
+        {
+            check_stack_marker(info, vmi, task);
+
+            switch (task->stage)
+            {
+                case task_t::stage_t::pending:
+                    status = dispatch_pending(vmi, info, *task);
+                    break;
+                case task_t::stage_t::queryvolumeinfo:
+                    status = dispatch_queryvolumeinfo(vmi, info, *task);
+                    break;
+                case task_t::stage_t::queryinfo:
+                    status = dispatch_queryinfo(vmi, info, *task);
+                    break;
+                case task_t::stage_t::createsection:
+                    status = dispatch_createsection(vmi, info, *task);
+                    break;
+                case task_t::stage_t::mapview:
+                    status = dispatch_mapview(vmi, info, *task);
+                    break;
+                case task_t::stage_t::allocate_pool:
+                    status = dispatch_allocate_pool(vmi, info, *task);
+                    break;
+                case task_t::stage_t::memcpy:
+                    status = dispatch_memcpy(vmi, info, *task);
+                    break;
+                case task_t::stage_t::unmapview:
+                    status = dispatch_unmapview(vmi, info, *task);
+                    break;
+                case task_t::stage_t::close_handle:
+                    status = dispatch_close_handle(vmi, info, *task);
+                    break;
+                case task_t::stage_t::finished:
+                    break;
+            }
+
+            if (error::none == status || error::error == status)
+            {
+                free_resources(info, *task);
+                task->extracted = true;
+                task->error = true;
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+
+            if (error::zero_size == status)
+            {
+                if (this->extract_size && ( task->new_eof > this->extract_size ))
+                {
+                    print_extraction_failure(info, task->filename, "Too big file");
+                    free_resources(info, *task);
+                    task->extracted = true;
+                    task->error = true;
+                    return VMI_EVENT_RESPONSE_NONE;
+                }
+
+                // create new file for later updates
+                // save metadata
+                if (!task->idx)
+                    task->idx = ++this->sequence_number;
+
+                auto file = get_data_filename(this->dump_folder, task->idx);
+                if (file.empty())
+                    return VMI_EVENT_RESPONSE_NONE;
+
+                umask(S_IWGRP|S_IWOTH);
+                FILE* fp = fopen(file.data(), "a+");
+                if (!fp)
+                    return VMI_EVENT_RESPONSE_NONE;
+
+                fseek(fp, 0, SEEK_END);
+                //make bigger file size
+                if ((uint64_t)ftell(fp) < task->new_eof)
+                {
+                    fclose(fp);
+                    fp = fopen(file.data(), "r+");
+                    if (!fp)
+                        return VMI_EVENT_RESPONSE_NONE;
+                    fseek(fp, task->new_eof - 1, SEEK_SET);
+                    fputc('\0', fp);
+                }
+                fclose(fp);
+                save_file_metadata(info, 0, *task);
+
+                task->stage = task_t::stage_t::finished;
+                status = error::success;
+            }
+
+            if (task_t::stage_t::finished == task->stage)
+            {
+                // free resourses after extraction and first NtWriteFile result from saved data
+                free_resources(info, *task);
+                task->extracted = true;
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+/*
+ * NTSTATUS NtWriteFile(
+ *  HANDLE           FileHandle,
+ *  HANDLE           Event,
+ *  PIO_APC_ROUTINE  ApcRoutine,
+ *  PVOID            ApcContext,
+ *  PIO_STATUS_BLOCK IoStatusBlock,
+ *  VOID             Buffer,
+ *  ULONG            Length,
+ *  PLARGE_INTEGER   ByteOffset,
+ *  PULONG           Key
+ * );
+ */
+
+event_response_t fileextractor::writefile_cb(drakvuf_t,
+    drakvuf_trap_info_t* info)
+{
+    if (drakvuf_lookup_injection(drakvuf, info))
+        drakvuf_remove_injection(drakvuf, info);
+
+    fileextractor::error status{fileextractor::error::error};
+
+    vmi_lock_guard vmi(drakvuf);
+
+    // checking the call context
+    // if returned from the injected call, then we continue extracting file
+    // else we make a new task, or update extracted file
+    task_t* task = nullptr;
+    for (auto& i: tasks)
+        if (drakvuf_check_return_context(drakvuf,
+                info,
+                i.second->target.ret_pid,
+                i.second->target.ret_tid,
+                i.second->target.ret_rsp))
+        {
+            task = i.second.get();
+            break;
+        }
+
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t str = drakvuf_get_function_argument(drakvuf, info, 6);
+    uint32_t len = drakvuf_get_function_argument(drakvuf, info, 7);
+    addr_t offset = drakvuf_get_function_argument(drakvuf, info, 8);
+
+    if (!task && is_handle_valid(handle))
+    {
+        if (this->is_stopping())
+            return VMI_EVENT_RESPONSE_NONE;
+
+        auto id = make_task_id(info->attached_proc_data.pid, handle);
+        // check that tasks not exist - first NtWriteFile call
+        // else just get required task from map. Second the following NtWriteFile calls
+        if (tasks.find(id) == tasks.end())
+        {
+            addr_t file = 0;
+            auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+            // create new task
+            tasks[id] = std::make_unique<task_t>(handle,
+                    filename,
+                    task_t::task_reason::write,
+                    file);
+            if (!file)
+            {
+                tasks.erase(id);
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+            // save some process info
+            tasks[id]->pid = info->attached_proc_data.pid;
+            tasks[id]->ppid = info->attached_proc_data.ppid;
+            tasks[id]->process_name = info->proc_data.name;
+            // save data needed to complete the first NtWriteFile
+            tasks[id]->first_len = len;
+            tasks[id]->first_offset = offset;
+            tasks[id]->first_str = str;
+            tasks[id]->first_cr3 = info->regs->cr3;
+            get_file_object_currentbyteoffset(vmi, info, handle, &tasks[id]->currentbyteoffset);
+            if (offset)
+                get_write_offset(vmi, info, offset, &tasks[id]->write_offset);
+        }
+        task = tasks.find(id)->second.get();
+    }
+
+
+    if (task)
+    {
+        if(task->error)
+            return VMI_EVENT_RESPONSE_NONE;
+
+        // file extraction
+        if (!task->extracted)
+        {
+            check_stack_marker(info, vmi, task);
+
+            switch (task->stage)
+            {
+                case task_t::stage_t::pending:
+                    status = dispatch_pending(vmi, info, *task);
+                    break;
+                case task_t::stage_t::queryvolumeinfo:
+                    status = dispatch_queryvolumeinfo(vmi, info, *task);
+                    break;
+                case task_t::stage_t::queryinfo:
+                    status = dispatch_queryinfo(vmi, info, *task);
+                    break;
+                case task_t::stage_t::createsection:
+                    status = dispatch_createsection(vmi, info, *task);
+                    break;
+                case task_t::stage_t::mapview:
+                    status = dispatch_mapview(vmi, info, *task);
+                    break;
+                case task_t::stage_t::allocate_pool:
+                    status = dispatch_allocate_pool(vmi, info, *task);
+                    break;
+                case task_t::stage_t::memcpy:
+                    status = dispatch_memcpy(vmi, info, *task);
+                    break;
+                case task_t::stage_t::unmapview:
+                    status = dispatch_unmapview(vmi, info, *task);
+                    break;
+                case task_t::stage_t::close_handle:
+                    status = dispatch_close_handle(vmi, info, *task);
+                    break;
+                case task_t::stage_t::finished:
+                    break;
+            }
+
+            if (error::none == status || error::error == status)
+            {
+                free_resources(info, *task);
+                task->extracted = true;
+                task->error = true;
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+
+            if (error::zero_size == status)
+            {
+                // create new file for later updates
+                // save metadata
+                if (!task->idx)
+                    task->idx = ++this->sequence_number;
+
+                auto file = get_data_filename(this->dump_folder, task->idx);
+                if (file.empty())
+                    return VMI_EVENT_RESPONSE_NONE;
+
+                umask(S_IWGRP|S_IWOTH);
+                FILE* fp = fopen(file.data(), "w");
+                if (!fp)
+                    return VMI_EVENT_RESPONSE_NONE;
+
+                fclose(fp);
+                save_file_metadata(info, 0, *task);
+
+                task->stage = task_t::stage_t::finished;
+                status = error::success;
+            }
+
+            if (task_t::stage_t::finished == task->stage)
+            {
+                // free resourses after extraction and first NtWriteFile result from saved data
+                free_resources(info, *task);
+                task->extracted = true;
+                if (!task->append)
+                {
+                    if (task->write_offset)
+                        dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->write_offset, task->first_len);
+                    else
+                        dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->currentbyteoffset, task->first_len);
+                }
+                else
+                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->currentbyteoffset, task->first_len);
+
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+        // file update
+        else
+        {
+            // return hook setup
+            if (task->append)
+                offset = 0;
+            auto hook_id = make_hook_id(info);
+            auto hook = createReturnHook<writefile_result_t>(info,
+                    &fileextractor::writefile_ret_cb);
+            auto params = libhook::GetTrapParams<writefile_result_t>(hook->trap_);
+            params->len = len;
+            params->str = str;
+            params->idx = task->idx;
+
+            if (offset)
+            {
+                get_write_offset(vmi, info, offset, &task->write_offset);
+                // check for special offset
+                if (!((task->write_offset & 0xffffffff) ^ FILE_USE_FILE_POINTER_POSITION))
+                {
+                    get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
+                    params->byteoffset = task->currentbyteoffset;
+                }
+                else
+                    params->byteoffset = task->write_offset;
+            }
+            else
+            {
+                get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
+                params->byteoffset = task->currentbyteoffset;
+            }
+            writefile_ret_hooks[hook_id] = std::move(hook);
+
         }
     }
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t fileextractor::writefile_cb(drakvuf_t,
+event_response_t fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info)
 {
-    if (this->is_stopping())
+    // get data from NtWriteFile Buffer and write it to a file with given offset
+    auto params = libhook::GetTrapParams<writefile_result_t>(info);
+    if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    vmi_lock_guard vmi(drakvuf);
+    // Return if NtWriteFile failed
+    // TODO: check rax errors
+    // if (info->regs->rax)
+    //     return VMI_EVENT_RESPONSE_NONE;
 
-    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    uint64_t str = params->str;
+    uint64_t len = params->len;
+    uint64_t byteoffset = params->byteoffset;
 
-    if (is_handle_valid(handle))
-    {
-        auto id = make_task_id(info->attached_proc_data.pid, handle);
-        if (tasks.find(id) == tasks.end())
-        {
-            addr_t file = 0;
-            auto filename = get_file_name(vmi, info, handle, &file, nullptr);
-            if (filename.empty()) filename = "<UNKNOWN>";
+    int idx = params->idx;
 
-            tasks[id] = std::make_unique<task_t>(handle,
-                    filename,
-                    task_t::task_reason::write,
-                    file);
-        }
-    }
+    dump_mem_to_file(info->regs->cr3, str, idx, byteoffset, len);
+    auto hook_id = make_hook_id(info);
+    writefile_ret_hooks.erase(hook_id);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -320,12 +731,15 @@ event_response_t fileextractor::createsection_cb(drakvuf_t,
         {
             addr_t file = 0;
             auto filename = get_file_name(vmi, info, handle, &file, nullptr);
-            if (filename.empty()) filename = "<UNKNOWN>";
 
             tasks[id] = std::make_unique<task_t>(handle,
                     filename,
                     task_t::task_reason::write,
                     file);
+            // save some process info
+            tasks[id]->pid = info->attached_proc_data.pid;
+            tasks[id]->ppid = info->attached_proc_data.ppid;
+            tasks[id]->process_name = info->proc_data.name;
         }
     }
 
@@ -338,6 +752,9 @@ event_response_t fileextractor::createsection_cb(drakvuf_t,
 event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     vmi_lock_guard vmi(drakvuf);
+
+    if (drakvuf_lookup_injection(drakvuf, info))
+        drakvuf_remove_injection(drakvuf, info);
 
     fileextractor::error status{fileextractor::error::error};
     task_t* task = nullptr;
@@ -352,7 +769,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             break;
         }
 
-    if (!task)
+    if (!task && !is_stopping())
     {
         auto handle = drakvuf_get_function_argument(drakvuf, info, 1);
         /* If there are more then one open handle to the file. So do nothing. */
@@ -360,67 +777,152 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (get_file_object_handle_count(info, handle, &handle_count) &&
             handle_count > 1)
             return VMI_EVENT_RESPONSE_NONE;
-
         auto id = make_task_id(info->attached_proc_data.pid, handle);
         auto task_it = tasks.find(id);
 
         /* The system closes handle to untracked resource. So do nothing. */
-        if ( tasks.end() == task_it )
+        if ( tasks.end() == task_it)
+        {
             return VMI_EVENT_RESPONSE_NONE;
+        }
 
         task = task_it->second.get();
     }
 
-    switch (task->stage)
-    {
-        case task_t::stage_t::pending:
-            status = dispatch_pending(vmi, info, *task);
-            break;
-        case task_t::stage_t::queryvolumeinfo:
-            status = dispatch_queryvolumeinfo(vmi, info, *task);
-            break;
-        case task_t::stage_t::queryinfo:
-            status = dispatch_queryinfo(vmi, info, *task);
-            break;
-        case task_t::stage_t::createsection:
-            status = dispatch_createsection(vmi, info, *task);
-            break;
-        case task_t::stage_t::mapview:
-            status = dispatch_mapview(vmi, info, *task);
-            break;
-        case task_t::stage_t::allocate_pool:
-            status = dispatch_allocate_pool(vmi, info, *task);
-            break;
-        case task_t::stage_t::memcpy:
-            status = dispatch_memcpy(vmi, info, *task);
-            break;
-        case task_t::stage_t::unmapview:
-            status = dispatch_unmapview(vmi, info, *task);
-            break;
-        case task_t::stage_t::close_handle:
-            status = dispatch_close_handle(vmi, info, *task);
-            break;
-        case task_t::stage_t::finished:
-            break;
-    }
+    if (!task)
+        return VMI_EVENT_RESPONSE_NONE;
 
-    if (error::error == status)
+    if (task && timeout && is_stopping() &&
+        g_get_real_time() / G_USEC_PER_SEC - begin_stop_at > timeout)
     {
-        grab_file_by_handle(vmi, info, *task);
         task->stage = task_t::stage_t::finished;
-        status = error::success;
+        print_extraction_failure(info, task->filename, "Timeout");
     }
 
-    if (task_t::stage_t::finished == task->stage)
+    PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d] "
+        "\n"
+        , info->event_uid
+        , info->attached_proc_data.pid, info->attached_proc_data.tid
+        , task->target.ret_pid, task->stage
+    );
+
+    // check that the file has not been extracted
+    if (!task->extracted)
     {
-        free_resources(info, *task);
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        // extract file and close task
+        if ( task->reason == task_t::task_reason::write)
+            return VMI_EVENT_RESPONSE_NONE;
+
+        check_stack_marker(info, vmi, task);
+
+        switch (task->stage)
+        {
+            case task_t::stage_t::pending:
+                status = dispatch_pending(vmi, info, *task);
+                break;
+            case task_t::stage_t::queryvolumeinfo:
+                status = dispatch_queryvolumeinfo(vmi, info, *task);
+                break;
+            case task_t::stage_t::queryinfo:
+                status = dispatch_queryinfo(vmi, info, *task);
+                break;
+            case task_t::stage_t::createsection:
+                status = dispatch_createsection(vmi, info, *task);
+                break;
+            case task_t::stage_t::mapview:
+                status = dispatch_mapview(vmi, info, *task);
+                break;
+            case task_t::stage_t::allocate_pool:
+                status = dispatch_allocate_pool(vmi, info, *task);
+                break;
+            case task_t::stage_t::memcpy:
+                status = dispatch_memcpy(vmi, info, *task);
+                break;
+            case task_t::stage_t::unmapview:
+                status = dispatch_unmapview(vmi, info, *task);
+                break;
+            case task_t::stage_t::close_handle:
+                status = dispatch_close_handle(vmi, info, *task);
+                break;
+            case task_t::stage_t::finished:
+                break;
+        }
+
+        if (error::error == status || error::none == status)
+        {
+            task->stage = task_t::stage_t::finished;
+            task->error = true;
+            status = error::success;
+        }
+
+        if (error::zero_size == status)
+        {
+            // create new file for later updates
+            // save metadata
+            if (!task->idx)
+                task->idx = ++this->sequence_number;
+
+            auto file = get_data_filename(this->dump_folder, task->idx);
+            if (file.empty())
+                return VMI_EVENT_RESPONSE_NONE;
+
+            umask(S_IWGRP|S_IWOTH);
+            FILE* fp = fopen(file.data(), "w");
+            if (!fp)
+                return VMI_EVENT_RESPONSE_NONE;
+
+            fclose(fp);
+            save_file_metadata(info, 0, *task);
+
+            task->stage = task_t::stage_t::finished;
+            status = error::success;
+        }
+
+        if (task_t::stage_t::finished == task->stage)
+        {
+            free_resources(info, *task);
+
+            if(task->error)
+            {
+                tasks.erase(make_task_id(*task));
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+
+            task->closed = true;
+            free_resources(info, *task);
+            calc_checksum(*task);
+            print_file_information(info, *task);
+            tasks.erase(make_task_id(*task));
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        return VMI_EVENT_RESPONSE_NONE;
     }
+    else
+    {
+        // close task
+        auto handle = drakvuf_get_function_argument(drakvuf, info, 1);
+        if (handle != task->handle)
+            return VMI_EVENT_RESPONSE_NONE;
+        /* If there are more then one open handle to the file. So do nothing. */
+        uint64_t handle_count = 1;
+        if (get_file_object_handle_count(info, task->handle, &handle_count) &&
+            handle_count > 1)
+            return VMI_EVENT_RESPONSE_NONE;
 
-    if (error::success == status)
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        if(task->error)
+        {
+            tasks.erase(make_task_id(*task));
+            return VMI_EVENT_RESPONSE_NONE;
+        }
 
-    return VMI_EVENT_RESPONSE_NONE;
+        task->closed = true;
+        calc_checksum(*task);
+        update_file_metadata(nullptr, *task);
+        print_file_information(info, *task);
+        tasks.erase(make_task_id(*task));
+        return VMI_EVENT_RESPONSE_NONE;
+    }
 }
 
 /*****************************************************************************
@@ -479,7 +981,7 @@ fileextractor::error fileextractor::dispatch_queryvolumeinfo(
                     &dev_info,
                     NULL)))
         {
-            PRINT_DEBUG("[FILEDELETE] [ZwQueryVolumeInformationFile] "
+            PRINT_DEBUG("[FILEEXTRACTOR] [ZwQueryVolumeInformationFile] "
                 "Failed to read FsDeviceInformation\n");
             return error::error;
         }
@@ -531,18 +1033,21 @@ fileextractor::error fileextractor::dispatch_queryinfo(
                     &dev_info,
                     NULL)))
         {
-            PRINT_DEBUG("[FILEDELETE] [ZwQueryInformationFile] "
+            PRINT_DEBUG("[FILEEXTRACTOR] [ZwQueryInformationFile] "
                 "Failed to read FsDeviceInformation\n");
             return error::error;
         }
 
         if (0 == dev_info.end_of_file)
-        {
-            print_extraction_failure(info, task.filename, "Zero size file");
-            return error::error;
-        }
+            return error::zero_size;
 
         task.file_size = dev_info.end_of_file;
+
+        if (this->extract_size && ( task.file_size > this->extract_size ))
+        {
+            print_extraction_failure(info, task.filename, "Too big file");
+            return error::error;
+        }
 
         if (!inject_createsection(info, vmi, task))
             return error::error;
@@ -578,7 +1083,7 @@ fileextractor::error fileextractor::dispatch_createsection(
                     &task.section_handle,
                     NULL)))
         {
-            PRINT_DEBUG("[FILEDELETE] [ZwCreateSection] "
+            PRINT_DEBUG("[FILEEXTRACTOR] [ZwCreateSection] "
                 "Failed to read section handle\n");
             return error::error;
         }
@@ -616,7 +1121,7 @@ fileextractor::error fileextractor::dispatch_mapview(
                     &task.view_base,
                     NULL)))
         {
-            PRINT_DEBUG("[FILEDELETE] [ZwMapViewOfSection] "
+            PRINT_DEBUG("[FILEEXTRACTOR] [ZwMapViewOfSection] "
                 "Failed to read view base\n");
             return error::error;
         }
@@ -630,7 +1135,7 @@ fileextractor::error fileextractor::dispatch_mapview(
                     &view_size,
                     NULL)))
         {
-            PRINT_DEBUG("[FILEDELETE] [ZwMapViewOfSection] "
+            PRINT_DEBUG("[FILEEXTRACTOR] [ZwMapViewOfSection] "
                 "Failed to read view size\n");
             return error::error;
         }
@@ -735,7 +1240,10 @@ bool fileextractor::inject_queryvolumeinfo(drakvuf_trap_info_t* info,
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = task.target.regs.rsp;
 
-    struct argument args[5] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 5> args{};
     struct IO_STATUS_BLOCK_32 io_status_block_32 = {};
     struct IO_STATUS_BLOCK_64 io_status_block_64 = {};
     struct FILE_FS_DEVICE_INFORMATION dev_info = {};
@@ -749,12 +1257,11 @@ bool fileextractor::inject_queryvolumeinfo(drakvuf_trap_info_t* info,
     init_int_argument(&args[3], sizeof(dev_info));
     init_int_argument(&args[4], FileFsDeviceInformation);
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 5))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->queryvolumeinfo_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
+    task.target.ret_rsp = regs.rsp;
     task.queryvolumeinfo.out = args[2].data_on_stack;
-    info->regs->rip = this->queryvolumeinfo_va;
 
     task.stage = task_t::stage_t::queryvolumeinfo;
     return true;
@@ -767,7 +1274,10 @@ bool fileextractor::inject_queryinfo(drakvuf_trap_info_t* info,
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = task.target.regs.rsp;
 
-    struct argument args[5] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 5> args{};
     struct IO_STATUS_BLOCK_32 io_status_block_32 = {};
     struct IO_STATUS_BLOCK_64 io_status_block_64 = {};
     struct FILE_STANDARD_INFORMATION dev_info = {};
@@ -781,12 +1291,11 @@ bool fileextractor::inject_queryinfo(drakvuf_trap_info_t* info,
     init_int_argument(&args[3], sizeof(dev_info));
     init_int_argument(&args[4], FileStandardInformation);
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 5))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->queryinfo_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
+    task.target.ret_rsp = regs.rsp;
     task.queryinfo.out = args[2].data_on_stack;
-    info->regs->rip = queryinfo_va;
 
     task.stage = task_t::stage_t::queryinfo;
     return true;
@@ -799,7 +1308,10 @@ bool fileextractor::inject_createsection(drakvuf_trap_info_t* info,
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = task.target.regs.rsp;
 
-    struct argument args[7] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 7> args{};
     handle_t section_handle = 0;
     struct _LARGE_INTEGER max_size = { 0 };
     max_size.QuadPart = task.file_size;
@@ -812,12 +1324,11 @@ bool fileextractor::inject_createsection(drakvuf_trap_info_t* info,
     init_int_argument(&args[5], 0x8000000); // AllocationAttributes = SEC_COMMIT
     init_int_argument(&args[6], task.handle); // FileHandle
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 7))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->createsection_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
+    task.target.ret_rsp = regs.rsp;
     task.createsection.handle = args[0].data_on_stack;
-    info->regs->rip = this->createsection_va;
 
     task.stage = task_t::stage_t::createsection;
     return true;
@@ -830,7 +1341,10 @@ bool fileextractor::inject_mapview(drakvuf_trap_info_t* info,
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = task.target.regs.rsp;
 
-    struct argument args[10] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 10> args{};
     uint64_t base = 0;
     struct _LARGE_INTEGER offset = { 0 };
     offset.QuadPart = task.file_offset;
@@ -847,13 +1361,12 @@ bool fileextractor::inject_mapview(drakvuf_trap_info_t* info,
     init_int_argument   (&args[8], 0); // AllocationType
     init_int_argument   (&args[9], 2); // Win32Protect
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 10))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->mapview_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
+    task.target.ret_rsp = regs.rsp;
     task.mapview.base = args[2].data_on_stack;
     task.mapview.size = args[6].data_on_stack;
-    info->regs->rip = this->mapview_va;
 
     task.stage = task_t::stage_t::mapview;
     return true;
@@ -866,16 +1379,18 @@ bool fileextractor::inject_allocate_pool(drakvuf_trap_info_t* info,
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = task.target.regs.rsp;
 
-    struct argument args[3] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 3> args{};
     init_int_argument(&args[0], 0); // NonPagedPool
     init_int_argument(&args[1], BYTES_TO_READ);
     init_int_argument(&args[2], 0);
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->exallocatepool_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
-    info->regs->rip = this->exallocatepool_va;
+    task.target.ret_rsp = regs.rsp;
 
     task.stage = task_t::stage_t::allocate_pool;
     return true;
@@ -890,16 +1405,18 @@ bool fileextractor::inject_memcpy(drakvuf_trap_info_t* info,
 
     task.bytes_to_read = std::min(task.file_size - task.file_offset, BYTES_TO_READ);
 
-    struct argument args[3] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 3> args{};
     init_int_argument(&args[0], task.pool);
     init_int_argument(&args[1], task.view_base);
     init_int_argument(&args[2], task.bytes_to_read);
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->memcpy_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
-    info->regs->rip = this->memcpy_va;
+    task.target.ret_rsp = regs.rsp;
 
     task.stage = task_t::stage_t::memcpy;
     return true;
@@ -912,16 +1429,18 @@ bool fileextractor::inject_unmapview(drakvuf_trap_info_t* info,
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = task.target.regs.rsp;
 
-    struct argument args[2] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 2> args{};
 
     init_int_argument(&args[0], 0xffffffffffffffff); // current process pseudo handle
     init_int_argument(&args[1], task.view_base);
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 2))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->unmapview_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
-    info->regs->rip = this->unmapview_va;
+    task.target.ret_rsp = regs.rsp;
 
     task.stage = task_t::stage_t::unmapview;
     return true;
@@ -934,15 +1453,17 @@ bool fileextractor::inject_close_handle(drakvuf_trap_info_t* info,
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = task.target.regs.rsp;
 
-    struct argument args[1] = {};
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
+
+    std::array<argument, 1> args{};
 
     init_int_argument(&args[0], task.section_handle);
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 1))
+    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->close_handle_va, task.set_stack_marker()))
         return false;
 
-    task.target.ret_rsp = info->regs->rsp;
-    info->regs->rip = this->close_handle_va;
+    task.target.ret_rsp = regs.rsp;
 
     task.stage = task_t::stage_t::close_handle;
     return true;
@@ -951,6 +1472,35 @@ bool fileextractor::inject_close_handle(drakvuf_trap_info_t* info,
 /*****************************************************************************
  *                                 Routines                                  *
  *****************************************************************************/
+
+void fileextractor::check_stack_marker(
+    drakvuf_trap_info_t* info,
+    vmi_lock_guard& vmi,
+    task_t* task)
+{
+    if (task->stage != task_t::stage_t::pending &&
+        task->stage != task_t::stage_t::finished)
+    {
+        ACCESS_CONTEXT(ctx);
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = task->stack_marker_va();
+        uint64_t stack_marker;
+
+        if ( VMI_SUCCESS == vmi_read_64(vmi, &ctx, &stack_marker) &&
+            stack_marker != task->stack_marker())
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d] "
+                "Stack marker check failed at %#lx: "
+                "expected %#lx, result %#lx\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , task->target.ret_pid, task->stage
+                , task->stack_marker_va(), task->stack_marker(), stack_marker
+            );
+        }
+    }
+}
 
 bool fileextractor::get_file_object_handle_count(drakvuf_trap_info_t* info,
     handle_t handle,
@@ -1014,12 +1564,13 @@ std::string fileextractor::get_file_name(vmi_instance_t vmi,
     addr_t* out_file,
     addr_t* out_filetype)
 {
+    std::string unknown{"<UNKNOWN>"};
     addr_t obj = drakvuf_get_obj_by_handle(drakvuf,
             info->attached_proc_data.base_addr,
             handle);
 
     if (!obj)
-        return {};
+        return unknown;
 
     addr_t file = obj + this->offsets[OBJECT_HEADER_BODY];
     addr_t filename = file + this->offsets[FILE_OBJECT_FILENAME];
@@ -1038,18 +1589,53 @@ std::string fileextractor::get_file_name(vmi_instance_t vmi,
 
     uint8_t type = 0;
     if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type))
-        return {};
+        return unknown;
 
     if (type != 5)
-        return {};
+        return unknown;
 
     unicode_string_t* filename_us = drakvuf_read_unicode(drakvuf,
             info,
             filename);
-    if (!filename_us) return {};
+    if (!filename_us) return unknown;
     std::string ret = {(const char*)filename_us->contents};
     vmi_free_unicode_str(filename_us);
     return ret;
+}
+
+bool fileextractor::get_file_object_currentbyteoffset(vmi_instance_t vmi,
+    drakvuf_trap_info_t* info,
+    handle_t handle,
+    uint64_t* currentbyteoffset)
+{
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf,
+            info->attached_proc_data.base_addr,
+            handle);
+    if (!obj)
+        return false; // Break operatioin to not crash VM
+    addr_t file = obj + this->offsets[OBJECT_HEADER_BODY];
+    addr_t fileflags = file + this->offsets[FILE_OBJECT_CURRENTBYTEOFFSET];
+
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = fileflags;
+    ctx.dtb = info->regs->cr3;
+
+    uint64_t offset_value;
+    bool success = (VMI_SUCCESS == vmi_read_64(vmi, &ctx, &offset_value));
+    if (success && currentbyteoffset) *currentbyteoffset = offset_value;
+    return success;
+}
+
+bool fileextractor::get_write_offset(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t offset_addr, uint64_t* write_offset)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = offset_addr
+    );
+    bool success = (VMI_SUCCESS == vmi_read_64(vmi, &ctx, write_offset));
+    return success;
 }
 
 void fileextractor::print_file_information(drakvuf_trap_info_t* info,
@@ -1062,6 +1648,9 @@ void fileextractor::print_file_information(drakvuf_trap_info_t* info,
         case task_t::task_reason::write:
             r = "WriteFile";
             break;
+        case task_t::task_reason::createsection:
+            r = "CreateSection";
+            break;
         case task_t::task_reason::del:
             r = "DeleteFile";
             break;
@@ -1070,14 +1659,102 @@ void fileextractor::print_file_information(drakvuf_trap_info_t* info,
             break;
     }
 
+    std::optional<fmt::Qstr<std::string>> file_sha256;
+    if (!task.file_sha256.empty())
+        file_sha256 = task.file_sha256;
+
     fmt::print(this->format, "fileextractor", drakvuf, info,
         keyval("FileName", fmt::Estr(task.filename)),
         keyval("Size", fmt::Nval(task.file_size)),
+        keyval("FileHash", file_sha256),
         keyval("Flags", fmt::Xval(task.fo_flags)),
         flagsval("FlagsExpanded", flags),
         keyval("SeqNum", fmt::Nval(task.idx)),
-        keyval("Reason", fmt::Qstr(r))
+        keyval("Reason", fmt::Qstr(r)),
+        keyval("isClosed", fmt::Nval(task.closed))
     );
+}
+
+void fileextractor::print_plugin_close_information(drakvuf_trap_info_t* info,
+    task_t& task)
+{
+    std::string flags = parse_flags(task.fo_flags, fo_flags_map, this->format);
+    std::string r;
+    switch (task.reason)
+    {
+        case task_t::task_reason::write:
+            r = "WriteFile";
+            break;
+        case task_t::task_reason::createsection:
+            r = "CreateSection";
+            break;
+        case task_t::task_reason::del:
+            r = "DeleteFile";
+            break;
+        default:
+            r = "Unknown";
+            break;
+    }
+
+    std::optional<fmt::Qstr<std::string>> file_sha256;
+    if (!task.file_sha256.empty())
+        file_sha256 = task.file_sha256;
+
+    fmt::print(this->format, "fileextractor_close", drakvuf, info,
+        keyval("Time", TimeVal{UNPACK_TIMEVAL(g_get_real_time())}),
+        keyval("ProcessName", fmt::Qstr(task.process_name)),
+        keyval("PID", fmt::Nval(task.pid)),
+        keyval("PPID", fmt::Nval(task.ppid)),
+        keyval("FileName", fmt::Estr(task.filename)),
+        keyval("Size", fmt::Nval(task.file_size)),
+        keyval("FileHash", file_sha256),
+        keyval("Flags", fmt::Xval(task.fo_flags)),
+        flagsval("FlagsExpanded", flags),
+        keyval("SeqNum", fmt::Nval(task.idx)),
+        keyval("Reason", fmt::Qstr(r)),
+        keyval("isClosed", fmt::Nval(task.closed))
+    );
+}
+
+void fileextractor::calc_checksum(task_t& task)
+{
+    auto file = get_data_filename(this->dump_folder, task.idx);
+    if (file.empty())
+        return;
+
+    umask(S_IWGRP|S_IWOTH);
+    FILE* fp = fopen(file.data(), "r");
+    if (!fp)
+        return;
+
+    fseek(fp, 0, SEEK_END);
+    uint64_t size = ftell(fp);
+
+    task.file_size = size;
+    if(this->hash_size && ( task.file_size > this->hash_size ))
+    {
+        fclose(fp);
+        PRINT_DEBUG("[FILEEXTRACTOR] Too big file to calculate hash\n");
+        return;
+    }
+
+    fseek(fp, 0, SEEK_SET);
+    char* list = new char[4096];
+    int  numread;
+    GChecksum* checksum = nullptr;
+    checksum = g_checksum_new(G_CHECKSUM_SHA256);
+
+    do {
+        numread = fread(list, sizeof(char), 4096, fp );
+        g_checksum_update(checksum, (const unsigned char*)list, numread);
+    } while ((uint64_t)ftell(fp) < size);
+
+    task.file_size = size;
+    task.file_sha256 = g_checksum_get_string(checksum);
+    g_checksum_free(checksum);
+    delete [] list;
+    fclose(fp);
+    return;
 }
 
 void fileextractor::print_extraction_failure(drakvuf_trap_info_t* info,
@@ -1085,7 +1762,7 @@ void fileextractor::print_extraction_failure(drakvuf_trap_info_t* info,
     const string& message)
 {
     fmt::print(this->format, "fileextractor_fail", drakvuf, info,
-        keyval("FileName", fmt::Qstr(filename)),
+        keyval("FileName", fmt::Estr(filename)),
         keyval("Message", fmt::Qstr(message))
     );
 }
@@ -1094,16 +1771,12 @@ void fileextractor::save_file_metadata(drakvuf_trap_info_t* info,
     addr_t control_area,
     task_t& task)
 {
-    char* file = NULL;
-    if ( asprintf(&file,
-            "%s/file.%06d.metadata",
-            this->dump_folder,
-            task.idx) < 0 )
+    auto file = get_metadata_filename(this->dump_folder, task.idx);
+    if (file.empty())
         return;
 
     umask(S_IWGRP|S_IWOTH);
-    FILE* fp = fopen(file, "w");
-    free(file);
+    FILE* fp = fopen(file.data(), "w");
     if (!fp)
         return;
 
@@ -1152,212 +1825,147 @@ void fileextractor::save_file_metadata(drakvuf_trap_info_t* info,
     fclose(fp);
 
     json_object_put(jobj);
-    print_file_information(info, task);
 }
 
-void fileextractor::extract_ca_file(drakvuf_trap_info_t* info,
-    vmi_instance_t vmi,
-    addr_t control_area,
+void fileextractor::update_file_metadata(drakvuf_trap_info_t* info,
     task_t& task)
 {
-    addr_t subsection = control_area + this->control_area_size;
-    addr_t segment = 0;
-    addr_t test = 0;
-    uint32_t test2 = 0;
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
-
-    /* Check whether subsection points back to the control area */
-    ctx.addr = control_area + this->offsets[CONTROL_AREA_SEGMENT];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &segment) )
-        return;
-
-    ctx.addr = segment + this->offsets[SEGMENT_CONTROLAREA];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &test) || test != control_area )
-        return;
-
-    ctx.addr = segment + this->offsets[SEGMENT_SIZEOFSEGMENT];
-    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &test) )
-        return;
-
-    ctx.addr = segment + this->offsets[SEGMENT_TOTALNUMBEROFPTES];
-    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &test2) )
-        return;
-
-    if ( test != (static_cast<addr_t>(test2) * 4096) )
-        return;
-
-    char* file = NULL;
-    if ( asprintf(&file,
-            "%s/file.%06d.mm",
-            this->dump_folder,
-            task.idx) < 0 )
+    //update metadata: change size, add sha256
+    auto file = get_metadata_filename(this->dump_folder, task.idx);
+    if (file.empty())
         return;
 
     umask(S_IWGRP|S_IWOTH);
-    FILE* fp = fopen(file, "w");
-    free(file);
+    FILE* fp = fopen(file.data(), "r+");
     if (!fp)
         return;
+    fseek(fp, 0, SEEK_END);
+    uint64_t size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
 
-    while (subsection)
+    // NULL-terminate buffer to avoid "heap-buffer-overflow"
+    auto buf = std::make_unique<char[]>(size+1);
+    if (size != fread(buf.get(), sizeof(char), size, fp))
     {
-        /* Check whether subsection points back to the control area */
-        ctx.addr = subsection + this->offsets[SUBSECTION_CONTROLAREA];
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &test) ||
-            test != control_area )
-            break;
-
-        addr_t base = 0;
-        uint32_t start = 0;
-        uint32_t ptes = 0;
-
-        ctx.addr = subsection + this->offsets[SUBSECTION_SUBSECTIONBASE];
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &base) )
-            break;
-
-        ctx.addr = subsection + this->offsets[SUBSECTION_PTESINSUBSECTION];
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &ptes) )
-            break;
-
-        ctx.addr = subsection + this->offsets[SUBSECTION_STARTINGSECTOR];
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &start) )
-            break;
-
-        /*
-         * The offset into the file is stored implicitely
-         * based on the PTE's location within the Subsection.
-         */
-        addr_t subsection_offset = static_cast<addr_t>(start) * 0x200;
-        addr_t ptecount;
-        for (ptecount=0; ptecount < ptes; ptecount++)
-        {
-            addr_t pteoffset = base + this->mmpte_size * ptecount;
-            addr_t fileoffset = subsection_offset + ptecount * 0x1000;
-
-            addr_t pte = 0;
-            ctx.addr = pteoffset;
-            if ( VMI_FAILURE == vmi_read(vmi,
-                    &ctx,
-                    this->mmpte_size,
-                    &pte, NULL) )
-                break;
-
-            if ( ENTRY_PRESENT(1, pte) )
-            {
-                uint8_t page[4096];
-
-                if ( VMI_FAILURE == vmi_read_pa(vmi,
-                        VMI_BIT_MASK(12, 48) & pte,
-                        4096,
-                        &page,
-                        NULL) )
-                    continue;
-
-                if ( !fseek ( fp, fileoffset, SEEK_SET ) )
-                {
-                    if ( fwrite(page, 4096, 1, fp) )
-                        task.file_size = MAX(task.file_size, fileoffset + 4096);
-                }
-            }
-        }
-
-        ctx.addr = subsection + this->offsets[SUBSECTION_NEXTSUBSECTION];
-        if ( !vmi_read_addr(vmi, &ctx, &subsection) )
-            break;
+        fclose(fp);
+        return;
     }
 
+    json_object* jobj = json_tokener_parse(buf.get());
+    if (!jobj)
+    {
+        fclose(fp);
+        return;
+    }
+
+    json_object_object_add(jobj,
+        "FileSize",
+        json_object_new_int64(task.file_size));
+
+    json_object_object_add(jobj,
+        "FileHash",
+        json_object_new_string(task.file_sha256.data()));
+
+
+    fseek(fp, 0, SEEK_SET);
+    fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
 
-    save_file_metadata(info, control_area, task);
-}
-
-void fileextractor::extract_file(drakvuf_trap_info_t* info,
-    vmi_instance_t vmi,
-    task_t& task)
-{
-    addr_t sop = 0;
-    addr_t datasection = 0;
-    addr_t sharedcachemap = 0;
-    addr_t imagesection = 0;
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
-
-    ctx.addr = task.file_obj + this->offsets[FILE_OBJECT_SECTIONOBJECTPOINTER];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &sop) )
-        return;
-
-    ctx.addr = sop + this->offsets[SECTIONOBJECTPOINTER_DATASECTIONOBJECT];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &datasection) )
-        return;
-
-    if ( datasection )
-        extract_ca_file(info, vmi, datasection, task);
-
-    ctx.addr = sop + this->offsets[SECTIONOBJECTPOINTER_SHAREDCACHEMAP];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &sharedcachemap) )
-        return;
-
-    // TODO: extraction from sharedcachemap
-
-    ctx.addr = sop + this->offsets[SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &imagesection) )
-        return;
-
-    if ( imagesection != datasection )
-        extract_ca_file(info, vmi, imagesection, task);
-}
-
-/*
- * The approach where the system process list es enumerated looking for
- * the matching cr3 value in each _EPROCESS struct is not going to work
- * if a DKOM attack unhooks the _EPROCESS struct.
- *
- * We can access the _EPROCESS structure by reading the FS_BASE register on x86
- * or the GS_BASE register on x64, which contains the _KPCR.
- *
- * FS/GS -> _KPCR._KPRCB.CurrentThread -> _ETHREAD._KTHREAD.Process = _EPROCESS
- *
- * See: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
- */
-void fileextractor::grab_file_by_handle(vmi_instance_t vmi,
-    drakvuf_trap_info_t* info,
-    task_t& task)
-{
-    get_file_object_flags(info, vmi, task.handle, &task.fo_flags);
-
-    if (this->dump_folder)
-        extract_file(info, vmi, task);
-    else
-        print_file_information(info, task);
+    json_object_put(jobj);
 }
 
 bool fileextractor::save_file_chunk(int file_sequence_number,
     void* buffer,
     size_t size)
 {
-    char* file = nullptr;
-    if ( asprintf(&file,
-            "%s/file.%06d.mm",
-            this->dump_folder,
-            file_sequence_number) < 0 )
+    auto file = get_data_filename(this->dump_folder, file_sequence_number);
+    if (file.empty())
         return false;
 
     umask(S_IWGRP|S_IWOTH);
-    FILE* fp = fopen(file, "a");
-    free(file);
+    FILE* fp = fopen(file.data(), "a");
     if (!fp) return false;
 
     bool success = (fwrite(buffer, size, 1, fp) == 1);
     fclose(fp);
 
     return success;
+}
+
+bool fileextractor::save_file_chunk_rb(int file_sequence_number, uint64_t currentoffset,
+    void* buffer,
+    size_t size)
+{
+    auto file = get_data_filename(this->dump_folder, file_sequence_number);
+    if (file.empty())
+        return false;
+
+    umask(S_IWGRP|S_IWOTH);
+    FILE* fp = fopen(file.data(), "rb+");
+    if (!fp) return false;
+
+    // check for special offset
+    if (!((currentoffset & 0xffffffff) ^ FILE_WRITE_TO_END_OF_FILE))
+        fseek(fp, 0, SEEK_END);
+    else
+        fseek(fp, currentoffset, SEEK_SET);
+
+    bool success = (fwrite(buffer, size, 1, fp) == 1);
+    fclose(fp);
+
+    return (bool)success;
+}
+
+void fileextractor::dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t offset, size_t size)
+{
+    vmi_lock_guard vmi(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = cr3,
+        .addr = str
+    );
+    addr_t currentbyteoffset = offset;
+    addr_t aligned_size = size & ~(VMI_PS_4KB - 1);
+
+    auto intra_page_offset = ctx.addr & (VMI_PS_4KB - 1);
+    if (size & (VMI_PS_4KB - 1))
+        aligned_size += VMI_PS_4KB;
+
+    if (size + intra_page_offset > aligned_size)
+        aligned_size += VMI_PS_4KB;
+
+
+    auto num_pages = aligned_size / VMI_PS_4KB ;
+
+    // sometimes very big size causes std::bad_alloc()
+    if (size > 100000000)
+        return;
+
+    std::vector<void*> access_ptrs(num_pages, nullptr);
+
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
+        return;
+
+    for (size_t i = 0; i < num_pages; i++)
+    {
+        size_t write_size = size;
+
+        if (write_size > VMI_PS_4KB - intra_page_offset)
+            write_size = VMI_PS_4KB - intra_page_offset;
+
+        if (access_ptrs[i])
+        {
+            save_file_chunk_rb(idx, currentbyteoffset, static_cast<uint8_t*>(access_ptrs[i]) + intra_page_offset, write_size);
+            // check for special offset
+            if (((currentbyteoffset & 0xffffffff) ^ FILE_WRITE_TO_END_OF_FILE))
+                currentbyteoffset += write_size;
+            munmap(access_ptrs[i], VMI_PS_4KB);
+        }
+
+        intra_page_offset = 0;
+        size -= write_size;
+    }
+    return;
 }
 
 uint64_t fileextractor::make_hook_id(drakvuf_trap_info_t* info)
@@ -1403,34 +2011,8 @@ addr_t fileextractor::find_pool()
 
 void fileextractor::free_resources(drakvuf_trap_info_t* info, task_t& task)
 {
-    // One could not restore all registers at once like this:
-    //     memcpy(info->regs, &saved_regs, sizeof(x86_registers_t)),
-    // because thus kernel structures could be affected.
-    // For example on Windows 7 x64 GS BASE stores pointer to KPCR. If save
-    // GS BASE on vCPU0 and start injections Windows scheduler could switch
-    // thread to other vCPU1. After restoring all registers vCPU1's GS BASE
-    // would point to KPCR of vCPU0.
-    info->regs->rax = task.target.regs.rax;
-    info->regs->rcx = task.target.regs.rcx;
-    info->regs->rdx = task.target.regs.rdx;
-    info->regs->rbx = task.target.regs.rbx;
-    info->regs->rbp = task.target.regs.rbp;
-    info->regs->rsp = task.target.regs.rsp;
-    info->regs->rdi = task.target.regs.rdi;
-    info->regs->rsi = task.target.regs.rsi;
-    info->regs->r8  = task.target.regs.r8;
-    info->regs->r9  = task.target.regs.r9;
-    info->regs->r10 = task.target.regs.r10;
-    info->regs->r11 = task.target.regs.r11;
-    info->regs->r12 = task.target.regs.r12;
-    info->regs->r13 = task.target.regs.r13;
-    info->regs->r14 = task.target.regs.r14;
-    info->regs->r15 = task.target.regs.r15;
-    info->regs->rip = task.target.regs.rip;
-    info->regs->rsp = task.target.regs.rsp;
-
+    drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &task.target.regs, true);
     free_pool(task.pool);
-    tasks.erase(make_task_id(task));
 }
 
 void fileextractor::read_vm(vmi_instance_t vmi,
@@ -1478,12 +2060,21 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     const fileextractor_config* c,
     output_format_t output)
     : pluginex(drakvuf, output)
+    , timeout{c->timeout}
     , is32bit(drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E)
     , offsets(new size_t[__OFFSET_MAX])
     , dump_folder(c->dump_folder)
+    , hash_size(c->hash_size)
+    , extract_size(c->extract_size)
     , format(output)
     , sequence_number()
 {
+    if (dump_folder == nullptr)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] No dump folder specified\n");
+        throw -1;
+    }
+
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
             offset_names, __OFFSET_MAX, this->offsets) )
         throw -1;
@@ -1492,10 +2083,15 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
             "_CONTROL_AREA", &this->control_area_size) )
         throw -1;
 
-    if ( this->is32bit )
+    if ( VMI_PM_LEGACY == drakvuf_get_page_mode(drakvuf) )
         this->mmpte_size = 4;
     else
         this->mmpte_size = 8;
+
+    if(this->hash_size)
+        this->hash_size = this->hash_size*1024*1024;
+    if(this->extract_size)
+        this->extract_size = this->extract_size*1024*1024;
 
     this->queryvolumeinfo_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwQueryVolumeInformationFile");
@@ -1550,6 +2146,7 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
             &fileextractor::openfile_cb);
 }
 
+
 /* NOTE One should run drakvuf loop to restore VM state.
  *
  * The plug-in injects syscalls thus changes the state. So to avoid BSOD
@@ -1566,8 +2163,33 @@ fileextractor::~fileextractor()
 
 bool fileextractor::stop_impl()
 {
+    if (!begin_stop_at)
+        begin_stop_at = g_get_real_time() / G_USEC_PER_SEC;
+
     for (auto& i: tasks)
-        if (i.second->stage != task_t::stage_t::pending)
+        if (i.second->stage != task_t::stage_t::pending && i.second->stage != task_t::stage_t::finished)
+        {
+            PRINT_DEBUG(
+                "[FILEEXTRACTOR] Pending tasks count: %zu. "
+                "pid %d, name '''%s''', stage %d\n"
+                , tasks.size()
+                , i.second->target.ret_pid, i.second->filename.data()
+                , i.second->stage);
             return false;
+        }
+
+    //hash calculation and metadata update for still opened tasks
+    task_t* task;
+    for (auto& i: tasks)
+    {
+        task = i.second.get();
+        if(!task->error)
+        {
+            calc_checksum(*task);
+            update_file_metadata(nullptr, *task);
+            print_plugin_close_information(nullptr, *task);
+        }
+    }
+
     return true;
 }

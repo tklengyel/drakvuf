@@ -118,7 +118,10 @@ using task_id = uint64_t;
 
 struct fileextractor_config
 {
+    uint32_t timeout;
     const char* dump_folder;
+    uint64_t hash_size;
+    uint64_t extract_size;
 };
 
 struct task_t;
@@ -139,8 +142,12 @@ private:
         success,
         none,
         error,
+        zero_size,
     };
 
+    /* Prevent injections on timeout after stop plugin begin. */
+    uint32_t timeout{0};
+    uint32_t begin_stop_at{0};
     /* Internal data */
     std::unordered_map<task_id, std::unique_ptr<task_t>> tasks;
     bool is32bit{false};
@@ -154,6 +161,8 @@ private:
     size_t mmpte_size = 0;
 
     const char* dump_folder;
+    uint64_t hash_size{0};
+    uint64_t extract_size{0};
     output_format_t format;
 
     int sequence_number = 0;
@@ -166,6 +175,7 @@ private:
     std::unique_ptr<libhook::SyscallHook> createfile_hook;
     std::unique_ptr<libhook::SyscallHook> openfile_hook;
     std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> createfile_ret_hooks;
+    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> writefile_ret_hooks;
 
     /* VA of functions to be injected */
     addr_t queryvolumeinfo_va = 0;
@@ -183,12 +193,13 @@ private:
     /* Hook handlers */
     event_response_t setinformation_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t writefile_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t writefile_ret_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t close_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t createsection_cb (drakvuf_t, drakvuf_trap_info_t*);
     event_response_t createfile_cb (drakvuf_t, drakvuf_trap_info_t*);
     event_response_t openfile_cb (drakvuf_t, drakvuf_trap_info_t*);
     event_response_t createfile_ret_cb(drakvuf_t, drakvuf_trap_info_t*);
-    void createfile_cb_impl(drakvuf_t, drakvuf_trap_info_t*, addr_t handle);
+    void createfile_cb_impl(drakvuf_t, drakvuf_trap_info_t*, addr_t handle, bool, bool);
 
     /* Dispatchers */
     // TODO Maybe remove "response" in flavor of "error"?
@@ -226,14 +237,23 @@ private:
         addr_t handle,
         addr_t* out_file,
         addr_t* out_filetype);
+    bool get_file_object_currentbyteoffset(vmi_instance_t, drakvuf_trap_info_t*, handle_t, uint64_t*);
+    bool get_write_offset(vmi_instance_t, drakvuf_trap_info_t*, addr_t, uint64_t*);
     void print_file_information(drakvuf_trap_info_t*, task_t&);
+    void print_plugin_close_information(drakvuf_trap_info_t*, task_t&);
+    void calc_checksum(task_t&);
     void print_extraction_failure(drakvuf_trap_info_t*,
         const std::string& filename,
         const std::string& message);
     void save_file_metadata(drakvuf_trap_info_t*, addr_t control_area, task_t&);
+    void update_file_metadata(drakvuf_trap_info_t*, task_t&);
     bool save_file_chunk(int file_sequence_number,
         void* buffer,
         size_t size);
+    bool save_file_chunk_rb(int file_sequence_number, uint64_t currentoffset,
+        void* buffer,
+        size_t size);
+    void dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t offset, size_t size);
     uint64_t make_hook_id(drakvuf_trap_info_t*);
     uint64_t make_task_id(vmi_pid_t pid, handle_t handle);
     uint64_t make_task_id(task_t&);
@@ -242,13 +262,8 @@ private:
     void free_resources(drakvuf_trap_info_t*, task_t&);
     void read_vm(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
 
-    void grab_file_by_handle(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
-    void extract_file(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
-    void extract_ca_file(drakvuf_trap_info_t*,
-        vmi_instance_t,
-        addr_t control_area,
-        task_t&);
     bool is_handle_valid(handle_t);
+    void check_stack_marker(drakvuf_trap_info_t*, vmi_lock_guard&, task_t*);
 };
 
 #endif
