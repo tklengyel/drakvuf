@@ -108,13 +108,13 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 #include "plugins/plugins_ex.h"
+#include "private.h"
 
 #include <map>
 #include <utility>
 #include <cstdint>
 
-using handle_t = uint64_t;
-using task_id = uint64_t;
+using namespace fileextractor_ns;
 
 struct fileextractor_config
 {
@@ -124,15 +124,13 @@ struct fileextractor_config
     uint64_t extract_size;
 };
 
-struct task_t;
-
 class fileextractor: public pluginex
 {
 public:
     fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output);
     fileextractor(const fileextractor&) = delete;
     fileextractor& operator=(const fileextractor&) = delete;
-    ~fileextractor();
+    ~fileextractor() = default;
 
     virtual bool stop_impl() override;
 
@@ -156,7 +154,7 @@ private:
     // * `false` otherwise.
     std::map<addr_t, bool> pools;
 
-    size_t* offsets;
+    std::array<size_t, fileextractor_ns::__OFFSET_MAX> offsets;
     size_t control_area_size = 0;
     size_t mmpte_size = 0;
 

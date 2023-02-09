@@ -107,6 +107,8 @@
 
 #include "../plugin_utils.h"
 
+namespace fileextractor_ns
+{
 #define FILE_DISPOSITION_INFORMATION 13
 #define FILE_END_OF_FILE_INFORMATION 20
 #define FILE_DELETE_ON_CLOSE 0x1000
@@ -114,6 +116,9 @@
 #define FILE_APPEND_DATA 4
 #define FILE_WRITE_TO_END_OF_FILE 0xffffffff
 #define FILE_USE_FILE_POINTER_POSITION 0xfffffffe
+
+using handle_t = uint64_t;
+using task_id = uint64_t;
 
 enum offset
 {
@@ -137,17 +142,6 @@ enum offset
     OBJECT_HEADER_BODY,
     OBJECT_HEADER_HANDLE_COUNT,
     __OFFSET_MAX
-};
-
-struct createfile_ret_info
-{
-    vmi_pid_t pid;
-    uint32_t tid;
-    uint64_t rsp;
-
-    addr_t handle;
-
-    fileextractor* f;
 };
 
 enum file_object_flags
@@ -447,5 +441,5 @@ struct FILE_FS_DEVICE_INFORMATION
 
 // TODO Move into "task_t" as "MAX_READ_BYTES"
 static const uint64_t BYTES_TO_READ = 0x10000;
-
+};
 #endif // FILEDELETE_PRIVATE_H

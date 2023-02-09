@@ -119,6 +119,7 @@
 
 using std::ostringstream;
 using std::string;
+using namespace fileextractor_ns;
 
 /*****************************************************************************
  *                               Hook handlers                               *
@@ -556,7 +557,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
 
     if (task)
     {
-        if(task->error)
+        if (task->error)
             return VMI_EVENT_RESPONSE_NONE;
 
         // file extraction
@@ -882,7 +883,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         {
             free_resources(info, *task);
 
-            if(task->error)
+            if (task->error)
             {
                 tasks.erase(make_task_id(*task));
                 return VMI_EVENT_RESPONSE_NONE;
@@ -910,7 +911,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             handle_count > 1)
             return VMI_EVENT_RESPONSE_NONE;
 
-        if(task->error)
+        if (task->error)
         {
             tasks.erase(make_task_id(*task));
             return VMI_EVENT_RESPONSE_NONE;
@@ -1731,7 +1732,7 @@ void fileextractor::calc_checksum(task_t& task)
     uint64_t size = ftell(fp);
 
     task.file_size = size;
-    if(this->hash_size && ( task.file_size > this->hash_size ))
+    if (this->hash_size && ( task.file_size > this->hash_size ))
     {
         fclose(fp);
         PRINT_DEBUG("[FILEEXTRACTOR] Too big file to calculate hash\n");
@@ -1744,7 +1745,8 @@ void fileextractor::calc_checksum(task_t& task)
     GChecksum* checksum = nullptr;
     checksum = g_checksum_new(G_CHECKSUM_SHA256);
 
-    do {
+    do
+    {
         numread = fread(list, sizeof(char), 4096, fp );
         g_checksum_update(checksum, (const unsigned char*)list, numread);
     } while ((uint64_t)ftell(fp) < size);
@@ -2062,7 +2064,6 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     : pluginex(drakvuf, output)
     , timeout{c->timeout}
     , is32bit(drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E)
-    , offsets(new size_t[__OFFSET_MAX])
     , dump_folder(c->dump_folder)
     , hash_size(c->hash_size)
     , extract_size(c->extract_size)
@@ -2076,7 +2077,7 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     }
 
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
-            offset_names, __OFFSET_MAX, this->offsets) )
+            offset_names, this->offsets.size(), this->offsets.data()) )
         throw -1;
 
     if ( !drakvuf_get_kernel_struct_size(drakvuf,
@@ -2088,9 +2089,9 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     else
         this->mmpte_size = 8;
 
-    if(this->hash_size)
+    if (this->hash_size)
         this->hash_size = this->hash_size*1024*1024;
-    if(this->extract_size)
+    if (this->extract_size)
         this->extract_size = this->extract_size*1024*1024;
 
     this->queryvolumeinfo_va = drakvuf_kernel_symbol_to_va(drakvuf,
@@ -2146,7 +2147,6 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
             &fileextractor::openfile_cb);
 }
 
-
 /* NOTE One should run drakvuf loop to restore VM state.
  *
  * The plug-in injects syscalls thus changes the state. So to avoid BSOD
@@ -2156,10 +2156,6 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
  * Hint: there is no need to wait all files read finish. Just waite every
  * hook and restore state.
  */
-fileextractor::~fileextractor()
-{
-    delete[] offsets;
-}
 
 bool fileextractor::stop_impl()
 {
@@ -2183,7 +2179,7 @@ bool fileextractor::stop_impl()
     for (auto& i: tasks)
     {
         task = i.second.get();
-        if(!task->error)
+        if (!task->error)
         {
             calc_checksum(*task);
             update_file_metadata(nullptr, *task);
