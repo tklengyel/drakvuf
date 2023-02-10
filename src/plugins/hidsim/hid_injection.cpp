@@ -631,8 +631,6 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
     int sleep = 0;
     int time_frame = 0;
 
-    int s = _rand()%512;
-
     bool is_click = false;
     int moves_next_click = gaussian_rand(CLK_MEAN, CLK_SIGMA);
 
@@ -708,7 +706,6 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
         if (sleep>0)
             usleep(sleep);
 
-        s++;
     }
 
     return 0;
