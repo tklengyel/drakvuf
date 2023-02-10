@@ -213,6 +213,13 @@ if get_option('plugin-ipt')
     config_h.set('ENABLE_PLUGIN_IPT', 1)
 endif
 
+if get_option('plugin-rebootmon')
+    plugin_sources += 'rebootmon/rebootmon.cpp'
+    plugin_sources += 'rebootmon/linux.cpp'
+
+    config_h.set('ENABLE_PLUGIN_REBOOTMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -244,6 +251,7 @@ summary({
     'unixsocketmon' : get_option('plugin-unixsocketmon'),
     'etwmon' : get_option('plugin-etwmon'),
     'ipt' : get_option('plugin-ipt'),
+    'rebootmon' : get_option('plugin-rebootmon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({

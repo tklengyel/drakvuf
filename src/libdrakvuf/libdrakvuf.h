@@ -158,6 +158,7 @@ extern bool verbose;
 #define SIGDRAKVUFTIMEOUT -2
 #define SIGDRAKVUFCRASH   -3
 #define SIGDRAKVUFKERNELPANIC -4 // drakvuf loop interrupted by BSOD or KERNEL PANIC
+#define SIGDRAKVUFPOWEROFF -5 // drakvuf loop interrupted by POWER OFF, HALT or REBOOT
 
 typedef enum lookup_type
 {

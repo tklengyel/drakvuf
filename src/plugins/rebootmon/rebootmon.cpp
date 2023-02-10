@@ -102,20 +102,15 @@
  *                                                                         *
  ***************************************************************************/
 
-#pragma once
+#include "rebootmon.h"
+#include "linux.h"
 
-enum drakvuf_exit_code_t
+rebootmon::rebootmon(drakvuf_t drakvuf, const rebootmon_config* c, output_format_t output)
+    : pluginex(drakvuf, output)
 {
-    SUCCESS = 0,
-    FAIL = 1,
-    INJECTION_TIMEOUT = 2,
-    INJECTION_ERROR = 3, // Injection failed due to implementation error
-    INJECTION_UNSUCCESSFUL = 4, /* Injection has been done correctly, but
-                                 * the sample could not be started
-                                 * (corrupted, arch mismatch and so on) */
-    WRITE_FILE_TIMEOUT = 5,
-    WRITE_FILE_ERROR = 6,
-    PLUGINS_STOP_TIMEOUT = 7,
-    KERNEL_PANIC = 10,
-    POWER_OFF = 11,
-};
+    auto os = drakvuf_get_os_type(drakvuf);
+    if (os == VMI_OS_WINDOWS)
+        throw -1;
+    else
+        this->l_impl = std::make_unique<linux_rebootmon>(drakvuf, c, output);
+}

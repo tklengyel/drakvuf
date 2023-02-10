@@ -132,6 +132,18 @@ std::string parse_flags(uint64_t flags,
     output_format_t format = OUTPUT_DEFAULT,
     std::string empty = std::string());
 
+
+/* Represent enum as string.
+ *
+ * value binary enum value.
+ * enum_map mapping from enum values to names.
+ *
+ * Return string representation for a known enum value.
+ * Return to_string(value) otherwise.
+ */
+std::string parse_enum(uint64_t value,
+    const flags_str_t& enum_map);
+
 /* Dump buffer from VA to stdout.
  *
  * Read count bytes from VA specified in ctx and dumps it to stdout
