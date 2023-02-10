@@ -104,18 +104,62 @@
 
 #pragma once
 
-enum drakvuf_exit_code_t
+#include "plugin_utils.h"
+
+namespace rebootmon_ns
 {
-    SUCCESS = 0,
-    FAIL = 1,
-    INJECTION_TIMEOUT = 2,
-    INJECTION_ERROR = 3, // Injection failed due to implementation error
-    INJECTION_UNSUCCESSFUL = 4, /* Injection has been done correctly, but
-                                 * the sample could not be started
-                                 * (corrupted, arch mismatch and so on) */
-    WRITE_FILE_TIMEOUT = 5,
-    WRITE_FILE_ERROR = 6,
-    PLUGINS_STOP_TIMEOUT = 7,
-    KERNEL_PANIC = 10,
-    POWER_OFF = 11,
+
+// Magic values required to use _reboot() system call.
+#define	LINUX_REBOOT_MAGIC1  0xfee1dead
+#define	LINUX_REBOOT_MAGIC2  672274793
+#define	LINUX_REBOOT_MAGIC2A 85072278
+#define	LINUX_REBOOT_MAGIC2B 369367448
+#define	LINUX_REBOOT_MAGIC2C 537993216
+
+
+/*
+ * Commands accepted by the _reboot() system call.
+ *
+ * RESTART     Restart system using default command and mode.
+ * HALT        Stop OS and give system control to ROM monitor, if any.
+ * CAD_ON      Ctrl-Alt-Del sequence causes RESTART command.
+ * CAD_OFF     Ctrl-Alt-Del sequence sends SIGINT to init task.
+ * POWER_OFF   Stop OS and remove all power from system, if possible.
+ * RESTART2    Restart system using given command string.
+ * SW_SUSPEND  Suspend system using software suspend if compiled in.
+ * KEXEC       Restart system using a previously loaded Linux kernel
+ */
+enum reboot_command_t
+{
+    LINUX_REBOOT_CMD_RESTART    = 0x01234567,
+    LINUX_REBOOT_CMD_HALT       = 0xCDEF0123,
+    LINUX_REBOOT_CMD_CAD_ON     = 0x89ABCDEF,
+    LINUX_REBOOT_CMD_CAD_OFF    = 0x00000000,
+    LINUX_REBOOT_CMD_POWER_OFF  = 0x4321FEDC,
+    LINUX_REBOOT_CMD_RESTART2   = 0xA1B2C3D4,
+    LINUX_REBOOT_CMD_SW_SUSPEND = 0xD000FCE2,
+    LINUX_REBOOT_CMD_KEXEC      = 0x45584543,
 };
+
+static const flags_str_t reboot_magics =
+{
+    REGISTER_FLAG(LINUX_REBOOT_MAGIC1),
+    REGISTER_FLAG(LINUX_REBOOT_MAGIC2),
+    REGISTER_FLAG(LINUX_REBOOT_MAGIC2A),
+    REGISTER_FLAG(LINUX_REBOOT_MAGIC2B),
+    REGISTER_FLAG(LINUX_REBOOT_MAGIC2C),
+};
+
+static const flags_str_t reboot_commands =
+{
+    REGISTER_FLAG(LINUX_REBOOT_CMD_RESTART),
+    REGISTER_FLAG(LINUX_REBOOT_CMD_HALT),
+    REGISTER_FLAG(LINUX_REBOOT_CMD_CAD_ON),
+    REGISTER_FLAG(LINUX_REBOOT_CMD_CAD_OFF),
+    REGISTER_FLAG(LINUX_REBOOT_CMD_POWER_OFF),
+    REGISTER_FLAG(LINUX_REBOOT_CMD_RESTART2),
+    REGISTER_FLAG(LINUX_REBOOT_CMD_SW_SUSPEND),
+    REGISTER_FLAG(LINUX_REBOOT_CMD_KEXEC),
+};
+
+}
