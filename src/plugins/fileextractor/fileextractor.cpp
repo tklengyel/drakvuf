@@ -2073,7 +2073,7 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     if (dump_folder == nullptr)
     {
         PRINT_DEBUG("[FILEEXTRACTOR] No dump folder specified\n");
-        throw -1;
+        return;
     }
 
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
