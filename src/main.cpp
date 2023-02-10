@@ -226,6 +226,14 @@ static void print_usage()
         "\t -M                        Dump new or modified files also (requires -D)\n"
         "\t -n                        Use extraction method based on function injection (requires -D)\n"
 #endif
+#ifdef ENABLE_PLUGIN_FILEEXTRACTOR
+        "\t --fileextractor-timeout <timeout>\n"
+        "\t                           Timeout (in seconds) to finish file extractions\n"
+        "\t --fileextractor-max-size-hash <size>\n"
+        "\t                           Max file size (in MB) to calculate hash\n"
+        "\t --fileextractor-max-size-extract <size>\n"
+        "\t                           Max file size (in MB) to extract\n"
+#endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
         "\t -T, --json-tcpip <path to json>\n"
         "\t                           The JSON profile for tcpip.sys\n"
@@ -464,6 +472,9 @@ int main(int argc, char** argv)
         opt_memdump_disable_set_thread,
         opt_memdump_disable_shellcode_detect,
         opt_dll_hooks_list,
+        opt_fileextractor_timeout,
+        opt_fileextractor_hash,
+        opt_fileextractor_extract,
         opt_procdump_timeout,
         opt_procdump_dir,
         opt_compress_procdumps,
@@ -542,6 +553,9 @@ int main(int argc, char** argv)
         {"memdump-disable-set-thread", no_argument, NULL, opt_memdump_disable_set_thread},
         {"memdump-disable-shellcode-detect", no_argument, NULL, opt_memdump_disable_shellcode_detect},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
+        {"fileextractor-timeout", required_argument, NULL, opt_fileextractor_timeout},
+        {"fileextractor-max-size-hash", required_argument, NULL, opt_fileextractor_hash},
+        {"fileextractor-max-size-extract", required_argument, NULL, opt_fileextractor_extract},
         {"procdump-timeout", required_argument, NULL, opt_procdump_timeout},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
@@ -731,6 +745,17 @@ int main(int argc, char** argv)
                 break;
             case 'n':
                 options.filedelete_use_injector = true;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_FILEEXTRACTOR
+            case opt_fileextractor_timeout:
+                options.fileextractor_timeout = strtoul(optarg, NULL, 0);
+                break;
+            case opt_fileextractor_hash:
+                options.fileextractor_hash = strtoul(optarg, NULL, 0);
+                break;
+            case opt_fileextractor_extract:
+                options.fileextractor_extract = strtoul(optarg, NULL, 0);
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
