@@ -102,7 +102,8 @@ executable('drakvuf',
     dependencies : deps,
     link_language : 'cpp',
     link_with : [libdrakvuf, drakvuf_plugins, libinjector],
-    link_args : hardened_link_args
+    link_args : hardened_link_args,
+    install : true,
 )
 
 executable('injector',
@@ -112,7 +113,8 @@ executable('injector',
     dependencies : deps,
     link_language : 'cpp',
     link_with : [libdrakvuf, libinjector],
-    link_args : hardened_link_args
+    link_args : hardened_link_args,
+    install : true,
 )
 
 executable('proc_stat',
