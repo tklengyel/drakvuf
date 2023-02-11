@@ -136,6 +136,7 @@ struct plugins_options
     uint32_t fileextractor_timeout;     // PLUGIN_FILEEXTRACTOR
     uint64_t fileextractor_hash;        // PLUGIN_FILEEXTRACTOR
     uint64_t fileextractor_extract;     // PLUGIN_FILEEXTRACTOR
+    const char* fileextractor_exclude_file; // PLUGIN_FILEEXTRACTOR
     bool cpuid_stealth;                 // PLUGIN_CPUIDMON
     const char* tcpip_profile;          // PLUGIN_SOCKETMON
     const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON, PLUGIN_SYSCALLS
