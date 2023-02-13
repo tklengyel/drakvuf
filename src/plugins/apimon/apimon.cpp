@@ -295,8 +295,8 @@ static void on_dll_discovered(drakvuf_t drakvuf, const std::string& dll_name, co
 
     vmi_pid_t pid;
     {
-        vmi_lock_guard lg(drakvuf);
-        vmi_dtb_to_pid(lg.vmi, dll->dtb, &pid);
+        auto vmi = vmi_lock_guard(drakvuf);
+        vmi_dtb_to_pid(vmi, dll->dtb, &pid);
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, nullptr,
