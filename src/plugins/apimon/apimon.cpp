@@ -293,6 +293,19 @@ static void on_dll_discovered(drakvuf_t drakvuf, const std::string& dll_name, co
 {
     apimon* plugin = (apimon*)extra;
 
+    vmi_pid_t pid;
+    {
+        vmi_lock_guard lg(drakvuf);
+        vmi_dtb_to_pid(lg.vmi, dll->dtb, &pid);
+    }
+
+    fmt::print(plugin->m_output_format, "apimon", drakvuf, nullptr,
+       keyval("Event", fmt::Qstr("dll_discovered")),
+       keyval("DllName", fmt::Qstr(dll_name)),
+       keyval("DllBase", fmt::Xval(dll->real_dll_base)),
+       keyval("PID", fmt::Nval(pid))
+    );
+
     plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
     {
         drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
