@@ -300,10 +300,10 @@ static void on_dll_discovered(drakvuf_t drakvuf, const std::string& dll_name, co
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, nullptr,
-       keyval("Event", fmt::Qstr("dll_discovered")),
-       keyval("DllName", fmt::Qstr(dll_name)),
-       keyval("DllBase", fmt::Xval(dll->real_dll_base)),
-       keyval("PID", fmt::Nval(pid))
+        keyval("Event", fmt::Qstr("dll_discovered")),
+        keyval("DllName", fmt::Qstr(dll_name)),
+        keyval("DllBase", fmt::Xval(dll->real_dll_base)),
+        keyval("PID", fmt::Nval(pid))
     );
 
     plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
