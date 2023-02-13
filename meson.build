@@ -55,6 +55,14 @@ add_project_arguments('-Wno-reorder-init-list', language : ['cpp'])
 add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
 add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
 
+if get_option('buildtype') == 'release'
+  add_project_arguments('-O3',  language : ['c', 'cpp'])
+endif
+
+if get_option('buildtype') == 'debugoptimized'
+  add_project_arguments('-O3', '-g3',  language : ['c', 'cpp'])
+endif
+
 # Runtime hardening
 hardened_link_args=[]
 if get_option('hardening')
