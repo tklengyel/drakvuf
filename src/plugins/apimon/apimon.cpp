@@ -158,7 +158,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
-        keyval("Event", fmt::Qstr("api_called")),
+        keyval("Event", fmt::Rstr("api_called")),
         keyval("CLSID", clsid),
         keyval("CalledFrom", fmt::Xval(info->regs->rip)),
         keyval("ReturnValue", fmt::Xval(info->regs->rax)),
@@ -300,8 +300,8 @@ static void on_dll_discovered(drakvuf_t drakvuf, const std::string& dll_name, co
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, nullptr,
-        keyval("Event", fmt::Qstr("dll_discovered")),
-        keyval("DllName", fmt::Qstr(dll_name)),
+        keyval("Event", fmt::Rstr("dll_discovered")),
+        keyval("DllName", fmt::Estr(dll_name)),
         keyval("DllBase", fmt::Xval(dll->real_dll_base)),
         keyval("PID", fmt::Nval(pid))
     );
