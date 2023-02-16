@@ -196,7 +196,8 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
             // The order of the arguments is different when processing x32 syscalls
             // https://elixir.bootlin.com/linux/v5.10.166/source/arch/x86/include/asm/syscall_wrapper.h#L24
             // Assume if it is not x32 syscall, then we will use the standard convention for x64
-            if ( params->type == SYSCALL_TYPE_LINUX_X32 ) {
+            if ( params->type == SYSCALL_TYPE_LINUX_X32 )
+            {
                 if ( nargs > 0 )
                     arguments.push_back(pt_regs[PT_REGS_RBX]);
                 if ( nargs > 1 )
@@ -209,7 +210,9 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
                     arguments.push_back(pt_regs[PT_REGS_RDI]);
                 if ( nargs > 5 )
                     arguments.push_back(pt_regs[PT_REGS_RBP]);
-            } else {
+            }
+            else
+            {
                 if ( nargs > 0 )
                     arguments.push_back(pt_regs[PT_REGS_RDI]);
                 if ( nargs > 1 )
@@ -250,13 +253,15 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
 
     this->fmt_args.clear();
-    if (arguments.size() > 0) {
+    if (arguments.size() > 0)
+    {
         for (size_t i = 0; i < arguments.size(); i++)
         {
             auto str = this->parse_argument(drakvuf, info, params->sc->args[i], arguments[i]);
             if (!str.empty())
                 this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Estr(str)));
-            else {
+            else
+            {
                 uint64_t value = this->transform_value(drakvuf, info, params->sc->args[i], arguments[i]);
                 this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Xval(value)));
             }
@@ -273,7 +278,7 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         keyval("vCPU", fmt::Nval(info->vcpu)),
         keyval("CR3", fmt::Xval(info->regs->cr3)),
         keyval("Syscall", fmt::Nval((uint64_t)(params->num))),
-        keyval("NArgs", fmt::Nval(params->sc->num_args)), 
+        keyval("NArgs", fmt::Nval(params->sc->num_args)),
         keyval("Type", fmt::Estr(params->type)),
         this->fmt_args
     );
@@ -282,7 +287,7 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
-    if(!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
+    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
     this->print_sysret(drakvuf, info, (uint64_t)params->num);
@@ -317,7 +322,7 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     params->tid = info->proc_data.tid;
 
     hook->trap_->name = info->trap->name;
-    
+
     auto hookID = make_hook_id(info);
     this->ret_hooks[hookID] = std::move(hook);
 
@@ -357,7 +362,7 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
         // Setup filter
         if (!this->filter.empty() && (this->filter.find(syscall_defintion->name) == this->filter.end()))
             continue;
-        
+
         // x32 syscall breakpoint
         snprintf(syscall_name, sizeof(syscall_name), "__ia32_sys_%s", syscall_defintion->name);
         if (!this->register_hook(syscall_name, syscall_number, syscall_defintion, false))
@@ -385,6 +390,6 @@ linux_syscalls::linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config,
         return;
     }
 
-    if(!this->trap_syscall_table_entries(drakvuf))
+    if (!this->trap_syscall_table_entries(drakvuf))
         PRINT_DEBUG("[SYSCALLS] Failed to set breakpoints on some syscalls.\n");
 }

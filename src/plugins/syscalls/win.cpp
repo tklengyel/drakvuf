@@ -456,7 +456,7 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
     return true;
 }
 
-win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) 
+win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output)
     : syscalls_base(drakvuf, config, output)
     , ntdll_base   { 0 }
     , wow64cpu_base{ 0 }

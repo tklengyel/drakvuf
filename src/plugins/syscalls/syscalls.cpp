@@ -243,8 +243,10 @@ syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, o
     this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     this->disable_sysret = config->disable_sysret;
 
-    if (config->syscalls_filter_file) {
-        if (!this->read_syscalls_filter(config->syscalls_filter_file)) {
+    if (config->syscalls_filter_file)
+    {
+        if (!this->read_syscalls_filter(config->syscalls_filter_file))
+        {
             PRINT_DEBUG("[SYSCALLS] Failed to read given file\n");
             throw -1;
         }

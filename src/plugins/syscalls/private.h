@@ -534,7 +534,7 @@ struct linux_syscall_data : PluginResult
 
 #define ENUM(name, number) { number, #name }
 
-static inline std::unordered_map<uint64_t, std::string> prctl_option = 
+static inline std::unordered_map<uint64_t, std::string> prctl_option =
 {
     ENUM(PR_SET_PDEATHSIG, 1),
     ENUM(PR_GET_PDEATHSIG, 2),
@@ -612,7 +612,7 @@ static inline std::unordered_map<uint64_t, std::string> arch_prctl_code =
     ENUM(ARCH_MAP_VDSO_64, 0x2003),
 };
 
-static const flags_str_t mmap_prot = 
+static const flags_str_t mmap_prot =
 {
     REGISTER_FLAG(PROT_READ),
     REGISTER_FLAG(PROT_WRITE),

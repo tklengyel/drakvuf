@@ -140,7 +140,10 @@ public:
     uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, uint64_t val);
     bool read_syscalls_filter(const char* filter_file);
 
-    virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val) { return NULL; };
+    virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val)
+    {
+        return NULL;
+    };
 
     syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     syscalls_base(const syscalls_base&) = delete;
