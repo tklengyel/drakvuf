@@ -147,6 +147,7 @@
 #include "unixsocketmon/unixsocketmon.h"
 #include "etwmon/etwmon.h"
 #include "rebootmon/rebootmon.h"
+#include "linkmon/linkmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -316,6 +317,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .abort_on_power_off = options->rebootmon_abort_on_power_off,
                     };
                     this->plugins[plugin_id] = std::make_unique<rebootmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_LINKMON
+                case PLUGIN_LINKMON:
+                {
+                    linkmon_config config =
+                    {
+                        .ole32_profile = options->ole32_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<linkmon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
