@@ -105,8 +105,18 @@
 #ifndef SYSCALLS_PRIVATE_H
 #define SYSCALLS_PRIVATE_H
 
+#include "plugins/plugins_ex.h"
+#include "plugins/plugin_utils.h"
+
 namespace syscalls_ns
 {
+
+struct syscalls_module
+{
+    std::string name;
+    addr_t base;
+    size_t size;
+};
 
 typedef enum
 {
@@ -283,7 +293,11 @@ typedef enum
     WIN32_PROTECTION_MASK,
     WINAPI,
     WORKERFACTORYINFOCLASS,
-    WPARAM
+    WPARAM,
+    // Linux special types for parsing values
+    MMAP_PROT,
+    PRCTL_OPTION,
+    ARCH_PRCTL_CODE,
 } type_t;
 
 static const char* type_names[]
@@ -441,7 +455,10 @@ static const char* type_names[]
     [WIN32_PROTECTION_MASK] = "WIN32_PROTECTION_MASK",
     [WINAPI] = "WINAPI",
     [WORKERFACTORYINFOCLASS] = "WORKERFACTORYINFOCLASS",
-    [WPARAM] = "WPARAM"
+    [WPARAM] = "WPARAM",
+    [MMAP_PROT] = "MMAP_PROT",
+    [PRCTL_OPTION] = "PRCTL_OPTION",
+    [ARCH_PRCTL_CODE] = "ARCH_PRCTL_CODE",
 };
 
 typedef struct
@@ -493,42 +510,186 @@ struct wrapper_t : public call_result_t
      .args = (const arg_t*)&_name ## _arg                        \
    }
 
-void print_syscall(
-    syscalls* s,
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    int nr,
-    std::string&& module,
-    const syscall_t* sc,
-    const std::vector<uint64_t>& args,
-    bool inlined
-);
-
-void print_sysret(
-    syscalls* s,
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    int nr,
-    std::string&& module,
-    const syscall_t* sc,
-    uint64_t ret,
-    const char* extra_info = nullptr
-);
-
-// NOTE Non "pluginex" support for linux
-struct wrapper;
-struct wrapper
+struct linux_syscall_data : PluginResult
 {
-    syscalls* s;
+    linux_syscall_data()
+        : PluginResult()
+        , type()
+        , sc()
+        , num()
+        , pid()
+        , tid()
+        , rsp()
+    {
+    }
+
+    std::string type;
     const syscall_t* sc;
-    const char* type;
-    struct wrapper* w;
     uint16_t num;
+
     vmi_pid_t pid;
-    addr_t tid;
-    addr_t stack_fingerprint;
+    uint64_t tid;
+    addr_t rsp;
 };
-void free_trap(gpointer p);
+
+#define ENUM(name, number) { number, #name }
+
+static inline std::unordered_map<uint64_t, std::string> prctl_option = 
+{
+    ENUM(PR_SET_PDEATHSIG, 1),
+    ENUM(PR_GET_PDEATHSIG, 2),
+    ENUM(PR_GET_DUMPABLE, 3),
+    ENUM(PR_SET_DUMPABLE, 4),
+    ENUM(PR_GET_UNALIGN, 5),
+    ENUM(PR_SET_UNALIGN, 6),
+    ENUM(PR_GET_FPEMU, 9),
+    ENUM(PR_SET_FPEMU, 10),
+    ENUM(PR_GET_FPEXC, 11),
+    ENUM(PR_SET_FPEXC, 12),
+    ENUM(PR_GET_TIMING, 13),
+    ENUM(PR_SET_TIMING, 14),
+    ENUM(PR_SET_NAME, 15),
+    ENUM(PR_GET_NAME, 16),
+    ENUM(PR_GET_ENDIAN, 19),
+    ENUM(PR_SET_ENDIAN, 20),
+    ENUM(PR_GET_SECCOMP, 21),
+    ENUM(PR_SET_SECCOMP, 22),
+    ENUM(PR_GET_TSC, 25),
+    ENUM(PR_SET_TSC, 26),
+    ENUM(PR_GET_SECUREBITS, 27),
+    ENUM(PR_SET_SECUREBITS, 28),
+    ENUM(PR_SET_TIMERSLACK, 29),
+    ENUM(PR_GET_TIMERSLACK, 30),
+    ENUM(PR_TASK_PERF_EVENTS_DISABLE, 31),
+    ENUM(PR_TASK_PERF_EVENTS_ENABLE, 32),
+    ENUM(PR_MCE_KILL, 33),
+    ENUM(PR_MCE_KILL_GET, 34),
+    ENUM(PR_SET_MM, 35),
+    ENUM(PR_SET_CHILD_SUBREAPER, 36),
+    ENUM(PR_GET_CHILD_SUBREAPER, 37),
+    ENUM(PR_SET_NO_NEW_PRIVS, 38),
+    ENUM(PR_GET_NO_NEW_PRIVS, 39),
+    ENUM(PR_GET_TID_ADDRESS, 40),
+    ENUM(PR_SET_THP_DISABLE, 41),
+    ENUM(PR_GET_THP_DISABLE, 42),
+    ENUM(PR_MPX_ENABLE_MANAGEMENT, 43),
+    ENUM(PR_MPX_DISABLE_MANAGEMENT, 44),
+    ENUM(PR_SET_FP_MODE, 45),
+    ENUM(PR_GET_FP_MODE, 46),
+    ENUM(PR_CAP_AMBIENT, 47),
+    ENUM(PR_SVE_SET_VL, 50),
+    ENUM(PR_SVE_SET_VL, 50),
+    ENUM(PR_GET_SPECULATION_CTRL, 52),
+    ENUM(PR_SET_SPECULATION_CTRL, 53),
+    ENUM(PR_PAC_RESET_KEYS, 54),
+    ENUM(PR_SET_TAGGED_ADDR_CTRL, 55),
+    ENUM(PR_GET_TAGGED_ADDR_CTRL, 56),
+    ENUM(PR_SET_IO_FLUSHER, 57),
+    ENUM(PR_GET_IO_FLUSHER, 58),
+    ENUM(PR_SET_SYSCALL_USER_DISPATCH, 59),
+    ENUM(PR_PAC_SET_ENABLED_KEYS, 60),
+    ENUM(PR_PAC_GET_ENABLED_KEYS, 61),
+    ENUM(PR_SCHED_CORE, 62),
+    ENUM(PR_SME_SET_VL, 63),
+    ENUM(PR_SME_GET_VL, 64),
+};
+
+static inline std::unordered_map<uint64_t, std::string> arch_prctl_code =
+{
+    ENUM(ARCH_SET_GS, 0x1001),
+    ENUM(ARCH_SET_FS, 0x1002),
+    ENUM(ARCH_GET_FS, 0x1003),
+    ENUM(ARCH_GET_GS, 0x1004),
+    ENUM(ARCH_GET_CPUID, 0x1011),
+    ENUM(ARCH_SET_CPUID, 0x1012),
+    ENUM(ARCH_GET_XCOMP_SUPP, 0x1021),
+    ENUM(ARCH_GET_XCOMP_PERM, 0x1022),
+    ENUM(ARCH_REQ_XCOMP_PERM, 0x1023),
+    ENUM(ARCH_GET_XCOMP_GUEST_PERM, 0x1024),
+    ENUM(ARCH_REQ_XCOMP_GUEST_PERM, 0x1025),
+    ENUM(ARCH_MAP_VDSO_X32, 0x2001),
+    ENUM(ARCH_MAP_VDSO_32, 0x2002),
+    ENUM(ARCH_MAP_VDSO_64, 0x2003),
+};
+
+static const flags_str_t mmap_prot = 
+{
+    REGISTER_FLAG(PROT_READ),
+    REGISTER_FLAG(PROT_WRITE),
+    REGISTER_FLAG(PROT_EXEC),
+    REGISTER_FLAG(PROT_GROWSUP),
+    REGISTER_FLAG(PROT_GROWSDOWN),
+};
+
+/**
+ * Older Linux kernels pass the arguments to the syscall functions via
+ * registers, per the ABI. Newer kernels pass the arguments via a
+ * struct pt_regs. This change was made Apr 2018 in/near commit
+ * fa697140f9a20119a9ec8fd7460cc4314fbdaff3.
+ *
+ * See kernel: arch/x86/include/asm/syscall_wrapper.h
+ *             arch/x86/entry/entry_64.S
+ *             arch/x86/include/uapi/asm/ptrace.h
+ */
+
+enum linux_pt_regs
+{
+    PT_REGS_R15,
+    PT_REGS_R14,
+    PT_REGS_R13,
+    PT_REGS_R12,
+    PT_REGS_RBP,
+    PT_REGS_RBX,
+
+    PT_REGS_R11,
+    PT_REGS_R10,
+    PT_REGS_R9,
+    PT_REGS_R8,
+    PT_REGS_RAX,
+    PT_REGS_RCX,
+    PT_REGS_RDX,
+    PT_REGS_RSI,
+    PT_REGS_RDI,
+
+    PT_REGS_ORIG_RAX,
+
+    PT_REGS_RIP,
+    PT_REGS_CS,
+    PT_REGS_EFLAGS,
+    PT_REGS_RSP,
+    PT_REGS_SS,
+
+    __PT_REGS_MAX
+};
+
+// TODO: make global for all plugins, copy from plugin to plugin is bullshit
+static const char* linux_pt_regs_offsets_name[__PT_REGS_MAX][2] =
+{
+    [PT_REGS_R15]      = {"pt_regs", "r15"},
+    [PT_REGS_R14]      = {"pt_regs", "r14"},
+    [PT_REGS_R13]      = {"pt_regs", "r13"},
+    [PT_REGS_R12]      = {"pt_regs", "r12"},
+    [PT_REGS_RBP]      = {"pt_regs", "bp"},
+    [PT_REGS_RBX]      = {"pt_regs", "bx"},
+
+    [PT_REGS_R11]      = {"pt_regs", "r11"},
+    [PT_REGS_R10]      = {"pt_regs", "r10"},
+    [PT_REGS_R9]       = {"pt_regs", "r9"},
+    [PT_REGS_R8]       = {"pt_regs", "r8"},
+    [PT_REGS_RAX]      = {"pt_regs", "ax"},
+    [PT_REGS_RCX]      = {"pt_regs", "cx"},
+    [PT_REGS_RDX]      = {"pt_regs", "dx"},
+    [PT_REGS_RSI]      = {"pt_regs", "si"},
+    [PT_REGS_RDI]      = {"pt_regs", "di"},
+
+    [PT_REGS_ORIG_RAX] = {"pt_regs", "orig_ax"},
+
+    [PT_REGS_RIP]      = {"pt_regs", "ip"},
+    [PT_REGS_CS]       = {"pt_regs", "cs"},
+    [PT_REGS_EFLAGS]   = {"pt_regs", "flags"},
+    [PT_REGS_RSP]      = {"pt_regs", "sp"},
+    [PT_REGS_SS]       = {"pt_regs", "ss"},
+};
 
 }
 

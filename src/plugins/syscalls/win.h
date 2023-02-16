@@ -105,11 +105,44 @@
 #ifndef SYSCALLS_WIN_H
 #define SYSCALLS_WIN_H
 
+#include "private.h"
+#include "private_2.h"
+
+class win_syscalls : public syscalls_base
+{
+public:
+    GSList* strings_to_free;
+
+    addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
+
+    addr_t ntdll_base, wow64cpu_base;
+    size_t ntdll_size, wow64cpu_size;
+    std::unordered_map<vmi_pid_t, std::vector<syscalls_ns::syscalls_module>> procs;
+
+    addr_t image_path_name;
+    std::string win32k_profile;
+    bool win32k_initialized;
+
+    std::unique_ptr<libhook::SyscallHook> load_driver_hook;
+    std::unique_ptr<libhook::SyscallHook> create_process_hook;
+    std::unique_ptr<libhook::ReturnHook> wait_process_creation_hook;
+
+    bool setup_win32k_syscalls(drakvuf_t drakvuf);
+
+    event_response_t load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, addr_t sst[2], json_object* json);
+    virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
+
+    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, std::string&& module, const syscalls_ns::syscall_t* sc, const std::vector<uint64_t>& args, bool inlined);
+
+    win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+};
+
 namespace syscalls_ns
 {
-
-void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c);
-char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val);
 
 #define NUMBER_SERVICE_TABLES   2
 #define NTOS_SERVICE_INDEX      0

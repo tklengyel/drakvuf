@@ -112,18 +112,16 @@
 #include <libdrakvuf/ntstatus.h>
 #include <libinjector/libinjector.h>
 
-#include "syscalls.h"
-#include "private.h"
 #include "win.h"
 
-namespace syscalls_ns
-{
+using namespace syscalls_ns;
+
 static constexpr auto ki_syscall_user_ret_offset = 0x28;
 
 static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     //Loads a pointer to the plugin, which is responsible for the trap
-    auto s = get_trap_plugin<syscalls>(info);
+    auto s = get_trap_plugin<win_syscalls>(info);
 
     //get_trap_params reinterprets the pointer of info->trap->data as a pointer to duplicate_result_t
     auto wr = get_trap_params<wrapper_t>(info);
@@ -137,7 +135,9 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!exit_status_str)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
-    print_sysret(s, drakvuf, info, wr->num, info->trap->breakpoint.module, wr->sc, info->regs->rax, exit_status_str);
+    if (wr->sc)
+        info->trap->name = wr->sc->name;
+    s->print_sysret(drakvuf, info, wr->num, exit_status_str);
 
     //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
     //Deletes this trap from the list of existing traps traps
@@ -230,7 +230,7 @@ static bool resolve_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char
     return false;
 }
 
-static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, syscalls* s, const char* subsystem)
+static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s, const char* subsystem)
 {
     // Only x64 nt syscalls are supported.
     if (s->is32bit || !s->kernel_size || strcmp(subsystem, "nt"))
@@ -286,14 +286,14 @@ static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, sys
 
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto s = get_trap_plugin<syscalls>(info);
+    auto s = get_trap_plugin<win_syscalls>(info);
     auto w = get_trap_params<wrapper_t>(info);
     const syscall_t* sc = w->sc;
 
-    std::vector<uint64_t> args = extract_args(drakvuf, info, s->reg_size, sc ? sc->num_args : 0);
+    std::vector<uint64_t> args = extract_args(drakvuf, info, s->register_size, sc ? sc->num_args : 0);
 
     auto inlined = is_inlined_syscall(drakvuf, info, s, w->type);
-    print_syscall(s, drakvuf, info, w->num, w->type, sc, args, inlined);
+    s->print_syscall(drakvuf, info, w->num, w->type, sc, args, inlined);
 
     if ( s->disable_sysret || s->is_stopping() )
         return 0;
@@ -332,15 +332,14 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, syscalls* s,
-    addr_t cr3, bool ntos, addr_t base, addr_t sst[2], json_object* json)
+bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, addr_t _sst[2], json_object* json)
 {
     unsigned int syscall_count = ntos ? NUM_SYSCALLS_NT : NUM_SYSCALLS_WIN32K;
     const syscall_t** definitions = ntos ? nt : win32k;
 
     symbols_t* symbols = json ? json_get_symbols(json) : NULL;
 
-    int32_t* table = (int32_t*)g_try_malloc0(sst[1] * sizeof(int32_t));
+    int32_t* table = (int32_t*)g_try_malloc0(_sst[1] * sizeof(int32_t));
     if ( !table )
     {
         drakvuf_free_symbols(symbols);
@@ -350,20 +349,20 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
     ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = cr3;
-    ctx.addr = sst[0];
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sst[1] * sizeof(uint32_t), table, NULL) )
+    ctx.addr = _sst[0];
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, _sst[1] * sizeof(uint32_t), table, NULL) )
     {
         drakvuf_free_symbols(symbols);
         g_free(table);
         return false;
     }
 
-    for ( addr_t syscall_num = 0; syscall_num < sst[1]; syscall_num++ )
+    for ( addr_t syscall_num = 0; syscall_num < _sst[1]; syscall_num++ )
     {
         long offset = 0;
         addr_t syscall_va;
 
-        if ( !s->is32bit )
+        if ( !this->is32bit )
         {
             /*
              * The offsets in the SSDT are 32-bit RVAs calculated from the table base.
@@ -371,13 +370,13 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
              * Must be signed long because the offset may be negative.
              */
             offset = table[syscall_num] >> 4;
-            syscall_va = sst[0] + offset;
+            syscall_va = _sst[0] + offset;
         }
         else
             syscall_va = table[syscall_num];
 
         addr_t rva = syscall_va - base;
-        if ( s->is32bit )
+        if ( this->is32bit )
             rva = static_cast<uint32_t>(rva);
 
         const struct symbol* symbol = nullptr;
@@ -406,11 +405,11 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         const char* symbol_name = nullptr;
 
         if ( !symbol )
-            PRINT_DEBUG("\t Syscall %lu @ 0x%lx has no debug information matching it with RVA 0x%lx. Table: 0x%lx Offset: 0x%lx\n", syscall_num, syscall_va, rva, sst[0], offset);
+            PRINT_DEBUG("\t Syscall %lu @ 0x%lx has no debug information matching it with RVA 0x%lx. Table: 0x%lx Offset: 0x%lx\n", syscall_num, syscall_va, rva, _sst[0], offset);
         else if ( !definition )
         {
             gchar* tmp = g_strdup(symbol->name);
-            s->strings_to_free = g_slist_prepend(s->strings_to_free, tmp);
+            this->strings_to_free = g_slist_prepend(this->strings_to_free, tmp);
             symbol_name = (const char*)tmp;
             PRINT_DEBUG("\t Syscall %s:%s has no internal definition. New syscall?\n",
                 ntos ? "nt" : "wink32k", symbol_name);
@@ -418,14 +417,14 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         else
             symbol_name = definition->name;
 
-        if ( s->filter && ( !symbol_name || !g_hash_table_contains(s->filter, symbol_name) ) )
+        if ( !this->filter.empty() && ( !symbol_name || (this->filter.find(symbol_name) == this->filter.end())))
         {
             PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol_name ? symbol_name : "<unknown>");
             continue;
         }
 
         breakpoint_by_dtb_searcher bp;
-        auto trap = s->register_trap<wrapper_t>(
+        auto trap = this->register_trap<wrapper_t>(
                 nullptr,
                 syscall_cb,
                 bp.for_virt_addr(syscall_va).for_dtb(cr3),
@@ -457,55 +456,62 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
     return true;
 }
 
-void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c)
+win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) 
+    : syscalls_base(drakvuf, config, output)
+    , ntdll_base   { 0 }
+    , wow64cpu_base{ 0 }
+    , ntdll_size   { 0 }
+    , wow64cpu_size{ 0 }
+    , win32k_profile{ config->win32k_profile ?: "" }
+    , win32k_initialized{ false }
 {
     auto vmi = vmi_lock_guard(drakvuf);
 
     addr_t start = 0;
 
-    if ( !s->is32bit )
+    if ( !this->is32bit )
     {
         if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiSystemServiceStart", &start) )
             throw -1;
 
-        system_service_table_x64 sst[2] = {};
-        if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x64), (void*)&sst, NULL) )
+        system_service_table_x64 _sst[2] = {};
+        if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x64), (void*)&_sst, NULL) )
             throw -1;
 
-        s->sst[0][0] = sst[0].ServiceTable;
-        s->sst[0][1] = sst[0].ServiceLimit;
-        s->sst[1][0] = sst[1].ServiceTable;
-        s->sst[1][1] = sst[1].ServiceLimit;
+        this->sst[0][0] = _sst[0].ServiceTable;
+        this->sst[0][1] = _sst[0].ServiceLimit;
+        this->sst[1][0] = _sst[1].ServiceTable;
+        this->sst[1][1] = _sst[1].ServiceLimit;
     }
     else
     {
         if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiFastCallEntry", &start) )
             throw -1;
 
-        system_service_table_x86 sst[2] = {};
-        if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x86), (void*)&sst, NULL) )
+        system_service_table_x86 _sst[2] = {};
+        if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x86), (void*)&_sst, NULL) )
             throw -1;
 
-        s->sst[0][0] = sst[0].ServiceTable;
-        s->sst[0][1] = sst[0].ServiceLimit;
-        s->sst[1][0] = sst[1].ServiceTable;
-        s->sst[1][1] = sst[1].ServiceLimit;
+        this->sst[0][0] = _sst[0].ServiceTable;
+        this->sst[0][1] = _sst[0].ServiceLimit;
+        this->sst[1][0] = _sst[1].ServiceTable;
+        this->sst[1][1] = _sst[1].ServiceLimit;
     }
 
-    start += s->kernel_base;
+    start += this->kernel_base;
 
     addr_t dtb;
     if ( VMI_FAILURE == vmi_pid_to_dtb(vmi, 0, &dtb) )
         throw -1;
 
-    s->ntdll_base    = 0;
-    s->ntdll_size    = 0;
-    s->wow64cpu_base = 0;
-    s->wow64cpu_size = 0;
-    s->kernel_size   = 0;
+    this->ntdll_base    = 0;
+    this->ntdll_size    = 0;
+    this->wow64cpu_base = 0;
+    this->wow64cpu_size = 0;
+    this->kernel_size   = 0;
     // Get ntoskrnl size.
     pass_ctx_t pass;
-    pass.plugin = s;
+    pass.plugin = this;
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage", &pass.size_rva) ||
         !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "BaseDllName", &pass.name_rva))
     {
@@ -523,14 +529,14 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c)
             if (!strcmp((const char*)name->contents, "ntoskrnl.exe"))
             {
                 vmi_lock_guard vmi(drakvuf);
-                if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_entry + pass->size_rva, 0, &static_cast<syscalls*>(pass->plugin)->kernel_size))
+                if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_entry + pass->size_rva, 0, &static_cast<win_syscalls*>(pass->plugin)->kernel_size))
                     throw -1;
             }
             vmi_free_unicode_str(name);
         }
     }, &pass);
 
-    if (!s->kernel_size)
+    if (!this->kernel_size)
     {
         PRINT_DEBUG("Failed to get kernel image size\n");
         throw -1;
@@ -541,41 +547,39 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c)
     if ( VMI_FAILURE == vmi_read_16_ksym(vmi, "NtBuildNumber", &ntbuild) )
         throw -1;
 
-    PRINT_DEBUG("Kernel base: 0x%lx\n", s->kernel_base);
+    PRINT_DEBUG("Kernel base: 0x%lx\n", this->kernel_base);
     PRINT_DEBUG("Kernel pagetable: 0x%lx\n", dtb);
     PRINT_DEBUG("NtBuildNumber: %u\n", ntbuild);
-    PRINT_DEBUG("NT syscall table: 0x%lx. Limit: %lu\n", s->sst[0][0], s->sst[0][1]);
-    PRINT_DEBUG("Win32k syscall table: 0x%lx. Limit: %lu\n", s->sst[1][0], s->sst[1][1]);
+    PRINT_DEBUG("NT syscall table: 0x%lx. Limit: %lu\n", this->sst[0][0], this->sst[0][1]);
+    PRINT_DEBUG("Win32k syscall table: 0x%lx. Limit: %lu\n", this->sst[1][0], this->sst[1][1]);
     PRINT_DEBUG("Windows syscall entry: 0x%lx\n", start);
 #endif
 
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &s->image_path_name))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
         throw -1;
 
-    if ( !trap_syscall_table_entries(drakvuf, vmi, s, dtb, true, s->kernel_base, (addr_t*)&s->sst[0], vmi_get_kernel_json(vmi)) )
+    if ( !trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, (addr_t*)&this->sst[0], vmi_get_kernel_json(vmi)) )
     {
         PRINT_DEBUG("Failed to trap NT syscall table entries\n");
         throw -1;
     }
 
-    if ( !c->win32k_profile )
+    if ( !config->win32k_profile )
     {
         PRINT_DEBUG("Skipping second syscall table since no json profile for win32k is provided\n");
         return;
     }
 
-    if (!s->setup_win32k_syscalls(drakvuf))
+    if (!this->setup_win32k_syscalls(drakvuf))
     {
         PRINT_DEBUG("[SYSCALLS] Delay second syscall table hooks initialization\n");
 
-        s->load_driver_hook = s->createSyscallHook("NtLoadDriver", &syscalls::load_driver_cb);
-        s->create_process_hook = s->createSyscallHook("NtCreateUserProcess", &syscalls::create_process_cb);
+        this->load_driver_hook = this->createSyscallHook("NtLoadDriver", &win_syscalls::load_driver_cb);
+        this->create_process_hook = this->createSyscallHook("NtCreateUserProcess", &win_syscalls::create_process_cb);
     }
 }
 
-}
-
-bool syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
+bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
 {
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -616,7 +620,7 @@ bool syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
         return false;
     }
 
-    if (!syscalls_ns::trap_syscall_table_entries(drakvuf, vmi, this, dtb, false, win32k_base, (addr_t*)&sst[1], win32k_json))
+    if (!this->trap_syscall_table_entries(drakvuf, vmi, dtb, false, win32k_base, (addr_t*)&sst[1], win32k_json))
     {
         json_object_put(win32k_json);
         PRINT_DEBUG("Failed to trap win32k syscall entries\n");
@@ -628,10 +632,7 @@ bool syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
     return true;
 }
 
-namespace syscalls_ns
-{
-
-char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+char* win_syscalls::win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     vmi_lock_guard vmi(drakvuf);
     if ( arg.type == POBJECT_ATTRIBUTES )
@@ -649,9 +650,7 @@ char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return nullptr;
 }
 
-}
-
-event_response_t syscalls::load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t win_syscalls::load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t service_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
     unicode_string_t* service_name = drakvuf_read_unicode(drakvuf, info, service_name_addr);
@@ -678,7 +677,7 @@ event_response_t syscalls::load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t syscalls::create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t win_syscalls::create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t user_process_parameters_addr = drakvuf_get_function_argument(drakvuf, info, 9);
     addr_t imagepath_addr = user_process_parameters_addr + this->image_path_name;
@@ -697,7 +696,7 @@ event_response_t syscalls::create_process_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         {
             this->create_process_hook = {};
 
-            auto hook = createReturnHook<PluginResult>(info, &syscalls::create_process_ret_cb);
+            auto hook = createReturnHook<PluginResult>(info, &win_syscalls::create_process_ret_cb);
             this->wait_process_creation_hook = std::move(hook);
         }
         g_free(image_path_casefold);
@@ -706,7 +705,7 @@ event_response_t syscalls::create_process_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t syscalls::create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t win_syscalls::create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<PluginResult>(info);
     if (!params->verifyResultCallParams(drakvuf, info))
@@ -718,4 +717,41 @@ event_response_t syscalls::create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap
         this->load_driver_hook = {};
 
     return VMI_EVENT_RESPONSE_NONE;
+}
+
+void win_syscalls::print_syscall(
+    drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    int nr, std::string&& module, const syscall_t* sc,
+    const std::vector<uint64_t>& args, bool inlined
+)
+{
+    if (sc)
+        info->trap->name = sc->name;
+
+    this->fmt_args.clear();
+
+    if (sc)
+    {
+        for (size_t i = 0; i < args.size(); ++i)
+        {
+            auto str = this->parse_argument(drakvuf, info, sc->args[i], args[i]);
+            if ( !str.empty() )
+                this->fmt_args.push_back(keyval(sc->args[i].name, fmt::Estr(str)));
+            else
+            {
+                uint64_t val = transform_value(drakvuf, info, sc->args[i], args[i]);
+                this->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(val)));
+            }
+        }
+    }
+
+    fmt::print(this->m_output_format, "syscall", drakvuf, info,
+        keyval("Module", fmt::Qstr(std::move(module))),
+        keyval("vCPU", fmt::Nval(info->vcpu)),
+        keyval("CR3", fmt::Xval(info->regs->cr3)),
+        keyval("Syscall", fmt::Nval(nr)),
+        keyval("NArgs", fmt::Nval(args.size())),
+        keyval("Inlined", fmt::Qstr(inlined ? "True" : "False")),
+        this->fmt_args
+    );
 }

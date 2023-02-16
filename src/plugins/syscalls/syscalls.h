@@ -105,56 +105,22 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
-#include "plugins/plugins.h"
-#include "plugins/plugins_ex.h"
 #include "plugins/private.h"
-#include "plugins/output_format.h"
+#include "plugins/plugins_ex.h"
 
-struct syscalls_config
-{
-    const char* syscalls_filter_file;
-    const char* win32k_profile;
-    bool disable_sysret;
-};
+#include "linux.h"
+#include "win.h"
 
-class syscalls: public pluginex
+// external syscalls class
+class syscalls : public pluginex
 {
 public:
-    GSList* traps; // NOTE Non "pluginex" support for linux
-    GSList* strings_to_free;
-    GHashTable* filter;
-
-    uint8_t reg_size;
-    bool is32bit;
-    output_format_t format;
-    os_t os;
-    bool disable_sysret;
-
-    size_t* offsets;
-
-    addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
-    addr_t ntdll_base, ntdll_size, wow64cpu_base, wow64cpu_size;
-
-    addr_t kernel_base, kernel_size;
-    addr_t image_path_name;
-    std::string win32k_profile;
-
-    std::unique_ptr<libhook::SyscallHook> load_driver_hook;
-    std::unique_ptr<libhook::SyscallHook> create_process_hook;
-    std::unique_ptr<libhook::ReturnHook> wait_process_creation_hook;
-
-    std::vector<std::pair<char const*, fmt::Aarg>> fmt_args; // cache
+    std::unique_ptr<linux_syscalls> _linux_syscalls;
+    std::unique_ptr<win_syscalls> _win_syscalls;
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     syscalls(const syscalls&) = delete;
     syscalls& operator=(const syscalls&) = delete;
-    ~syscalls();
-
-    bool setup_win32k_syscalls(drakvuf_t drakvuf);
-
-    event_response_t load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    event_response_t create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    event_response_t create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 };
 
 #endif

@@ -102,160 +102,49 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <glib.h>
-#include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <assert.h>
-#include <string>
-#include <variant>
-#include <fstream>
-#include <iostream>
+#ifndef SYSCALLS_PRIVATE_2_H
+#define SYSCALLS_PRIVATE_2_H
 
-#include "syscalls.h"
+#include <unordered_set>
+
+#include "plugins/plugin_utils.h"
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
+#include "plugins/output_format.h"
+
 #include "private.h"
 
-using namespace syscalls_ns;
-
-void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info)
+struct syscalls_config
 {
-    fmt::print(this->m_output_format, "sysret", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("Ret", fmt::Xval(info->regs->rax)),
-        keyval("Info", fmt::Rstr(extra_info ?: ""))
-    );
-}
+    const char* syscalls_filter_file;
+    const char* win32k_profile;
+    bool disable_sysret;
+};
 
-std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+// internal syscalls class
+class syscalls_base : public pluginex
 {
-    char* cstr = nullptr;
-    std::string str;
+public:
+    os_t os;
+    addr_t kernel_base, kernel_size;
+    addr_t register_size;
+    bool is32bit;
+    bool disable_sysret;
 
-    if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
-    {
-        switch (arg.type)
-        {
-            case PUNICODE_STRING:
-            {
-                unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-                if ( us )
-                {
-                    cstr = (char*)us->contents;
-                    us->contents = nullptr;
-                    vmi_free_unicode_str(us);
-                }
-                break;
-            }
-            case PCHAR:
-                cstr = drakvuf_read_ascii_str(drakvuf, info, val);
-                break;
-            case MMAP_PROT:
-                // PROT_NONE == 0, so incorrect for parsing flags
-                str = val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
-                break;
-            case PRCTL_OPTION:
-                return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
-            case ARCH_PRCTL_CODE:
-                return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
-            default:
-                if (this->os == VMI_OS_WINDOWS)
-                    cstr = win_extract_string(drakvuf, info, arg, val);
-                break;
-        }
-    }
+    std::unordered_set<std::string> filter;
+    std::vector<std::pair<char const*, fmt::Aarg>> fmt_args;
 
-    if (cstr)
-    {
-        str = std::string(cstr);
-        g_free(cstr);
-    }
-    return str;
-}
+    void print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info = nullptr);
+    std::string parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
+    uint64_t mask_value(const syscalls_ns::arg_t& arg, uint64_t val);
+    uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, uint64_t val);
+    bool read_syscalls_filter(const char* filter_file);
 
-uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
-{
-    switch (arg.type)
-    {
-        case BYTE:
-        case BOOLEAN:
-            return val & 0xff;
-        case SHORT:
-        case USHORT:
-        case WORD:
-            return val & 0xffff;
-        case DWORD:
-        case INT:
-        case UINT:
-        case LONG:
-        case ULONG:
-        case WIN32_PROTECTION_MASK:
-            return val & 0xffffffff;
-        default:
-            return val;
-    }
-}
+    virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val) { return NULL; };
 
-uint64_t syscalls_base::transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
-{
-    if ((arg.type == PPVOID) && val)
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = val
-        );
+    syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+    syscalls_base(const syscalls_base&) = delete;
+    syscalls_base& operator=(const syscalls_base&) = delete;
+};
 
-        uint64_t _val;
-
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &_val))
-        {
-            fprintf(stderr, "Failed to read address (%p)\n", (void*) val);
-            _val = 0;
-        }
-
-        val = _val;
-    }
-    return mask_value(arg, val);
-}
-
-bool syscalls_base::read_syscalls_filter(const char* filter_file)
-{
-    std::ifstream file(filter_file);
-    if (!file.is_open())
-        return false;
-
-    std::string line;
-    while (std::getline(file, line))
-        this->filter.insert(line);
-
-    return true;
-}
-
-
-syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
-{
-    this->os = drakvuf_get_os_type(drakvuf);
-    this->kernel_base = drakvuf_get_kernel_base(drakvuf);
-    this->register_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
-    this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    this->disable_sysret = config->disable_sysret;
-
-    if (config->syscalls_filter_file) {
-        if (!this->read_syscalls_filter(config->syscalls_filter_file)) {
-            PRINT_DEBUG("[SYSCALLS] Failed to read given file\n");
-            throw -1;
-        }
-    }
-}
-
-syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
-{
-    os_t os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->_win_syscalls = std::make_unique<win_syscalls>(drakvuf, config, output);
-    else
-        this->_linux_syscalls = std::make_unique<linux_syscalls>(drakvuf, config, output);
-}
+#endif
