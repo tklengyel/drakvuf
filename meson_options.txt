@@ -44,6 +44,7 @@ option('plugin-unixsocketmon', type : 'boolean', value : true)
 option('plugin-etwmon', type : 'boolean', value : true)
 option('plugin-ipt', type : 'boolean', value : true)
 option('plugin-rebootmon', type : 'boolean', value : true)
+option('plugin-linkmon', type : 'boolean', value : true)
 
 # Disabled by default plugins
 option('plugin-libhooktest', type : 'boolean', value : 'false')

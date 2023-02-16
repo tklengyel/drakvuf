@@ -274,11 +274,13 @@ static void print_usage()
         "\t                           The JSON profile for ntdll.dll\n"
         "\t --json-iphlpapi <path to json>\n"
         "\t                           The JSON profile for iphlpapi.dll\n"
+#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON)
+        "\t --json-ole32 <path to json>\n"
+        "\t                           The JSON profile for ole32.dll\n"
+#endif
 #ifdef ENABLE_PLUGIN_WMIMON
         "\t --json-mpr <path to json>\n"
         "\t                           The JSON profile for mpr.dll\n"
-        "\t --json-ole32 <path to json>\n"
-        "\t                           The JSON profile for ole32.dll\n"
         "\t --json-wow-ole32 <path to json>\n"
         "\t                           The JSON profile for SysWOW64/ole32.dll\n"
         "\t --json-combase <path to json>\n"
@@ -820,10 +822,12 @@ int main(int argc, char** argv)
                 ignored_processes.insert(pid);
                 break;
             }
-#ifdef ENABLE_PLUGIN_WMIMON
+#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON)
             case opt_json_ole32:
                 options.ole32_profile = optarg;
                 break;
+#endif
+#ifdef ENABLE_PLUGIN_WMIMON
             case opt_json_wow_ole32:
                 options.wow_ole32_profile = optarg;
                 break;
