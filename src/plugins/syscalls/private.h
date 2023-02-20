@@ -517,19 +517,12 @@ struct linux_syscall_data : PluginResult
         , type()
         , sc()
         , num()
-        , pid()
-        , tid()
-        , rsp()
     {
     }
 
     std::string type;
     const syscall_t* sc;
     uint16_t num;
-
-    vmi_pid_t pid;
-    uint64_t tid;
-    addr_t rsp;
 };
 
 #define ENUM(name, number) { number, #name }

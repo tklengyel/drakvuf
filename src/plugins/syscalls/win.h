@@ -113,7 +113,7 @@ class win_syscalls : public syscalls_base
 public:
     GSList* strings_to_free;
 
-    addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
+    std::array<std::array<addr_t, 2>, 2> sst;
 
     addr_t ntdll_base, wow64cpu_base;
     size_t ntdll_size, wow64cpu_size;
@@ -133,7 +133,7 @@ public:
     event_response_t create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-    bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, addr_t sst[2], json_object* json);
+    bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, std::array<addr_t, 2> _sst, json_object* json);
     virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
 
     void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, std::string&& module, const syscalls_ns::syscall_t* sc, const std::vector<uint64_t>& args, bool inlined);

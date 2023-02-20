@@ -149,7 +149,6 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
     if (nr > NUM_SYSCALLS_LINUX)
         return arguments;
 
-    auto vmi = vmi_lock_guard(drakvuf);
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
     int nargs = params->sc->num_args;
 
@@ -176,6 +175,7 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
         // Support both calling conventions for 64 bit Linux syscalls
         if (pt_regs_addr)
         {
+            auto vmi = vmi_lock_guard(drakvuf);
             // The syscall args are passed via a struct pt_regs *, which is in %rdi upon entry
             size_t pt_regs[__PT_REGS_MAX] = {0};
             ACCESS_CONTEXT(ctx,
@@ -253,18 +253,15 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
 
     this->fmt_args.clear();
-    if (arguments.size() > 0)
+    for (size_t i = 0; i < arguments.size(); i++)
     {
-        for (size_t i = 0; i < arguments.size(); i++)
+        auto str = this->parse_argument(drakvuf, info, params->sc->args[i], arguments[i]);
+        if (!str.empty())
+            this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Estr(str)));
+        else
         {
-            auto str = this->parse_argument(drakvuf, info, params->sc->args[i], arguments[i]);
-            if (!str.empty())
-                this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Estr(str)));
-            else
-            {
-                uint64_t value = this->transform_value(drakvuf, info, params->sc->args[i], arguments[i]);
-                this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Xval(value)));
-            }
+            uint64_t value = this->transform_value(drakvuf, info, params->sc->args[i], arguments[i]);
+            this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Xval(value)));
         }
     }
 
@@ -287,7 +284,7 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
-    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
+    if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     this->print_sysret(drakvuf, info, (uint64_t)params->num);
@@ -317,9 +314,7 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     auto hook = this->createReturnHook<linux_syscall_data>(info, &linux_syscalls::linux_ret_cb);
     auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
-    params->rsp = drakvuf_get_function_return_address(drakvuf, info);
-    params->pid = info->proc_data.pid;
-    params->tid = info->proc_data.tid;
+    params->setResultCallParams(info);
 
     hook->trap_->name = info->trap->name;
 
@@ -352,7 +347,11 @@ bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, 
 
 bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
 {
+    // In this case, we check whether we were able to install all syscalls without errors,
+    // and if this isn't the case, we simply warn the user that some syscalls couldn't be installed correctly
+    // For example, old kernels don't support new syscalls, and hooks can't be installed
     bool check = true;
+
     // Iterate over all syscalls and setup breakpoint on each function instead of do_syscall_64
     // This increase performance, especially with filter file
     char syscall_name[256] = {0};
@@ -378,6 +377,7 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
             check = false;
         memset(syscall_name, sizeof(char), sizeof(syscall_name));
     }
+
     return check;
 }
 

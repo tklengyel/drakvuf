@@ -332,7 +332,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, addr_t _sst[2], json_object* json)
+bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, std::array<addr_t, 2> _sst, json_object* json)
 {
     unsigned int syscall_count = ntos ? NUM_SYSCALLS_NT : NUM_SYSCALLS_WIN32K;
     const syscall_t** definitions = ntos ? nt : win32k;
@@ -558,7 +558,7 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
         throw -1;
 
-    if ( !trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, (addr_t*)&this->sst[0], vmi_get_kernel_json(vmi)) )
+    if ( !trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, this->sst[0], vmi_get_kernel_json(vmi)) )
     {
         PRINT_DEBUG("Failed to trap NT syscall table entries\n");
         throw -1;
@@ -620,7 +620,7 @@ bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
         return false;
     }
 
-    if (!this->trap_syscall_table_entries(drakvuf, vmi, dtb, false, win32k_base, (addr_t*)&sst[1], win32k_json))
+    if (!this->trap_syscall_table_entries(drakvuf, vmi, dtb, false, win32k_base, this->sst[1], win32k_json))
     {
         json_object_put(win32k_json);
         PRINT_DEBUG("Failed to trap win32k syscall entries\n");
