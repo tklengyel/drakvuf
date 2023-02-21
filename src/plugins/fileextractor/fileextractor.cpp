@@ -108,6 +108,10 @@
 #include <cassert>
 #include <sstream>
 #include <string>
+#include <fstream>
+#include <algorithm>
+#include <vector>
+#include <iterator>
 
 #include <libinjector/libinjector.h>
 
@@ -187,6 +191,9 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
     if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
+    auto hook_id = make_hook_id(info);
+    createfile_ret_hooks.erase(hook_id);
+
     // Return if NtCreateFile/NtOpenFile failed
     if (info->regs->rax)
         return VMI_EVENT_RESPONSE_NONE;
@@ -216,6 +223,12 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
             addr_t file = 0;
             auto filename = get_file_name(vmi, info, handle, &file, nullptr);
 
+            if (is_in_exclude_list(filename))
+            {
+                print_extraction_exclusion(info, filename);
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+
             tasks[id] = std::make_unique<task_t>(handle,
                     filename,
                     reason,
@@ -227,9 +240,6 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
             tasks[id]->append = params->append;
         }
     }
-
-    auto hook_id = make_hook_id(info);
-    createfile_ret_hooks.erase(hook_id);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -318,6 +328,12 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
                     addr_t file = 0;
                     auto filename = get_file_name(vmi, info, handle, &file, nullptr);
 
+                    if (is_in_exclude_list(filename))
+                    {
+                        print_extraction_exclusion(info, filename);
+                        return VMI_EVENT_RESPONSE_NONE;
+                    }
+
                     tasks[id] = std::make_unique<task_t>(handle,
                             filename,
                             task_t::task_reason::del,
@@ -348,6 +364,12 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
                 {
                     addr_t file = 0;
                     auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+                    if (is_in_exclude_list(filename))
+                    {
+                        print_extraction_exclusion(info, filename);
+                        return VMI_EVENT_RESPONSE_NONE;
+                    }
 
                     tasks[id] = std::make_unique<task_t>(handle,
                             filename,
@@ -527,6 +549,12 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
         {
             addr_t file = 0;
             auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+            if (is_in_exclude_list(filename))
+            {
+                print_extraction_exclusion(info, filename);
+                return VMI_EVENT_RESPONSE_NONE;
+            }
 
             // create new task
             tasks[id] = std::make_unique<task_t>(handle,
@@ -732,6 +760,12 @@ event_response_t fileextractor::createsection_cb(drakvuf_t,
         {
             addr_t file = 0;
             auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+            if (is_in_exclude_list(filename))
+            {
+                print_extraction_exclusion(info, filename);
+                return VMI_EVENT_RESPONSE_NONE;
+            }
 
             tasks[id] = std::make_unique<task_t>(handle,
                     filename,
@@ -1769,6 +1803,15 @@ void fileextractor::print_extraction_failure(drakvuf_trap_info_t* info,
     );
 }
 
+void fileextractor::print_extraction_exclusion(drakvuf_trap_info_t* info,
+    const std::string& filename)
+{
+    fmt::print(this->format, "fileextractor_skip", drakvuf, info,
+        keyval("FileName", fmt::Estr(filename)),
+        keyval("Message", fmt::Qstr("Excluded by filter"))
+    );
+}
+
 void fileextractor::save_file_metadata(drakvuf_trap_info_t* info,
     addr_t control_area,
     task_t& task)
@@ -2055,6 +2098,47 @@ bool fileextractor::is_handle_valid(handle_t handle)
     return handle && !VMI_GET_BIT(handle, 31);
 }
 
+bool fileextractor::is_in_exclude_list(const std::string& filename) const
+{
+    for (const auto& re : exclude_list)
+    {
+        if (regex_match(filename, re))
+            return true;
+    }
+    return false;
+}
+
+static std::vector<std::regex> parse_exclude_file(const char* exclude_file)
+{
+    if (!exclude_file)
+        return {};
+
+    std::ifstream fs(exclude_file);
+    if (!fs)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] Couldn't open (%s) for reading\n", exclude_file);
+        throw -1;
+    }
+
+    std::vector<std::string> lines;
+    std::copy(std::istream_iterator<std::string>(fs),
+        std::istream_iterator<std::string>(), std::back_inserter(lines));
+
+    std::vector<std::regex> ret;
+    try
+    {
+        auto flags = std::regex::optimize | std::regex::nosubs | std::regex::icase;
+        for (const auto& line : lines)
+            ret.emplace_back(line, flags);
+    }
+    catch (const std::regex_error& e)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] Invalid regex: %s\n", e.what());
+        throw;
+    }
+    return ret;
+}
+
 /*****************************************************************************
  *                             Public interface                              *
  *****************************************************************************/
@@ -2067,6 +2151,7 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     , dump_folder(c->dump_folder)
     , hash_size(c->hash_size)
     , extract_size(c->extract_size)
+    , exclude_list{parse_exclude_file(c->exclude_file)}
     , format(output)
     , sequence_number()
 {
