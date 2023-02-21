@@ -113,6 +113,8 @@
 #include <map>
 #include <utility>
 #include <cstdint>
+#include <vector>
+#include <regex>
 
 using namespace fileextractor_ns;
 
@@ -122,6 +124,7 @@ struct fileextractor_config
     const char* dump_folder;
     uint64_t hash_size;
     uint64_t extract_size;
+    const char* exclude_file;
 };
 
 class fileextractor: public pluginex
@@ -161,6 +164,7 @@ private:
     const char* dump_folder;
     uint64_t hash_size{0};
     uint64_t extract_size{0};
+    const std::vector<std::regex> exclude_list;
     output_format_t format;
 
     int sequence_number = 0;
@@ -237,12 +241,7 @@ private:
         addr_t* out_filetype);
     bool get_file_object_currentbyteoffset(vmi_instance_t, drakvuf_trap_info_t*, handle_t, uint64_t*);
     bool get_write_offset(vmi_instance_t, drakvuf_trap_info_t*, addr_t, uint64_t*);
-    void print_file_information(drakvuf_trap_info_t*, task_t&);
-    void print_plugin_close_information(drakvuf_trap_info_t*, task_t&);
     void calc_checksum(task_t&);
-    void print_extraction_failure(drakvuf_trap_info_t*,
-        const std::string& filename,
-        const std::string& message);
     void save_file_metadata(drakvuf_trap_info_t*, addr_t control_area, task_t&);
     void update_file_metadata(drakvuf_trap_info_t*, task_t&);
     bool save_file_chunk(int file_sequence_number,
@@ -260,8 +259,15 @@ private:
     void free_resources(drakvuf_trap_info_t*, task_t&);
     void read_vm(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
 
+    bool is_in_exclude_list(const std::string& filename) const;
+
     bool is_handle_valid(handle_t);
     void check_stack_marker(drakvuf_trap_info_t*, vmi_lock_guard&, task_t*);
+
+    void print_file_information(drakvuf_trap_info_t*, task_t&);
+    void print_plugin_close_information(drakvuf_trap_info_t*, task_t&);
+    void print_extraction_failure(drakvuf_trap_info_t* info, const std::string& filename, const std::string& message);
+    void print_extraction_exclusion(drakvuf_trap_info_t* info, const std::string& filename);
 };
 
 #endif
