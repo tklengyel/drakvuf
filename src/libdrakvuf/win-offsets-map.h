@@ -205,6 +205,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [CM_KEY_NAMELENGTH]    = { "_CM_NAME_CONTROL_BLOCK", "NameLength"      },
     [CM_KEY_PARENTKCB]     = { "_CM_KEY_CONTROL_BLOCK",  "ParentKcb"       },
     [CM_KEY_PROCESSID]     = { "_CM_KEY_BODY",           "ProcessID"       },
+    [CM_KEY_FLAGS]         = { "_CM_KEY_CONTROL_BLOCK",  "Flags"           },
 
     [PROCCREATIONINFO_IMAGEFILENAME] = { "_SE_AUDIT_PROCESS_CREATION_INFO", "ImageFileName" },
     [OBJECTNAMEINFORMATION_NAME] = { "_OBJECT_NAME_INFORMATION", "Name" },
