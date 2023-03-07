@@ -222,7 +222,7 @@ static gchar* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info
              *     ULONG Flags:16;               //0xb0
              * [...]
              * };
-             */ 
+             */
 
             ctx.addr = p_key_control_block + drakvuf->offsets[ CM_KEY_FLAGS ] + 2 ;
 
