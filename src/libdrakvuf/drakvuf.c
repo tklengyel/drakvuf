@@ -238,7 +238,7 @@ bool drakvuf_init(
     if ( drakvuf->domID == test )
         goto err;
 
-    drakvuf_pause(drakvuf);
+    xen_pause(drakvuf->xen, drakvuf->domID);
 
     if (!init_vmi(drakvuf, fast_singlestep))
         goto err;
@@ -629,14 +629,14 @@ void drakvuf_release_vmi(drakvuf_t drakvuf)
 #endif
 }
 
-void drakvuf_pause (drakvuf_t drakvuf)
+bool drakvuf_pause (drakvuf_t drakvuf)
 {
-    xen_pause(drakvuf->xen, drakvuf->domID);
+    return vmi_pause_vm(drakvuf->vmi) == VMI_SUCCESS;
 }
 
-void drakvuf_resume (drakvuf_t drakvuf)
+bool drakvuf_resume (drakvuf_t drakvuf)
 {
-    xen_resume(drakvuf->xen, drakvuf->domID);
+    return vmi_resume_vm(drakvuf->vmi) == VMI_SUCCESS;
 }
 
 void drakvuf_force_resume (drakvuf_t drakvuf)
