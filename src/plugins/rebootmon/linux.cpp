@@ -192,6 +192,7 @@ linux_rebootmon::linux_rebootmon(drakvuf_t drakvuf, const rebootmon_config* c, o
     REGISTER_HOOK(machine_restart, machine_restart_cb)
     REGISTER_HOOK(machine_halt, machine_power_off_cb)
     REGISTER_HOOK(machine_power_off, machine_power_off_cb)
+    REGISTER_HOOK(machine_emergency_restart, machine_power_off_cb)
 
 #undef REGISTER_HOOK
 #undef REGISTER_HOOK_EX
