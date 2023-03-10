@@ -118,6 +118,7 @@ private:
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> reboot_hook;
     std::unique_ptr<libhook::SyscallHook> machine_restart_hook;
+    std::unique_ptr<libhook::SyscallHook> machine_emergency_restart_hook;
     std::unique_ptr<libhook::SyscallHook> machine_halt_hook;
     std::unique_ptr<libhook::SyscallHook> machine_power_off_hook;
 
