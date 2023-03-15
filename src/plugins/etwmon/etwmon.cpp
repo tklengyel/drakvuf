@@ -179,10 +179,10 @@ static const std::vector<std::pair<const char*, size_t>> win7_global_callbacks =
 static const std::vector<std::pair<const char*, size_t>> win10_global_callbacks =
 {
     { "EtwpDiskIoNotifyRoutines", 2 },
-    { "EtwpFileIoNotifyRoutines", 6 },
+    { "EtwpFileIoNotifyRoutines", 4 },
 };
 
-wmi_logger_t::wmi_logger_t(etwmon* plugin, vmi_instance_t vmi, addr_t base) : base(base), cb_ctx(0)
+wmi_logger_t::wmi_logger_t(etwmon* plugin, vmi_instance_t vmi, addr_t base) : base(base)
 {
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, base + plugin->offsets[WMI_LOGGER_CONTEXT_GETCPUCLOCK], 0, &this->clock_fn))
     {
@@ -627,10 +627,12 @@ bool etwmon::stop_impl()
         for (size_t i = 0; i < this->global_callbacks.size(); i++)
         {
             if (this->global_callbacks.at(i) != snapshot->global_callbacks.at(i))
+            {
                 report(drakvuf, "GlobalCallback", "Anonymous", "Modified");
+            }
         }
 
-        for (size_t i = 0; i < this->global_callbacks.size(); i++)
+        for (size_t i = 0; i < this->global_handles.size(); i++)
         {
             if (this->global_handles.at(i) != snapshot->global_handles.at(i))
                 report(drakvuf, "GlobalHandle", "Anonymous", "Modified");
