@@ -162,7 +162,7 @@ static void copy_proc_data_from_priv(proc_data_t* proc_data, proc_data_priv_t* p
  * This function gets called from the singlestep event
  * after an int3 or a read event happens.
  */
-event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
     drakvuf_t drakvuf = (drakvuf_t)event->data;
