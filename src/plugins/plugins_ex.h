@@ -659,6 +659,9 @@ std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb,
 template<typename Callback>
 constexpr libhook::cb_wrapper_t pluginex::wrap_plugin_cb(Callback cb)
 {
+    static_assert(std::is_same_v<Callback, hook_cb_t> || std::is_member_function_pointer_v<Callback>,
+        "Unexpected callback type passed into wrap_plugin_cb");
+
     if constexpr (std::is_same_v<Callback, hook_cb_t>)
         return cb;
 
@@ -671,8 +674,6 @@ constexpr libhook::cb_wrapper_t pluginex::wrap_plugin_cb(Callback cb)
             return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
         };
     }
-
-    static_assert(decltype(cb)::xd, "Unexpected callback type passed into wrap_plugin_cb");
 }
 
 template<typename Params, typename IB>
