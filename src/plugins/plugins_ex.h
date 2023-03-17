@@ -498,7 +498,7 @@ public:
 private:
     template<typename Callback>
     [[nodiscard]]
-    constexpr libhook::cb_wrapper_t wrap_plugin_cb(Callback cb);
+    libhook::cb_wrapper_t wrap_plugin_cb(Callback cb);
 
     /************************************
      *        Legacy hooking API        *
@@ -657,7 +657,7 @@ std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb,
 }
 
 template<typename Callback>
-constexpr libhook::cb_wrapper_t pluginex::wrap_plugin_cb(Callback cb)
+libhook::cb_wrapper_t pluginex::wrap_plugin_cb(Callback cb)
 {
     static_assert(std::is_same_v<Callback, hook_cb_t> || std::is_member_function_pointer_v<Callback>,
         "Unexpected callback type passed into wrap_plugin_cb");
