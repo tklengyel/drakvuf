@@ -609,7 +609,7 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
-    auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, this->wrap_plugin_cb(cb), display_name, ttl);
+    auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, this->wrap_plugin_cb(cb), ttl, display_name);
     if (hook)
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
     else
