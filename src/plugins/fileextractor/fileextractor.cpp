@@ -2218,18 +2218,12 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
         throw -1;
     }
 
-    this->setinformation_hook = createSyscallHook("NtSetInformationFile",
-            &fileextractor::setinformation_cb);
-    this->writefile_hook = createSyscallHook("NtWriteFile",
-            &fileextractor::writefile_cb);
-    this->close_hook = createSyscallHook("NtClose",
-            &fileextractor::close_cb);
-    this->createsection_hook = createSyscallHook("ZwCreateSection",
-            &fileextractor::createsection_cb);
-    this->createfile_hook = createSyscallHook("NtCreateFile",
-            &fileextractor::createfile_cb);
-    this->openfile_hook = createSyscallHook("NtOpenFile",
-            &fileextractor::openfile_cb);
+    this->setinformation_hook = createSyscallHook("NtSetInformationFile", &fileextractor::setinformation_cb);
+    this->writefile_hook = createSyscallHook("NtWriteFile", &fileextractor::writefile_cb);
+    this->close_hook = createSyscallHook("NtClose", &fileextractor::close_cb);
+    this->createsection_hook = createSyscallHook("ZwCreateSection", &fileextractor::createsection_cb);
+    this->createfile_hook = createSyscallHook("NtCreateFile", &fileextractor::createfile_cb);
+    this->openfile_hook = createSyscallHook("NtOpenFile", &fileextractor::openfile_cb);
 }
 
 /* NOTE One should run drakvuf loop to restore VM state.
