@@ -672,7 +672,7 @@ libhook::cb_wrapper_t pluginex::wrap_plugin_cb(Callback cb)
         };
     }
 
-    static_assert(false, "Unexpected callback type passed into wrap_plugin_cb");
+    static_assert(decltype(cb)::xd, "Unexpected callback type passed into wrap_plugin_cb");
 }
 
 template<typename Params, typename IB>
