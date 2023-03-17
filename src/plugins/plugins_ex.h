@@ -605,7 +605,7 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name, int ttl)
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, int ttl, const std::optional<std::string>& display_name)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
