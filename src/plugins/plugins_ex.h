@@ -662,10 +662,12 @@ libhook::cb_wrapper_t wrap_plugin_cb(Callback cb)
     if constexpr (std::is_same_v<Callback, hook_cb_t>)
         return cb;
 
-    if constexpr (std::is_member_function_pointer_v<Callback>) {
+    if constexpr (std::is_member_function_pointer_v<Callback>)
+    {
         // we have a member function pointer, we need to wrap it in a lambda
         // to call it with "this" as an additional argument
-        return [=](auto&& ...args) -> event_response_t {
+        return [=](auto&& ...args) -> event_response_t
+        {
             return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
         };
     }
