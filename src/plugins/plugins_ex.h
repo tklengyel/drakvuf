@@ -497,7 +497,7 @@ public:
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::MemAccessHook> createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl);
+    std::unique_ptr<libhook::MemAccessHook> createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl = UNLIMITED_TTL);
 
 private:
     template<typename Callback>
