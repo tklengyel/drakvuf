@@ -1063,7 +1063,7 @@ codemon::codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_
     //Check if the dump directory parameter was provided
     if (!config->dump_dir)
     {
-        fprintf(stderr, "[CODEMON] Output directory for dumps not provided, not activating codemon plugin\n");
+        PRINT_DEBUG("[CODEMON] Output directory for dumps not provided, not activating codemon plugin\n");
         return;
     }
 
