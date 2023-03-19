@@ -495,6 +495,10 @@ public:
     [[nodiscard]]
     std::unique_ptr<libhook::CatchAllHook> createCatchAllHook(Callback cb, int ttl = UNLIMITED_TTL);
 
+    template<typename Params = PluginResult, typename Callback>
+    [[nodiscard]]
+    std::unique_ptr<libhook::MemAccessHook> createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl = UNLIMITED_TTL);
+
 private:
     template<typename Callback>
     [[nodiscard]]
@@ -649,6 +653,19 @@ std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb,
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
     auto hook = libhook::CatchAllHook::create<Params>(this->drakvuf, this->wrap_plugin_cb(cb), ttl);
+    if (hook)
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    else
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
+    return hook;
+}
+
+template<typename Params, typename Callback>
+std::unique_ptr<libhook::MemAccessHook> pluginex::createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+{
+    static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
+
+    auto hook = libhook::MemAccessHook::create<Params>(this->drakvuf, wrap_plugin_cb(cb), gfn, mem_access_type, mem_access, ttl);
     if (hook)
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
     else

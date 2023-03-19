@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -103,52 +103,102 @@
  ***************************************************************************/
 #pragma once
 
+#include <string>
 #include <libhook/call_result.hpp>
 #include <libhook/hooks/base.hpp>
-#include <libhook/hooks/manual.hpp>
-#include <libhook/hooks/memaccess.hpp>
-#include <libhook/hooks/return.hpp>
-#include <libhook/hooks/syscall.hpp>
-#include <libhook/hooks/cr3.hpp>
-#include <libhook/hooks/cpuid.hpp>
-#include <libhook/hooks/catchall.hpp>
 
-/**
- * A brief information about caveats of libhook.
- *
- * There are few things libhook provides:
- *  1) RAII containers around libdrakvuf traps
- *  2) Trap API unification
- *  3) ability to use non-static class-member-functions as callbacks
- *
- * 1) I spent over 2 days debugging this issue, so I'm going to note it down here (for future reference).
- *
- * If we delete a hook, we call dctor of the hook object, where we call drakvuf_remove_trap.
- * The problem is that drakvuf doesn't immediately remove those traps, but waits for entire drakvuf loop
- * to pass. This means that drakvuf might call hook, which has been already free'd.
- *
- * To avoid this we overwrite hook->trap_->cb with nullstub, which is a more "sane" (what user expects to happen).
- *
- *
- * 2) Well. this was quite easy, libhook introduces factory functions for that :)
- *
- *
- * 3a) We need to call
- *
- *    event_response_t (Dummy::*)(drakvuf_t, drakvuf_trap_info*)
- *
- * but our `this` reference has signature of `BetterPlugin*`. Problem is solved
- * by clever use of `subject_type` SFINAE (shoutout to @dekrain and @KrzaQ for helping).
- * It obtains class type (in this case `Dummy`, which needs to inherit from `pluginex`)
- * from member-function-pointer and casts `this` to it. Then we just need a standard `std::invoke`.
- *
- * 3b) Since we capture `this` in a lambda, we can at most store it in `std::function`
- * while libdrakvuf traps only contain plain C function pointer.
- *
- * That's why hooks in libhook contain callbacks as `std::function`, while using non-capture
- * lambda as trap's callback.
- *
- * The lambda has to:
- *  - get hook from trap
- *  - call callback stored in hook
- */
+namespace libhook
+{
+
+class MemAccessHook : public BaseHook
+{
+public:
+    /**
+     * Factory function to create the trap and perform hooking at the same time.
+     */
+    template<typename Params = CallResult>
+    [[nodiscard]]
+    static auto create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+    -> std::unique_ptr<MemAccessHook>;
+
+    /**
+     * unhook on dctor
+     */
+    ~MemAccessHook() override;
+
+    /**
+     * delete copy ctor, as this class has ownership via RAII
+     */
+    MemAccessHook(const MemAccessHook&) = delete;
+
+    /**
+     * move ctor, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    MemAccessHook(MemAccessHook&&) noexcept;
+
+    /**
+     * delete copy assignment operator, as this class has ownership via RAII
+     */
+    MemAccessHook& operator=(const MemAccessHook&) = delete;
+
+    /**
+     * move assignment operator, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    MemAccessHook& operator=(MemAccessHook&&) noexcept;
+
+    cb_wrapper_t callback_;
+    drakvuf_trap_t* trap_;
+
+protected:
+    /**
+     * Hide ctor from users, as we enforce factory function usage.
+     */
+    MemAccessHook(drakvuf_t, cb_wrapper_t cb);
+};
+
+template<typename Params>
+auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+-> std::unique_ptr<MemAccessHook>
+{
+    PRINT_DEBUG("[LIBHOOK] creating MemAccessHook hook\n");
+
+    // not using std::make_unique because ctor is private
+    auto hook = std::unique_ptr<MemAccessHook>(new MemAccessHook(drakvuf, cb));
+    hook->trap_ = new drakvuf_trap_t();
+
+    hook->trap_->name = "libhook MemAccessHook";
+    hook->trap_->type = MEMACCESS;
+    hook->trap_->memaccess.gfn = gfn;
+    hook->trap_->memaccess.type = mem_access_type;
+    hook->trap_->memaccess.access = mem_access;
+    hook->trap_->ttl = ttl;
+    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
+        return GetTrapHook<MemAccessHook>(info)->callback_(drakvuf, info);
+    };
+
+    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
+
+    // populate backref
+    auto* params = new Params();
+    params->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(params);
+
+    if (!drakvuf_add_trap(drakvuf, hook->trap_))
+    {
+        PRINT_DEBUG("[LIBHOOK] failed to create MemAccessHook trap!\n");
+        delete static_cast<CallResult*>(hook->trap_->data);
+        hook->trap_->data = nullptr;
+        delete hook->trap_;
+        hook->trap_ = nullptr;
+        return std::unique_ptr<MemAccessHook>();
+    }
+
+    PRINT_DEBUG("[LIBHOOK] MemAccessHook hook OK\n");
+    return hook;
+}
+
+};  // namespace libhook
