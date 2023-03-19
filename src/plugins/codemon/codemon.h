@@ -102,13 +102,15 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef CODEMON_H
-#define CODEMON_H
+#pragma once
 
 #include <vector>
 #include <memory>
 #include <set>
 #include <filesystem>
+#include <optional>
+#include <string>
+#include <array>
 #include <glib.h>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
@@ -117,47 +119,68 @@
 struct codemon_config_struct
 {
     //Dir to save extracted frames to
-    const char* codemon_dump_dir;
+    const char* dump_dir;
+
     //Executable to filter
-    const char* codemon_filter_executable;
+    const char* filter_executable;
+
     //Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not.
-    bool codemon_log_everything;
+    bool log_everything;
+
     //By default only page sized areas are dumped. By setting this flag whole VAD nodes can be dumped instead.
-    bool codemon_dump_vad;
+    bool dump_vad;
+
     //Can be utilised to enforce the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64
-    bool codemon_analyse_system_dll_vad;
+    bool analyse_system_dll_vad;
+
     //By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated.
-    bool codemon_default_benign;
+    bool default_benign;
 };
 
 class codemon : public pluginex
 {
-
 public:
-    //See codemon_config_struct
-    std::filesystem::path dump_dir;
-    const char* filter_executable = "";
+    codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_format_t output);
 
-    //a temporary  dump file
-    char* tmp_file_path = nullptr;
+    std::filesystem::path dump_dir;
+
+    std::optional<std::string> filter_executable;
+
+    //a temporary dump file
+    std::string tmp_file_path;
 
     //Counts how often an actual dump occured
     unsigned int dump_id = 0;
 
-    //Set to store all traps so they can be deleted in the end
-    std::set<drakvuf_trap*> traps;
+    // hooks and callbacks for MmAccessFault
+    std::unique_ptr<libhook::SyscallHook> mmAccessFaultHook;
+    std::unique_ptr<libhook::ReturnHook> mmAccessFaultReturnHook;
+    event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
+    event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
 
-    //Keeps track of monitored pages. Prevents duplicate traps.
+    // hooks and callbacks for memory execution/write
+    std::set<std::unique_ptr<libhook::MemAccessHook>> memaccess_hooks;
+    event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
+    event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
+
+    // responsible for removing traps from memaccess_hooks field based on drakvuf_trap_info_t
+    void remove_memaccess_hook(drakvuf_trap_info_t* trap_info);
+
+    // used for forcing windows to load swapped pages
+    event_response_t ki_system_service_handler_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    std::unique_ptr<libhook::SyscallHook> kiSystemServiceHandlerHook;
+    x86_registers_t backup_regs;
+    std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
+
+    // Keeps track of monitored pages. Prevents duplicate traps.
     std::set<std::pair<addr_t, addr_t>> monitored_pages;
 
-    //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
+    // Keeps track of the data which was already dumped, used to prevent duplicate dump files.
     // Uses the hash as key and the dumped file stem (without extension) as value.
     std::unordered_map<std::string, std::string> dumped_memory_map;
 
-    codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_format_t output);
-    codemon(const codemon&) = delete;
-    codemon& operator=(const codemon&) = delete;
-    ~codemon();
+    // processing
+    void save_file_metadata(const drakvuf_trap_info_t* trap_info, const struct dump_metadata_struct* dump_metadata, addr_t page_va);
+    void log_all_to_console(const drakvuf_trap_info* trap_info, struct dump_metadata_struct* dump_metadata, addr_t page_va);
+    bool analyse_memory(const drakvuf_trap_info_t* trap_info, struct dump_metadata_struct* dump_metadata, addr_t page_va);
 };
-
-#endif
