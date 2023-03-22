@@ -109,7 +109,6 @@
 
 #include "plugins/output_format.h"
 #include "apimon.h"
-#include "private.h"
 #include "crypto.h"
 
 

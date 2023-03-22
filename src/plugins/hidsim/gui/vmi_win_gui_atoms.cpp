@@ -106,8 +106,6 @@
 
 #include <stdio.h>
 
-/* For PRINT_DEBUG */
-#include "../../private.h"
 /* For eprint_current_time  */
 #include <libdrakvuf/libdrakvuf.h>
 

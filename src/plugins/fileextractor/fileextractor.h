@@ -105,7 +105,6 @@
 #ifndef FILEEXTRACTOR_H
 #define FILEEXTRACTOR_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 #include "plugins/plugins_ex.h"
 #include "private.h"

@@ -106,7 +106,6 @@
 #define FILETRACER_LINUX_H
 
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 #include "private.h"
 
 using namespace filetracer_ns;

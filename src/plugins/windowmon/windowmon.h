@@ -105,7 +105,6 @@
 #ifndef WINDOWMON_H
 #define WINDOWMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 struct windowmon_config

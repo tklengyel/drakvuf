@@ -105,7 +105,6 @@
 #ifndef FILETRACER_H
 #define FILETRACER_H
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 #include "win.h"
 #include "linux.h"

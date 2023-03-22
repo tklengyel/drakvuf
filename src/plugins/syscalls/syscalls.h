@@ -107,7 +107,6 @@
 
 #include "plugins/plugins.h"
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 #include "plugins/output_format.h"
 
 struct syscalls_config

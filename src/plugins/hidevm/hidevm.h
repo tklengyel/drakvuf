@@ -106,7 +106,6 @@
 #define HIDEVM_H
 
 #include <libusermode/userhook.hpp>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 #include "private.h"
 

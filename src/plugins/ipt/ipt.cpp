@@ -111,7 +111,6 @@
 #include "plugins/output_format.h"
 
 #include "ipt.h"
-#include "private.h"
 
 uint64_t pack_payload(uint32_t cmd, uint32_t data)
 {
