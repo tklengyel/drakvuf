@@ -131,7 +131,6 @@ void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
 std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     char* cstr = nullptr;
-    std::string str;
 
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
     {
@@ -153,8 +152,7 @@ std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t
                 break;
             case MMAP_PROT:
                 // PROT_NONE == 0, so incorrect for parsing flags
-                str = val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
-                break;
+                return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
             case PRCTL_OPTION:
                 return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
             case ARCH_PRCTL_CODE:
@@ -168,10 +166,11 @@ std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     if (cstr)
     {
-        str = std::string(cstr);
+        std::string str = std::string(cstr);
         g_free(cstr);
+        return str;
     }
-    return str;
+    return {};
 }
 
 uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
@@ -221,6 +220,13 @@ uint64_t syscalls_base::transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     return mask_value(arg, val);
 }
 
+static std::string rstrip(std::string s)
+{
+    while (!s.empty() && isspace(s.back()))
+        s.pop_back();
+    return s;
+}
+
 bool syscalls_base::read_syscalls_filter(const char* filter_file)
 {
     std::ifstream file(filter_file);
@@ -229,7 +235,11 @@ bool syscalls_base::read_syscalls_filter(const char* filter_file)
 
     std::string line;
     while (std::getline(file, line))
-        this->filter.insert(line);
+    {
+        line = rstrip(std::move(line));
+        if (!line.empty())
+            this->filter.insert(line);
+    }
 
     return true;
 }
