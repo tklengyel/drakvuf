@@ -232,7 +232,7 @@ bool syscalls_base::read_syscalls_filter(const char* filter_file)
     std::ifstream file(filter_file);
     if (!file.is_open())
     {
-        fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?");
+        fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?\n");
         return false;
     }
 
@@ -257,10 +257,7 @@ syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, o
     this->disable_sysret = config->disable_sysret;
 
     if (config->syscalls_filter_file && !this->read_syscalls_filter(config->syscalls_filter_file))
-    {
-        fprintf(stderr, "[SYSCALLS] Failed to read given file\n");
         throw -1;
-    }
 }
 
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
