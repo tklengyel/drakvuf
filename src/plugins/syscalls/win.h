@@ -115,6 +115,7 @@ public:
 
     std::array<std::array<addr_t, 2>, 2> sst;
 
+    addr_t kernel_size;
     addr_t ntdll_base, wow64cpu_base;
     size_t ntdll_size, wow64cpu_size;
     std::unordered_map<vmi_pid_t, std::vector<syscalls_ns::syscalls_module>> procs;

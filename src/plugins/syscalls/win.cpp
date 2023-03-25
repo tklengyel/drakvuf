@@ -458,6 +458,7 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
 
 win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output)
     : syscalls_base(drakvuf, config, output)
+    , kernel_size  { 0 }
     , ntdll_base   { 0 }
     , wow64cpu_base{ 0 }
     , ntdll_size   { 0 }
@@ -472,11 +473,17 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     if ( !this->is32bit )
     {
         if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiSystemServiceStart", &start) )
+        {
+            PRINT_DEBUG("[SYSCALLS] Failed to get symbol KiSystemServiceStart\n");
             throw -1;
+        }
 
         system_service_table_x64 _sst[2] = {};
         if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x64), (void*)&_sst, NULL) )
+        {
+            PRINT_DEBUG("[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
             throw -1;
+        }
 
         this->sst[0][0] = _sst[0].ServiceTable;
         this->sst[0][1] = _sst[0].ServiceLimit;
@@ -486,11 +493,17 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     else
     {
         if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiFastCallEntry", &start) )
+        {
+            PRINT_DEBUG("[SYSCALLS] Failed to get symbol KiFastCallEntry\n");
             throw -1;
+        }
 
         system_service_table_x86 _sst[2] = {};
         if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x86), (void*)&_sst, NULL) )
+        {
+            PRINT_DEBUG("[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
             throw -1;
+        }
 
         this->sst[0][0] = _sst[0].ServiceTable;
         this->sst[0][1] = _sst[0].ServiceLimit;
@@ -504,11 +517,6 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     if ( VMI_FAILURE == vmi_pid_to_dtb(vmi, 0, &dtb) )
         throw -1;
 
-    this->ntdll_base    = 0;
-    this->ntdll_size    = 0;
-    this->wow64cpu_base = 0;
-    this->wow64cpu_size = 0;
-    this->kernel_size   = 0;
     // Get ntoskrnl size.
     pass_ctx_t pass;
     pass.plugin = this;
@@ -530,7 +538,10 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
             {
                 vmi_lock_guard vmi(drakvuf);
                 if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_entry + pass->size_rva, 0, &static_cast<win_syscalls*>(pass->plugin)->kernel_size))
+                {
+                    PRINT_DEBUG("[SYSCALLS] Failed to enumerate drivers\n");
                     throw -1;
+                }
             }
             vmi_free_unicode_str(name);
         }
@@ -558,7 +569,7 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
         throw -1;
 
-    if ( !trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, this->sst[0], vmi_get_kernel_json(vmi)) )
+    if (!trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, this->sst[0], vmi_get_kernel_json(vmi)))
     {
         PRINT_DEBUG("Failed to trap NT syscall table entries\n");
         throw -1;

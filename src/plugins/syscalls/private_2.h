@@ -126,7 +126,7 @@ class syscalls_base : public pluginex
 {
 public:
     os_t os;
-    addr_t kernel_base, kernel_size;
+    addr_t kernel_base;
     addr_t register_size;
     bool is32bit;
     bool disable_sysret;
