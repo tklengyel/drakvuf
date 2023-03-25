@@ -474,14 +474,14 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     {
         if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiSystemServiceStart", &start) )
         {
-            PRINT_DEBUG("[SYSCALLS] Failed to get symbol KiSystemServiceStart\n");
+            fprintf(stderr, "[SYSCALLS] Failed to get symbol KiSystemServiceStart\n");
             throw -1;
         }
 
         system_service_table_x64 _sst[2] = {};
         if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x64), (void*)&_sst, NULL) )
         {
-            PRINT_DEBUG("[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
+            fprintf(stderr, "[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
             throw -1;
         }
 
@@ -494,14 +494,14 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     {
         if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiFastCallEntry", &start) )
         {
-            PRINT_DEBUG("[SYSCALLS] Failed to get symbol KiFastCallEntry\n");
+            fprintf(stderr, "[SYSCALLS] Failed to get symbol KiFastCallEntry\n");
             throw -1;
         }
 
         system_service_table_x86 _sst[2] = {};
         if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x86), (void*)&_sst, NULL) )
         {
-            PRINT_DEBUG("[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
+            fprintf(stderr, "[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
             throw -1;
         }
 
@@ -515,7 +515,10 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
 
     addr_t dtb;
     if ( VMI_FAILURE == vmi_pid_to_dtb(vmi, 0, &dtb) )
+    {
+        fprintf(stderr, "[SYSCALLS] Failed to get dtb.\n");
         throw -1;
+    }
 
     // Get ntoskrnl size.
     pass_ctx_t pass;
@@ -523,7 +526,7 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage", &pass.size_rva) ||
         !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "BaseDllName", &pass.name_rva))
     {
-        PRINT_DEBUG("Failed to get _LDR_DATA_TABLE_ENTRY members rva\n");
+        fprintf(stderr, "[SYSCALLS] Failed to get _LDR_DATA_TABLE_ENTRY members rva\n");
         throw -1;
     }
 
@@ -539,7 +542,7 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
                 vmi_lock_guard vmi(drakvuf);
                 if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_entry + pass->size_rva, 0, &static_cast<win_syscalls*>(pass->plugin)->kernel_size))
                 {
-                    PRINT_DEBUG("[SYSCALLS] Failed to enumerate drivers\n");
+                    fprintf(stderr, "[SYSCALLS] Failed to enumerate drivers\n");
                     throw -1;
                 }
             }
@@ -549,7 +552,7 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
 
     if (!this->kernel_size)
     {
-        PRINT_DEBUG("Failed to get kernel image size\n");
+        fprintf(stderr, "[SYSCALLS] Failed to get kernel image size\n");
         throw -1;
     }
 
@@ -567,27 +570,29 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
 #endif
 
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
+    {
+        fprintf(stderr, "[SYSCALLS] Failed to get ImagePathName from _RTL_USER_PROCESS_PARAMETERS\n");
         throw -1;
+    }
 
     if (!trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, this->sst[0], vmi_get_kernel_json(vmi)))
     {
-        PRINT_DEBUG("Failed to trap NT syscall table entries\n");
+        fprintf(stderr, "[SYSCALLS] Failed to trap NT syscall table entries\n");
         throw -1;
     }
 
-    if ( !config->win32k_profile )
+    if (config->win32k_profile)
     {
-        PRINT_DEBUG("Skipping second syscall table since no json profile for win32k is provided\n");
-        return;
-    }
+        if (!this->setup_win32k_syscalls(drakvuf))
+        {
+            PRINT_DEBUG("[SYSCALLS] Delay second syscall table hooks initialization\n");
 
-    if (!this->setup_win32k_syscalls(drakvuf))
-    {
-        PRINT_DEBUG("[SYSCALLS] Delay second syscall table hooks initialization\n");
-
-        this->load_driver_hook = this->createSyscallHook("NtLoadDriver", &win_syscalls::load_driver_cb);
-        this->create_process_hook = this->createSyscallHook("NtCreateUserProcess", &win_syscalls::create_process_cb);
+            this->load_driver_hook = this->createSyscallHook("NtLoadDriver", &win_syscalls::load_driver_cb);
+            this->create_process_hook = this->createSyscallHook("NtCreateUserProcess", &win_syscalls::create_process_cb);
+        }
     }
+    else
+        PRINT_DEBUG("[SYSCALLS] Skipping second syscall table since no json profile for win32k is provided\n");
 }
 
 bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)

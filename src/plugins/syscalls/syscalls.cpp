@@ -231,7 +231,10 @@ bool syscalls_base::read_syscalls_filter(const char* filter_file)
 {
     std::ifstream file(filter_file);
     if (!file.is_open())
+    {
+        fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?");
         return false;
+    }
 
     std::string line;
     while (std::getline(file, line))
@@ -253,13 +256,10 @@ syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, o
     this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     this->disable_sysret = config->disable_sysret;
 
-    if (config->syscalls_filter_file)
+    if (config->syscalls_filter_file && !this->read_syscalls_filter(config->syscalls_filter_file))
     {
-        if (!this->read_syscalls_filter(config->syscalls_filter_file))
-        {
-            PRINT_DEBUG("[SYSCALLS] Failed to read given file\n");
-            throw -1;
-        }
+        fprintf(stderr, "[SYSCALLS] Failed to read given file\n");
+        throw -1;
     }
 }
 
