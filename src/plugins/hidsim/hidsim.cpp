@@ -105,7 +105,6 @@
  ***************************************************************************/
 
 #include <libdrakvuf/libdrakvuf.h>  /* eprint_current_time */
-#include "../private.h"             /* PRINT_DEBUG */
 #include "hid_injection.h"          /* hid_inject */
 #include "gui_monitor.h"            /* gui_reconstruct */
 

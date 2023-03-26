@@ -105,7 +105,6 @@
 #pragma once
 
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 #include "linux-private.h"
 
 using namespace rebootmon_ns;

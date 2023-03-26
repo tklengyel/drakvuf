@@ -112,7 +112,6 @@
 #include <functional>
 
 #include <glib.h>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 #include "printers/printers.hpp"
 

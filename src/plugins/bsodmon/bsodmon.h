@@ -105,7 +105,6 @@
 #ifndef BSODMON_H
 #define BSODMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 #include <map>

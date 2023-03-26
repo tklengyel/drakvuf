@@ -105,7 +105,6 @@
 #ifndef REGMON_H
 #define REGMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 class regmon: public plugin

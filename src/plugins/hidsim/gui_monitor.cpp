@@ -112,7 +112,6 @@
 
 /* Plugin code */
 #include "../plugins.h"
-#include "../private.h"             /* PRINT_DEBUG */
 
 /* GUI reconstruction specific code */
 #include "gui/vmi_win_gui_offsets.h"

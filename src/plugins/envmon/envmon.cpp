@@ -107,7 +107,6 @@
 #include <stdexcept>
 #include <map>
 
-#include "plugins/private.h"
 #include <plugins/output_format.h>
 
 #include "envmon.h"

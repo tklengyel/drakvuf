@@ -105,7 +105,6 @@
 #ifndef DKOMMON_H
 #define DKOMMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 #include <string>

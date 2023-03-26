@@ -106,7 +106,6 @@
 #define PTRACEMON_H
 
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 #include "private.h"
 
 class ptracemon : public pluginex
