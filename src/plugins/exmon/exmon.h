@@ -105,7 +105,6 @@
 #ifndef EXMON_H
 #define EXMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 class exmon: public plugin

@@ -307,6 +307,18 @@ constexpr bool print_data(std::ostream& os, const T& data, const Ts& ... rest)
 
 /**/
 
+inline const char* userid_field_name(drakvuf_t drakvuf)
+{
+    switch (drakvuf_get_os_type(drakvuf))
+    {
+        case VMI_OS_WINDOWS:
+            return "SessionID";
+        case VMI_OS_LINUX:
+        default:
+            return "UID";
+    }
+}
+
 inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
     if (info)
@@ -322,7 +334,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf
             keyval("VCPU", fmt::Nval(info->vcpu)),
             keyval("CR3", fmt::Xval(info->regs->cr3)),
             keyval(procname.c_str(), fmt::Rstr(method)),
-            keyval(USERIDSTR(drakvuf), fmt::Nval(proc_data->userid)),
+            keyval(userid_field_name(drakvuf), fmt::Nval(proc_data->userid)),
             keyval("PID", fmt::Nval(proc_data->pid)),
             keyval("PPID", fmt::Nval(proc_data->ppid))
         );

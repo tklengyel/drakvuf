@@ -105,7 +105,6 @@
 #ifndef FILETRACER_WIN_H
 #define FILETRACER_WIN_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 class win_filetracer

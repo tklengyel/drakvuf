@@ -113,7 +113,6 @@
 #include <libvmi/libvmi.h>
 
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 
 struct procdump2_config
 {

@@ -111,8 +111,6 @@
 #include <atomic>
 #include <mutex>
 
-#include "../private.h" //  PRINT_DEBUG
-
 /* Injects random HID events or events specified in a template file */
 int hid_inject(const char* sock_path, const char* template_path,
     bool is_rand_clicks, std::atomic<uint32_t>* coords,

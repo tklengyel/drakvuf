@@ -105,7 +105,6 @@
 #ifndef CRASHMON_H
 #define CRASHMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 class crashmon: public plugin

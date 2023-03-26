@@ -106,7 +106,6 @@
 #define WIN_PROCMON_H
 
 #include <glib.h>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 class win_procmon : public pluginex

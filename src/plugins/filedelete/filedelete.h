@@ -105,7 +105,6 @@
 #ifndef FILEDELETE_H
 #define FILEDELETE_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 #include "plugins/plugins_ex.h"
 

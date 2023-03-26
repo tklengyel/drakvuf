@@ -105,7 +105,6 @@
 #ifndef SSDTMON_H
 #define SSDTMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 struct ssdtmon_config
