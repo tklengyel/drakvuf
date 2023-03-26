@@ -355,7 +355,7 @@ jobs:
       - name: Scan build
         run: |
           meson build
-          analyze-build-$VERSION --cdb build/compile_commands.json \
+          analyze-build-$VERSION -v --cdb build/compile_commands.json \
             --status-bugs \
             --disable-checker deadcode.DeadStores
 
