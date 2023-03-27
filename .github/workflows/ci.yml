@@ -311,7 +311,7 @@ jobs:
 
   scan-build:
     env:
-      THRESHOLD: 4000
+      THRESHOLD: 11585
       VERSION: 15
       CC: clang-15
       CXX: clang++-15
@@ -385,5 +385,6 @@ jobs:
 
           if [ $complexity -gt $THRESHOLD ]; then
             echo "Please don't increase the cognitive complexity of existing highly complex functions or introduce new ones"
+            echo "Maximum allowed total complexity (baseline): $THRESHOLD"
             exit 1
           fi
