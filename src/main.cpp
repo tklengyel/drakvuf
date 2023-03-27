@@ -1155,13 +1155,12 @@ int main(int argc, char** argv)
         case SIGDRAKVUFPOWEROFF:
             PRINT_DEBUG("Exit on power off\n");
             return drakvuf_exit_code_t::POWER_OFF;
+        case SIGTERM:
+            return drakvuf_exit_code_t::SUCCESS;
         default:
+            clear_interrupt();
             break;
     }
-
-    if (is_interrupted != SIGINT)
-        return drakvuf_exit_code_t::SUCCESS;
-    clear_interrupt();
 
     if (terminate && injected_pid)
         drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
