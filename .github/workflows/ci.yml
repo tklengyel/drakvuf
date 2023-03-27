@@ -310,33 +310,35 @@ jobs:
       uses: github/codeql-action/analyze@v2
 
   scan-build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - 'ubuntu-latest'
+    env:
+      VERSION: 15
+      CC: clang-15
+      CXX: clang++-15
+
+    runs-on: ubuntu-latest
     needs:
       - init
     if: ${{ github.event_name == 'pull_request' }}
+
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang clang-tools-13 autoconf-archive flex bison libjson-c-dev meson ninja-build
+          sudo apt-get install -y clang-$VERSION clang-tools-$VERSION autoconf-archive flex bison libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
         uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -351,14 +353,81 @@ jobs:
 
       - name: Scan build
         run: |
-          # Set Exports
-          export CC=clang
-          export CXX=clang++
-
           meson build
-
-          # scan-build
-
-          analyze-build-13 --cdb build/compile_commands.json \
-            --status-bugs --analyze-headers \
+          analyze-build-$VERSION -v --cdb build/compile_commands.json \
+            --status-bugs \
             --disable-checker deadcode.DeadStores
+
+  cognitive-complexity:
+    env:
+      THRESHOLD: 11585
+      VERSION: 15
+      CC: clang-15
+      CXX: clang++-15
+
+    runs-on: ubuntu-latest
+    needs:
+      - init
+    if: ${{ github.event_name == 'pull_request' }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          # Install packages
+          sudo apt-get update -q
+          sudo apt-get install -y clang-$VERSION clang-tools-$VERSION clang-tidy-$VERSION autoconf-archive flex bison libjson-c-dev meson ninja-build
+
+      - name: Cache Xen debball
+        uses: actions/cache@v3
+        with:
+          path: xen/dist
+          key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v3
+        with:
+          path: libvmi/dist
+          key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
+          sudo ldconfig
+          cd ../..
+
+      - name: Calculate cognitive complexity
+        run: |
+          meson build
+          cd build
+          run-clang-tidy-$VERSION -quiet \
+              -config="{Checks: 'readability-function-cognitive-complexity', CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: 0}, {key: readability-function-cognitive-complexity.DescribeBasicIncrements, value: False}]}" \
+              2>/dev/null | \
+              grep warning | grep "cognitive complexity" > cognitive-complexity.log || :
+
+          complexity=0
+          while read -r log; do
+              file=$(echo $log | awk -F":" '{ print $1 }')
+              line=$(echo $log | awk -F":" '{ print $2 }')
+              function=$(echo $log | awk -F"function" '{ print $2 }' | awk '{ print $1 }' | sed "s/'//g")
+              score=$(echo $log | awk -F"cognitive complexity of" '{ print $2 }' | awk '{ print $1 }')
+
+              [[ $score -lt 25 ]] && continue
+
+              echo "Complex function found: $file:$line $function(), complexity score: $score"
+
+              complexity=$(( complexity + score ))
+          done < cognitive-complexity.log
+
+          echo "Final complexity sum of complex functions: $complexity"
+
+          if [ $complexity -gt $THRESHOLD ]; then
+            echo "Please don't increase the cognitive complexity of existing highly complex functions or introduce new ones"
+            echo "Maximum allowed total complexity (baseline): $THRESHOLD"
+            exit 1
+          fi
