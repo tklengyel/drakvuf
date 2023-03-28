@@ -361,6 +361,7 @@ jobs:
   cognitive-complexity:
     env:
       THRESHOLD: 11585
+      COUNT: 184
       VERSION: 15
       CC: clang-15
       CXX: clang++-15
@@ -411,6 +412,7 @@ jobs:
               grep warning | grep "cognitive complexity" > cognitive-complexity.log || :
 
           complexity=0
+          complex_functions=0
           while read -r log; do
               file=$(echo $log | awk -F":" '{ print $1 }')
               line=$(echo $log | awk -F":" '{ print $2 }')
@@ -422,12 +424,19 @@ jobs:
               echo "Complex function found: $file:$line $function(), complexity score: $score"
 
               complexity=$(( complexity + score ))
+              (( complex_functions++ )) || :
           done < cognitive-complexity.log
 
+          echo "Found $complex_functions complex functions"
           echo "Final complexity sum of complex functions: $complexity"
 
           if [ $complexity -gt $THRESHOLD ]; then
-            echo "Please don't increase the cognitive complexity of existing highly complex functions or introduce new ones"
+            echo "Please don't increase the cognitive complexity of existing highly complex functions"
             echo "Maximum allowed total complexity (baseline): $THRESHOLD"
+            exit 1
+          fi
+
+          if [ $complex_functions -gt $COUNT ]; then
+            echo "Please don't introduce new cognitively complex functions, break it up into smaller ones"
             exit 1
           fi
