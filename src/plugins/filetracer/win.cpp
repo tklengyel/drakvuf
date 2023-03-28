@@ -159,6 +159,7 @@ static void print_create_file_obj_info(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     win_filetracer* f,
     uint32_t handle,
+    uint32_t io_information,
     const win_objattrs_t& attrs,
     const wrapper* w,
     bool is_success)
@@ -173,11 +174,15 @@ static void print_create_file_obj_info(drakvuf_t drakvuf,
         ? parse_flags(w->desired_access, directory_ar, f->format)
         : parse_flags(w->desired_access, file_ar, f->format);
     auto security_descriptor = build_security_descriptor(attrs);
+    std::optional<fmt::Nval<int>> io_information_opt;
+    if (is_success)
+        io_information_opt = fmt::Nval((int)io_information);
 
     fmt::print(f->format, "filetracer", drakvuf, info,
         keyval("FileName", fmt::Estr(attrs.file_path)),
         keyval("FileHandle", fmt::Xval(handle)),
         flagsval("ObjectAttributes", attrs.obj_attrs),
+        keyval("IoStatusBlock", io_information_opt),
         keyval("SecurityDescriptor", security_descriptor),
         flagsval("DesiredAccess", desired_access),
         flagsval("FileAttributes", file_attrs),
@@ -441,6 +446,33 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     g_free(src_file);
 }
 
+static void print_eof_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
+{
+    win_filetracer* f = (win_filetracer*)info->trap->data;
+    const char* operation_name = "FileEndOfFileInformation";
+
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = fileinfo;
+    ctx.dtb = info->regs->cr3;
+
+    uint64_t file_size = 0;
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &file_size))
+        return;
+
+    char* filename_ = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
+    const char* filename = filename_ ? : "<UNKNOWN>";
+
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("Operation", fmt::Rstr(operation_name)),
+        keyval("FileHandle", fmt::Xval(src_file_handle)),
+        keyval("FileName", fmt::Qstr(filename)),
+        keyval("FileSize", fmt::Nval(file_size))
+    );
+
+    g_free(filename_);
+}
+
 static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     struct wrapper* w = (struct wrapper*)info->trap->data;
@@ -465,8 +497,20 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     auto [succ, file_attrs] = objattr_read(drakvuf, info, f, w->obj_attr);
 
+    uint32_t io_information = 0;
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = w->io_status_block + f->offsets[_IO_STATUS_BLOCK_Information]
+        );
+        if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &io_information))
+            PRINT_DEBUG("filetracer: Failed to read _IO_STATUS_BLOCK Information at 0x%lx (PID %d, TID %d)\n", w->io_status_block + f->offsets[_IO_STATUS_BLOCK_Information], w->pid, w->tid);
+    }
+
     if (succ)
-        print_create_file_obj_info(drakvuf, info, f, handle, file_attrs, w, is_success);
+        print_create_file_obj_info(drakvuf, info, f, handle, io_information, file_attrs, w, is_success);
     delete w;
 
     f->traps_to_free = g_slist_remove(f->traps_to_free, info->trap);
@@ -496,6 +540,7 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     auto desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
     auto attrs = drakvuf_get_function_argument(drakvuf, info, 3);
+    auto io_status_block = drakvuf_get_function_argument(drakvuf, info, 4);
     auto file_attrs = drakvuf_get_function_argument(drakvuf, info, 6);
     auto share_access = drakvuf_get_function_argument(drakvuf, info, 7);
     auto create_disposition = drakvuf_get_function_argument(drakvuf, info, 8);
@@ -517,6 +562,7 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     w->pid = info->attached_proc_data.pid;
     w->tid = info->attached_proc_data.tid;
     w->obj_attr = attrs;
+    w->io_status_block = io_status_block;
     w->file_attrs = file_attrs;
     w->share_access = share_access;
     w->create_disposition = create_disposition;
@@ -608,6 +654,7 @@ static event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap
 #define FILE_BASIC_INFORMATION 4
 #define FILE_RENAME_INFORMATION 10
 #define FILE_DISPOSITION_INFORMATION 13
+#define FILE_END_OF_FILE_INFORMATION 20
 
 static event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -630,6 +677,12 @@ static event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
     {
         print_delete_file_info(drakvuf, info, handle, fileinfo);
+    }
+
+    if (fileinfoclass == FILE_END_OF_FILE_INFORMATION)
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        print_eof_file_info(vmi, drakvuf, info, handle, fileinfo);
     }
 
     return 0;
