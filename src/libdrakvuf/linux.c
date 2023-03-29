@@ -364,7 +364,14 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_kernel_version = linux_get_kernel_version;
     drakvuf->osi.get_filepath_from_dentry = linux_get_filepath_from_dentry;
 
-    PRINT_DEBUG("LINUX BANNER: %s", linux_get_banner(drakvuf));
+#ifdef DRAKVUF_DEBUG
+    char* banner = linux_get_banner(drakvuf);
+    if (banner)
+    {
+        PRINT_DEBUG("LINUX BANNER: %s", banner);
+        g_free(banner);
+    }
+#endif
 
     return 1;
 }
