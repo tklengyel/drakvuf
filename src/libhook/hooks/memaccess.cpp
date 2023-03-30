@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -101,162 +101,53 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#include <libhook/hooks/memaccess.hpp>
 
-#ifndef WIN_OFFSETS_H
-#define WIN_OFFSETS_H
-
-/*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in win-offsets-map.h
- */
-enum win_offsets
+namespace libhook
 {
-    KIINITIALPCR,
 
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_PROCCREATIONINFO,
-    EPROCESS_TASKS,
-    EPROCESS_THREADLISTHEAD,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
-    EPROCESS_PCB,
-    EPROCESS_INHERITEDPID,
-    EPROCESS_WOW64PROCESS,
-    EPROCESS_WOW64PROCESS_WIN10,
-    EPROCESS_SECTIONOBJECT,
-    EPROCESS_VADROOT,
-    EPROCESS_LISTTHREADHEAD,
-
-    RTL_AVL_TREE_ROOT,
-    RTL_BALANCED_NODE_LEFT,
-    RTL_BALANCED_NODE_RIGHT,
-    RTL_BALANCED_NODE_PARENTVALUE,
-    MMVAD_CORE,
-    MMVAD_SHORT_STARTING_VPN,
-    MMVAD_SHORT_STARTING_VPN_HIGH,
-    MMVAD_SHORT_ENDING_VPN,
-    MMVAD_SHORT_ENDING_VPN_HIGH,
-    MMVAD_SHORT_FLAGS,
-    MMVAD_SHORT_FLAGS1,
-
-    SECTION_CONTROLAREA,
-    SECTIONOBJECT_SEGMENT,
-    SEGMENT_CONTROLAREA,
-    VADROOT_BALANCED_ROOT,
-
-    MMVAD_LEFT_CHILD,
-    MMVAD_RIGHT_CHILD,
-    MMVAD_STARTING_VPN,
-    MMVAD_ENDING_VPN,
-    MMVAD_FLAGS,
-    MMVAD_SUBSECTION,
-    SUBSECTION_CONTROL_AREA,
-    CONTROL_AREA_FILEPOINTER,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SEGMENT_PROTOTYPEPTE,
-
-    KPROCESS_HEADER,
-
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-    PEB_PROCESSPARAMETERS,
-    PEB_SESSIONID,
-    PEB_CSDVERSION,
-
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
-
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-
-    HANDLE_TABLE_TABLECODE,
-
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPCR_IRQL,
-    KPRCB_CURRENTTHREAD,
-    KPRCB_RSPBASE,
-
-    KTHREAD_APCSTATE,
-    KTHREAD_APCSTATEINDEX,
-    KTHREAD_PROCESS,
-    KTHREAD_PREVIOUSMODE,
-    KTHREAD_HEADER,
-    KTHREAD_TEB,
-    KTHREAD_STACKBASE,
-    KTHREAD_TRAPFRAME,
-    KTHREAD_STATE,
-    KAPC_STATE_PROCESS,
-    KTRAP_FRAME_RBP,
-    KTRAP_FRAME_RSP,
-
-    TEB_TLS_SLOTS,
-    TEB_LASTERRORVALUE,
-
-    ETHREAD_CID,
-    ETHREAD_TCB,
-    ETHREAD_WIN32STARTADDRESS,
-    ETHREAD_THREADLISTENTRY,
-    CLIENT_ID_UNIQUETHREAD,
-
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
-
-    DISPATCHER_TYPE,
-
-    CM_KEY_CONTROL_BLOCK,
-    CM_KEY_NAMEBLOCK,
-    CM_KEY_NAMEBUFFER,
-    CM_KEY_NAMELENGTH,
-    CM_KEY_PARENTKCB,
-    CM_KEY_PROCESSID,
-    CM_KEY_FLAGS,
-
-    PROCCREATIONINFO_IMAGEFILENAME,
-
-    OBJECTNAMEINFORMATION_NAME,
-
-    FILEOBJECT_NAME,
-
-    RTL_USER_PROCESS_PARAMETERS_COMMANDLINE,
-
-    EWOW64PROCESS_PEB,
-
-    LIST_ENTRY_FLINK,
-
-    OBJECT_ATTRIBUTES_OBJECTNAME,
-    OBJECT_ATTRIBUTES_ROOTDIRECTORY,
-
-    __WIN_OFFSETS_MAX
-};
-
-enum win_bitfields
+MemAccessHook::~MemAccessHook()
 {
-    MMVAD_FLAGS_PROTECTION,
-    MMVAD_FLAGS_MEMCOMMIT,
-    MMVAD_FLAGS1_MEMCOMMIT,
-    MMVAD_FLAGS_VADTYPE,
-    MMVAD_FLAGS1_VADTYPE,
-    MMVAD_FLAGS_COMMITCHARGE,
-    MMVAD_FLAGS1_COMMITCHARGE,
-    MMVAD_FLAGS_PRIVATEMEMORY,
-    __WIN_BITFIELDS_MAX
-};
+    if (this->drakvuf_ && this->trap_)
+    {
+        PRINT_DEBUG("[LIBHOOK] destroying MemAccessHook hook...\n");
+        // read in libhook.hpp why this happens
+        this->trap_->cb = [](drakvuf_t, drakvuf_trap_info_t*) -> event_response_t
+        {
+            PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        };
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+        {
+            delete static_cast<CallResult*>(trap->data);
+            delete trap;
+        });
+    }
+    else
+    {
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as MemAccessHook hook was moved from\n");
+    }
+}
 
-enum win_sizes
+MemAccessHook::MemAccessHook(MemAccessHook&& rhs) noexcept
+    : BaseHook(std::forward<BaseHook>(rhs))
 {
-    EPROCESS,
-    HANDLE_TABLE_ENTRY,
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+}
 
-    __WIN_SIZES_MAX
-};
+MemAccessHook& MemAccessHook::operator=(MemAccessHook&& rhs) noexcept
+{
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+    return *this;
+}
 
-#endif
+MemAccessHook::MemAccessHook(drakvuf_t drakvuf, cb_wrapper_t cb)
+    : BaseHook(drakvuf),
+      callback_(cb)
+{}
+
+} // namespace libhook

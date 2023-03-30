@@ -337,7 +337,7 @@ public:
         } readfile;
     };
 
-    addr_t pool;
+    addr_t pool{0};
 
     task_t(handle_t handle_,
         std::string filename_,

@@ -233,6 +233,8 @@ static void print_usage()
         "\t                           Max file size (in MB) to calculate hash\n"
         "\t --fileextractor-max-size-extract <size>\n"
         "\t                           Max file size (in MB) to extract\n"
+        "\t --fileextractor-exclude-list <file name filter>\n"
+        "\t                           File with list of file name regexps to exclude from extracting\n"
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
         "\t -T, --json-tcpip <path to json>\n"
@@ -274,11 +276,13 @@ static void print_usage()
         "\t                           The JSON profile for ntdll.dll\n"
         "\t --json-iphlpapi <path to json>\n"
         "\t                           The JSON profile for iphlpapi.dll\n"
+#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON)
+        "\t --json-ole32 <path to json>\n"
+        "\t                           The JSON profile for ole32.dll\n"
+#endif
 #ifdef ENABLE_PLUGIN_WMIMON
         "\t --json-mpr <path to json>\n"
         "\t                           The JSON profile for mpr.dll\n"
-        "\t --json-ole32 <path to json>\n"
-        "\t                           The JSON profile for ole32.dll\n"
         "\t --json-wow-ole32 <path to json>\n"
         "\t                           The JSON profile for SysWOW64/ole32.dll\n"
         "\t --json-combase <path to json>\n"
@@ -479,6 +483,7 @@ int main(int argc, char** argv)
         opt_fileextractor_timeout,
         opt_fileextractor_hash,
         opt_fileextractor_extract,
+        opt_fileextractor_exclude_list,
         opt_procdump_timeout,
         opt_procdump_dir,
         opt_compress_procdumps,
@@ -561,6 +566,7 @@ int main(int argc, char** argv)
         {"fileextractor-timeout", required_argument, NULL, opt_fileextractor_timeout},
         {"fileextractor-max-size-hash", required_argument, NULL, opt_fileextractor_hash},
         {"fileextractor-max-size-extract", required_argument, NULL, opt_fileextractor_extract},
+        {"fileextractor-exclude-list", required_argument, NULL, opt_fileextractor_exclude_list},
         {"procdump-timeout", required_argument, NULL, opt_procdump_timeout},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
@@ -763,6 +769,14 @@ int main(int argc, char** argv)
             case opt_fileextractor_extract:
                 options.fileextractor_extract = strtoul(optarg, NULL, 0);
                 break;
+            case opt_fileextractor_exclude_list:
+                if (!std::filesystem::exists(optarg))
+                {
+                    fprintf(stderr, "file %s does not exist!\n", optarg);
+                    return drakvuf_exit_code_t::FAIL;
+                }
+                options.fileextractor_exclude_file = optarg;
+                break;
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
             case 'b':
@@ -820,10 +834,12 @@ int main(int argc, char** argv)
                 ignored_processes.insert(pid);
                 break;
             }
-#ifdef ENABLE_PLUGIN_WMIMON
+#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON)
             case opt_json_ole32:
                 options.ole32_profile = optarg;
                 break;
+#endif
+#ifdef ENABLE_PLUGIN_WMIMON
             case opt_json_wow_ole32:
                 options.wow_ole32_profile = optarg;
                 break;

@@ -592,6 +592,16 @@ if test x$plugin_rebootmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_REBOOTMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_linkmon],
+  [AS_HELP_STRING([--disable-plugin-linkmon],
+    [Enable plugin for NTFS links extraction @<:@yes@:>@])],
+  [plugin_linkmon="$enableval"],
+  [plugin_linkmon="yes"])
+AM_CONDITIONAL([PLUGIN_LINKMON], [test x$plugin_linkmon = xyes])
+if test x$plugin_linkmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LINKMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -909,6 +919,7 @@ Etwmon:             $plugin_etwmon
 Memaccessmon:       $plugin_memaccessmon
 Unixsocketmon:      $plugin_unixsocketmon
 Rebootmon:          $plugin_rebootmon
+Linkmon:            $plugin_linkmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:             $plugin_wmimon

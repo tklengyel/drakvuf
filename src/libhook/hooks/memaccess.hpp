@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -101,162 +101,104 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
 
-#ifndef WIN_OFFSETS_H
-#define WIN_OFFSETS_H
+#include <string>
+#include <libhook/call_result.hpp>
+#include <libhook/hooks/base.hpp>
 
-/*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in win-offsets-map.h
- */
-enum win_offsets
+namespace libhook
 {
-    KIINITIALPCR,
 
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_PROCCREATIONINFO,
-    EPROCESS_TASKS,
-    EPROCESS_THREADLISTHEAD,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
-    EPROCESS_PCB,
-    EPROCESS_INHERITEDPID,
-    EPROCESS_WOW64PROCESS,
-    EPROCESS_WOW64PROCESS_WIN10,
-    EPROCESS_SECTIONOBJECT,
-    EPROCESS_VADROOT,
-    EPROCESS_LISTTHREADHEAD,
+class MemAccessHook : public BaseHook
+{
+public:
+    /**
+     * Factory function to create the trap and perform hooking at the same time.
+     */
+    template<typename Params = CallResult>
+    [[nodiscard]]
+    static auto create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+    -> std::unique_ptr<MemAccessHook>;
 
-    RTL_AVL_TREE_ROOT,
-    RTL_BALANCED_NODE_LEFT,
-    RTL_BALANCED_NODE_RIGHT,
-    RTL_BALANCED_NODE_PARENTVALUE,
-    MMVAD_CORE,
-    MMVAD_SHORT_STARTING_VPN,
-    MMVAD_SHORT_STARTING_VPN_HIGH,
-    MMVAD_SHORT_ENDING_VPN,
-    MMVAD_SHORT_ENDING_VPN_HIGH,
-    MMVAD_SHORT_FLAGS,
-    MMVAD_SHORT_FLAGS1,
+    /**
+     * unhook on dctor
+     */
+    ~MemAccessHook() override;
 
-    SECTION_CONTROLAREA,
-    SECTIONOBJECT_SEGMENT,
-    SEGMENT_CONTROLAREA,
-    VADROOT_BALANCED_ROOT,
+    /**
+     * delete copy ctor, as this class has ownership via RAII
+     */
+    MemAccessHook(const MemAccessHook&) = delete;
 
-    MMVAD_LEFT_CHILD,
-    MMVAD_RIGHT_CHILD,
-    MMVAD_STARTING_VPN,
-    MMVAD_ENDING_VPN,
-    MMVAD_FLAGS,
-    MMVAD_SUBSECTION,
-    SUBSECTION_CONTROL_AREA,
-    CONTROL_AREA_FILEPOINTER,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SEGMENT_PROTOTYPEPTE,
+    /**
+     * move ctor, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    MemAccessHook(MemAccessHook&&) noexcept;
 
-    KPROCESS_HEADER,
+    /**
+     * delete copy assignment operator, as this class has ownership via RAII
+     */
+    MemAccessHook& operator=(const MemAccessHook&) = delete;
 
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-    PEB_PROCESSPARAMETERS,
-    PEB_SESSIONID,
-    PEB_CSDVERSION,
+    /**
+     * move assignment operator, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    MemAccessHook& operator=(MemAccessHook&&) noexcept;
 
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
+    cb_wrapper_t callback_;
+    drakvuf_trap_t* trap_;
 
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-
-    HANDLE_TABLE_TABLECODE,
-
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPCR_IRQL,
-    KPRCB_CURRENTTHREAD,
-    KPRCB_RSPBASE,
-
-    KTHREAD_APCSTATE,
-    KTHREAD_APCSTATEINDEX,
-    KTHREAD_PROCESS,
-    KTHREAD_PREVIOUSMODE,
-    KTHREAD_HEADER,
-    KTHREAD_TEB,
-    KTHREAD_STACKBASE,
-    KTHREAD_TRAPFRAME,
-    KTHREAD_STATE,
-    KAPC_STATE_PROCESS,
-    KTRAP_FRAME_RBP,
-    KTRAP_FRAME_RSP,
-
-    TEB_TLS_SLOTS,
-    TEB_LASTERRORVALUE,
-
-    ETHREAD_CID,
-    ETHREAD_TCB,
-    ETHREAD_WIN32STARTADDRESS,
-    ETHREAD_THREADLISTENTRY,
-    CLIENT_ID_UNIQUETHREAD,
-
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
-
-    DISPATCHER_TYPE,
-
-    CM_KEY_CONTROL_BLOCK,
-    CM_KEY_NAMEBLOCK,
-    CM_KEY_NAMEBUFFER,
-    CM_KEY_NAMELENGTH,
-    CM_KEY_PARENTKCB,
-    CM_KEY_PROCESSID,
-    CM_KEY_FLAGS,
-
-    PROCCREATIONINFO_IMAGEFILENAME,
-
-    OBJECTNAMEINFORMATION_NAME,
-
-    FILEOBJECT_NAME,
-
-    RTL_USER_PROCESS_PARAMETERS_COMMANDLINE,
-
-    EWOW64PROCESS_PEB,
-
-    LIST_ENTRY_FLINK,
-
-    OBJECT_ATTRIBUTES_OBJECTNAME,
-    OBJECT_ATTRIBUTES_ROOTDIRECTORY,
-
-    __WIN_OFFSETS_MAX
+protected:
+    /**
+     * Hide ctor from users, as we enforce factory function usage.
+     */
+    MemAccessHook(drakvuf_t, cb_wrapper_t cb);
 };
 
-enum win_bitfields
+template<typename Params>
+auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+-> std::unique_ptr<MemAccessHook>
 {
-    MMVAD_FLAGS_PROTECTION,
-    MMVAD_FLAGS_MEMCOMMIT,
-    MMVAD_FLAGS1_MEMCOMMIT,
-    MMVAD_FLAGS_VADTYPE,
-    MMVAD_FLAGS1_VADTYPE,
-    MMVAD_FLAGS_COMMITCHARGE,
-    MMVAD_FLAGS1_COMMITCHARGE,
-    MMVAD_FLAGS_PRIVATEMEMORY,
-    __WIN_BITFIELDS_MAX
-};
+    PRINT_DEBUG("[LIBHOOK] creating MemAccessHook hook\n");
 
-enum win_sizes
-{
-    EPROCESS,
-    HANDLE_TABLE_ENTRY,
+    // not using std::make_unique because ctor is private
+    auto hook = std::unique_ptr<MemAccessHook>(new MemAccessHook(drakvuf, cb));
+    hook->trap_ = new drakvuf_trap_t();
 
-    __WIN_SIZES_MAX
-};
+    hook->trap_->name = "libhook MemAccessHook";
+    hook->trap_->type = MEMACCESS;
+    hook->trap_->memaccess.gfn = gfn;
+    hook->trap_->memaccess.type = mem_access_type;
+    hook->trap_->memaccess.access = mem_access;
+    hook->trap_->ttl = ttl;
+    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
+        return GetTrapHook<MemAccessHook>(info)->callback_(drakvuf, info);
+    };
 
-#endif
+    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
+
+    // populate backref
+    auto* params = new Params();
+    params->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(params);
+
+    if (!drakvuf_add_trap(drakvuf, hook->trap_))
+    {
+        PRINT_DEBUG("[LIBHOOK] failed to create MemAccessHook trap!\n");
+        delete static_cast<CallResult*>(hook->trap_->data);
+        hook->trap_->data = nullptr;
+        delete hook->trap_;
+        hook->trap_ = nullptr;
+        return std::unique_ptr<MemAccessHook>();
+    }
+
+    PRINT_DEBUG("[LIBHOOK] MemAccessHook hook OK\n");
+    return hook;
+}
+
+};  // namespace libhook

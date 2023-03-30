@@ -324,7 +324,7 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
                             {
                                 this->addr_InputBuffer_Status = 0;
                                 this->addr_IoStatusBlock_Information = 0;
-                                this->NtClose_hook[hook_ID] = this->createSyscallHook("NtClose", &hidevm::NtClose_cb, UNLIMITED_TTL);
+                                this->NtClose_hook[hook_ID] = this->createSyscallHook("NtClose", &hidevm::NtClose_cb);
                                 fmt::print(this->format, "hidevm", drakvuf, info,
                                     keyval("Reason", fmt::Qstr("MSAcpi_ThermalZoneTemperature query spoofed"))
                                 );
@@ -766,7 +766,7 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
         throw -1;
     }
 
-    this->NtDeviceIoControlFile_hook = createSyscallHook("NtDeviceIoControlFile", &hidevm::NtDeviceIoControlFile_cb, UNLIMITED_TTL);
+    this->NtDeviceIoControlFile_hook = createSyscallHook("NtDeviceIoControlFile", &hidevm::NtDeviceIoControlFile_cb);
 
     // Usermode hooking for WQL spoofing
     if (!drakvuf_are_userhooks_supported(drakvuf))

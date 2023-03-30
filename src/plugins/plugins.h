@@ -136,6 +136,7 @@ struct plugins_options
     uint32_t fileextractor_timeout;     // PLUGIN_FILEEXTRACTOR
     uint64_t fileextractor_hash;        // PLUGIN_FILEEXTRACTOR
     uint64_t fileextractor_extract;     // PLUGIN_FILEEXTRACTOR
+    const char* fileextractor_exclude_file; // PLUGIN_FILEEXTRACTOR
     bool cpuid_stealth;                 // PLUGIN_CPUIDMON
     const char* tcpip_profile;          // PLUGIN_SOCKETMON
     const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON, PLUGIN_SYSCALLS
@@ -245,6 +246,7 @@ typedef enum drakvuf_plugin
     PLUGIN_UNIXSOCKETMON,
     PLUGIN_ETWMON,
     PLUGIN_REBOOTMON,
+    PLUGIN_LINKMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -293,6 +295,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_UNIXSOCKETMON] = "unixsocketmon",
     [PLUGIN_ETWMON] = "etwmon",
     [PLUGIN_REBOOTMON] = "rebootmon",
+    [PLUGIN_LINKMON] = "linkmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -340,6 +343,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_UNIXSOCKETMON]= { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_ETWMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_REBOOTMON]    = { [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_LINKMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin

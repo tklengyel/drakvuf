@@ -147,6 +147,7 @@
 #include "unixsocketmon/unixsocketmon.h"
 #include "etwmon/etwmon.h"
 #include "rebootmon/rebootmon.h"
+#include "linkmon/linkmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -213,6 +214,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .dump_folder = options->dump_folder,
                         .hash_size = options->fileextractor_hash,
                         .extract_size = options->fileextractor_extract,
+                        .exclude_file = options->fileextractor_exclude_file,
                     };
                     this->plugins[plugin_id] = std::make_unique<fileextractor>(this->drakvuf, &config, this->output);
                     break;
@@ -316,6 +318,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .abort_on_power_off = options->rebootmon_abort_on_power_off,
                     };
                     this->plugins[plugin_id] = std::make_unique<rebootmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_LINKMON
+                case PLUGIN_LINKMON:
+                {
+                    linkmon_config config =
+                    {
+                        .ole32_profile = options->ole32_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<linkmon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
@@ -462,12 +475,12 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     codemon_config_struct config =
                     {
-                        .codemon_dump_dir = options->codemon_dump_dir,
-                        .codemon_filter_executable = options->codemon_filter_executable,
-                        .codemon_log_everything = options->codemon_log_everything,
-                        .codemon_dump_vad = options->codemon_dump_vad,
-                        .codemon_analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
-                        .codemon_default_benign = options->codemon_default_benign,
+                        .dump_dir = options->codemon_dump_dir,
+                        .filter_executable = options->codemon_filter_executable,
+                        .log_everything = options->codemon_log_everything,
+                        .dump_vad = options->codemon_dump_vad,
+                        .analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
+                        .default_benign = options->codemon_default_benign,
                     };
                     this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
                     break;

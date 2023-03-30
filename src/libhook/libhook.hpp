@@ -106,6 +106,7 @@
 #include <libhook/call_result.hpp>
 #include <libhook/hooks/base.hpp>
 #include <libhook/hooks/manual.hpp>
+#include <libhook/hooks/memaccess.hpp>
 #include <libhook/hooks/return.hpp>
 #include <libhook/hooks/syscall.hpp>
 #include <libhook/hooks/cr3.hpp>

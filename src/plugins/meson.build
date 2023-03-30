@@ -220,6 +220,12 @@ if get_option('plugin-rebootmon')
     config_h.set('ENABLE_PLUGIN_REBOOTMON', 1)
 endif
 
+if get_option('plugin-linkmon')
+    plugin_sources += 'linkmon/linkmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_LINKMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -252,6 +258,7 @@ summary({
     'etwmon' : get_option('plugin-etwmon'),
     'ipt' : get_option('plugin-ipt'),
     'rebootmon' : get_option('plugin-rebootmon'),
+    'linkmon' : get_option('plugin-linkmon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
