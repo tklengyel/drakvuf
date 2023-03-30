@@ -458,6 +458,7 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
 
 win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output)
     : syscalls_base(drakvuf, config, output)
+    , strings_to_free(NULL)
     , kernel_size  { 0 }
     , ntdll_base   { 0 }
     , wow64cpu_base{ 0 }
@@ -770,4 +771,15 @@ void win_syscalls::print_syscall(
         keyval("Inlined", fmt::Qstr(inlined ? "True" : "False")),
         this->fmt_args
     );
+}
+
+win_syscalls::~win_syscalls()
+{
+    GSList* loop = this->strings_to_free;
+    while (loop)
+    {
+        g_free(loop->data);
+        loop = loop->next;
+    }
+    g_slist_free(this->strings_to_free);
 }

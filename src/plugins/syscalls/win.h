@@ -140,6 +140,7 @@ public:
     void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, std::string&& module, const syscalls_ns::syscall_t* sc, const std::vector<uint64_t>& args, bool inlined);
 
     win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+    ~win_syscalls();
 };
 
 namespace syscalls_ns
