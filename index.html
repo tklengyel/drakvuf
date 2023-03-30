@@ -396,19 +396,18 @@ Process listing for VM linux (id=29)
 
 Now we are ready to build and install DRAKVUF&reg;:
 <pre><code>cd ~/drakvuf
-autoreconf -vi
-./configure
-make
+meson build
+ninja -C build
 </code></pre>
 
 To simply trace the execution of the system:
-<pre><code>sudo ./src/drakvuf -r &lt;path to json config file&gt; -d &lt;domid&gt;</code></pre>
+<pre><code>sudo ./build/drakvuf -r &lt;path to json config file&gt; -d &lt;domid&gt;</code></pre>
 
 For example:
-<pre><code>sudo ./src/drakvuf -r /root/windows7-sp1.json -d 7</code></pre>
+<pre><code>sudo ./build/drakvuf -r /root/windows7-sp1.json -d 7</code></pre>
 
 To see all available options:
-<pre><code>./src/drakvuf --help</code></pre>
+<pre><code>./build/drakvuf --help</code></pre>
 
 
 <h3>
