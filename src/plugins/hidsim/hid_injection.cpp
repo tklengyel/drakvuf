@@ -119,7 +119,6 @@
 #include <random>
 
 #include <libdrakvuf/libdrakvuf.h> /* eprint_current_time */
-#include "../private.h" /* PRINT_DEBUG */
 
 /* Hidsim specific includes */
 #include "qmp/keymap_evdev_to_qapi.h"

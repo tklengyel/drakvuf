@@ -112,7 +112,6 @@
 #include <string>
 #include <array>
 #include <glib.h>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 //Struct to pass the parameters

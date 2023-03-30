@@ -570,14 +570,6 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
             tasks[id]->pid = info->attached_proc_data.pid;
             tasks[id]->ppid = info->attached_proc_data.ppid;
             tasks[id]->process_name = info->proc_data.name;
-            // save data needed to complete the first NtWriteFile
-            tasks[id]->first_len = len;
-            tasks[id]->first_offset = offset;
-            tasks[id]->first_str = str;
-            tasks[id]->first_cr3 = info->regs->cr3;
-            get_file_object_currentbyteoffset(vmi, info, handle, &tasks[id]->currentbyteoffset);
-            if (offset)
-                get_write_offset(vmi, info, offset, &tasks[id]->write_offset);
         }
         task = tasks.find(id)->second.get();
     }
@@ -592,6 +584,18 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
         if (!task->extracted)
         {
             check_stack_marker(info, vmi, task);
+
+            if (task->stage == task_t::stage_t::pending && is_handle_valid(handle))
+            {
+                // save data needed to complete the first NtWriteFile
+                task->first_len = len;
+                task->first_offset = offset;
+                task->first_str = str;
+                task->first_cr3 = info->regs->cr3;
+                get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
+                if (offset)
+                    get_write_offset(vmi, info, offset, &task->write_offset);
+            }
 
             switch (task->stage)
             {
@@ -670,7 +674,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
                         dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->currentbyteoffset, task->first_len);
                 }
                 else
-                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->currentbyteoffset, task->first_len);
+                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->file_size, task->first_len);
 
                 return VMI_EVENT_RESPONSE_NONE;
             }

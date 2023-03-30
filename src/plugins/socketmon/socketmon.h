@@ -105,7 +105,6 @@
 #ifndef SOCKETMON_H
 #define SOCKETMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 #include "private.h"
 

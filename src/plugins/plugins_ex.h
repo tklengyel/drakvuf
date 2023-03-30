@@ -114,7 +114,6 @@
 #include <functional>
 #include <optional>
 
-#include "private.h"
 #include "plugins.h"
 #include "helpers/hooks.h"
 

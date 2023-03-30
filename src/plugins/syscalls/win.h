@@ -352,6 +352,15 @@ SYSCALL(NtAllocateVirtualMemory, NTSTATUS,
     "AllocationType", "", DIR_IN, DWORD,
     "Protect", "", DIR_IN, DWORD,
 );
+SYSCALL(NtAllocateVirtualMemoryEx, NTSTATUS,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "RegionSize", "", DIR_INOUT, PSIZE_T,
+    "AllocationType", "", DIR_IN, DWORD,
+    "Protect", "", DIR_IN, DWORD,
+    "ExtendedParameter", "opt", DIR_INOUT, PMEM_EXTENDED_PARAMETER,
+    "ExtendedParameterCount", "", DIR_IN, ULONG,
+);
 SYSCALL(NtAlpcAcceptConnectPort, NTSTATUS,
     "PortHandle", "", DIR_OUT, PHANDLE,
     "ConnectionPortHandle", "", DIR_IN, HANDLE,
@@ -777,6 +786,17 @@ SYSCALL(NtCreateSection, NTSTATUS,
     "SectionPageProtection", "", DIR_IN, ULONG,
     "AllocationAttributes", "", DIR_IN, ULONG,
     "FileHandle", "opt", DIR_IN, HANDLE,
+);
+SYSCALL(NtCreateSectionEx, NTSTATUS,
+    "SectionHandle", "", DIR_OUT, PHANDLE,
+    "DesiredAccess", "", DIR_IN, ACCESS_MASK,
+    "ObjectAttributes", "opt", DIR_IN, POBJECT_ATTRIBUTES,
+    "MaximumSize", "opt", DIR_IN, PLARGE_INTEGER,
+    "SectionPageProtection", "", DIR_IN, ULONG,
+    "AllocationAttributes", "", DIR_IN, ULONG,
+    "FileHandle", "opt", DIR_IN, HANDLE,
+    "ExtendedParameter", "opt", DIR_INOUT, PMEM_EXTENDED_PARAMETER,
+    "ExtendedParameterCount", "", DIR_IN, ULONG,
 );
 SYSCALL(NtCreateSemaphore, NTSTATUS,
     "SemaphoreHandle", "", DIR_OUT, PHANDLE,
@@ -1250,6 +1270,17 @@ SYSCALL(NtMapViewOfSection, NTSTATUS,
     "InheritDisposition", "", DIR_IN, SECTION_INHERIT,
     "AllocationType", "", DIR_IN, ULONG,
     "Win32Protect", "", DIR_IN, WIN32_PROTECTION_MASK,
+);
+SYSCALL(NtMapViewOfSectionEx, NTSTATUS,
+    "SectionHandle", "", DIR_IN, HANDLE,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "SectionOffset", "opt", DIR_INOUT, PLARGE_INTEGER,
+    "ViewSize", "", DIR_INOUT, PSIZE_T,
+    "AllocationType", "", DIR_IN, ULONG,
+    "Win32Protect", "", DIR_IN, WIN32_PROTECTION_MASK,
+    "ExtendedParameter", "opt", DIR_INOUT, PMEM_EXTENDED_PARAMETER,
+    "ExtendedParameterCount", "", DIR_IN, ULONG,
 );
 SYSCALL(NtModifyBootEntry, NTSTATUS,
     "BootEntry", "", DIR_IN, PBOOT_ENTRY,
@@ -1949,6 +1980,14 @@ SYSCALL(NtReadVirtualMemory, NTSTATUS,
     "BufferSize", "", DIR_IN, SIZE_T,
     "NumberOfBytesRead", "opt", DIR_OUT, PSIZE_T,
 );
+SYSCALL(NtReadVirtualMemoryEx, NTSTATUS,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "BaseAddress", "opt", DIR_IN, PVOID,
+    "Buffer", "bcount(BufferSize)", DIR_OUT, PVOID,
+    "BufferSize", "", DIR_IN, SIZE_T,
+    "NumberOfBytesRead", "opt", DIR_OUT, PSIZE_T,
+    "Flags", "", DIR_IN, ULONG,
+);
 SYSCALL(NtRecoverEnlistment, NTSTATUS,
     "EnlistmentHandle", "", DIR_IN, HANDLE,
     "EnlistmentKey", "opt", DIR_IN, PVOID,
@@ -2637,7 +2676,6 @@ SYSCALL(NtYieldExecution, NTSTATUS);
 SYSCALL(NtAcquireProcessActivityReference, NTSTATUS);
 SYSCALL(NtAddAtomEx, NTSTATUS);
 SYSCALL(NtAlertThreadByThreadId, NTSTATUS);
-SYSCALL(NtAllocateVirtualMemoryEx, NTSTATUS);
 SYSCALL(NtAlpcConnectPortEx, NTSTATUS);
 SYSCALL(NtAlpcImpersonateClientContainerOfPort, NTSTATUS);
 SYSCALL(NtAssociateWaitCompletionPacket, NTSTATUS);
@@ -2669,7 +2707,6 @@ SYSCALL(NtInitializeEnclave, NTSTATUS);
 SYSCALL(NtLoadEnclaveData, NTSTATUS);
 SYSCALL(NtLoadHotPatch, NTSTATUS);
 SYSCALL(NtManagePartition, NTSTATUS);
-SYSCALL(NtMapViewOfSectionEx, NTSTATUS);
 SYSCALL(NtNotifyChangeDirectoryFileEx, NTSTATUS);
 SYSCALL(NtOpenPartition, NTSTATUS);
 SYSCALL(NtOpenRegistryTransaction, NTSTATUS);
@@ -2693,7 +2730,6 @@ SYSCALL(NtTerminateEnclave, NTSTATUS);
 SYSCALL(NtUnsubscribeWnfStateChange, NTSTATUS);
 SYSCALL(NtUpdateWnfStateData, NTSTATUS);
 SYSCALL(NtWaitForAlertByThreadId, NTSTATUS);
-SYSCALL(NtCreateSectionEx, NTSTATUS);
 SYSCALL(NtManageHotPatch, NTSTATUS);
 SYSCALL(BvgaSetVirtualFrameBuffer, NTSTATUS);
 SYSCALL(CmpCleanUpHigherLayerKcbCachesPreCallback, NTSTATUS);
@@ -4163,6 +4199,7 @@ static const syscall_t* nt[] =
     &NtAllocateUserPhysicalPages,
     &NtAllocateUuids,
     &NtAllocateVirtualMemory,
+    &NtAllocateVirtualMemoryEx,
     &NtAlpcAcceptConnectPort,
     &NtAlpcCancelMessage,
     &NtAlpcConnectPort,
@@ -4228,6 +4265,7 @@ static const syscall_t* nt[] =
     &NtCreateProfile,
     &NtCreateResourceManager,
     &NtCreateSection,
+    &NtCreateSectionEx,
     &NtCreateSemaphore,
     &NtCreateSymbolicLinkObject,
     &NtCreateThreadEx,
@@ -4312,6 +4350,7 @@ static const syscall_t* nt[] =
     &NtMapUserPhysicalPages,
     &NtMapUserPhysicalPagesScatter,
     &NtMapViewOfSection,
+    &NtMapViewOfSectionEx,
     &NtModifyBootEntry,
     &NtModifyDriverEntry,
     &NtNotifyChangeDirectoryFile,
@@ -4421,6 +4460,7 @@ static const syscall_t* nt[] =
     &NtReadOnlyEnlistment,
     &NtReadRequestData,
     &NtReadVirtualMemory,
+    &NtReadVirtualMemoryEx,
     &NtRecoverEnlistment,
     &NtRecoverResourceManager,
     &NtRecoverTransactionManager,
@@ -4529,6 +4569,7 @@ static const syscall_t* nt[] =
     &NtUnlockFile,
     &NtUnlockVirtualMemory,
     &NtUnmapViewOfSection,
+    &NtUnmapViewOfSectionEx,
     &NtVdmControl,
     &NtWaitForDebugEvent,
     &NtWaitForKeyedEvent,
@@ -4547,7 +4588,6 @@ static const syscall_t* nt[] =
     &NtAcquireProcessActivityReference,
     &NtAddAtomEx,
     &NtAlertThreadByThreadId,
-    &NtAllocateVirtualMemoryEx,
     &NtAlpcConnectPortEx,
     &NtAlpcImpersonateClientContainerOfPort,
     &NtAssociateWaitCompletionPacket,
@@ -4579,7 +4619,6 @@ static const syscall_t* nt[] =
     &NtLoadEnclaveData,
     &NtLoadHotPatch,
     &NtManagePartition,
-    &NtMapViewOfSectionEx,
     &NtNotifyChangeDirectoryFileEx,
     &NtOpenPartition,
     &NtOpenRegistryTransaction,
@@ -4600,11 +4639,9 @@ static const syscall_t* nt[] =
     &NtSetWnfProcessNotificationEvent,
     &NtSubscribeWnfStateChange,
     &NtTerminateEnclave,
-    &NtUnmapViewOfSectionEx,
     &NtUnsubscribeWnfStateChange,
     &NtUpdateWnfStateData,
     &NtWaitForAlertByThreadId,
-    &NtCreateSectionEx,
     &NtManageHotPatch,
     &BvgaSetVirtualFrameBuffer,
     &CmpCleanUpHigherLayerKcbCachesPreCallback,

@@ -105,7 +105,6 @@
 #ifndef OBJMON_H
 #define OBJMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 struct objmon_config

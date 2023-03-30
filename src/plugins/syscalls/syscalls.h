@@ -106,6 +106,7 @@
 #define SYSCALLS_H
 
 #include "plugins/plugins_ex.h"
+#include "plugins/output_format.h"
 
 #include "linux.h"
 #include "win.h"

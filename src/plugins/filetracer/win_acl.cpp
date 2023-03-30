@@ -109,7 +109,6 @@
 
 #include "private.h"
 #include "win_acl.h"
-#include "plugins/private.h"
 
 using std::hex;
 using std::showbase;

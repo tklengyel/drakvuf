@@ -108,7 +108,6 @@
 #include "ostream.h"
 
 #include <libdrakvuf/libdrakvuf.h>
-#include <plugins/private.h>
 #include <plugins/helpers/type_traits.h>
 
 #include <algorithm>

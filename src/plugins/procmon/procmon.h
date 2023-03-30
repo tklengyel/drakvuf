@@ -105,7 +105,6 @@
 #ifndef PROCMON_H
 #define PROCMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 #include "win.h"
 #include "linux.h"

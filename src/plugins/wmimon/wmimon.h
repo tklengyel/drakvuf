@@ -106,7 +106,6 @@
 #define WMIMON_H
 
 #include "plugins.h"
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 struct wmimon_config
