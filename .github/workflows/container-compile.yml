@@ -63,6 +63,8 @@ jobs:
       run: |
         dpkg -i xen/dist/xen-*.deb
 
+    - uses: rui314/setup-mold@v1
+
     - name: Install LibVMI
       run: |
         git submodule update --init libvmi

@@ -60,6 +60,8 @@ jobs:
           path: libvmi/dist
           key: libvmi-${{ matrix.os }}-${{ steps.get-hash.outputs.LIBVMI_HASH }}
 
+      - uses: rui314/setup-mold@v1
+
       - name: Build LibVMI
         if: steps.cache-libvmi.outputs.cache-hit != 'true'
         run: |
@@ -134,6 +136,8 @@ jobs:
           sudo ldconfig
           cd ../..
 
+      - uses: rui314/setup-mold@v1
+
       - name: autoreconf
         run: autoreconf -vif
 
@@ -181,6 +185,8 @@ jobs:
           sudo apt install -f ./*.deb
           sudo ldconfig
           cd ../..
+
+      - uses: rui314/setup-mold@v1
 
       - name: autoreconf
         run: autoreconf -vif
@@ -235,6 +241,8 @@ jobs:
           sudo apt install -f ./*.deb
           sudo ldconfig
           cd ../..
+
+      - uses: rui314/setup-mold@v1
 
       - name: Build with meson
         run: |
