@@ -108,57 +108,72 @@
 #include <assert.h>
 #include <string>
 #include <variant>
-#include <vector>
+#include <fstream>
+#include <iostream>
 
-#include "plugins/output_format.h"
 #include "syscalls.h"
 #include "private.h"
-#include "win.h"
-#include "linux.h"
 
 using namespace syscalls_ns;
 
-namespace syscalls_ns
+void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info)
 {
+    fmt::print(this->m_output_format, "sysret", drakvuf, info,
+        keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
+        keyval("vCPU", fmt::Nval(info->vcpu)),
+        keyval("CR3", fmt::Xval(info->regs->cr3)),
+        keyval("Syscall", fmt::Nval(nr)),
+        keyval("Ret", fmt::Xval(info->regs->rax)),
+        keyval("Info", fmt::Rstr(extra_info ?: ""))
+    );
+}
 
-static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     char* cstr = nullptr;
 
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
     {
-        if ( arg.type == PUNICODE_STRING )
+        switch (arg.type)
         {
-            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-            if ( us )
+            case PUNICODE_STRING:
             {
-                cstr = (char*)us->contents;
-                us->contents = nullptr;
-                vmi_free_unicode_str(us);
+                unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
+                if ( us )
+                {
+                    cstr = (char*)us->contents;
+                    us->contents = nullptr;
+                    vmi_free_unicode_str(us);
+                }
+                break;
             }
-        }
-
-        else if ( arg.type == PCHAR )
-        {
-            cstr = drakvuf_read_ascii_str(drakvuf, info, val);
-        }
-
-        else if ( s->os == VMI_OS_WINDOWS )
-        {
-            cstr = win_extract_string(s, drakvuf, info, arg, val);
+            case PCHAR:
+                cstr = drakvuf_read_ascii_str(drakvuf, info, val);
+                break;
+            case MMAP_PROT:
+                // PROT_NONE == 0, so incorrect for parsing flags
+                return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
+            case PRCTL_OPTION:
+                return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
+            case ARCH_PRCTL_CODE:
+                return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
+            default:
+                if (this->os == VMI_OS_WINDOWS)
+                    cstr = win_extract_string(drakvuf, info, arg, val);
+                break;
         }
     }
 
-    std::string str;
     if (cstr)
     {
-        str = std::string(cstr);
+        std::string str = std::string(cstr);
         g_free(cstr);
+        return str;
     }
-    return str;
+    return {};
 }
 
-static uint64_t mask_value(const arg_t& arg, uint64_t val)
+uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
 {
     switch (arg.type)
     {
@@ -181,7 +196,7 @@ static uint64_t mask_value(const arg_t& arg, uint64_t val)
     }
 }
 
-static uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
+uint64_t syscalls_base::transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
 {
     if ((arg.type == PPVOID) && val)
     {
@@ -205,155 +220,51 @@ static uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, co
     return mask_value(arg, val);
 }
 
-void print_syscall(
-    syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    int nr, std::string&& module, const syscall_t* sc,
-    const std::vector<uint64_t>& args, bool inlined
-)
+static std::string rstrip(std::string s)
 {
-    if (sc)
-        info->trap->name = sc->name;
+    while (!s.empty() && isspace(s.back()))
+        s.pop_back();
+    return s;
+}
 
-    s->fmt_args.clear();
-
-    if (sc)
+bool syscalls_base::read_syscalls_filter(const char* filter_file)
+{
+    std::ifstream file(filter_file);
+    if (!file.is_open())
     {
-        for (size_t i = 0; i < args.size(); ++i)
-        {
-            auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
-            if ( !str.empty() )
-                s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Estr(str)));
-            else
-            {
-                uint64_t val = transform_value(drakvuf, info, sc->args[i], args[i]);
-                s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(val)));
-            }
-        }
+        fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?\n");
+        return false;
     }
 
-    fmt::print(s->format, "syscall", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("NArgs", fmt::Nval(args.size())),
-        keyval("Inlined", fmt::Qstr(inlined ? "True" : "False")),
-        s->fmt_args
-    );
-}
-
-void print_sysret(
-    syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    int nr, std::string&& module, const syscall_t* sc,
-    uint64_t ret, const char* extra_info)
-{
-    if (sc)
-        info->trap->name = sc->name;
-
-    fmt::print(s->format, "sysret", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("Ret", fmt::Nval(ret)),
-        keyval("Info", fmt::Rstr(extra_info ?: ""))
-    );
-}
-
-static GHashTable* read_syscalls_filter(const char* filter_file)
-{
-    GHashTable* table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
-    if (!table) return NULL;
-
-    FILE* f = fopen(filter_file, "r");
-    if (!f)
+    std::string line;
+    while (std::getline(file, line))
     {
-        g_hash_table_destroy(table);
-        return NULL;
+        line = rstrip(std::move(line));
+        if (!line.empty())
+            this->filter.insert(line);
     }
-    ssize_t bytes_read;
-    do
-    {
-        char* line = NULL;
-        size_t len = 0;
-        bytes_read = getline(&line, &len, f);
-        while (bytes_read > 0 && (line[bytes_read - 1] == '\n' || line[bytes_read - 1] == '\r')) bytes_read--;
-        if (bytes_read > 0)
-        {
-            line[bytes_read] = '\0';
-            g_hash_table_insert(table, line, NULL);
-        }
-        else
-            free(line);
-    } while (bytes_read != -1);
 
-    fclose(f);
-    return table;
+    return true;
 }
 
-void free_trap(gpointer p)
-{
-    if ( !p )
-        return;
 
-    drakvuf_trap_t* t = (drakvuf_trap_t*)p;
-    if ( t->data )
-        g_slice_free(struct wrapper, t->data);
-
-    g_slice_free(drakvuf_trap_t, t);
-}
-
-}
-
-syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
-    : pluginex(drakvuf, output)
-    , traps(NULL)
-    , strings_to_free(NULL)
-    , filter(NULL)
-    , format{output}
-    , offsets(NULL)
-    , win32k_profile{c->win32k_profile ?: ""}
+syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
     this->os = drakvuf_get_os_type(drakvuf);
     this->kernel_base = drakvuf_get_kernel_base(drakvuf);
-    this->reg_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
+    this->register_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
     this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    this->disable_sysret = c->disable_sysret;
+    this->disable_sysret = config->disable_sysret;
 
-    if ( c->syscalls_filter_file )
-        this->filter = read_syscalls_filter(c->syscalls_filter_file);
-
-    if ( this->os == VMI_OS_WINDOWS )
-        setup_windows(drakvuf, this, c);
-    else
-        setup_linux(drakvuf, this);
+    if (config->syscalls_filter_file && !this->read_syscalls_filter(config->syscalls_filter_file))
+        throw -1;
 }
 
-syscalls::~syscalls()
+syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
-    GSList* loop = this->strings_to_free;
-    while (loop)
-    {
-        g_free(loop->data);
-        loop = loop->next;
-    }
-    g_slist_free(this->strings_to_free);
-
-    // NOTE Non "pluginex" support for linux
-    if ( this->os != VMI_OS_WINDOWS )
-    {
-        loop = this->traps;
-        while (loop)
-        {
-            free_trap(loop->data);
-            loop = loop->next;
-        }
-        g_slist_free(this->traps);
-    }
-
-
-    if ( this->filter )
-        g_hash_table_destroy(this->filter);
-
-    g_free(this->offsets);
+    os_t os = drakvuf_get_os_type(drakvuf);
+    if (os == VMI_OS_WINDOWS)
+        this->_win_syscalls = std::make_unique<win_syscalls>(drakvuf, config, output);
+    else
+        this->_linux_syscalls = std::make_unique<linux_syscalls>(drakvuf, config, output);
 }
