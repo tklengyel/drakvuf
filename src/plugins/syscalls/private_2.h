@@ -102,25 +102,51 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SYSCALLS_H
-#define SYSCALLS_H
+#ifndef SYSCALLS_PRIVATE_2_H
+#define SYSCALLS_PRIVATE_2_H
 
+#include <unordered_set>
+
+#include "plugins/plugin_utils.h"
 #include "plugins/plugins_ex.h"
 #include "plugins/output_format.h"
 
-#include "linux.h"
-#include "win.h"
+#include "private.h"
 
-// external syscalls class
-class syscalls : public pluginex
+struct syscalls_config
+{
+    const char* syscalls_filter_file;
+    const char* win32k_profile;
+    bool disable_sysret;
+};
+
+// internal syscalls class
+class syscalls_base : public pluginex
 {
 public:
-    std::unique_ptr<linux_syscalls> _linux_syscalls;
-    std::unique_ptr<win_syscalls> _win_syscalls;
+    os_t os;
+    addr_t kernel_base;
+    addr_t register_size;
+    bool is32bit;
+    bool disable_sysret;
 
-    syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
-    syscalls(const syscalls&) = delete;
-    syscalls& operator=(const syscalls&) = delete;
+    std::unordered_set<std::string> filter;
+    std::vector<std::pair<char const*, fmt::Aarg>> fmt_args;
+
+    void print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info = nullptr);
+    std::string parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
+    uint64_t mask_value(const syscalls_ns::arg_t& arg, uint64_t val);
+    uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, uint64_t val);
+    bool read_syscalls_filter(const char* filter_file);
+
+    virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val)
+    {
+        return NULL;
+    };
+
+    syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+    syscalls_base(const syscalls_base&) = delete;
+    syscalls_base& operator=(const syscalls_base&) = delete;
 };
 
 #endif
