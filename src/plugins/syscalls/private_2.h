@@ -109,7 +109,6 @@
 
 #include "plugins/plugin_utils.h"
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 #include "plugins/output_format.h"
 
 #include "private.h"

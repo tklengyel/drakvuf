@@ -105,7 +105,6 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 #include "linux.h"
