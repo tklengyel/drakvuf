@@ -104,6 +104,7 @@
 #pragma once
 
 #include "plugins/plugins_ex.h"
+#include "private.h"
 
 struct callbackmon_config
 {
@@ -118,20 +119,20 @@ class callbackmon : public pluginex
 {
 public:
     callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output);
-    ~callbackmon();
 
     void report(drakvuf_t drakvuf, const char* list_name, addr_t addr, const char* action);
+
+    event_response_t load_unload_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     const callbackmon_config config;
     const output_format_t format;
 
-    addr_t ldr_data_name_rva;
-    addr_t ldr_data_base_rva;
-    addr_t ldr_data_size_rva;
+    std::array<size_t, callbackmon_ns::__OFFSET_MAX> offsets;
+    std::array<size_t, callbackmon_ns::__OFFSET_OPEN_MAX> open_offsets;
+    std::array<size_t, callbackmon_ns::__OFFSET_GENERIC_MAX> generic_offsets;
+    std::array<size_t, callbackmon_ns::__OFFSET_MINIPORT_MAX> miniport_offsets;
 
-    size_t* generic_offsets;
-    size_t* open_offsets;
-    size_t* miniport_offsets;
+    addr_t ob_type_table_va;
 
     std::vector<addr_t> process_cb;
     std::vector<addr_t> thread_cb;
@@ -155,7 +156,13 @@ public:
     std::vector<addr_t> w32callouts;
     std::vector<addr_t> wfpcallouts;
 
+    std::vector<callbackmon_ns::object_type_t> object_type;
+    std::vector<callbackmon_ns::object_t> object_cb;
     std::unordered_map<addr_t, protocol_cb_t> ndis_protocol_cb;
+
+    std::vector<callbackmon_ns::callbackmon_module_t> drivers;
+
+    std::unique_ptr<libhook::SyscallHook> load_unload_driver_hook;
 
     virtual bool stop_impl() override;
 };

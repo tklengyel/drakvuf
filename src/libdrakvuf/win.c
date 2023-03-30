@@ -154,9 +154,9 @@ bool win_enumerate_module_info_ctx(drakvuf_t drakvuf, addr_t module_list_head, a
         addr_t base_addr;
         if (vmi_read_addr(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
-            addr_t size = 0;
+            uint32_t size = 0;
             ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE];
-            if (vmi_read_addr(vmi, ctx, &size) == VMI_SUCCESS)
+            if (vmi_read_32(vmi, ctx, &size) == VMI_SUCCESS)
             {
                 ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
                 unicode_string_t* base_name = drakvuf_read_unicode_common(drakvuf, ctx);
@@ -424,6 +424,107 @@ static bool find_kernbase(drakvuf_t drakvuf)
     return 1;
 }
 
+unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object)
+{
+    // Object header is always present before actual object.
+    //
+    size_t ptrsize = drakvuf_get_address_width(drakvuf);
+    addr_t header  = object - drakvuf->sizes[OBJECT_HEADER] + ptrsize;
+
+    uint8_t infomask = 0, name_info_off = 0;
+
+    if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_INFOMASK], 0, &infomask))
+        return NULL;
+    // Get object name. Some objects are anonymous. See ObQueryNameInfo for more info.
+    //
+    if (infomask & 2)
+    {
+        if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, drakvuf->ob_infomask2off + (infomask & 3), 0, &name_info_off))
+            return NULL;
+        return drakvuf_read_unicode_va(drakvuf, header - name_info_off + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_NAME], 0);
+    }
+    return NULL;
+}
+
+unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object)
+{
+    // Object header is always present before actual object.
+    //
+    size_t ptrsize = drakvuf_get_address_width(drakvuf);
+    addr_t header  = object - drakvuf->sizes[OBJECT_HEADER] + ptrsize;
+
+    uint8_t index = 0;
+    if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_TYPEINDEX], 0, &index))
+    {
+        return NULL;
+    }
+    // https://medium.com/@ashabdalhalim/a-light-on-windows-10s-object-header-typeindex-value-e8f907e7073a
+    // Due to security mitigations type_index is no longer equals to index in ObTypeIndexTable array on win 10
+    // but calculated as following:
+    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_10)
+    {
+        index = index ^ ((header >> 8) & 0xff) ^ drakvuf->ob_header_cookie;
+    }
+
+    addr_t type = 0;
+    if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, drakvuf->ob_type_table + index * ptrsize, 0, &type))
+    {
+        return NULL;
+    }
+    return drakvuf_read_unicode_va(drakvuf, type + drakvuf->offsets[OBJECT_TYPE_NAME], 0);
+}
+
+static bool enumerate_directory(drakvuf_t drakvuf, addr_t directory, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx)
+{
+    // There is only 37 _OBJECT_DIRECTORY_ENTRY entries in object directory:
+    // 0: kd> dt nt!_OBJECT_DIRECTORY
+    //    +0x000 HashBuckets      : [37] Ptr64 _OBJECT_DIRECTORY_ENTRY
+    //    +0x128 Lock             : _EX_PUSH_LOCK
+    //    ...
+    for (int i = 0; i < 37; i++)
+    {
+        addr_t bucket = 0;
+        if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, directory + drakvuf_get_address_width(drakvuf) * i, 0, &bucket) || !bucket)
+            continue;
+
+        while (true)
+        {
+            addr_t object = 0;
+            if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, bucket + drakvuf->offsets[OBJECT_DIRECTORY_ENTRY_OBJECT], 0, &object) || !object)
+                break;
+
+            unicode_string_t* name = win_get_object_type_name(drakvuf, object);
+            if (!name)
+            {
+                return false;
+            }
+        
+            object_info_t object_info = { .base_addr = object, .name = name };
+            visitor_func(drakvuf, &object_info, visitor_ctx);
+
+            if (!strcmp((const char*)name->contents, "Directory"))
+            {
+                enumerate_directory(drakvuf, object, visitor_func, visitor_ctx);
+            }
+            vmi_free_unicode_str(name);
+
+            if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, bucket + drakvuf->offsets[OBJECT_DIRECTORY_ENTRY_CHAINLINK], 0, &bucket) || !bucket)
+                break;
+        }
+    }
+    return true;
+}
+
+bool win_enumerate_object_directory(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx)
+{
+    addr_t root_directory_object = 0;
+    if (VMI_SUCCESS != vmi_read_addr_ksym(drakvuf->vmi, "ObpRootDirectoryObject", &root_directory_object))
+    {
+        return false;
+    }
+    return enumerate_directory(drakvuf, root_directory_object, visitor_func, visitor_ctx);
+}
+
 bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // check if we're in kernel mode
@@ -547,11 +648,20 @@ bool set_os_windows(drakvuf_t drakvuf)
         PRINT_DEBUG("Loaded WoW64 offsets...\n");
     }
 
-    if ( VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
+    if ( VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY] ) ||
+         VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_EPROCESS",           &drakvuf->sizes[EPROCESS] ) || 
+         VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_OBJECT_HEADER",      &drakvuf->sizes[OBJECT_HEADER]) )
     {
         return 0;
     }
-    if ( VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_EPROCESS", &drakvuf->sizes[EPROCESS]) )
+
+    if (VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObpInfoMaskToOffset", &drakvuf->ob_infomask2off) ||
+        VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObTypeIndexTable",    &drakvuf->ob_type_table))
+    {
+        return 0;
+    }
+
+    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_10 && VMI_FAILURE == vmi_read_8_ksym(drakvuf->vmi, "ObHeaderCookie", &drakvuf->ob_header_cookie))
     {
         return 0;
     }
@@ -572,6 +682,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_current_process_userid = win_get_current_process_userid;
     drakvuf->osi.get_current_thread_id = win_get_current_thread_id;
     drakvuf->osi.get_thread_previous_mode = win_get_thread_previous_mode;
+    drakvuf->osi.get_process_from_thread = win_get_process_from_thread;
     drakvuf->osi.get_current_thread_previous_mode = win_get_current_thread_previous_mode;
     drakvuf->osi.get_module_base_addr = win_get_module_base_addr;
     drakvuf->osi.get_module_base_addr_ctx = win_get_module_base_addr_ctx;
@@ -599,6 +710,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
     drakvuf->osi.enumerate_drivers = win_enumerate_drivers;
     drakvuf->osi.enumerate_process_modules = win_enumerate_process_modules;
+    drakvuf->osi.enumerate_object_directory = win_enumerate_object_directory;
     drakvuf->osi.is_crashreporter = win_is_crashreporter;
     drakvuf->osi.find_mmvad = win_find_mmvad;
     drakvuf->osi.traverse_mmvad = win_traverse_mmvad;
@@ -617,6 +729,8 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_rspbase = win_get_rspbase;
     drakvuf->osi.get_kernel_symbol_rva = win_get_kernel_symbol_rva;
     drakvuf->osi.get_kernel_symbol_va = win_get_kernel_symbol_va;
+    drakvuf->osi.get_object_type_name = win_get_object_type_name;
+    drakvuf->osi.get_object_name = win_get_object_name;
 
     return true;
 }

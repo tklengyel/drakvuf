@@ -127,12 +127,30 @@ static inline size_t get_ci_table_size(vmi_instance_t vmi)
     return 0;
 }
 
-static inline void report(drakvuf_t drakvuf, const output_format_t format, const char* type, const char* name, const char* action)
+static inline void report(drakvuf_t drakvuf, const output_format_t format, const char* type, const char* action, const char* name = nullptr, const char* module = nullptr)
 {
+    std::optional<fmt::Qstr> name_opt, module_opt;
+    std::string module_s, name_s;
+    if (name)
+    {
+        name_opt = fmt::Qstr(name);
+    }
+    if (module)
+    {
+        module_s.assign(module);
+        if (auto sub = module_s.find_last_of("/\\"); sub != std::string::npos)
+        {
+            module_s.erase(0, sub + 1);
+        }
+        module_opt = fmt::Qstr(module_s);
+    }
+
     fmt::print(format, "rootkitmon", drakvuf, nullptr,
         keyval("Type", fmt::Qstr(type)),
-        keyval("Name", fmt::Qstr(name)),
-        keyval("Action", fmt::Qstr(action)));
+        keyval("Name", name_opt),
+        keyval("Module", module_opt),
+        keyval("Action", fmt::Qstr(action))
+    );
 }
 
 static bool translate_ksym2p(vmi_instance_t vmi, const char* symbol, addr_t* addr)
@@ -286,7 +304,7 @@ static std::vector<std::pair<addr_t, gdt_entry_t>> enumerate_gdt(vmi_instance_t 
 static event_response_t wfp_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin = static_cast<rootkitmon*>(info->trap->data);
-    report(drakvuf, plugin->format, "Function", "FwpmCalloutAdd0", "Called");
+    report(drakvuf, plugin->format, "Function", "Called", "FwpmCalloutAdd0");
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -300,7 +318,7 @@ static event_response_t halprivatetable_overwrite_cb(drakvuf_t drakvuf, drakvuf_
     // Table size is unknown, assume 0x100 bytes
     if (info->trap_pa >= plugin->halprivatetable && info->trap_pa < plugin->halprivatetable + 0x100)
     {
-        report(drakvuf, plugin->format, "SystemStruct", "HalPrivateDispatchTable", "Modified");
+        report(drakvuf, plugin->format, "SystemStruct", "Modified", "HalPrivateDispatchTable");
     }
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -369,117 +387,40 @@ static void initialize_ci_checks(drakvuf_t drakvuf, rootkitmon* plugin, const ro
         }
     }
     // Fill initial values
-    vmi_read_8_va(vmi, plugin->ci_enabled_va, 4, &plugin->ci_enabled);
+    if (VMI_SUCCESS != vmi_read_8_va(vmi, plugin->ci_enabled_va, 4, &plugin->ci_enabled) )
+        throw -1;
     plugin->ci_callbacks = calc_checksum(vmi, plugin->ci_callbacks_va, get_ci_table_size(vmi));
 
     plugin->syscall_hooks.push_back(plugin->createSyscallHook("SeValidateImageHeader", check_cb));
     plugin->syscall_hooks.push_back(plugin->createSyscallHook("SeValidateImageData", check_cb));
 }
 
-static void initialize_ob_checks(vmi_instance_t vmi, rootkitmon* plugin)
+static void initialize_drv_checks(drakvuf_t drakvuf, rootkitmon* plugin)
 {
-    auto consume_callbacks = [&](addr_t object) -> std::vector<addr_t>
+    if (!plugin->is32bit)
     {
-        std::vector<addr_t> out;
-        // typedef struct _CALLBACK_OBJECT <- undocumented
-        // {
-        //   ULONG Signature;                   // 0x00
-        //   KSPIN_LOCK Lock;                   // 0x08
-        //   LIST_ENTRY RegisteredCallbacks;    // 0x10
-        //   BOOLEAN AllowMultipleCallbacks;
-        //   UCHAR reserved[3];
-        // } CALLBACK_OBJECT, *PCALLBACK_OBJECT;
-        const addr_t callbacks_off = plugin->guest_ptr_size * 2;
-        // typedef struct _CALLBACK_REGISTRATION <- undocumented
-        // {
-        //   LIST_ENTRY Link;                       // 0x00
-        //   PCALLBACK_OBJECT CallbackObject;       // 0x10
-        //   PCALLBACK_FUNCTION CallbackFunction;   // 0x18
-        //   PVOID CallbackContext;
-        //   ULONG Busy;
-        //   BOOLEAN UnregisterWaiting;
-        // } CALLBACK_REGISTRATION, *PCALLBACK_REGISTRATION;
-        const addr_t callback_fn_off = plugin->guest_ptr_size * 3;
-        // Read list head
-        addr_t head = object + callbacks_off;
-        // Read flink entry
-        addr_t entry{ 0 };
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 4, &entry))
-            return out;
-        while (entry != head && entry)
+        drakvuf_enumerate_object_directory(drakvuf, [](drakvuf_t drakvuf, const object_info_t* info, void* ctx)
         {
-            addr_t callback{ 0 };
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry + callback_fn_off, 0, &callback) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
-                return out;
-            if (callback)
+            auto plugin = static_cast<rootkitmon*>(ctx);
+            if (!strcmp((const char*)info->name->contents, "Driver"))
             {
-                out.push_back(callback);
+                vmi_lock_guard vmi(drakvuf);
+                // 28 Major functions + DriverUnload + DriverStartIo = 30 pointers
+                auto drv_obj_crc = calc_checksum(vmi, info->base_addr + plugin->offsets[DRIVER_OBJECT_STARTIO], plugin->guest_ptr_size * 30);
+                // Calculate FASTIO_DISPATCH array as well if present
+                addr_t fastio_addr = 0;
+                if (VMI_SUCCESS != vmi_read_addr_va(vmi, info->base_addr + plugin->offsets[DRIVER_OBJECT_FASTIODISPATCH], 0, &fastio_addr))
+                {
+                    PRINT_DEBUG("[ROOTKITMON] Failed to read DRIVER_OBJECT_FASTIODISPATCH pointer\n");
+                    throw -1;
+                }
+                if (fastio_addr)
+                    drv_obj_crc = merge(drv_obj_crc, calc_checksum(vmi, fastio_addr, plugin->fastio_size));
+                plugin->driver_object_checksums[info->base_addr] = drv_obj_crc;
+                // Enumerate all device_stacks of a particular driver
+                plugin->driver_stacks[info->base_addr] = plugin->enumerate_driver_stacks(vmi, info->base_addr);
             }
-        }
-        return out;
-    };
-
-    auto consume_callbacklist = [&](addr_t object) -> std::vector<addr_t>
-    {
-        // // CALLBACK_ENTRY_ITEM
-        // typedef struct _CALLBACK_ENTRY_ITEM {
-        //     LIST_ENTRY CallbackList; // 0x0
-        //     OB_OPERATION Operations; // 0x10
-        //     DWORD Active; // 0x14
-        //     CALLBACK_ENTRY *CallbackEntry; // 0x18
-        //     PVOID ObjectType; // 0x20
-        //     POB_PRE_OPERATION_CALLBACK PreOperation; // 0x28
-        //     POB_POST_OPERATION_CALLBACK PostOperation; // 0x30
-        //     QWORD unk1; // 0x38
-        // } CALLBACK_ENTRY_ITEM, *PCALLBACK_ENTRY_ITEM; // size: 0x40
-        std::vector<addr_t> out;
-        if (plugin->guest_ptr_size != 8)
-            return out;
-        addr_t head{ 0 };
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, object + plugin->offsets[OBJECT_TYPE_CALLBACKLIST], 4, & head) ||
-            VMI_SUCCESS != vmi_read_addr_va(vmi, head, 4, & head))
-            return out;
-        // Read flink entry
-        addr_t entry{ 0 };
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 4, &entry))
-            return out;
-        while (entry != head && entry)
-        {
-            addr_t pre_cb{ 0 }, post_cb{ 0 };
-            uint32_t active{ 0 };
-            if (VMI_SUCCESS != vmi_read_32_va(vmi, entry + 0x14, 4, &active) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x28, 4, &pre_cb) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x30, 4, &post_cb) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 4, &entry))
-                return out;
-
-            if (active)
-            {
-                if (pre_cb) out.push_back(pre_cb);
-                if (post_cb) out.push_back(post_cb);
-            }
-        }
-        return out;
-    };
-
-    for (const auto& callback_object : plugin->enumerate_object_directory(vmi, "Callback"))
-    {
-        plugin->ob_callbacks[callback_object] = consume_callbacks(callback_object);
-    }
-
-    // Enumerate every object type. First 2 entries are not used
-    for (size_t i = 2; ; i++)
-    {
-        addr_t ob_type{ 0 };
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, plugin->type_idx_table + i * plugin->guest_ptr_size, 4, &ob_type))
-            continue;
-        // if reached the end
-        if (!ob_type)
-            break;
-        // CRC whole _OBJECT_TYPE_INITIALIZER structure
-        plugin->ob_type_initiliazer_crc[i] = calc_checksum(vmi, ob_type + plugin->offsets[OBJECT_TYPE_TYPE_INFO], plugin->ob_type_init_size);
-        plugin->ob_type_callbacks[i] = consume_callbacklist(ob_type);
+        }, plugin);
     }
 }
 
@@ -534,43 +475,54 @@ bool rootkitmon::enumerate_cores(vmi_instance_t vmi)
  * It is used to calculate checksums of driver sections.
  * @driver - LDR_DATA_TABLE_ENTRY pointer.
 */
-static void driver_visitor(drakvuf_t drakvuf, addr_t driver, void* ctx)
+static bool driver_visitor(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
 {
     auto plugin = static_cast<rootkitmon*>(ctx);
-    addr_t imagebase;
     vmi_lock_guard vmi(drakvuf);
-    // Read driver image base
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, driver + plugin->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &imagebase))
-    {
-        PRINT_DEBUG("[ROOTKITMON] Failed to read driver image base\n");
-        throw -1;
-    }
 
     ACCESS_CONTEXT(a_ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
         .pid = 4,
-        .addr = imagebase
+        .addr = module_info->base_addr
     );
 
     // Map 1 4KB page with PE header
     void* module = nullptr;
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module) || !module )
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module))
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to map guest VA 0x%lx\n", a_ctx.addr);
-        return;
+        return true;
     }
 
     sha256_checksum_t driver_hash{ 0 };
 
     // Checksum every section and save it into `driver_sections_checksums`
-    for (const auto& [virt_addr, virt_size] : get_pe_sections(module, imagebase))
+    for (const auto& [virt_addr, virt_size] : get_pe_sections(module, module_info->base_addr))
     {
         auto aligned_size = align_by_page(virt_size);
         auto section_hash = calc_checksum(vmi, virt_addr, aligned_size);
         driver_hash       = merge(driver_hash, section_hash);
     }
-    plugin->driver_sections_checksums[driver] = std::move(driver_hash);
+    plugin->driver_sections_checksums[module_info->base_addr] = { std::move(driver_hash), (const char*)module_info->base_name->contents };
     munmap(module, VMI_PS_4KB);
+    return true;
+}
+
+static std::string get_driver_name_by_addr(drakvuf_t drakvuf, addr_t addr)
+{
+    std::pair<std::string, addr_t> context{ "", addr };
+
+    drakvuf_enumerate_drivers(drakvuf, [](drakvuf_t drakvuf, const module_info_t* info, bool*, bool* stop, void* ctx)
+    {
+        auto pass_context = reinterpret_cast<std::pair<std::string, addr_t>*>(ctx);
+        if (pass_context->second >= info->base_addr && pass_context->second < info->base_addr + info->size)
+        {
+            pass_context->first.assign((const char*)info->full_name->contents);
+            *stop = true;
+        }
+        return true;
+    }, &context);
+    return context.first;
 }
 
 void rootkitmon::check_driver_integrity(drakvuf_t drakvuf)
@@ -580,28 +532,17 @@ void rootkitmon::check_driver_integrity(drakvuf_t drakvuf)
     // Collect new checksums
     drakvuf_enumerate_drivers(drakvuf, driver_visitor, static_cast<void*>(this));
     // Compare
-    for (const auto& [driver, checksum] : this->driver_sections_checksums)
+    for (const auto& [driver, data] : this->driver_sections_checksums)
     {
+        const auto& [checksum, name] = data;
         // Find driver object
         if (past_drivers_checksums.find(driver) == past_drivers_checksums.end())
             continue;
 
-        const auto& p_checksum = past_drivers_checksums[driver];
+        const auto& [p_checksum, p_name] = past_drivers_checksums[driver];
         if (checksum != p_checksum)
         {
-            {
-                vmi_lock_guard vmi(drakvuf);
-                unicode_string_t* drvname = drakvuf_read_unicode_va(drakvuf, driver + this->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4);
-                if (drvname)
-                {
-                    report(drakvuf, this->format, "DriverCRC", (const char*)drvname->contents, "Modified");
-                    vmi_free_unicode_str(drvname);
-                }
-                else
-                {
-                    report(drakvuf, this->format, "DriverCRC", "Unknown", "Modified");
-                }
-            }
+            report(drakvuf, this->format, "DriverCRC", "Modified", nullptr, name.c_str());
         }
     }
 }
@@ -613,23 +554,21 @@ void rootkitmon::check_driver_objects(drakvuf_t drakvuf)
     this->driver_object_checksums.clear();
     this->driver_stacks.clear();
     // Collect new info
+    initialize_drv_checks(drakvuf, this);
+
+    auto report_modification = [&](const char* type, addr_t driver_object)
     {
-        vmi_lock_guard vmi(drakvuf);
-        if (!this->is32bit)
-            for (const auto& drv_object : this->enumerate_object_directory(vmi, "Driver"))
-            {
-                auto drv_obj_crc = calc_checksum(vmi, drv_object + this->offsets[DRIVER_OBJECT_STARTIO], this->guest_ptr_size * 30);
-                addr_t fastio_addr = 0;
-                if (VMI_SUCCESS != vmi_read_addr_va(vmi, drv_object + this->offsets[DRIVER_OBJECT_FASTIODISPATCH], 4, &fastio_addr))
-                {
-                    PRINT_DEBUG("[ROOTKITMON] Failed to read DRIVER_OBJECT_FASTIODISPATCH pointer\n");
-                }
-                if (fastio_addr)
-                    drv_obj_crc = merge(drv_obj_crc, calc_checksum(vmi, fastio_addr, this->fastio_size));
-                this->driver_object_checksums[drv_object] = drv_obj_crc;
-                this->driver_stacks[drv_object] = this->enumerate_driver_stacks(vmi, drv_object);
-            }
-    }
+        if (auto name = drakvuf_read_unicode_va(drakvuf, driver_object + this->offsets[DRIVER_OBJECT_DRIVERNAME], 0))
+        {
+            report(drakvuf, this->format, type, "Modified", nullptr, (const char*)name->contents);
+            vmi_free_unicode_str(name);
+        }
+        else
+        {
+            report(drakvuf, this->format, type, "Modified");
+        }
+    };
+
     // Compare dispatch table checksums
     for (const auto& [drv_object, checksum] : this->driver_object_checksums)
     {
@@ -641,7 +580,7 @@ void rootkitmon::check_driver_objects(drakvuf_t drakvuf)
 
         if (checksum != p_checksum)
         {
-            report(drakvuf, this->format, "DriverObject", "Uknonwn", "Modified");
+            report_modification("DriverObject", drv_object);
         }
     }
     // Compare driver stacks
@@ -664,8 +603,7 @@ void rootkitmon::check_driver_objects(drakvuf_t drakvuf)
             // Size mismatch == stack modification
             if (p_dev_stack.size() != dev_stack.size())
             {
-                report(drakvuf, this->format, "DriverStack", "Uknonwn", "Modified");
-                continue;
+                report_modification("DriverStack", drv_object);
             }
 
             for (size_t i = 0; i < dev_stack.size(); i++)
@@ -673,7 +611,7 @@ void rootkitmon::check_driver_objects(drakvuf_t drakvuf)
                 // Dev object hijack
                 if (dev_stack[i] != p_dev_stack[i])
                 {
-                    report(drakvuf, this->format, "DriverStack", "Uknonwn", "Modified");
+                    report_modification("DriverStack", drv_object);
                     break;
                 }
             }
@@ -700,12 +638,12 @@ void rootkitmon::check_descriptors(drakvuf_t drakvuf)
         const auto& t_desc_info = past_descriptors[vcpu];
         if (desc_info.idtr_base != t_desc_info.idtr_base)
         {
-            report(drakvuf, this->format, "SystemRegister", "IDTR", "Modified");
+            report(drakvuf, this->format, "SystemRegister", "Modified", "IDTR");
             break;
         }
         if (desc_info.idt_checksum != t_desc_info.idt_checksum)
         {
-            report(drakvuf, this->format, "SystemStruct", "IDT", "Modified");
+            report(drakvuf, this->format, "SystemStruct", "Modified", "IDT");
             break;
         }
     }
@@ -715,12 +653,12 @@ void rootkitmon::check_descriptors(drakvuf_t drakvuf)
         const auto& t_desc_info = past_descriptors[vcpu];
         if (desc_info.gdtr_base != t_desc_info.gdtr_base)
         {
-            report(drakvuf, this->format, "SystemRegister", "GDTR", "Modified");
+            report(drakvuf, this->format, "SystemRegister", "Modified", "GDTR");
             break;
         }
         if (desc_info.gdt.size() != t_desc_info.gdt.size())
         {
-            report(drakvuf, this->format, "SystemStruct", "GDT", "Modified");
+            report(drakvuf, this->format, "SystemStruct", "Modified", "GDT");
             break;
         }
         else
@@ -732,84 +670,10 @@ void rootkitmon::check_descriptors(drakvuf_t drakvuf)
 
                 if (addr != t_addr)
                 {
-                    report(drakvuf, this->format, "SystemStruct", "GDT", "Modified");
+                    report(drakvuf, this->format, "SystemStruct", "Modified", "GDT");
                     break;
                 }
             }
-        }
-    }
-}
-
-void rootkitmon::check_objects(drakvuf_t drakvuf)
-{
-    auto p_ob_type_initializer_crc = std::move(this->ob_type_initiliazer_crc);
-    auto p_ob_type_callbacks = std::move(this->ob_type_callbacks);
-    auto p_ob_callbacks = std::move(this->ob_callbacks);
-    this->ob_type_initiliazer_crc.clear();
-    this->ob_type_callbacks.clear();
-    this->ob_callbacks.clear();
-
-    vmi_lock_guard vmi(drakvuf);
-    initialize_ob_checks(vmi, this);
-
-    auto compare_callbacks = [&](const auto& previous, const auto& current, const char* action)
-    {
-        for (const auto& [ob, prev_cbs] : previous)
-        {
-            auto obj_name = get_object_name(vmi, ob);
-            const char* name = obj_name ? (const char*)obj_name->contents : "";
-            if (current.find(ob) == current.end())
-            {
-                report(drakvuf, format, "ObjectCallbacks", name, action);
-            }
-            else
-            {
-                const auto& cur_cbs = current.at(ob);
-                for (const auto& cb : prev_cbs)
-                {
-                    if (std::find(cur_cbs.begin(), cur_cbs.end(), cb) == cur_cbs.end())
-                    {
-                        report(drakvuf, format, "ObjectCallbacks", name, action);
-                        break;
-                    }
-                }
-            }
-            if (obj_name) vmi_free_unicode_str(obj_name);
-        }
-    };
-    compare_callbacks(p_ob_callbacks, this->ob_callbacks, "Removed");
-    compare_callbacks(this->ob_callbacks, p_ob_callbacks, "Added");
-    // Check type initializer
-    for (const auto& [idx, crc] : p_ob_type_initializer_crc)
-    {
-        // Should never happen but better safe than sorry
-        if (this->ob_type_initiliazer_crc.find(idx) == this->ob_type_initiliazer_crc.end())
-            continue;
-        addr_t ob_type;
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, this->type_idx_table + idx * this->guest_ptr_size, 4, &ob_type))
-            continue;
-
-        const auto& ob_ty_init_crc = calc_checksum(vmi, ob_type + this->offsets[OBJECT_TYPE_TYPE_INFO], this->ob_type_init_size);
-        if (this->ob_type_initiliazer_crc[idx] != ob_ty_init_crc)
-        {
-            auto type_name = drakvuf_read_unicode_va(drakvuf, ob_type + this->offsets[OBJECT_TYPE_NAME], 4);
-            report(drakvuf, format, "ObjectType", type_name ? (const char*)type_name->contents : "", "Modified");
-            if (type_name) vmi_free_unicode_str(type_name);
-        }
-    }
-    // Check type callbacks
-    for (const auto& [idx, cbs] : p_ob_type_callbacks)
-    {
-        if (this->ob_type_callbacks.find(idx) == this->ob_type_callbacks.end())
-            continue;
-        addr_t ob_type;
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, this->type_idx_table + idx * this->guest_ptr_size, 4, &ob_type))
-            continue;
-        if (!std::equal(p_ob_type_callbacks.begin(), p_ob_type_callbacks.end(), this->ob_type_callbacks.begin()))
-        {
-            auto type_name = drakvuf_read_unicode_va(drakvuf, ob_type + this->offsets[OBJECT_TYPE_NAME], 4);
-            report(drakvuf, format, "ObjectTypeCallbacks", type_name ? (const char*)type_name->contents : "", "Modified");
-            if (type_name) vmi_free_unicode_str(type_name);
         }
     }
 }
@@ -830,12 +694,12 @@ void rootkitmon::check_ci(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (this->ci_enabled != ci_flag)
     {
-        report(drakvuf, format, "SystemStruct", "g_CiEnabled", "Modified");
+        report(drakvuf, format, "SystemStruct", "Modified", "g_CiEnabled");
     }
 
     if (this->ci_callbacks != calc_checksum(vmi, this->ci_callbacks_va, get_ci_table_size(vmi)))
     {
-        report(drakvuf, format, "SystemStruct", "g_CiCallbacks", "Modified");
+        report(drakvuf, format, "SystemStruct", "Modified", "g_CiCallbacks");
     }
 }
 
@@ -858,7 +722,7 @@ void rootkitmon::check_filter_callbacks(drakvuf_t drakvuf)
             const auto& new_callbacks = this->flt_callbacks[volume];
             if (callbacks != new_callbacks)
             {
-                report(drakvuf, format, "SystemStruct", "VolumeFilterCallbacks", "Modified");
+                report(drakvuf, format, "SystemStruct", "Modified", "VolumeFilterCallbacks");
             }
         }
     }
@@ -878,7 +742,7 @@ event_response_t rootkitmon::rop_callback(drakvuf_t drakvuf, drakvuf_trap_info_t
 
         if (rflag & ac_smap_mask)
         {
-            report(drakvuf, plugin->format, "SecurityFeature", "EFLAGS.SMAP", "Disabled");
+            report(drakvuf, plugin->format, "SecurityFeature", "Disabled", "EFLAGS.SMAP");
         }
         // Release memory hook. If EFLAGS.SMAP wasn't set at this point, we don't need this bp anymore
         plugin->rop_hooks.erase(info->trap->breakpoint.addr);
@@ -898,7 +762,10 @@ event_response_t rootkitmon::msr_callback(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         return VMI_EVENT_RESPONSE_NONE;
     }
-    report(drakvuf, plugin->format, "SystemRegister", "LSTAR", "Modified");
+
+    auto name = get_driver_name_by_addr(drakvuf, info->reg->value);
+
+    report(drakvuf, plugin->format, "SystemRegister", "Modified", "LSTAR", name.empty() ? nullptr : name.c_str());
     auto trap = new drakvuf_trap_t
     {
         .type = BREAKPOINT,
@@ -924,12 +791,12 @@ event_response_t rootkitmon::cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t
     PRINT_DEBUG("[ROOTKITMON] CR4: %lx -> %lx\n", info->reg->previous, info->reg->value);
     if (VMI_GET_BIT(info->reg->previous, cr4_smep_mask_bitoffset) == 1 && VMI_GET_BIT(info->reg->value, cr4_smep_mask_bitoffset) == 0)
     {
-        report(drakvuf, plugin->format, "SecurityFeature", "CR4.SMEP", "Disabled");
+        report(drakvuf, plugin->format, "SecurityFeature", "Disabled", "CR4.SMEP");
     }
 
     if (VMI_GET_BIT(info->reg->previous, cr4_smap_mask_bitoffset) == 1 && VMI_GET_BIT(info->reg->value, cr4_smap_mask_bitoffset) == 0)
     {
-        report(drakvuf, plugin->format, "SecurityFeature", "CR4.SMAP", "Disabled");
+        report(drakvuf, plugin->format, "SecurityFeature", "Disabled", "CR4.SMAP");
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -1007,103 +874,6 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_mem_hook(hook_cb_t cal
     {
         return hook;
     }
-}
-
-unicode_string_t* rootkitmon::get_object_type_name(vmi_instance_t vmi, addr_t object)
-{
-    addr_t ob_header = object - this->object_header_size + this->guest_ptr_size;
-    uint8_t type_index;
-
-    // Object header is always present before actual object
-    if (VMI_SUCCESS != vmi_read_8_va(vmi, ob_header + this->offsets[OBJECT_HEADER_TYPEINDEX], 4, &type_index))
-        return nullptr;
-
-    // https://medium.com/@ashabdalhalim/a-light-on-windows-10s-object-header-typeindex-value-e8f907e7073a
-    // Due to security mitigations type_index is no longer equals to index in ObTypeIndexTable array on win 10
-    // but calculated as following:
-    if (this->winver == VMI_OS_WINDOWS_10)
-        type_index = type_index ^ ((ob_header >> 8) & 0xff) ^ this->ob_header_cookie;
-
-    addr_t ob_type;
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, this->type_idx_table + type_index * this->guest_ptr_size, 4, &ob_type))
-        return nullptr;
-
-    return drakvuf_read_unicode_va(drakvuf, ob_type + this->offsets[OBJECT_TYPE_NAME], 4);
-}
-
-unicode_string_t* rootkitmon::get_object_name(vmi_instance_t vmi, addr_t object)
-{
-    // Get object header
-    addr_t object_header = object - this->object_header_size + this->guest_ptr_size;
-    // Get InfoMask
-    uint8_t infomask{ 0 };
-    if (vmi_read_8_va(vmi, object_header + this->offsets[OBJECT_HEADER_INFOMASK], 4, &infomask))
-        throw -1;
-    // Get object name. Some objects are anonymous. See ObQueryNameInfo for more info
-    if (infomask & 2)
-    {
-        uint8_t name_info_off{ 0 };
-        if (VMI_SUCCESS != vmi_read_8_va(vmi, this->ob_infomask2off + (infomask & 3), 4, &name_info_off))
-            throw -1;
-        addr_t object_name_info = object_header - name_info_off;
-        return drakvuf_read_unicode_va(drakvuf, object_name_info + this->offsets[OBJECT_HEADER_NAME_INFO_NAME], 4);
-    }
-    return nullptr;
-}
-
-std::set<addr_t> rootkitmon::enumerate_object_directory(vmi_instance_t vmi, const char* name)
-{
-    // Get root directory object VA
-    addr_t root_directory_object;
-    if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "ObpRootDirectoryObject", &root_directory_object))
-    {
-        PRINT_DEBUG("[ROOTKITMON] Failed to translate ObpRootDirectoryObject to VA\n");
-        throw -1;
-    }
-
-    std::function<std::set<addr_t>(vmi_instance_t vmi, addr_t directory, const char* name)> enumerate_directory;
-    enumerate_directory = [&](vmi_instance_t vmi, addr_t directory, const char* name)
-    {
-        std::set<addr_t> out;
-        // There is only 37 _OBJECT_DIRECTORY_ENTRY entries in object directory:
-        // 0: kd> dt nt!_OBJECT_DIRECTORY
-        //    +0x000 HashBuckets      : [37] Ptr64 _OBJECT_DIRECTORY_ENTRY
-        //    +0x128 Lock             : _EX_PUSH_LOCK
-        //    ...
-        for (int i = 0; i < 37; i++)
-        {
-            addr_t hashbucket = 0;
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, directory + this->guest_ptr_size * i, 4, &hashbucket) || !hashbucket)
-                continue;
-
-            while (true)
-            {
-                addr_t object = 0;
-                if (VMI_SUCCESS != vmi_read_addr_va(vmi, hashbucket + this->offsets[OBJECT_DIRECTORY_ENTRY_OBJECT], 4, &object) || !object)
-                    break;
-
-                unicode_string_t* obj_name = get_object_type_name(vmi, object);
-                if (obj_name)
-                {
-                    if (!strcmp((const char*)obj_name->contents, name))
-                        out.insert(object);
-
-                    if (!strcmp((const char*)obj_name->contents, "Directory"))
-                        for (auto obj : enumerate_directory(vmi, object, name))
-                            out.insert(obj);
-
-                    vmi_free_unicode_str(obj_name);
-                }
-
-                if (VMI_SUCCESS != vmi_read_addr_va(vmi, hashbucket + this->offsets[OBJECT_DIRECTORY_ENTRY_CHAINLINK], 4, &hashbucket) || !hashbucket)
-                    break;
-            }
-        }
-        return out;
-    };
-
-    // Enumerate directories recursively
-    return enumerate_directory(vmi, root_directory_object, name);
 }
 
 /**
@@ -1303,64 +1073,31 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
 
     drakvuf_enumerate_drivers(drakvuf, driver_visitor, static_cast<void*>(this));
 
-    vmi_lock_guard vmi(drakvuf);
-
-    // Hook HalPrivateDispatchTable on write
-    if (!translate_ksym2p(vmi, "HalPrivateDispatchTable", &(this->halprivatetable)))
     {
-        PRINT_DEBUG("[ROOTKITMON] Failed to translate symbol to physical address\n");
-        throw -1;
-    }
-    manual_hooks.push_back(register_mem_hook(halprivatetable_overwrite_cb, this->halprivatetable, VMI_MEMACCESS_W));
+        vmi_lock_guard vmi(drakvuf);
 
-    if (!drakvuf_get_kernel_struct_size(drakvuf, "_OBJECT_HEADER", &this->object_header_size) ||
-        !drakvuf_get_kernel_struct_size(drakvuf, "_FAST_IO_DISPATCH", &this->fastio_size) ||
-        !drakvuf_get_kernel_struct_size(drakvuf, "_OBJECT_TYPE_INITIALIZER", &this->ob_type_init_size))
-    {
-        throw -1;
-    }
-
-    if (VMI_SUCCESS != vmi_translate_ksym2v(vmi, "ObpInfoMaskToOffset", &this->ob_infomask2off) ||
-        VMI_SUCCESS != vmi_translate_ksym2v(vmi, "ObTypeIndexTable", &this->type_idx_table))
-    {
-        throw -1;
-    }
-
-    if (this->winver == VMI_OS_WINDOWS_10 && VMI_SUCCESS != vmi_read_8_ksym(vmi, "ObHeaderCookie", &this->ob_header_cookie))
-    {
-        PRINT_DEBUG("[ROOTKITMON] Failed to locate header cookie\n");
-        throw -1;
-    }
-
-    if (!this->is32bit)
-    {
-        for (const auto& drv_object : enumerate_object_directory(vmi, "Driver"))
+        // Hook HalPrivateDispatchTable on write
+        if (!translate_ksym2p(vmi, "HalPrivateDispatchTable", &(this->halprivatetable)))
         {
-            // 28 Major functions + DriverUnload + DriverStartIo = 30 pointers
-            auto drv_obj_crc = calc_checksum(vmi, drv_object + offsets[DRIVER_OBJECT_STARTIO], this->guest_ptr_size * 30);
-            // Calculate FASTIO_DISPATCH array as well if present
-            addr_t fastio_addr = 0;
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, drv_object + offsets[DRIVER_OBJECT_FASTIODISPATCH], 4, &fastio_addr))
-            {
-                PRINT_DEBUG("[ROOTKITMON] Failed to read DRIVER_OBJECT_FASTIODISPATCH pointer\n");
-                throw -1;
-            }
-            if (fastio_addr)
-                drv_obj_crc = merge(drv_obj_crc, calc_checksum(vmi, fastio_addr, this->fastio_size));
-            driver_object_checksums[drv_object] = drv_obj_crc;
-            // Enumerate all device_stacks of a particular driver
-            driver_stacks[drv_object] = enumerate_driver_stacks(vmi, drv_object);
+            PRINT_DEBUG("[ROOTKITMON] Failed to translate symbol to physical address\n");
+            throw -1;
+        }
+        manual_hooks.push_back(register_mem_hook(halprivatetable_overwrite_cb, this->halprivatetable, VMI_MEMACCESS_W));
+
+        if (!drakvuf_get_kernel_struct_size(drakvuf, "_FAST_IO_DISPATCH", &this->fastio_size))
+        {
+            throw -1;
+        }
+
+        // Enumerate descriptors on all cores
+        if (!enumerate_cores(vmi))
+        {
+            PRINT_DEBUG("[ROOTKITMON] Failed to enumerate descriptors\n");
+            throw -1;
         }
     }
 
-    initialize_ob_checks(vmi, this);
-
-    // Enumerate descriptors on all cores
-    if (!enumerate_cores(vmi))
-    {
-        PRINT_DEBUG("[ROOTKITMON] Failed to enumerate descriptors\n");
-        throw -1;
-    }
+    initialize_drv_checks(drakvuf, this);
 
     // MSR hook
     auto trap = new drakvuf_trap_t();
@@ -1393,7 +1130,6 @@ bool rootkitmon::stop_impl()
     check_driver_integrity(drakvuf);
     check_driver_objects(drakvuf);
     check_descriptors(drakvuf);
-    check_objects(drakvuf);
     check_ci(drakvuf, nullptr);
     check_filter_callbacks(drakvuf);
     return pluginex::stop_impl();

@@ -144,6 +144,8 @@ bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uin
 
 bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
 
+bool win_get_process_from_thread(drakvuf_t drakvuf, addr_t kthread, addr_t* eprocess);
+
 bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     privilege_mode_t* previous_mode);
@@ -175,7 +177,8 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
 
 bool win_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
 bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_drivers(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t driver, void* visitor_ctx), void* visitor_ctx);
+bool win_enumerate_drivers(drakvuf_t drakvuf, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx), void* visitor_ctx);
+bool win_enumerate_object_directory(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx);
 
 bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
@@ -219,5 +222,8 @@ addr_t win_get_rspbase(drakvuf_t dravkuf, drakvuf_trap_info_t* info);
 bool win_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva);
 
 bool win_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va);
+
+unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object);
+unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object);
 
 #endif
