@@ -441,7 +441,7 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang libjson-c-dev meson ninja-build
+          sudo apt-get install -y clang libjson-c-dev meson ninja-build cmake
           sudo apt-get install -y curl libc6-dev openjdk-11-jdk-headless sqlite3 xz-utils zlib1g-dev opam
           sudo apt-get clean
           sudo apt-get -y autoremove
