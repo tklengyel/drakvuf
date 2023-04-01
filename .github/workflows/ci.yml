@@ -400,25 +400,26 @@ jobs:
           sudo ldconfig
           cd ../..
 
-      - name: Calculate cognitive complexity
+      - name: Calculate cognitive complexity for pr
         run: |
-          ./scripts/complexity.sh
+          cp scripts/complexity.sh /tmp
+          /tmp/complexity.sh
           mv complexity.log complexity-pr.log
 
       - uses: actions/checkout@v3
         with:
           ref: main
 
-      - name: Calculate cognitive complexity
-        run: ./scripts/complexity.sh
+      - name: Calculate cognitive complexity for main
+        run: /tmp/complexity.sh
 
       - name: compare complexity
         run: |
-          FUNCTIONS=$(tail -2 complexity.log | awk '{ print $2 }')
+          FUNCTIONS=$(tail -2 complexity.log | head -1 | awk '{ print $2 }')
           THRESHOLD=$(tail -1 complexity.log | awk '{ print $2 }')
 
-          CURRENT_FUNCTIONS=$(tail -2 complexity-pr.log)
-          COMPLEXITY=$(tail -1 complexity-pr.log)
+          CURRENT_FUNCTIONS=$(tail -2 complexity-pr.log | head -1 | awk '{ print $2 }')
+          COMPLEXITY=$(tail -1 complexity-pr.log | awk '{ print $2 }')
 
           if [ $CURRENT_FUNCTIONS -gt $FUNCTIONS ] || [ $COMPLEXITY -gt $THRESHOLD ]; then
             echo "Please don't increase complexity of existing complex functions or introduce new ones"
