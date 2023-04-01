@@ -479,8 +479,6 @@ jobs:
           cd ..
           rm -rf infer
 
-      - uses: actions/checkout@v3
-
       - name: Cache Xen debball
         uses: actions/cache@v3
         with:
@@ -504,22 +502,34 @@ jobs:
           sudo ldconfig
           cd ../..
 
-      - name: run infer
+      - uses: actions/checkout@v3
+
+      - name: run infer on pr
         run: |
           export PATH=$PATH:$GITHUB_WORKSPACE/fbinfer/bin
-          meson build
           git fetch origin
-          git diff --name-only HEAD..origin/main > index.txt
-          infer capture --compilation-database build/compile_commands.json
-          infer analyze --costs --bufferoverrun --changed-files-index index.txt
-          cp infer-out/report.json .
-          cp infer-out/costs-report.json .
-          git checkout main
-          rm -rf build
           meson build
+          git diff --name-only HEAD..origin/main > /tmp/index.txt
+          infer capture --compilation-database build/compile_commands.json
+          infer analyze --costs --bufferoverrun --changed-files-index /tmp/index.txt
+          mv infer-out /tmp
+          cp /tmp/infer-out/report.json /tmp
+          cp /tmp/infer-out/costs-report.json /tmp
+
+      - uses: actions/checkout@v3
+        with:
+          ref: main
+
+      - name: run infer on main
+        run: |
+          meson build
+          mv /tmp/infer-out .
           infer capture --reactive --compilation-database build/compile_commands.json
-          infer analyze --costs --bufferoverrun --reactive --changed-files-index index.txt
-          infer reportdiff --report-current report.json --report-previous infer-out/report.json
+          infer analyze --reactive --costs --bufferoverrun --changed-files-index /tmp/index.txt
+
+      - name: check report diffs
+        run: |
+          infer reportdiff --report-current /tmp/report.json --report-previous infer-out/report.json
           jq '.' infer-out/differential/introduced.json
-          infer reportdiff --costs-current costs-report.json --costs-previous infer-out/costs-report.json
+          infer reportdiff --costs-current /tmp/costs-report.json --costs-previous infer-out/costs-report.json
           jq '.' infer-out/differential/introduced.json
