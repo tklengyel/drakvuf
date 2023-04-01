@@ -404,7 +404,7 @@ jobs:
         run: |
           cp scripts/complexity.sh /tmp
           /tmp/complexity.sh
-          mv complexity.log complexity-pr.log
+          mv complexity.log /tmp/complexity.log
 
       - uses: actions/checkout@v3
         with:
@@ -418,8 +418,8 @@ jobs:
           FUNCTIONS=$(tail -2 complexity.log | head -1 | awk '{ print $2 }')
           THRESHOLD=$(tail -1 complexity.log | awk '{ print $2 }')
 
-          CURRENT_FUNCTIONS=$(tail -2 complexity-pr.log | head -1 | awk '{ print $2 }')
-          COMPLEXITY=$(tail -1 complexity-pr.log | awk '{ print $2 }')
+          CURRENT_FUNCTIONS=$(tail -2 /tmp/complexity.log | head -1 | awk '{ print $2 }')
+          COMPLEXITY=$(tail -1 /tmp/complexity.log | awk '{ print $2 }')
 
           if [ $CURRENT_FUNCTIONS -gt $FUNCTIONS ] || [ $COMPLEXITY -gt $THRESHOLD ]; then
             echo "Please don't increase complexity of existing complex functions or introduce new ones"
