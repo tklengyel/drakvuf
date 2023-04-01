@@ -360,8 +360,6 @@ jobs:
 
   cognitive-complexity:
     env:
-      THRESHOLD: 11585
-      COUNT: 184
       VERSION: 15
       CC: clang-15
       CXX: clang++-15
@@ -402,41 +400,28 @@ jobs:
           sudo ldconfig
           cd ../..
 
-      - name: Calculate cognitive complexity
+      - name: Calculate cognitive complexity for pr
         run: |
-          meson build
-          cd build
-          run-clang-tidy-$VERSION -quiet \
-              -config="{Checks: 'readability-function-cognitive-complexity', CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: 0}, {key: readability-function-cognitive-complexity.DescribeBasicIncrements, value: False}]}" \
-              2>/dev/null | \
-              grep warning | grep "cognitive complexity" > cognitive-complexity.log || :
+          cp scripts/complexity.sh /tmp
+          /tmp/complexity.sh
+          mv complexity.log /tmp/complexity.log
 
-          complexity=0
-          complex_functions=0
-          while read -r log; do
-              file=$(echo $log | awk -F":" '{ print $1 }')
-              line=$(echo $log | awk -F":" '{ print $2 }')
-              function=$(echo $log | awk -F"function" '{ print $2 }' | awk '{ print $1 }' | sed "s/'//g")
-              score=$(echo $log | awk -F"cognitive complexity of" '{ print $2 }' | awk '{ print $1 }')
+      - uses: actions/checkout@v3
+        with:
+          ref: main
 
-              [[ $score -lt 25 ]] && continue
+      - name: Calculate cognitive complexity for main
+        run: /tmp/complexity.sh
 
-              echo "Complex function found: $file:$line $function(), complexity score: $score"
+      - name: compare complexity
+        run: |
+          FUNCTIONS=$(tail -2 complexity.log | head -1 | awk '{ print $2 }')
+          THRESHOLD=$(tail -1 complexity.log | awk '{ print $2 }')
 
-              complexity=$(( complexity + score ))
-              (( complex_functions++ )) || :
-          done < cognitive-complexity.log
+          CURRENT_FUNCTIONS=$(tail -2 /tmp/complexity.log | head -1 | awk '{ print $2 }')
+          COMPLEXITY=$(tail -1 /tmp/complexity.log | awk '{ print $2 }')
 
-          echo "Found $complex_functions complex functions"
-          echo "Final complexity sum of complex functions: $complexity"
-
-          if [ $complexity -gt $THRESHOLD ]; then
-            echo "Please don't increase the cognitive complexity of existing highly complex functions"
-            echo "Maximum allowed total complexity (baseline): $THRESHOLD"
-            exit 1
-          fi
-
-          if [ $complex_functions -gt $COUNT ]; then
-            echo "Please don't introduce new cognitively complex functions, break it up into smaller ones"
+          if [ $CURRENT_FUNCTIONS -gt $FUNCTIONS ] || [ $COMPLEXITY -gt $THRESHOLD ]; then
+            echo "Please don't increase complexity of existing complex functions or introduce new ones"
             exit 1
           fi
