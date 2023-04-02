@@ -466,7 +466,7 @@ jobs:
         uses: actions/cache@v3
         id: infer
         with:
-          path: fbinfer
+          path: infer
           key: infer
 
       - name: get infer
@@ -475,9 +475,11 @@ jobs:
           git clone --depth=1 https://github.com/facebook/infer
           cd infer
           ./build-infer.sh -y clang
-          DESTDIR=$GITHUB_WORKSPACE/fbinfer make install
-          cd ..
-          rm -rf infer
+          DESTDIR=/opt/infer sudo -E make install
+
+      - name: get infer
+        if: steps.infer.outputs.cache-hit == 'true'
+        run: sudo mv infer /opt
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -506,7 +508,7 @@ jobs:
 
       - name: run infer on pr
         run: |
-          export PATH=$PATH:$GITHUB_WORKSPACE/fbinfer/bin
+          export PATH=$PATH:/opt/infer/bin
           git fetch origin
           meson build
           git diff --name-only HEAD..origin/main > /tmp/index.txt
@@ -522,6 +524,7 @@ jobs:
 
       - name: run infer on main
         run: |
+          export PATH=$PATH:/opt/infer/bin
           meson build
           mv /tmp/infer-out .
           infer capture --reactive --compilation-database build/compile_commands.json
@@ -529,7 +532,11 @@ jobs:
 
       - name: check report diffs
         run: |
+          export PATH=$PATH:/opt/infer/bin
           infer reportdiff --report-current /tmp/report.json --report-previous infer-out/report.json
           jq '.' infer-out/differential/introduced.json
           infer reportdiff --costs-current /tmp/costs-report.json --costs-previous infer-out/costs-report.json
           jq '.' infer-out/differential/introduced.json
+
+      - name: move infer to cache path
+        run: sudo mv /opt/infer $GITHUB_WORKSPACE
