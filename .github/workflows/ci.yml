@@ -477,6 +477,7 @@ jobs:
           ./build-infer.sh -y clang
           DESTDIR=/opt/infer sudo -E make install
           sudo rm -rf infer
+          find /opt
 
       - name: get infer
         if: steps.infer.outputs.cache-hit == 'true'
@@ -509,6 +510,8 @@ jobs:
 
       - name: run infer on pr
         run: |
+          export PATH=$PATH:/opt/infer/bin
+          export PATH=$PATH:/opt/infer/usr/bin
           export PATH=$PATH:/opt/infer/usr/local/bin
           git fetch origin
           meson build
@@ -525,6 +528,8 @@ jobs:
 
       - name: run infer on main
         run: |
+          export PATH=$PATH:/opt/infer/bin
+          export PATH=$PATH:/opt/infer/usr/bin
           export PATH=$PATH:/opt/infer/usr/local/bin
           meson build
           mv /tmp/infer-out .
@@ -533,6 +538,8 @@ jobs:
 
       - name: check report diffs
         run: |
+          export PATH=$PATH:/opt/infer/bin
+          export PATH=$PATH:/opt/infer/usr/bin
           export PATH=$PATH:/opt/infer/usr/local/bin
           infer reportdiff --report-current /tmp/report.json --report-previous infer-out/report.json
           jq '.' infer-out/differential/introduced.json
