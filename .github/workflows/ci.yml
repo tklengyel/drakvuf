@@ -476,6 +476,7 @@ jobs:
           cd infer
           ./build-infer.sh -y clang
           DESTDIR=/opt/infer sudo -E make install
+          sudo rm -rf infer
 
       - name: get infer
         if: steps.infer.outputs.cache-hit == 'true'
