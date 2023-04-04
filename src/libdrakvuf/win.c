@@ -498,7 +498,7 @@ static bool enumerate_directory(drakvuf_t drakvuf, addr_t directory, void (*visi
             {
                 return false;
             }
-        
+
             object_info_t object_info = { .base_addr = object, .name = name };
             visitor_func(drakvuf, &object_info, visitor_ctx);
 
@@ -649,8 +649,8 @@ bool set_os_windows(drakvuf_t drakvuf)
     }
 
     if ( VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY] ) ||
-         VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_EPROCESS",           &drakvuf->sizes[EPROCESS] ) || 
-         VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_OBJECT_HEADER",      &drakvuf->sizes[OBJECT_HEADER]) )
+        VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_EPROCESS",           &drakvuf->sizes[EPROCESS] ) ||
+        VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_OBJECT_HEADER",      &drakvuf->sizes[OBJECT_HEADER]) )
     {
         return 0;
     }

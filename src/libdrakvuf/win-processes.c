@@ -1291,7 +1291,7 @@ bool win_enumerate_processes_with_module( drakvuf_t drakvuf, const char* module_
         );
 
         if ( win_get_process_pid( drakvuf, current_process, &pid) &&
-             win_get_process_dtb(drakvuf, current_process, &ctx.dtb))
+            win_get_process_dtb(drakvuf, current_process, &ctx.dtb))
         {
             addr_t wow_peb = win_get_wow_peb( drakvuf, &ctx, current_process ) ;
 

@@ -371,13 +371,14 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
     // Enumerate callback objects.
     //
     if (!drakvuf_enumerate_object_directory(drakvuf, [](drakvuf_t drakvuf, const object_info_t* info, void* ctx)
-    {
-        auto plugin = static_cast<callbackmon*>(ctx);
+{
+    auto plugin = static_cast<callbackmon*>(ctx);
 
         if (!strcmp((const char*)info->name->contents, "Callback"))
         {
             auto name = drakvuf_get_object_name(drakvuf, info->base_addr);
-            plugin->object_cb.push_back({
+            plugin->object_cb.push_back(
+            {
                 .base = info->base_addr,
                 .name = name ? (const char*)name->contents : "Anonymous",
                 .callbacks = get_callback_object_callbacks(drakvuf, plugin, info->base_addr)
@@ -394,7 +395,7 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
     {
         object_type_t ob_type{};
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, plugin->ob_type_table_va + i * drakvuf_get_address_width(drakvuf), 0, &ob_type.base))
-            return false; 
+            return false;
         // if reached the end.
         //
         if (!ob_type.base)
@@ -419,13 +420,13 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
         addr_t entry{};
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 0, &entry))
             return false;
-        
+
         while (entry != head && entry)
         {
             uint32_t active{};
             addr_t pre_cb{}, post_cb{};
             // Undocumented structure. No symbols.
-            // typedef struct _CALLBACK_ENTRY_ITEM 
+            // typedef struct _CALLBACK_ENTRY_ITEM
             // {
             //     LIST_ENTRY CallbackList; // 0x0
             //     OB_OPERATION Operations; // 0x10
@@ -446,8 +447,8 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
 
             if (active)
             {
-                if (pre_cb)  
-                    ob_type.callbacks.push_back({ .base = entry, .callback = pre_cb  });                    
+                if (pre_cb)
+                    ob_type.callbacks.push_back({ .base = entry, .callback = pre_cb  });
                 if (post_cb)
                     ob_type.callbacks.push_back({ .base = entry, .callback = post_cb });
             }
@@ -712,7 +713,8 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
 
     drakvuf_enumerate_drivers(drakvuf, [](drakvuf_t drakvuf, const module_info_t* info, bool*, bool*, void* ctx)
     {
-        static_cast<callbackmon*>(ctx)->drivers.push_back({
+        static_cast<callbackmon*>(ctx)->drivers.push_back(
+        {
             .base = info->base_addr,
             .size = info->size,
             .name = (const char*)info->base_name->contents
@@ -808,8 +810,11 @@ bool callbackmon::stop_impl()
     check_ndis_cbs (this->ndis_protocol_cb, snapshot->ndis_protocol_cb);
     for (const auto& past_object : this->object_cb)
     {
-        const auto& new_object = std::find_if(snapshot->object_cb.begin(), snapshot->object_cb.end(), 
-            [&past_object](const auto& object){ return object.base == past_object.base; });
+        const auto& new_object = std::find_if(snapshot->object_cb.begin(), snapshot->object_cb.end(),
+                [&past_object](const auto& object)
+        {
+            return object.base == past_object.base;
+        });
 
         if (new_object != snapshot->object_cb.end())
         {
@@ -819,8 +824,11 @@ bool callbackmon::stop_impl()
 
     for (const auto& past_object : this->object_type)
     {
-        const auto& new_object = std::find_if(snapshot->object_type.begin(), snapshot->object_type.end(), 
-            [&past_object](const auto& object){ return object.base == past_object.base; });
+        const auto& new_object = std::find_if(snapshot->object_type.begin(), snapshot->object_type.end(),
+                [&past_object](const auto& object)
+        {
+            return object.base == past_object.base;
+        });
 
         if (new_object != snapshot->object_type.end())
         {
