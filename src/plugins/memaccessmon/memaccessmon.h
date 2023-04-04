@@ -114,8 +114,10 @@ class memaccessmon : public pluginex
 {
 public:
     memaccessmon(drakvuf_t drakvuf, output_format_t output);
-    event_response_t readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     void print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info, size_t bytes);
+    mmvad_context* find_mmvad(drakvuf_t drakvuf, addr_t process, addr_t base_address, vmi_pid_t pid);
+    event_response_t readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     output_format_t format;
     std::unique_ptr<libhook::SyscallHook> write_hook;

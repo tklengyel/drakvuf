@@ -134,38 +134,14 @@ void memaccessmon::print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info,
     );
 }
 
-event_response_t memaccessmon::readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+mmvad_context* memaccessmon::find_mmvad(drakvuf_t drakvuf, addr_t process, addr_t base_address, vmi_pid_t pid)
 {
-    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    addr_t base_address = drakvuf_get_function_argument(drakvuf, info, 2);
-    size_t bytes = drakvuf_get_function_argument(drakvuf, info, 4);
-
-    // Ignore self reading
-    if (handle == -1UL)
-    {
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    vmi_pid_t pid;
-    if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
-    {
-        PRINT_DEBUG("[MEMACCESSMON] Failed to get pid from handle\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    addr_t process;
-    if (!drakvuf_get_process_by_pid(drakvuf, pid, &process, nullptr))
-    {
-        PRINT_DEBUG("[MEMACCESSMON] Failed to get process by pid\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    };
-
+    
     for (auto& vad : vads[pid])
     {
         if (base_address >= vad.starting_va && base_address <= vad.ending_va)
         {
-            print_result(&vad, info, bytes);
-            return VMI_EVENT_RESPONSE_NONE;
+            return &vad;
         }
     }
 
@@ -196,9 +172,42 @@ event_response_t memaccessmon::readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info
             }
         }
 
-        print_result(&vad, info, bytes);
         vads[pid].push_back(std::move(vad));
+        return &vads[pid].back();
+    }
+
+    return nullptr;
+}
+
+event_response_t memaccessmon::readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t base_address = drakvuf_get_function_argument(drakvuf, info, 2);
+    size_t bytes = drakvuf_get_function_argument(drakvuf, info, 4);
+
+    // Ignore self reading
+    if (handle == -1UL)
+    {
         return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    vmi_pid_t pid;
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
+    {
+        PRINT_DEBUG("[MEMACCESSMON] Failed to get pid from handle\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    addr_t process;
+    if (!drakvuf_get_process_by_pid(drakvuf, pid, &process, nullptr))
+    {
+        PRINT_DEBUG("[MEMACCESSMON] Failed to get process by pid\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    };
+
+    if (auto* mmvad = find_mmvad(drakvuf, process, base_address, pid))
+    {
+        print_result(mmvad, info, bytes);
     }
 
     return VMI_EVENT_RESPONSE_NONE;
