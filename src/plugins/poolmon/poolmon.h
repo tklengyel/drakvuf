@@ -105,7 +105,6 @@
 #ifndef POOLMON_H
 #define POOLMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 class poolmon: public plugin

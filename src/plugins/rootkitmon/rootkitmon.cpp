@@ -738,13 +738,6 @@ void rootkitmon::check_descriptors(drakvuf_t drakvuf)
             }
         }
     }
-    for (const auto& [vcpu, lstar] : this->msr_lstar)
-    {
-        if (past_lstar[vcpu] != lstar)
-        {
-            report(drakvuf, this->format, "SystemRegister", "LSTAR", "Modified");
-        }
-    }
 }
 
 void rootkitmon::check_objects(drakvuf_t drakvuf)
@@ -869,6 +862,77 @@ void rootkitmon::check_filter_callbacks(drakvuf_t drakvuf)
             }
         }
     }
+}
+
+/**
+ *  Callback to check if EFLAGS.SMAP were edited. If we've reached this point, MSR_LSTAR was changed and we've been redirected
+ *  to custom syscall callback instead of default.
+ */
+event_response_t rootkitmon::rop_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    rootkitmon* plugin = static_cast<rootkitmon*>(info->trap->data);
+    vmi_lock_guard vmi(drakvuf);
+    uint64_t rflag;
+    if (VMI_SUCCESS == vmi_get_vcpureg(vmi, &rflag, RFLAGS, info->vcpu))
+    {
+
+        if (rflag & ac_smap_mask)
+        {
+            report(drakvuf, plugin->format, "SecurityFeature", "EFLAGS.SMAP", "Disabled");
+        }
+        // Release memory hook. If EFLAGS.SMAP wasn't set at this point, we don't need this bp anymore
+        plugin->rop_hooks.erase(info->trap->breakpoint.addr);
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+/**
+ *  Callback to check if MSR_LSTAR were edited to redirect syscall to a custom user-defined callback,
+ *  it's the first point before setting FLAGS.SMAP(AC) to disable SMAP technology before syscall
+ */
+event_response_t rootkitmon::msr_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    rootkitmon* plugin = static_cast<rootkitmon*>(info->trap->data);
+    if (plugin->msr_lstar[info->vcpu] == info->reg->value)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+    report(drakvuf, plugin->format, "SystemRegister", "LSTAR", "Modified");
+    auto trap = new drakvuf_trap_t
+    {
+        .type = BREAKPOINT,
+        .breakpoint.lookup_type = LOOKUP_PID,
+        .breakpoint.pid = info->proc_data.pid,
+        .breakpoint.addr_type = ADDR_VA,
+        .breakpoint.addr = (addr_t)info->reg->value,
+        .data = (void*)plugin,
+        .cb = rootkitmon::rop_callback,
+    };
+    plugin->rop_hooks[info->reg->value] = plugin->createManualHook(trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t rootkitmon::cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    rootkitmon* plugin = static_cast<rootkitmon*>(info->trap->data);
+
+    PRINT_DEBUG("[ROOTKITMON] CR4: %lx -> %lx\n", info->reg->previous, info->reg->value);
+    if (VMI_GET_BIT(info->reg->previous, cr4_smep_mask_bitoffset) == 1 && VMI_GET_BIT(info->reg->value, cr4_smep_mask_bitoffset) == 0)
+    {
+        report(drakvuf, plugin->format, "SecurityFeature", "CR4.SMEP", "Disabled");
+    }
+
+    if (VMI_GET_BIT(info->reg->previous, cr4_smap_mask_bitoffset) == 1 && VMI_GET_BIT(info->reg->value, cr4_smap_mask_bitoffset) == 0)
+    {
+        report(drakvuf, plugin->format, "SecurityFeature", "CR4.SMAP", "Disabled");
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
@@ -1297,6 +1361,31 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
         PRINT_DEBUG("[ROOTKITMON] Failed to enumerate descriptors\n");
         throw -1;
     }
+
+    // MSR hook
+    auto trap = new drakvuf_trap_t();
+    trap->type = REGISTER;
+    trap->regaccess.type = MSR_ANY;
+    trap->regaccess.msr = msr_lstar_index;
+    trap->data = (void*)this;
+    trap->ah_cb = nullptr;
+    trap->cb = &rootkitmon::msr_callback;
+    this->msr_hook = createManualHook(trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
+
+    // cr4 hook
+    auto cr4_trap = new drakvuf_trap_t();
+    cr4_trap->type = REGISTER;
+    cr4_trap->regaccess.type = CR4;
+    cr4_trap->data = (void*)this;
+    cr4_trap->ah_cb = nullptr;
+    cr4_trap->cb = &rootkitmon::cr4_callback;
+    this->cr4_hook = createManualHook(cr4_trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
 }
 
 bool rootkitmon::stop_impl()

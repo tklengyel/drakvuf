@@ -225,16 +225,14 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     __cpuid(1, version_information, r0, r1, feature_information);
     __cpuid(0x80000001, r0, amd_extended_cpu_features, r1, r2);
 
-    this->terminate_process_hook = createSyscallHook("NtTerminateProcess",
-            &procdump2::terminate_process_cb);
-    this->clean_process_memory_hook = createSyscallHook(
-            "MmCleanProcessAddressSpace", &procdump2::clean_process_memory_cb);
+    this->terminate_process_hook = createSyscallHook("NtTerminateProcess", &procdump2::terminate_process_cb);
+    this->clean_process_memory_hook = createSyscallHook("MmCleanProcessAddressSpace", &procdump2::clean_process_memory_cb);
+
     if (!config->disable_kedelayexecutionthread_hook)
-        this->delay_execution_hook = createSyscallHook("KeDelayExecutionThread",
-                &procdump2::delay_execution_cb);
+        this->delay_execution_hook = createSyscallHook("KeDelayExecutionThread", &procdump2::delay_execution_cb);
+
     if (!config->disable_kideliverapc_hook)
-        this->deliver_apc_hook = createSyscallHook("KiDeliverApc",
-                &procdump2::deliver_apc_cb);
+        this->deliver_apc_hook = createSyscallHook("KiDeliverApc", &procdump2::deliver_apc_cb);
 
     if (config->dump_new_processes_on_finish)
         running_processes_on_start = get_running_processes();

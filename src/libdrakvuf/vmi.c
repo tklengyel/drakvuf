@@ -162,7 +162,7 @@ static void copy_proc_data_from_priv(proc_data_t* proc_data, proc_data_priv_t* p
  * This function gets called from the singlestep event
  * after an int3 or a read event happens.
  */
-event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
     drakvuf_t drakvuf = (drakvuf_t)event->data;
@@ -207,7 +207,7 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
 
     PRINT_DEBUG("Re-copying remapped gfn\n");
 
-    if ( VMI_FAILURE == vmi_pause_vm(vmi) )
+    if (!drakvuf_pause(drakvuf))
         return 0;
 
     uint8_t backup[VMI_PS_4KB];
@@ -273,7 +273,7 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
         loop = loop->next;
     }
 
-    if ( VMI_FAILURE == vmi_resume_vm(vmi) )
+    if (!drakvuf_resume(drakvuf))
         return 0;
 
     return 1;
@@ -1236,6 +1236,12 @@ void remove_trap(drakvuf_t drakvuf,
                 if ( !drakvuf->cr3 && !drakvuf->enable_cr3_based_interception )
                     control_cr3_trap(drakvuf, 0);
             }
+            else if (CR4 == trap->regaccess.type)
+            {
+                drakvuf->cr4 = g_slist_remove(drakvuf->cr4, trap);
+                if (!drakvuf->cr4)
+                    control_cr4_trap(drakvuf, 0);
+            }
             else if (MSR_ALL == trap->regaccess.type)
             {
                 drakvuf->msr = g_slist_remove(drakvuf->msr, trap);
@@ -1244,9 +1250,10 @@ void remove_trap(drakvuf_t drakvuf,
             }
             else if (MSR_ANY == trap->regaccess.type)
             {
+                uint32_t index = trap->regaccess.msr;
                 drakvuf->msr = g_slist_remove(drakvuf->msr, trap);
                 if (!drakvuf->msr)
-                    control_msr_trap_any(drakvuf, 0, 0);
+                    control_msr_trap_any(drakvuf, 0, index);
             }
             break;
         }
@@ -1802,7 +1809,7 @@ void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), v
     while (!is_interrupted(drakvuf, data))
         drakvuf_poll(drakvuf, 1000);
 
-    vmi_pause_vm(drakvuf->vmi);
+    drakvuf_pause(drakvuf);
 
     // Ensures all events are processed from the ring
     drakvuf_poll(drakvuf, 0);
@@ -1814,7 +1821,7 @@ void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf)
 {
     bool toggle = !drakvuf->enable_cr3_based_interception;
     status_t status;
-    vmi_pause_vm(drakvuf->vmi);
+    drakvuf_pause(drakvuf);
 
     if (toggle)
     {
@@ -1840,7 +1847,7 @@ void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf)
         drakvuf->enable_cr3_based_interception = false;
     }
 
-    vmi_resume_vm(drakvuf->vmi);
+    drakvuf_resume(drakvuf);
 }
 
 bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
@@ -2038,7 +2045,7 @@ void close_vmi(drakvuf_t drakvuf)
 {
     PRINT_DEBUG("close_vmi starting\n");
 
-    drakvuf_pause(drakvuf);
+    xen_pause(drakvuf->xen, drakvuf->domID);
 
     if (drakvuf->vmi)
     {
@@ -2168,7 +2175,7 @@ void close_vmi(drakvuf_t drakvuf)
     drakvuf->altp2m_idr = 0;
     drakvuf->sink_page_gfn = 0;
 
-    drakvuf_resume(drakvuf);
+    xen_resume(drakvuf->xen, drakvuf->domID);
 
     PRINT_DEBUG("close_vmi finished\n");
 }

@@ -25,7 +25,7 @@ required virtualization extensions.
 DRAKVUF currently supports:
  - Windows 7 - 8, both 32 and 64-bit
  - Windows 10 64-bit
- - Linux 2.6.x - 5.x, both 32-bit and 64-bit
+ - Linux 2.6.x - 6.x, both 32-bit and 64-bit
 
 ## Pre-built Debian packages
 

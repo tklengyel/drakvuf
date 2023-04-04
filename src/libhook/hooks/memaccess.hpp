@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -101,18 +101,104 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
 
-#ifndef DRAKVUF_PLUGINS_PRIVATE_H
-#define DRAKVUF_PLUGINS_PRIVATE_H
+#include <string>
+#include <libhook/call_result.hpp>
+#include <libhook/hooks/base.hpp>
 
-#include "plugins.h"
-
-static const char* userid[] =
+namespace libhook
 {
-    [VMI_OS_WINDOWS] = "SessionID",
-    [VMI_OS_LINUX] = "UID"
+
+class MemAccessHook : public BaseHook
+{
+public:
+    /**
+     * Factory function to create the trap and perform hooking at the same time.
+     */
+    template<typename Params = CallResult>
+    [[nodiscard]]
+    static auto create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+    -> std::unique_ptr<MemAccessHook>;
+
+    /**
+     * unhook on dctor
+     */
+    ~MemAccessHook() override;
+
+    /**
+     * delete copy ctor, as this class has ownership via RAII
+     */
+    MemAccessHook(const MemAccessHook&) = delete;
+
+    /**
+     * move ctor, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    MemAccessHook(MemAccessHook&&) noexcept;
+
+    /**
+     * delete copy assignment operator, as this class has ownership via RAII
+     */
+    MemAccessHook& operator=(const MemAccessHook&) = delete;
+
+    /**
+     * move assignment operator, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    MemAccessHook& operator=(MemAccessHook&&) noexcept;
+
+    cb_wrapper_t callback_;
+    drakvuf_trap_t* trap_;
+
+protected:
+    /**
+     * Hide ctor from users, as we enforce factory function usage.
+     */
+    MemAccessHook(drakvuf_t, cb_wrapper_t cb);
 };
 
-#define USERIDSTR(drakvuf) (userid[drakvuf_get_os_type(drakvuf)])
+template<typename Params>
+auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+-> std::unique_ptr<MemAccessHook>
+{
+    PRINT_DEBUG("[LIBHOOK] creating MemAccessHook hook\n");
 
-#endif
+    // not using std::make_unique because ctor is private
+    auto hook = std::unique_ptr<MemAccessHook>(new MemAccessHook(drakvuf, cb));
+    hook->trap_ = new drakvuf_trap_t();
+
+    hook->trap_->name = "libhook MemAccessHook";
+    hook->trap_->type = MEMACCESS;
+    hook->trap_->memaccess.gfn = gfn;
+    hook->trap_->memaccess.type = mem_access_type;
+    hook->trap_->memaccess.access = mem_access;
+    hook->trap_->ttl = ttl;
+    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
+        return GetTrapHook<MemAccessHook>(info)->callback_(drakvuf, info);
+    };
+
+    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
+
+    // populate backref
+    auto* params = new Params();
+    params->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(params);
+
+    if (!drakvuf_add_trap(drakvuf, hook->trap_))
+    {
+        PRINT_DEBUG("[LIBHOOK] failed to create MemAccessHook trap!\n");
+        delete static_cast<CallResult*>(hook->trap_->data);
+        hook->trap_->data = nullptr;
+        delete hook->trap_;
+        hook->trap_ = nullptr;
+        return std::unique_ptr<MemAccessHook>();
+    }
+
+    PRINT_DEBUG("[LIBHOOK] MemAccessHook hook OK\n");
+    return hook;
+}
+
+};  // namespace libhook

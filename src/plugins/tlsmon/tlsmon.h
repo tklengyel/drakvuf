@@ -119,7 +119,6 @@
 #include <vector>
 
 #include <libusermode/userhook.hpp>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 

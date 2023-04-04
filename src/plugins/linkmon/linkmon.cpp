@@ -389,8 +389,6 @@ linkmon::linkmon(drakvuf_t drakvuf,
             throw -1;
     }
 
-    this->ntfscontrolfile_hook = createSyscallHook("NtFsControlFile",
-            &linkmon::ntfscontrolfile_cb);
-    this->setinformation_hook = createSyscallHook("NtSetInformationFile",
-            &linkmon::setinformation_cb);
+    this->ntfscontrolfile_hook = createSyscallHook("NtFsControlFile", &linkmon::ntfscontrolfile_cb);
+    this->setinformation_hook = createSyscallHook("NtSetInformationFile", &linkmon::setinformation_cb);
 }

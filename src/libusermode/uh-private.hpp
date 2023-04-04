@@ -111,7 +111,6 @@
 #include <map>
 
 #include <glib.h>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 class userhook; // Forward declaration.

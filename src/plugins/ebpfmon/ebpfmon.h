@@ -106,7 +106,6 @@
 #define EBPFMON_H
 
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 
 class ebpfmon: public pluginex
 {

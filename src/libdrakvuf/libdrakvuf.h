@@ -432,8 +432,8 @@ void drakvuf_loop (drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), 
 void drakvuf_interrupt (drakvuf_t drakvuf,
     int sig) NOEXCEPT;
 int drakvuf_is_interrupted(drakvuf_t drakvuf) NOEXCEPT;
-void drakvuf_pause (drakvuf_t drakvuf) NOEXCEPT;
-void drakvuf_resume (drakvuf_t drakvuf) NOEXCEPT;
+bool drakvuf_pause (drakvuf_t drakvuf) NOEXCEPT;
+bool drakvuf_resume (drakvuf_t drakvuf) NOEXCEPT;
 
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
     addr_t process,

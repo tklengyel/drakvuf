@@ -105,7 +105,6 @@
 #ifndef CLIPBOARDMON_H
 #define CLIPBOARDMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 struct clipboardmon_config

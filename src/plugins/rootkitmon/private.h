@@ -190,7 +190,10 @@ static const char* flt_offset_names[__FLT_OFFSET_MAX][2] =
 static constexpr uint32_t mem_not_paged = 0x08000000;
 static constexpr uint32_t mem_execute = 0x20000000;
 static constexpr uint32_t mem_write = 0x80000000;
-
+static constexpr uint32_t msr_lstar_index = 0xc0000082;
+static constexpr uint64_t ac_smap_mask = 0x40000;
+static constexpr uint32_t cr4_smep_mask_bitoffset = 20;
+static constexpr uint32_t cr4_smap_mask_bitoffset = 21;
 struct section_header_t
 {
     char     name[8];

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -101,24 +101,53 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#include <libhook/hooks/memaccess.hpp>
 
-#ifndef PROCMON_H
-#define PROCMON_H
-
-#include "plugins/plugins_ex.h"
-#include "win.h"
-#include "linux.h"
-
-#include <memory>
-
-class procmon: public pluginex
+namespace libhook
 {
-public:
-    std::unique_ptr<win_procmon> wp;
-    std::unique_ptr<linux_procmon> lp;
 
-    procmon(drakvuf_t drakvuf, output_format_t output);
-    ~procmon() = default;
-};
+MemAccessHook::~MemAccessHook()
+{
+    if (this->drakvuf_ && this->trap_)
+    {
+        PRINT_DEBUG("[LIBHOOK] destroying MemAccessHook hook...\n");
+        // read in libhook.hpp why this happens
+        this->trap_->cb = [](drakvuf_t, drakvuf_trap_info_t*) -> event_response_t
+        {
+            PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        };
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+        {
+            delete static_cast<CallResult*>(trap->data);
+            delete trap;
+        });
+    }
+    else
+    {
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as MemAccessHook hook was moved from\n");
+    }
+}
 
-#endif
+MemAccessHook::MemAccessHook(MemAccessHook&& rhs) noexcept
+    : BaseHook(std::forward<BaseHook>(rhs))
+{
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+}
+
+MemAccessHook& MemAccessHook::operator=(MemAccessHook&& rhs) noexcept
+{
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+    return *this;
+}
+
+MemAccessHook::MemAccessHook(drakvuf_t drakvuf, cb_wrapper_t cb)
+    : BaseHook(drakvuf),
+      callback_(cb)
+{}
+
+} // namespace libhook

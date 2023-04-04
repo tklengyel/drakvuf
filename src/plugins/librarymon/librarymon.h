@@ -105,7 +105,6 @@
 #ifndef LIBRARYMON_H
 #define LIBRARYMON_H
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 struct librarymon_config

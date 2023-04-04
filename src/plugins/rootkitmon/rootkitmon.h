@@ -140,6 +140,9 @@ public:
     void check_objects(drakvuf_t drakvuf);
     void check_ci(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     void check_filter_callbacks(drakvuf_t drakvuf);
+    static event_response_t msr_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    static event_response_t rop_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    static event_response_t cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     virtual bool stop_impl() override;
 
@@ -182,4 +185,7 @@ public:
     std::unordered_map<unsigned int, addr_t> msr_lstar;
     std::vector<std::unique_ptr<libhook::ManualHook>> manual_hooks;
     std::vector<std::unique_ptr<libhook::SyscallHook>> syscall_hooks;
+    std::unique_ptr<libhook::ManualHook> msr_hook;
+    std::map<uint64_t, std::unique_ptr<libhook::ManualHook>> rop_hooks;
+    std::unique_ptr<libhook::ManualHook> cr4_hook;
 };

@@ -106,7 +106,6 @@
 #define UNIXSOCKETMON_H
 
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 
 struct unixsocketmon_config
 {

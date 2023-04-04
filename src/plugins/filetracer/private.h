@@ -142,6 +142,7 @@ struct wrapper
     uint64_t create_disposition;
     uint64_t create_opts;
     uint64_t desired_access;
+    addr_t io_status_block;
 };
 
 struct linux_data : PluginResult
@@ -222,6 +223,7 @@ enum
     _SID_SubAuthority,
     _ACL_AceCount,
     _ACL_AclSize,
+    _IO_STATUS_BLOCK_Information,
     __OFFSET_MAX
 };
 
@@ -398,6 +400,7 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_SID_SubAuthority] = {"_SID", "SubAuthority"},
     [_ACL_AceCount] = {"_ACL", "AceCount"},
     [_ACL_AclSize] = {"_ACL", "AclSize"},
+    [_IO_STATUS_BLOCK_Information] = {"_IO_STATUS_BLOCK", "Information"},
 };
 
 static const flags_str_t object_attrs =
