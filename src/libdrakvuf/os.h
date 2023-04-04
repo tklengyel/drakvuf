@@ -169,9 +169,6 @@ typedef struct os_interface
     bool (*get_thread_previous_mode)
     (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
 
-    bool (*get_process_from_thread)
-    (drakvuf_t drakvuf, addr_t kthread, addr_t* eprocess);
-
     bool (*get_current_thread_previous_mode)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t* previous_mode);
 

@@ -602,9 +602,6 @@ bool drakvuf_get_current_thread_previous_mode(drakvuf_t drakvuf,
 bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
     addr_t kthread,
     privilege_mode_t* previous_mode) NOEXCEPT;
-bool drakvuf_get_process_from_thread( drakvuf_t drakvuf,
-    addr_t kthread,
-    addr_t* eprocess) NOEXCEPT;
 
 bool drakvuf_is_thread(drakvuf_t drakvuf,
     addr_t dtb,

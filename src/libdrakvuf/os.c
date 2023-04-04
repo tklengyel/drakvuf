@@ -495,20 +495,6 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
     return ret;
 }
 
-bool drakvuf_get_process_from_thread( drakvuf_t drakvuf, addr_t kthread, addr_t* eprocess )
-{
-    bool ret = false;
-
-    if ( drakvuf->osi.get_process_from_thread )
-    {
-        drakvuf_lock_and_get_vmi(drakvuf);
-        ret = drakvuf->osi.get_process_from_thread(drakvuf, kthread, eprocess);
-        drakvuf_release_vmi(drakvuf);
-    }
-
-    return ret;
-}
-
 bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     privilege_mode_t* previous_mode )

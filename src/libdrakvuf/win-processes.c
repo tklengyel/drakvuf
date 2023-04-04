@@ -645,25 +645,6 @@ bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-
-bool win_get_process_from_thread( drakvuf_t drakvuf, addr_t kthread, addr_t* eprocess )
-{
-    addr_t process;
-    if (kthread)
-    {
-        if (vmi_read_addr_va(drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PROCESS ], 0, &process) == VMI_SUCCESS)
-        {
-            *eprocess = process;
-
-            return true;
-        }
-    }
-    return false;
-}
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-
 bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
     dispatcher_object_t dispatcher_type = __DISPATCHER_INVALID_OBJECT;
