@@ -423,5 +423,7 @@ jobs:
 
           if [ $CURRENT_FUNCTIONS -gt $FUNCTIONS ] || [ $COMPLEXITY -gt $THRESHOLD ]; then
             echo "Please don't increase complexity of existing complex functions or introduce new ones"
+            echo "Showing diff of main (<) and this PR (>)"
+            diff complexity.log /tmp/complexity.log | egrep '>|<'
             exit 1
           fi
