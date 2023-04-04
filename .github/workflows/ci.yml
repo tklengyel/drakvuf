@@ -517,7 +517,7 @@ jobs:
           meson build
           git diff --name-only HEAD..origin/main > /tmp/index.txt
           infer capture --compilation-database build/compile_commands.json
-          infer analyze --costs --bufferoverrun --changed-files-index /tmp/index.txt
+          infer analyze --cost --bufferoverrun --changed-files-index /tmp/index.txt
           mv infer-out /tmp
           cp /tmp/infer-out/report.json /tmp
           cp /tmp/infer-out/costs-report.json /tmp
@@ -532,7 +532,7 @@ jobs:
           meson build
           mv /tmp/infer-out .
           infer capture --reactive --compilation-database build/compile_commands.json
-          infer analyze --reactive --costs --bufferoverrun --changed-files-index /tmp/index.txt
+          infer analyze --reactive --cost --bufferoverrun --changed-files-index /tmp/index.txt
 
       - name: check report diffs
         run: |
