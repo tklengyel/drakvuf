@@ -481,13 +481,6 @@ typedef struct
 
 typedef struct
 {
-    void* plugin;
-    addr_t size_rva;
-    addr_t name_rva;
-} pass_ctx_t;
-
-typedef struct
-{
     const char* name;
     addr_t base;
     addr_t size;

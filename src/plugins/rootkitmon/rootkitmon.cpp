@@ -129,7 +129,7 @@ static inline size_t get_ci_table_size(vmi_instance_t vmi)
 
 static inline void report(drakvuf_t drakvuf, const output_format_t format, const char* type, const char* action, const char* name = nullptr, const char* module = nullptr)
 {
-    std::optional<fmt::Qstr> name_opt, module_opt;
+    std::optional<fmt::Qstr<const char*>> name_opt, module_opt;
     std::string module_s, name_s;
     if (name)
     {
@@ -142,7 +142,7 @@ static inline void report(drakvuf_t drakvuf, const output_format_t format, const
         {
             module_s.erase(0, sub + 1);
         }
-        module_opt = fmt::Qstr(module_s);
+        module_opt = fmt::Qstr(module_s.c_str());
     }
 
     fmt::print(format, "rootkitmon", drakvuf, nullptr,

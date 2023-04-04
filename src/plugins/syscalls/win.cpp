@@ -522,34 +522,18 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     }
 
     // Get ntoskrnl size.
-    pass_ctx_t pass;
-    pass.plugin = this;
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage", &pass.size_rva) ||
-        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "BaseDllName", &pass.name_rva))
+    //
+    drakvuf_enumerate_drivers(drakvuf, [](drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
     {
-        fprintf(stderr, "[SYSCALLS] Failed to get _LDR_DATA_TABLE_ENTRY members rva\n");
-        throw -1;
-    }
+        auto plugin = static_cast<win_syscalls*>(ctx);
 
-    drakvuf_enumerate_drivers(drakvuf, [](drakvuf_t drakvuf, addr_t ldr_entry, void* ctx)
-    {
-        pass_ctx_t* pass = static_cast<pass_ctx_t*>(ctx);
-
-        auto name = drakvuf_read_unicode_va(drakvuf, ldr_entry + pass->name_rva, 0);
-        if (name != nullptr)
+        if (!strcmp((const char*)module_info->base_name->contents, "ntoskrnl.exe"))
         {
-            if (!strcmp((const char*)name->contents, "ntoskrnl.exe"))
-            {
-                vmi_lock_guard vmi(drakvuf);
-                if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_entry + pass->size_rva, 0, &static_cast<win_syscalls*>(pass->plugin)->kernel_size))
-                {
-                    fprintf(stderr, "[SYSCALLS] Failed to enumerate drivers\n");
-                    throw -1;
-                }
-            }
-            vmi_free_unicode_str(name);
+            plugin->kernel_size = module_info->size;
+            *need_stop = true;
         }
-    }, &pass);
+        return true;
+    }, this);
 
     if (!this->kernel_size)
     {
