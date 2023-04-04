@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -104,25 +104,14 @@
 
 #pragma once
 
-class memaccessmon;
+#include <optional>
 
-struct MMVAD_ENTRY
+struct mmvad_context
 {
     addr_t starting_va;
     addr_t ending_va;
     addr_t process;
     vmi_pid_t pid;
-    std::string filename;
-    size_t bytes;
-    const char* process_name;
-};
-
-struct MMVAD_CB_DATA
-{
-    memaccessmon* plugin;
-    addr_t target_va;
-    addr_t target_process;
-    vmi_pid_t target_pid;
-    drakvuf_trap_info_t* info;
-    size_t bytes;
+    std::optional<std::string> process_name;
+    std::optional<std::string> filename;
 };
