@@ -510,9 +510,9 @@ jobs:
 
       - name: run infer on pr
         run: |
-          export PATH=$PATH:/opt/infer/bin
-          export PATH=$PATH:/opt/infer/usr/bin
-          export PATH=$PATH:/opt/infer/usr/local/bin
+          export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
+          printenv
+          which infer
           git fetch origin
           meson build
           git diff --name-only HEAD..origin/main > /tmp/index.txt
@@ -528,9 +528,7 @@ jobs:
 
       - name: run infer on main
         run: |
-          export PATH=$PATH:/opt/infer/bin
-          export PATH=$PATH:/opt/infer/usr/bin
-          export PATH=$PATH:/opt/infer/usr/local/bin
+          export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
           meson build
           mv /tmp/infer-out .
           infer capture --reactive --compilation-database build/compile_commands.json
@@ -538,9 +536,7 @@ jobs:
 
       - name: check report diffs
         run: |
-          export PATH=$PATH:/opt/infer/bin
-          export PATH=$PATH:/opt/infer/usr/bin
-          export PATH=$PATH:/opt/infer/usr/local/bin
+          export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
           infer reportdiff --report-current /tmp/report.json --report-previous infer-out/report.json
           jq '.' infer-out/differential/introduced.json
           infer reportdiff --costs-current /tmp/costs-report.json --costs-previous infer-out/costs-report.json
