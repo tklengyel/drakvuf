@@ -427,3 +427,122 @@ jobs:
             diff complexity.log /tmp/complexity.log | egrep '>|<'
             exit 1
           fi
+
+  infer:
+    env:
+      CC: clang
+      CXX: clang++
+
+    runs-on: ubuntu-latest
+    needs:
+      - init
+    if: ${{ github.event_name == 'pull_request' }}
+
+    steps:
+      - name: Install dependencies
+        run: |
+          # Install packages
+          sudo apt-get update -q
+          sudo apt-get install -y clang libjson-c-dev meson ninja-build cmake
+          sudo apt-get install -y curl libc6-dev openjdk-11-jdk-headless sqlite3 xz-utils zlib1g-dev opam
+          sudo apt-get clean
+          sudo apt-get -y autoremove
+
+      - name: free disk space
+        run: |
+          sudo systemd-run docker system prune --force --all --volumes
+          sudo systemd-run rm -rf \
+            "$AGENT_TOOLSDIRECTORY" \
+            /opt/* \
+            /usr/local/* \
+            /usr/share/az* \
+            /usr/share/dotnet \
+            /usr/share/gradle* \
+            /usr/share/miniconda \
+            /usr/share/swift \
+            /var/lib/gems \
+            /var/lib/mysql \
+            /var/lib/snapd
+
+      - name: Cache infer files
+        uses: actions/cache@v3
+        id: infer
+        with:
+          path: infer
+          key: infer
+
+      - name: get infer
+        if: steps.infer.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth=1 https://github.com/facebook/infer
+          cd infer
+          ./build-infer.sh -y clang
+          DESTDIR=/opt/infer sudo -E make install
+          sudo rm -rf infer
+          find /opt
+
+      - name: get infer
+        if: steps.infer.outputs.cache-hit == 'true'
+        run: sudo mv infer /opt
+
+      - name: Cache Xen debball
+        uses: actions/cache@v3
+        with:
+          path: xen/dist
+          key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v3
+        with:
+          path: libvmi/dist
+          key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
+          sudo ldconfig
+          cd ../..
+
+      - uses: actions/checkout@v3
+
+      - name: run infer on pr
+        run: |
+          export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
+          printenv
+          which infer
+          git fetch origin
+          meson build
+          git diff --name-only HEAD..origin/main > /tmp/index.txt
+          infer capture --compilation-database build/compile_commands.json
+          infer analyze --cost --bufferoverrun --changed-files-index /tmp/index.txt
+          mv infer-out /tmp
+          cp /tmp/infer-out/report.json /tmp
+          cp /tmp/infer-out/costs-report.json /tmp
+
+      - uses: actions/checkout@v3
+        with:
+          ref: main
+
+      - name: run infer on main
+        run: |
+          export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
+          meson build
+          mv /tmp/infer-out .
+          infer capture --reactive --compilation-database build/compile_commands.json
+          infer analyze --reactive --cost --bufferoverrun --changed-files-index /tmp/index.txt
+
+      - name: check report diffs
+        run: |
+          export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
+          infer reportdiff --report-current /tmp/report.json --report-previous infer-out/report.json
+          jq '.' infer-out/differential/introduced.json
+          infer reportdiff --costs-current /tmp/costs-report.json --costs-previous infer-out/costs-report.json
+          jq '.' infer-out/differential/introduced.json
+
+      - name: move infer to cache path
+        run: sudo mv /opt/infer $GITHUB_WORKSPACE
