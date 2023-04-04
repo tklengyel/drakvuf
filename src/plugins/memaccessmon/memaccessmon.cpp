@@ -119,7 +119,7 @@ void memaccessmon::print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info,
     {
         process_name_opt = fmt::Qstr(mmvad->process_name.value());
     }
-    
+
     std::optional<fmt::Qstr<std::string>> file_name_opt;
     if (mmvad->filename)
     {
