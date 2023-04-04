@@ -136,7 +136,6 @@ void memaccessmon::print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info,
 
 mmvad_context* memaccessmon::find_mmvad(drakvuf_t drakvuf, addr_t process, addr_t base_address, vmi_pid_t pid)
 {
-    
     for (auto& vad : vads[pid])
     {
         if (base_address >= vad.starting_va && base_address <= vad.ending_va)
