@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -103,20 +103,26 @@
  ***************************************************************************/
 
 #pragma once
-#include "plugins/plugins_ex.h"
+
+#include <optional>
 #include <vector>
+
+#include "plugins/plugins_ex.h"
 #include "private.h"
 
 class memaccessmon : public pluginex
 {
 public:
     memaccessmon(drakvuf_t drakvuf, output_format_t output);
+
+    void print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info, size_t bytes);
+    mmvad_context* find_mmvad(drakvuf_t drakvuf, addr_t process, addr_t base_address, vmi_pid_t pid);
     event_response_t readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    void print_result(MMVAD_ENTRY* mmvad, drakvuf_trap_info_t* info);
-    ~memaccessmon();
 
     output_format_t format;
-    std::unique_ptr<libhook::SyscallHook> readHook;
-    std::unique_ptr<libhook::SyscallHook> writeHook;
-    std::unordered_map<uint32_t, std::vector<MMVAD_ENTRY>> vads;
+    std::unique_ptr<libhook::SyscallHook> write_hook;
+    std::unique_ptr<libhook::SyscallHook> read_hook;
+    std::unique_ptr<libhook::SyscallHook> read_ex_hook;
+
+    std::unordered_map<uint32_t, std::vector<mmvad_context>> vads;
 };

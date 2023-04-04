@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,59 +102,84 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <libvmi/libvmi.h>
 #include <algorithm>
-#include "memaccessmon.h"
-#include "private.h"
-#include "plugins/output_format.h"
 #include <fstream>
 
-void memaccessmon::print_result(MMVAD_ENTRY* mmvad, drakvuf_trap_info_t* info)
+#include <libdrakvuf/libdrakvuf.h>
+#include <libvmi/libvmi.h>
+
+#include "plugins/output_format.h"
+#include "memaccessmon.h"
+#include "private.h"
+
+void memaccessmon::print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info, size_t bytes)
 {
+    std::optional<fmt::Qstr<std::string>> process_name_opt;
+    if (mmvad->process_name)
+    {
+        process_name_opt = fmt::Qstr(mmvad->process_name.value());
+    }
+
+    std::optional<fmt::Qstr<std::string>> file_name_opt;
+    if (mmvad->filename)
+    {
+        file_name_opt = fmt::Qstr(mmvad->filename.value());
+    }
+
     fmt::print(this->format, "memaccessmon", drakvuf, info,
-        keyval("TargetName", fmt::Qstr(mmvad->process_name)),
+        keyval("TargetName", process_name_opt),
         keyval("TargetPID", fmt::Nval(mmvad->pid)),
-        keyval("FileName", fmt::Qstr(mmvad->filename)),
-        keyval("Bytes", fmt::Xval(mmvad->bytes))
+        keyval("FileName", file_name_opt),
+        keyval("Bytes", fmt::Xval(bytes))
     );
 }
 
-static bool traverse_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data)
+mmvad_context* memaccessmon::find_mmvad(drakvuf_t drakvuf, addr_t process, addr_t base_address, vmi_pid_t pid)
 {
-    MMVAD_CB_DATA* cb_data = static_cast<MMVAD_CB_DATA*>(callback_data);
-    memaccessmon* plugin = cb_data->plugin;
-    addr_t starting_va = mmvad->starting_vpn * VMI_PS_4KB;
-    addr_t ending_va = mmvad->ending_vpn * VMI_PS_4KB;
-    unicode_string_t* filepath = nullptr;
-    std::string sFilepath = "None";
-    if (mmvad->file_name_ptr)
+    for (auto& vad : vads[pid])
     {
-        filepath = drakvuf_read_unicode_va(drakvuf, mmvad->file_name_ptr, 0);
-        if (filepath)
+        if (base_address >= vad.starting_va && base_address <= vad.ending_va)
         {
-            sFilepath = std::string((const char*) filepath->contents);
-            vmi_free_unicode_str(filepath);
+            return &vad;
         }
     }
 
-    plugin->vads[cb_data->target_pid].push_back(MMVAD_ENTRY
+    // Didn't find in cache, try to resolve.
+    //
+    if (mmvad_info_t mmvad{}; drakvuf_find_mmvad(drakvuf, process, base_address, &mmvad))
     {
-        .starting_va = starting_va,
-        .ending_va = ending_va,
-        .process = cb_data->target_process,
-        .pid = cb_data->target_pid,
-        .filename = sFilepath,
-        .bytes = cb_data->bytes,
-        .process_name = drakvuf_get_process_name(drakvuf, cb_data->target_process, true)
-    });
+        mmvad_context vad =
+        {
+            .starting_va = mmvad.starting_vpn * VMI_PS_4KB,
+            .ending_va = mmvad.ending_vpn * VMI_PS_4KB,
+            .process = process,
+            .pid = pid
+        };
 
-    return false;
+        if (auto process_name = drakvuf_get_process_name(drakvuf, process, true))
+        {
+            vad.process_name = process_name;
+            g_free(process_name);
+        }
+
+        if (mmvad.file_name_ptr)
+        {
+            if (auto filename = drakvuf_read_unicode_va(drakvuf, mmvad.file_name_ptr, pid))
+            {
+                vad.filename = (char*)filename->contents;
+                vmi_free_unicode_str(filename);
+            }
+        }
+
+        vads[pid].push_back(std::move(vad));
+        return &vads[pid].back();
+    }
+
+    return nullptr;
 }
 
 event_response_t memaccessmon::readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    vmi_pid_t pid = 0;
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t base_address = drakvuf_get_function_argument(drakvuf, info, 2);
     size_t bytes = drakvuf_get_function_argument(drakvuf, info, 4);
@@ -164,38 +189,24 @@ event_response_t memaccessmon::readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info
     {
         return VMI_EVENT_RESPONSE_NONE;
     }
+
+    vmi_pid_t pid;
     if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
     {
         PRINT_DEBUG("[MEMACCESSMON] Failed to get pid from handle\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
-    addr_t process, dtb;
-    if (!drakvuf_get_process_by_pid(drakvuf, pid, &process, &dtb))
+
+    addr_t process;
+    if (!drakvuf_get_process_by_pid(drakvuf, pid, &process, nullptr))
     {
         PRINT_DEBUG("[MEMACCESSMON] Failed to get process by pid\n");
         return VMI_EVENT_RESPONSE_NONE;
     };
 
-    if (!this->vads.count(pid))
+    if (auto* mmvad = find_mmvad(drakvuf, process, base_address, pid))
     {
-        MMVAD_CB_DATA data = MMVAD_CB_DATA
-        {
-            .info = info,
-            .plugin = this,
-            .target_pid = pid,
-            .target_process = process,
-            .target_va = base_address,
-            .bytes = bytes
-        };
-        drakvuf_traverse_mmvad(drakvuf, process, traverse_mmvad, &data);
-    }
-    for (auto& it : vads[pid])
-    {
-        if (base_address >= it.starting_va && base_address <= it.ending_va)
-        {
-            this->print_result(&it, info);
-            break;
-        }
+        print_result(mmvad, info, bytes);
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -205,17 +216,7 @@ memaccessmon::memaccessmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output), format(output)
 {
     PRINT_DEBUG("[MEMACCESSMON] Starting initialization...\n");
-    this->readHook = createSyscallHook("NtReadVirtualMemory", &memaccessmon::readwrite_cb);
-    this->writeHook = createSyscallHook("NtWriteVirtualMemory", &memaccessmon::readwrite_cb);
-}
-
-memaccessmon::~memaccessmon()
-{
-    for (auto& [pid, info] : vads)
-    {
-        for (auto& vad : info)
-        {
-            g_free(const_cast<char*>(vad.process_name));
-        }
-    }
+    this->write_hook = createSyscallHook("NtWriteVirtualMemory", &memaccessmon::readwrite_cb);
+    this->read_hook = createSyscallHook("NtReadVirtualMemory", &memaccessmon::readwrite_cb);
+    this->read_ex_hook = createSyscallHook("NtReadVirtualMemoryEx", &memaccessmon::readwrite_cb);
 }
