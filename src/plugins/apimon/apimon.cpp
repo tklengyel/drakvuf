@@ -378,10 +378,11 @@ std::optional<std::string> apimon::resolve_module(drakvuf_t drakvuf, addr_t proc
                 {
                     name.erase(0, sub + 1);
                 }
-                mods.push_back({
+                mods.push_back(
+                {
                     .name = std::move(name),
                     .base = mmvad.starting_vpn << 12,
-                    .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
+                        .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
                 });
                 vmi_free_unicode_str(u_name);
                 return mods.back().name;
