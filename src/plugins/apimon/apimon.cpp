@@ -119,6 +119,36 @@ static void free_trap(drakvuf_trap_t* trap)
     delete trap;
 }
 
+static bool enum_modules_callback(drakvuf_t dravkuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
+{
+    auto plugin   = static_cast<apimon*>(ctx);
+    auto& modules = plugin->procs[module_info->pid];
+
+    modules.push_back({
+        .name = module_info->base_name ? (const char*)module_info->base_name->contents : "",
+        .base = module_info->base_addr,
+        .size = module_info->size
+    });
+
+    return true;
+}
+
+static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin  = get_trap_plugin<apimon>(info);
+    auto process = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_pid(drakvuf, process, &pid))
+    {
+        PRINT_DEBUG("[APIMON] Failed to read process pid\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    plugin->procs.erase(pid);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
@@ -156,11 +186,20 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         fmt_extra.insert(std::make_pair(extra.first, fmt::Qstr(extra.second)));
     }
 
+    auto module_name = plugin->resolve_module(drakvuf, info->regs->rip, info->proc_data.pid);
+
+    std::optional<fmt::Qstr<std::string>> module_opt;
+    if (module_name.has_value())
+    {
+        module_opt = module_name.value();
+    }
+
     fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
         keyval("Event", fmt::Rstr("api_called")),
         keyval("CLSID", clsid),
         keyval("CalledFrom", fmt::Xval(info->regs->rip)),
         keyval("ReturnValue", fmt::Xval(info->regs->rax)),
+        keyval("FromModule", module_opt),
         keyval("Arguments", fmt_args),
         keyval("Extra", fmt_extra)
     );
@@ -318,6 +357,67 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
     PRINT_DEBUG("[APIMON] DLL hooked - done\n");
 }
 
+std::optional<std::string> apimon::resolve_module(drakvuf_t drakvuf, addr_t addr, vmi_pid_t pid)
+{
+    // Get module name by address.
+    //
+    auto lookup = [&](const auto& mods) -> std::optional<std::string>
+    {
+        const auto target_module = std::find_if(mods->second.cbegin(), mods->second.cend(), [addr](const auto& module)
+        {
+            return addr >= module.base && addr < module.base + module.size;
+        });
+        if (target_module != mods->second.cend())
+        {
+            return target_module->name;
+        }
+        return {};
+    };
+
+    if (const auto& mods = procs.find(pid); mods != procs.end())
+    {
+        if (auto module_name = lookup(mods))
+        {
+            return module_name.value();
+        }
+        // If not found enumerate and try again.
+        //
+        if (!enumerate_modules(drakvuf, pid))
+        {
+            return {};
+        }
+        if (auto module_name = lookup(mods))
+        {
+            return module_name.value();
+        }
+    }
+    else
+    {
+        if (!enumerate_modules(drakvuf, pid))
+        {
+            return {};
+        }
+        // Try resolve once again.
+        //
+        return resolve_module(drakvuf, addr, pid);
+    }
+    return {};
+}
+
+bool apimon::enumerate_modules(drakvuf_t drakvuf, vmi_pid_t pid)
+{
+    auto& mods = procs[pid];
+    mods.clear();
+
+    addr_t process{}, dtb{};
+    if (!drakvuf_get_process_by_pid(drakvuf, pid, &process, &dtb))
+    {
+        PRINT_DEBUG("[APIMON-USER] Failed to get process by pid\n");
+        return false;
+    }
+    return drakvuf_enumerate_process_modules(drakvuf, process, enum_modules_callback, this);
+}
+
 apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output)
     : pluginex(drakvuf, output)
 {
@@ -355,6 +455,9 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
         .extra = (void*)this
     };
     drakvuf_register_usermode_callback(drakvuf, &reg);
+
+    breakpoint_in_system_process_searcher bp;
+    register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete"));
 }
 
 apimon::~apimon()
