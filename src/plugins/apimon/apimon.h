@@ -136,8 +136,7 @@ public:
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();
 
-    std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t addr, vmi_pid_t pid);
-    bool enumerate_modules(drakvuf_t drakvuf, vmi_pid_t pid);
+    std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t process, addr_t addr, vmi_pid_t pid);
 };
 
 #endif
