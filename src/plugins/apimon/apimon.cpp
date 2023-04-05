@@ -347,7 +347,8 @@ std::optional<std::string> apimon::resolve_module(drakvuf_t drakvuf, addr_t proc
 {
     auto lookup = [&]() -> std::optional<std::string>
     {
-        if (const auto& mods = this->procs.find(pid); mods != this->procs.end())
+        const auto& mods = this->procs.find(pid);
+        if (mods != this->procs.end())
         {
             for (const auto& module : mods->second)
             {
