@@ -292,7 +292,8 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
             goto done;
         }
 
-        if (bp_addr & (1LL << 63)) {
+        if (bp_addr & (1LL << 63))
+        {
             PRINT_DEBUG("Got return address from kernel address space, waiting for another one.\n")
             goto done;
         }
