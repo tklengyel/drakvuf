@@ -2,7 +2,7 @@
 meson _complexity
 cd _complexity
 run-clang-tidy-$VERSION -quiet \
-    -config="{Checks: 'readability-function-cognitive-complexity', CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: 0}, {key: readability-function-cognitive-complexity.DescribeBasicIncrements, value: False}]}" \
+    -config="{Checks: 'readability-function-cognitive-complexity', CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: 25}, {key: readability-function-cognitive-complexity.DescribeBasicIncrements, value: False}]}" \
     2>/dev/null | \
     grep warning | grep "cognitive complexity" > complexity.log || :
 
@@ -13,8 +13,6 @@ while read -r log; do
     line=$(echo $log | awk -F":" '{ print $2 }')
     function=$(echo $log | awk -F"function" '{ print $2 }' | awk '{ print $1 }' | sed "s/'//g")
     score=$(echo $log | awk -F"cognitive complexity of" '{ print $2 }' | awk '{ print $1 }')
-
-    [[ $score -lt 25 ]] && continue
 
     echo "Complex function found: $file:$line $function(), complexity score: $score"
 
