@@ -101,185 +101,33 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
+#include <libdrakvuf/json-util.h>
+#include <stdexcept>
 
-#ifndef WIN_USERHOOK_H
-#define WIN_USERHOOK_H
-
-#include <string>
-#include <vector>
-#include <map>
-#include <memory>
-#include <functional>
-
-#include <glib.h>
-#include "plugins/plugins_ex.h"
-#include "printers/printers.hpp"
-
-typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
-
-enum target_hook_type
-{
-    HOOK_BY_NAME,
-    HOOK_BY_OFFSET
-};
-
-struct HookActions
-{
-    bool log;
-    bool stack;
-
-    HookActions() : log{false}, stack{false} {}
-
-    static HookActions empty()
-    {
-        return HookActions{};
-    }
-    HookActions& set_log()
-    {
-        this->log = true;
-        return *this;
-    }
-    HookActions& set_stack()
-    {
-        this->stack = true;
-        return *this;
-    }
-};
-
-struct plugin_target_config_entry_t
-{
-    std::string dll_name;
-    target_hook_type type;
-    std::string function_name;
-    std::string clsid;
-    addr_t offset;
-    HookActions actions;
-    std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
-
-    plugin_target_config_entry_t()
-        : dll_name(), type(), function_name(), offset(), actions(), argument_printers()
-    {}
-
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, addr_t offset, HookActions hook_actions, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
-        : dll_name(std::move(dll_name)), type(HOOK_BY_OFFSET), function_name(std::move(function_name)), offset(offset), actions(hook_actions), argument_printers(std::move(argument_printers))
-    {}
-
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, HookActions hook_actions, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
-        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), offset(), actions(hook_actions), argument_printers(std::move(argument_printers))
-    {}
-};
-
-enum target_hook_state
-{
-    HOOK_FIRST_TRY,
-    HOOK_PAGEFAULT_RETRY,
-    HOOK_FAILED,
-    HOOK_OK
-};
-
-struct hook_target_entry_t
-{
-    vmi_pid_t pid;
-    target_hook_type type;
-    std::string target_name;
-    std::string clsid;
-    addr_t offset;
-    callback_t callback;
-    const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers;
-    target_hook_state state;
-    drakvuf_trap_t* trap;
-    void* plugin;
-
-    hook_target_entry_t(std::string target_name, std::string clsid, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers, void* plugin)
-        : pid(0), type(HOOK_BY_NAME), target_name(target_name), clsid(clsid), offset(0), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), trap(nullptr), plugin(plugin)
-    {}
-
-    hook_target_entry_t(std::string target_name, std::string clsid, addr_t offset, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers, void* plugin)
-        : pid(0), type(HOOK_BY_OFFSET), target_name(target_name), clsid(clsid), offset(offset), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), trap(nullptr), plugin(plugin)
-    {}
-};
-
-struct hook_target_view_t
-{
-    std::string target_name;
-    addr_t offset;
-    target_hook_state state;
-
-    hook_target_view_t(std::string target_name, addr_t offset, target_hook_state state)
-        : target_name(target_name), offset(offset), state(state) {}
-};
-
-struct dll_view_t
-{
-    // relevant while loading
-    addr_t dtb;
-    uint32_t thread_id;
-    addr_t real_dll_base;
-    mmvad_info_t mmvad;
-    bool is_hooked;
-};
-
-typedef void (*dll_pre_hook_cb)(drakvuf_t, const std::string&, const dll_view_t*, void*);
-typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, const std::vector<hook_target_view_t>& targets, void*);
-
-struct usermode_cb_registration
-{
-    dll_pre_hook_cb pre_cb;
-    dll_post_hook_cb post_cb;
-    void* extra;
-};
-
-class wanted_hooks_t
+/**
+ * This is a simple wrapper class for automatic releasing an json_object
+ * at the end of the scope.
+ */
+class profile_guard
 {
 public:
-    template<typename... Args>
-    void add_hook(Args&& ... args)
+    explicit profile_guard(const char* profile_file)
+        : obj(json_object_from_file(profile_file))
     {
-        auto e = plugin_target_config_entry_t(std::forward<Args>(args)...);
-        hooks[e.dll_name].emplace_back(std::move(e));
+        if (!obj)
+            throw std::runtime_error("Failed to open profile file\n");
+    }
+    ~profile_guard()
+    {
+        json_object_put(obj);
     }
 
-    bool empty() const noexcept
+    operator json_object* () const
     {
-        return hooks.empty();
+        return obj;
     }
-
-    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const;
 
 private:
-    std::map<std::string, std::vector<plugin_target_config_entry_t>> hooks;
+    json_object* obj;
 };
-
-using hook_filter_t = std::function<bool(const plugin_target_config_entry_t&)>;
-
-/**
- * Userhooks are not supported on some windows versions yet, therefore
- * this function should be called first before using any other function
- * from libuserhook library.
- *
- * @param[in] drakvuf drakvuf context
- * @return true if userhooks are supported on this system, false otherwise.
- */
-bool drakvuf_are_userhooks_supported(drakvuf_t drakvuf);
-void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, const hook_filter_t& hook_filter, wanted_hooks_t& wanted_hooks);
-
-
-/**
- * Sets usermode hook on a process that already exists in the system.
- * Note that this is rather an expensive operation, so whenever possible it is
- * better to use drakvuf_register_usermode_callback.
- *
- * @param[in] drakvuf drakvuf context
- * @param[in] target_process Base address of the process that we want to hook on.
- * @param[in] dll_name Name of the dll library that contains func_name.
- * @param[in] func_name Name of the function we want to hook on.
- * @param[in] cb Callback which will get invoked when the hook is reached.
- * @param[in] extra Additional data which will be set as trap->data.
- */
-void drakvuf_request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
-
-
-void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
-#endif

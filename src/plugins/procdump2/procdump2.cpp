@@ -898,7 +898,9 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
         if ( !drakvuf_get_process_pid(drakvuf, target_process_base, &target_process_pid) )
             return false;
 
-        target_process_name = std::string(drakvuf_get_process_name(drakvuf, target_process_base, true));
+        char* name = drakvuf_get_process_name(drakvuf, target_process_base, true);
+        target_process_name = std::string(name ?: "");
+        g_free(name);
     }
 
     /* Don't process active and finished tasks.

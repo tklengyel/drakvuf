@@ -187,8 +187,8 @@ void fileextractor::createfile_cb_impl(drakvuf_t,
 event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
 {
-    auto params = libhook::GetTrapParams<createfile_result_t>(info);
-    if (!params->verifyResultCallParams(drakvuf, info))
+    auto params_copy = *libhook::GetTrapParams<createfile_result_t>(info);
+    if (!params_copy.verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     auto hook_id = make_hook_id(info);
@@ -202,23 +202,23 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = params->handle
+        .addr = params_copy.handle
     );
 
     vmi_lock_guard vmi(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
         PRINT_DEBUG("[FILEEXTRACTOR] "
             "Failed to read pHandle at 0x%lx (PID %d, TID %d)\n",
-            params->handle,
-            params->target_pid,
-            params->target_tid);
+            params_copy.handle,
+            params_copy.target_pid,
+            params_copy.target_tid);
 
     if (handle && is_handle_valid(handle))
     {
         auto id = make_task_id(info->attached_proc_data.pid, handle);
         if (tasks.find(id) == tasks.end())
         {
-            auto reason = params->del ?
+            auto reason = params_copy.del ?
                 task_t::task_reason::del : task_t::task_reason::write;
             addr_t file = 0;
             auto filename = get_file_name(vmi, info, handle, &file, nullptr);
@@ -237,7 +237,7 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
             tasks[id]->pid = info->attached_proc_data.pid;
             tasks[id]->ppid = info->attached_proc_data.ppid;
             tasks[id]->process_name = info->proc_data.name;
-            tasks[id]->append = params->append;
+            tasks[id]->append = params_copy.append;
         }
     }
 

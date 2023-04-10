@@ -121,6 +121,7 @@
 
 #include "helpers/vmi_lock_guard.h"
 #include "helpers/unicode_string.h"
+#include "helpers/profile_guard.h"
 
 #if defined(LIBDRAKVUF_PRIVATE_GUARD)
 #error You should never include libdrakvuf/private.h in a plugin

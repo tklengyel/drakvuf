@@ -379,7 +379,7 @@ linkmon::linkmon(drakvuf_t drakvuf,
         return;
     }
 
-    json_object* ole32_profile_json = json_object_from_file(c->ole32_profile);
+    auto ole32_profile_json = profile_guard(c->ole32_profile);
     if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json,
             offset_names_1, this->offsets.size(), this->offsets.data()))
     {
