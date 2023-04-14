@@ -109,6 +109,9 @@
 #include <libusermode/userhook.hpp>
 #include "plugins/plugins_ex.h"
 
+#include <map>
+#include <memory>
+
 class rpcmon: public pluginex
 {
 public:
@@ -116,6 +119,12 @@ public:
 
     rpcmon(drakvuf_t drakvuf, output_format_t output);
     ~rpcmon();
+
+    bool stop_impl() override;
+
+    event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info);
+
+    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 };
 
 #endif
