@@ -112,6 +112,27 @@
 #include "crypto.h"
 
 
+namespace
+{
+
+struct return_hook_target_entry_t
+{
+    vmi_pid_t pid;
+    uint32_t tid;
+    addr_t rsp;
+
+    std::string clsid;
+    void* plugin;
+    std::vector < uint64_t > arguments;
+    const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers;
+
+    return_hook_target_entry_t(vmi_pid_t pid, uint32_t tid, addr_t rsp,
+        std::string clsid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers) :
+        pid(pid), tid(tid), rsp(rsp), clsid(clsid), plugin(plugin), argument_printers(argument_printers) {}
+};
+
+};
+
 static void free_trap(drakvuf_trap_t* trap)
 {
     return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)trap->data;
@@ -231,11 +252,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     trap->breakpoint.addr = ret_addr;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
-    if (drakvuf_add_trap(drakvuf, trap))
-    {
-        ret_target->trap = trap;
-    }
-    else
+    if (!drakvuf_add_trap(drakvuf, trap))
     {
         PRINT_DEBUG("[APIMON-USER] Failed to add trap :(\n");
         delete trap;
