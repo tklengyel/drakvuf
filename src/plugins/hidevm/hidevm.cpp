@@ -679,6 +679,7 @@ static void check_and_replace_query_string(drakvuf_t drakvuf, drakvuf_trap_info_
                 );
             }
         }
+        vmi_free_unicode_str(strQuery);
     }
     else
         PRINT_DEBUG("[HIDEVM] IWbemServices::ExecQuery: Failed to read strQuery parameter\n");
