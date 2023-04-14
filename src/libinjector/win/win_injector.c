@@ -294,7 +294,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
 
         if (VMI_GET_BIT(bp_addr, 47))
         {
-            PRINT_DEBUG("Got return address from kernel address space, waiting for another one.\n")
+            PRINT_DEBUG("Got return address from kernel address space, waiting for another one.\n");
             goto done;
         }
 
