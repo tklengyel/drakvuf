@@ -607,24 +607,21 @@ static bool replace_object_name(vmi_instance_t vmi, uint64_t cr3, addr_t addr_st
     unicode_string_t replacement_utf16;
     bool result = false;
 
-    const char* replacement_str = "Win32_BIOS";
-    size_t replacement_length = strlen(replacement_str);
-    replacement_utf8.contents = static_cast<uint8_t*>(malloc(replacement_length));
+    replacement_utf8.contents = reinterpret_cast<uint8_t*>(strdup("Win32_BIOS"));
 
     if (replacement_utf8.contents)
     {
         replacement_utf8.encoding = "UTF-8";
-        replacement_utf8.length = strlen(replacement_str);
-        strncpy(reinterpret_cast<char*>(replacement_utf8.contents), replacement_str, replacement_length);
+        replacement_utf8.length = strlen(reinterpret_cast<char*>(replacement_utf8.contents)) + 1;
 
-        if (VMI_SUCCESS == vmi_convert_str_encoding(&replacement_utf8, &replacement_utf16, "UTF-16"))
+        if (VMI_SUCCESS == vmi_convert_str_encoding(&replacement_utf8, &replacement_utf16, "UTF-16LE"))
         {
             ACCESS_CONTEXT(ctx,
                 .translate_mechanism = VMI_TM_PROCESS_DTB,
                 .dtb = cr3,
                 .addr = addr_strQuery + object_name_pos * 2
             );
-            if (VMI_SUCCESS == vmi_write(vmi, &ctx, replacement_utf16.length, replacement_utf16.contents + 2, nullptr))
+            if (VMI_SUCCESS == vmi_write(vmi, &ctx, replacement_utf16.length, replacement_utf16.contents, nullptr))
             {
                 result = true;
             }
