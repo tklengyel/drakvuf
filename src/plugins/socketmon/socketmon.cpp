@@ -499,6 +499,7 @@ static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     if (data)
     {
         print_udp_info(drakvuf, info, s, *data, sockaddr.sin6_family, rip, sockaddr.sin6_port);
+        g_free(const_cast<char*>(data->name));
         delete data;
     }
     g_free(rip);
