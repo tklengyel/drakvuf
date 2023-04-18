@@ -106,6 +106,7 @@
 #define APIMON_H
 
 #include <vector>
+#include <map>
 #include <memory>
 
 #include <glib.h>
@@ -125,6 +126,12 @@ public:
 
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();
+
+    bool stop_impl() override;
+
+    event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info);
+
+    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 };
 
 #endif
