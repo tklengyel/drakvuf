@@ -276,7 +276,7 @@ static void print_usage()
         "\t                           The JSON profile for ntdll.dll\n"
         "\t --json-iphlpapi <path to json>\n"
         "\t                           The JSON profile for iphlpapi.dll\n"
-#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON)
+#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON) || defined(ENABLE_PLUGIN_FILETRACER)
         "\t --json-ole32 <path to json>\n"
         "\t                           The JSON profile for ole32.dll\n"
 #endif
@@ -834,7 +834,7 @@ int main(int argc, char** argv)
                 ignored_processes.insert(pid);
                 break;
             }
-#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON)
+#if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON) || defined(ENABLE_PLUGIN_FILETRACER)
             case opt_json_ole32:
                 options.ole32_profile = optarg;
                 break;

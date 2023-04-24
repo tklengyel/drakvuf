@@ -117,7 +117,7 @@ public:
     std::unique_ptr<win_filetracer> wf;
     std::unique_ptr<linux_filetracer> lf;
 
-    filetracer(drakvuf_t drakvuf, output_format_t output);
+    filetracer(drakvuf_t drakvuf, const filetracer_config* config, output_format_t output);
     ~filetracer() = default;
 };
 
