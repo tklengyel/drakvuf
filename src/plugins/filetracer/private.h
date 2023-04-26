@@ -108,7 +108,6 @@
 #include <string>
 #include <optional>
 #include "plugins/plugin_utils.h"
-#include "win.h"
 #include "plugins/plugins_ex.h"
 
 namespace filetracer_ns
@@ -126,9 +125,23 @@ struct win_objattrs_t
     std::string dacl;
 };
 
-struct wrapper
+struct win_data : PluginResult
 {
-    win_filetracer* f;
+    win_data()
+        : PluginResult()
+        , pid()
+        , tid()
+        , rsp()
+        , handle()
+        , obj_attr()
+        , file_attrs()
+        , share_access()
+        , create_disposition()
+        , create_opts()
+        , desired_access()
+        , io_status_block()
+    {
+    }
 
     vmi_pid_t pid;
     uint32_t tid;
@@ -225,6 +238,19 @@ enum
     _ACL_AclSize,
     _IO_STATUS_BLOCK_Information,
     __OFFSET_MAX
+};
+
+enum
+{
+    _FILE_RENAME_INFORMATION_RootDirectory,
+    _FILE_RENAME_INFORMATION_FileName,
+    _FILE_RENAME_INFORMATION_FileNameLength,
+    _FILE_BASIC_INFORMATION_CreationTime,
+    _FILE_BASIC_INFORMATION_LastAccessTime,
+    _FILE_BASIC_INFORMATION_LastWriteTime,
+    _FILE_BASIC_INFORMATION_ChangeTime,
+    _FILE_BASIC_INFORMATION_FileAttributes,
+    __OLE32_OFFSET_MAX
 };
 
 enum
@@ -401,6 +427,18 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_ACL_AceCount] = {"_ACL", "AceCount"},
     [_ACL_AclSize] = {"_ACL", "AclSize"},
     [_IO_STATUS_BLOCK_Information] = {"_IO_STATUS_BLOCK", "Information"},
+};
+
+static const char* ole32_offset_names[__OLE32_OFFSET_MAX][2] =
+{
+    [_FILE_RENAME_INFORMATION_RootDirectory] = {"_FILE_RENAME_INFORMATION", "RootDirectory"},
+    [_FILE_RENAME_INFORMATION_FileName] = {"_FILE_RENAME_INFORMATION", "FileName"},
+    [_FILE_RENAME_INFORMATION_FileNameLength] = {"_FILE_RENAME_INFORMATION", "FileNameLength"},
+    [_FILE_BASIC_INFORMATION_CreationTime] = {"_FILE_BASIC_INFORMATION", "CreationTime"},
+    [_FILE_BASIC_INFORMATION_LastAccessTime] = {"_FILE_BASIC_INFORMATION", "LastAccessTime"},
+    [_FILE_BASIC_INFORMATION_LastWriteTime] = {"_FILE_BASIC_INFORMATION", "LastWriteTime"},
+    [_FILE_BASIC_INFORMATION_ChangeTime] = {"_FILE_BASIC_INFORMATION", "ChangeTime"},
+    [_FILE_BASIC_INFORMATION_FileAttributes] = {"_FILE_BASIC_INFORMATION", "FileAttributes"},
 };
 
 static const flags_str_t object_attrs =
