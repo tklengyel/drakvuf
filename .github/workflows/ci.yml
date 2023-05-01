@@ -241,7 +241,7 @@ jobs:
           export CC=clang
           export CXX=clang++
 
-          meson build
+          meson build --buildtype debug
           ninja -C build
 
   codeql-analyze:
@@ -353,7 +353,7 @@ jobs:
 
       - name: Scan build
         run: |
-          meson build
+          meson build --buildtype debug
           analyze-build-$VERSION -v --cdb build/compile_commands.json \
             --status-bugs \
             --disable-checker deadcode.DeadStores
@@ -432,6 +432,7 @@ jobs:
     env:
       CC: clang
       CXX: clang++
+      VERSION: 1.1.0
 
     runs-on: ubuntu-latest
     needs:
@@ -468,22 +469,20 @@ jobs:
         uses: actions/cache@v3
         id: infer
         with:
-          path: infer
+          path: infer.tar.xz
           key: infer
 
       - name: get infer
         if: steps.infer.outputs.cache-hit != 'true'
         run: |
-          git clone --depth=1 https://github.com/facebook/infer
-          cd infer
-          ./build-infer.sh -y clang
-          DESTDIR=/opt/infer sudo -E make install
-          sudo rm -rf infer
-          find /opt
+          wget "https://github.com/facebook/infer/releases/download/v$VERSION/infer-linux64-v$VERSION.tar.xz"
+          mv infer-linux64-v$VERSION.tar.xz infer.tar.xz
 
-      - name: get infer
-        if: steps.infer.outputs.cache-hit == 'true'
-        run: sudo mv infer /opt
+      - name: unpack infer
+        run: |
+          sudo tar -C /opt -xvf infer.tar.xz
+          sudo -E ln -s "/opt/infer-linux64-v$VERSION/bin/infer" /usr/bin/infer
+          mv infer.tar.xz /tmp
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -516,9 +515,10 @@ jobs:
           printenv
           which infer
           git fetch origin
-          meson build
+          meson build --buildtype debug
+          cd build
           git diff --name-only HEAD..origin/main > /tmp/index.txt
-          infer capture --compilation-database build/compile_commands.json
+          infer capture --compilation-database compile_commands.json
           infer analyze --cost --bufferoverrun --changed-files-index /tmp/index.txt
           mv infer-out /tmp
           cp /tmp/infer-out/report.json /tmp
@@ -531,18 +531,20 @@ jobs:
       - name: run infer on main
         run: |
           export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
-          meson build
+          meson build --buildtype debug
+          cd build
           mv /tmp/infer-out .
-          infer capture --reactive --compilation-database build/compile_commands.json
+          infer capture --reactive --compilation-database compile_commands.json
           infer analyze --reactive --cost --bufferoverrun --changed-files-index /tmp/index.txt
 
       - name: check report diffs
         run: |
           export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
+          cd build
           infer reportdiff --report-current /tmp/report.json --report-previous infer-out/report.json
           jq '.' infer-out/differential/introduced.json
           infer reportdiff --costs-current /tmp/costs-report.json --costs-previous infer-out/costs-report.json
           jq '.' infer-out/differential/introduced.json
 
       - name: move infer to cache path
-        run: sudo mv /opt/infer $GITHUB_WORKSPACE
+        run: mv /tmp/infer.tar.xz $GITHUB_WORKSPACE
