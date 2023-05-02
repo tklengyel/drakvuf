@@ -319,13 +319,12 @@ struct BinaryString<T,
     BinaryString(T v, size_t size): ArrayHolder<uint8_t*>(const_cast<uint8_t*>(v), size) {}
     void format(std::ostream& os) const
     {
-        auto flags = os.flags();
-        os << std::hex;
+        auto restore_flags = RestoreFlags(os);
+        os << std::hex << std::setfill('0');
         for (size_t it = 0; it < size; it++)
         {
-            os << static_cast<int>(value[it]);
+            os << std::setw(2) << static_cast<int>(value[it]);
         }
-        os.setf(flags);
     }
 };
 
