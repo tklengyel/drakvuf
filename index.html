@@ -395,7 +395,9 @@ Process listing for VM linux (id=29)
 </code></pre>
 
 Now we are ready to build and install DRAKVUF&reg;:
-<pre><code>cd ~/drakvuf
+<pre><code>export CC=clang
+export CXX=clang++
+cd ~/drakvuf
 meson build
 ninja -C build
 </code></pre>
