@@ -109,6 +109,27 @@
 #include "private.h"
 #include "plugins/output_format.h"
 
+static bool is_printable_string(const std::vector<uint8_t>& message)
+{
+    if (message.empty() || message.front() == 0x00)
+        return false;
+
+    // symbol codes from 0x00 to 0x1f excluding \t, \r, \n
+    std::vector<uint8_t> unprintable
+    {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0b,
+        0x0c, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+        0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+    };
+    auto it = std::find_first_of(message.begin(), message.end(), unprintable.begin(), unprintable.end());
+
+    // termination zeroes check
+    return std::all_of(it, message.end(), [](uint8_t i)
+    {
+        return i == 0x00;
+    });
+}
+
 bool unixsocketmon::get_socket_family_type(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* family_type)
 {
     addr_t sock = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -207,7 +228,7 @@ event_response_t unixsocketmon::sock_send_msg_cb(drakvuf_t drakvuf, drakvuf_trap
     unicode_string_t out;
     status_t rc = vmi_convert_str_encoding(&msg, &out, "UTF-8");
 
-    if (VMI_FAILURE == rc)
+    if (VMI_FAILURE == rc || !is_printable_string(message))
     {
         fmt::print(this->m_output_format, "unixsocketmon", drakvuf, info,
             keyval("Type", fmt::Rstr(socket_family_str)),
