@@ -102,8 +102,8 @@
 #                                                                         #
 #*************************************************************************#
 
-sources =  userhook.cpp running.cpp userhook.hpp uh-private.hpp userhook_pf.cpp \
-           userhook_inject.cpp
+sources =  userhook.cpp running.cpp userhook.hpp uh-private.hpp utils.hpp \
+           utils.cpp userhook_pf.cpp userhook_inject.cpp
 sources += printers/printers.hpp printers/printers.cpp printers/utils.hpp \
            printers/utils.cpp
 
@@ -164,6 +164,12 @@ check_PROGRAMS += printers/check
 printers_check_SOURCES = printers/check.cpp
 printers_check_CFLAGS = $(CHECK_CFLAGS) $(ZLIB_CFLAGS)
 printers_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS) printers/utils.lo
+
+# Unit tests for libusermode utils
+check_PROGRAMS += userhook_check
+userhook_check_SOURCES = check.cpp
+userhook_check_CFLAGS = $(CHECK_CFLAGS) $(ZLIB_CFLAGS)
+userhook_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS) utils.lo
 
 TESTS = $(check_PROGRAMS)
 

@@ -6,6 +6,7 @@ libusermode = static_library('usermode',
     'userhook_pf.cpp',
     'userhook_inject.cpp',
     'running.cpp',
+    'utils.cpp',
     'printers/printers.cpp',
     'printers/utils.cpp',
 
