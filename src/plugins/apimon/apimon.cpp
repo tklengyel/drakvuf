@@ -130,6 +130,22 @@ static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
     return (u64_pid << 32) | u64_tid;
 }
 
+static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin  = get_trap_plugin<apimon>(info);
+    auto process = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_pid(drakvuf, process, &pid))
+    {
+        PRINT_DEBUG("[APIMON] Failed to read process pid\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    plugin->procs.erase(pid);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     auto params = libhook::GetTrapParams<ApimonReturnHookData>(info);
@@ -165,11 +181,20 @@ event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
         fmt_extra.insert(std::make_pair(extra.first, fmt::Qstr(extra.second)));
     }
 
+    auto module_name = resolve_module(drakvuf, info->proc_data.base_addr, info->regs->rip, info->proc_data.pid);
+
+    std::optional<fmt::Qstr<std::string>> module_opt;
+    if (module_name.has_value())
+    {
+        module_opt = module_name.value();
+    }
+
     fmt::print(m_output_format, "apimon", drakvuf, info,
         keyval("Event", fmt::Rstr("api_called")),
         keyval("CLSID", clsid),
         keyval("CalledFrom", fmt::Xval(info->regs->rip)),
         keyval("ReturnValue", fmt::Xval(info->regs->rax)),
+        keyval("FromModule", module_opt),
         keyval("Arguments", fmt_args),
         keyval("Extra", fmt_extra)
     );
@@ -303,6 +328,56 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
     PRINT_DEBUG("[APIMON] DLL hooked - done\n");
 }
 
+std::optional<std::string> apimon::resolve_module(drakvuf_t drakvuf, addr_t process, addr_t addr, vmi_pid_t pid)
+{
+    auto lookup = [&]() -> std::optional<std::string>
+    {
+        const auto& mods = this->procs.find(pid);
+        if (mods != this->procs.end())
+        {
+            for (const auto& module : mods->second)
+            {
+                if (addr >= module.base && addr < module.base + module.size)
+                {
+                    return module.name;
+                }
+            }
+        }
+        return {};
+    };
+    if (auto name = lookup())
+    {
+        return name.value();
+    }
+    // Didn't find in cache, try to resolve.
+    //
+    if (mmvad_info_t mmvad{}; drakvuf_find_mmvad(drakvuf, process, addr, &mmvad))
+    {
+        auto& mods = this->procs[pid];
+        if (mmvad.file_name_ptr)
+        {
+            if (auto u_name = drakvuf_read_unicode_va(drakvuf, mmvad.file_name_ptr, 0))
+            {
+                std::string name = (const char*)u_name->contents;
+
+                if (auto sub = name.find_last_of("/\\"); sub != std::string::npos)
+                {
+                    name.erase(0, sub + 1);
+                }
+                mods.push_back(
+                {
+                    .name = std::move(name),
+                    .base = mmvad.starting_vpn << 12,
+                        .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
+                });
+                vmi_free_unicode_str(u_name);
+                return mods.back().name;
+            }
+        }
+    }
+    return {};
+}
+
 apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output)
     : pluginex(drakvuf, output)
 {
@@ -340,6 +415,9 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
         .extra = (void*)this
     };
     drakvuf_register_usermode_callback(drakvuf, &reg);
+
+    breakpoint_in_system_process_searcher bp;
+    register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete"));
 }
 
 bool apimon::stop_impl()

@@ -108,6 +108,8 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <unordered_map>
+#include <optional>
 
 #include <glib.h>
 #include <libusermode/userhook.hpp>
@@ -119,14 +121,23 @@ struct apimon_config
     const bool print_no_addr;
 };
 
+struct apimon_module
+{
+    std::string name;
+    addr_t base;
+    size_t size;
+};
+
 class apimon: public pluginex
 {
 public:
     wanted_hooks_t wanted_hooks;
+    std::unordered_map<vmi_pid_t, std::vector<apimon_module>> procs;
 
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();
 
+    std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t process, addr_t addr, vmi_pid_t pid);
     bool stop_impl() override;
 
     event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info);
