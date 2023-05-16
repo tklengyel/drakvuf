@@ -550,21 +550,23 @@ event_response_t linux_filetracer::rename_file_cb(drakvuf_t drakvuf, drakvuf_tra
 event_response_t linux_filetracer::truncate_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     /*
-    long vfs_truncate(
-        const struct path *path,
-        loff_t length
+    int do_truncate(
+        struct dentry *dentry,
+        loff_t length,
+        unsigned int time_attrs,
+        struct file *filp
     )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t path_struct = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 1);
     uint64_t length = drakvuf_get_function_argument(drakvuf, info, 2);
 
     linux_data params;
     params.args["length"] = std::to_string(length);
 
-    if (get_path_info(drakvuf, info, &params, path_struct))
+    if (get_dentry_info(drakvuf, info, &params, dentry_addr))
         print_info(drakvuf, info, &params);
 
     return VMI_EVENT_RESPONSE_NONE;

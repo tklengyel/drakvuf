@@ -112,11 +112,22 @@
 #include "crypto.h"
 
 
-static void free_trap(drakvuf_trap_t* trap)
+namespace
 {
-    return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)trap->data;
-    delete ret_target;
-    delete trap;
+
+struct ApimonReturnHookData : PluginResult
+{
+    std::vector<uint64_t> arguments;
+    hook_target_entry_t* target = nullptr;
+};
+
+};
+
+static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
+{
+    uint64_t u64_pid = info->attached_proc_data.pid;
+    uint64_t u64_tid = info->attached_proc_data.tid;
+    return (u64_pid << 32) | u64_tid;
 }
 
 static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -135,29 +146,27 @@ static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
-    return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
+    auto params = libhook::GetTrapParams<ApimonReturnHookData>(info);
 
-    if (!drakvuf_check_return_context(drakvuf, info, ret_target->pid, ret_target->tid, ret_target->rsp))
+    if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
-
-    auto plugin = (apimon*)ret_target->plugin;
 
     std::map < std::string, std::string > extra_data;
 
     if (!strcmp(info->trap->name, "CryptGenKey"))
-        extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
+        extra_data = CryptGenKey_hook(drakvuf, info, params->arguments);
 
     std::optional<fmt::Qstr<std::string>> clsid;
 
-    if (!ret_target->clsid.empty())
-        clsid = fmt::Qstr(ret_target->clsid);
+    if (!params->target->clsid.empty())
+        clsid = fmt::Qstr(params->target->clsid);
 
     std::vector<fmt::Rstr<std::string>> fmt_args{};
     {
-        const auto& args = ret_target->arguments;
-        const auto& printers = ret_target->argument_printers;
+        const auto& args = params->arguments;
+        const auto& printers = params->target->argument_printers;
         for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
             arg != std::cend(args) && printer != std::cend(printers);
             ++arg, ++printer)
@@ -172,7 +181,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         fmt_extra.insert(std::make_pair(extra.first, fmt::Qstr(extra.second)));
     }
 
-    auto module_name = plugin->resolve_module(drakvuf, info->proc_data.base_addr, info->regs->rip, info->proc_data.pid);
+    auto module_name = resolve_module(drakvuf, info->proc_data.base_addr, info->regs->rip, info->proc_data.pid);
 
     std::optional<fmt::Qstr<std::string>> module_opt;
     if (module_name.has_value())
@@ -180,7 +189,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         module_opt = module_name.value();
     }
 
-    fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
+    fmt::print(m_output_format, "apimon", drakvuf, info,
         keyval("Event", fmt::Rstr("api_called")),
         keyval("CLSID", clsid),
         keyval("CalledFrom", fmt::Xval(info->regs->rip)),
@@ -190,15 +199,21 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         keyval("Extra", fmt_extra)
     );
 
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
+    uint64_t hookID = make_hook_id(info);
+    ret_hooks.erase(hookID);
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     hook_target_entry_t* target = (hook_target_entry_t*)info->trap->data;
+    auto plugin = (apimon*)target->plugin;
 
     if (target->pid != info->attached_proc_data.pid)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    if (plugin->is_stopping())
         return VMI_EVENT_RESPONSE_NONE;
 
     auto vmi = vmi_lock_guard(drakvuf);
@@ -212,60 +227,30 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    return_hook_target_entry_t* ret_target = new (std::nothrow) return_hook_target_entry_t(
-        info->attached_proc_data.pid, info->attached_proc_data.tid, info->regs->rsp,
-        target->clsid, target->plugin, target->argument_printers);
-
-    if (!ret_target)
+    addr_t ret_paddr;
+    if ( VMI_SUCCESS != vmi_pagetable_lookup(vmi, info->regs->cr3, ret_addr, &ret_paddr) )
     {
-        PRINT_DEBUG("[APIMON-USER] Failed to allocate memory for return_hook_target_entry_t\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    drakvuf_trap_t* trap = new (std::nothrow) drakvuf_trap_t();
-
-    if (!trap)
-    {
-        PRINT_DEBUG("[APIMON-USER] Failed to allocate memory for drakvuf_trap_t\n");
-        delete ret_target;
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
+    std::vector<uint64_t> arguments;
+    arguments.reserve(target->argument_printers.size());
     for (size_t i = 1; i <= target->argument_printers.size(); i++)
     {
         uint64_t argument = drakvuf_get_function_argument(drakvuf, info, i);
-        ret_target->arguments.push_back(argument);
+        arguments.push_back(argument);
     }
 
-    addr_t paddr;
+    uint64_t hookID = make_hook_id(info);
+    auto hook = plugin->createReturnHook<ApimonReturnHookData>(info,
+            &apimon::usermode_return_hook_cb, drakvuf_get_limited_traps_ttl(drakvuf));
+    auto params = libhook::GetTrapParams<ApimonReturnHookData>(hook->trap_);
 
-    if ( VMI_SUCCESS != vmi_pagetable_lookup(vmi, info->regs->cr3, ret_addr, &paddr) )
-    {
-        delete trap;
-        delete ret_target;
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    params->arguments = std::move(arguments);
+    params->target = target;
 
-    trap->type = BREAKPOINT;
-    trap->name = target->target_name.c_str();
-    trap->cb = usermode_return_hook_cb;
-    trap->data = ret_target;
-    trap->breakpoint.lookup_type = LOOKUP_DTB;
-    trap->breakpoint.dtb = info->regs->cr3;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = ret_addr;
-    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-
-    if (drakvuf_add_trap(drakvuf, trap))
-    {
-        ret_target->trap = trap;
-    }
-    else
-    {
-        PRINT_DEBUG("[APIMON-USER] Failed to add trap :(\n");
-        delete trap;
-        delete ret_target;
-    }
+    hook->trap_->name = target->target_name.c_str();
+    plugin->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -433,6 +418,11 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 
     breakpoint_in_system_process_searcher bp;
     register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete"));
+}
+
+bool apimon::stop_impl()
+{
+    return ret_hooks.empty() && pluginex::stop_impl();
 }
 
 apimon::~apimon()

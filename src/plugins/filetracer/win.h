@@ -105,38 +105,61 @@
 #ifndef FILETRACER_WIN_H
 #define FILETRACER_WIN_H
 
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
+#include "private.h"
 
-class win_filetracer
+using namespace filetracer_ns;
+
+struct filetracer_config
+{
+    const char* ole32_profile;
+};
+
+class win_filetracer : public pluginex
 {
 public:
-    output_format_t format;
-    size_t* offsets;
-    GSList* traps_to_free = nullptr;
+    std::array<size_t, __OFFSET_MAX> offsets;
+    std::array<size_t, __OLE32_OFFSET_MAX> ole32_offsets;
 
-    addr_t newfile_name_offset;
-    addr_t newfile_name_length_offset;
-    addr_t newfile_root_offset;
-    addr_t basic_creation_offset;
-    addr_t basic_last_access_offset;
-    addr_t basic_last_write_offset;
-    addr_t basic_change_time_offset;
-    addr_t basic_attributes_offset;
+    /* Hooks */
+    std::unique_ptr<libhook::SyscallHook> create_file_hook;
+    std::unique_ptr<libhook::SyscallHook> open_file_hook;
+    std::unique_ptr<libhook::SyscallHook> open_directory_object_hook;
+    std::unique_ptr<libhook::SyscallHook> query_attributes_file_hook;
+    std::unique_ptr<libhook::SyscallHook> set_information_file_hook;
+    std::unique_ptr<libhook::SyscallHook> read_file_hook;
+    std::unique_ptr<libhook::SyscallHook> write_file_hook;
 
-    drakvuf_trap_t trap[7] =
-    {
-        [0 ... 6] = {
-            .breakpoint.lookup_type = LOOKUP_KERNEL,
-            .breakpoint.addr_type = ADDR_RVA,
-            .type = BREAKPOINT,
-            .data = (void*)this,
-        }
-    };
+    /* Return hooks */
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 
-    win_filetracer(drakvuf_t drakvuf, output_format_t output);
+    /* Callbacks */
+    event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t open_directory_object_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t read_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* Return callbacks */
+    event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* File info parsing */
+    std::tuple<bool, win_objattrs_t> objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
+
+    /* Helper functions */
+    void print_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs);
+    void print_create_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, uint32_t io_information, const win_objattrs_t& attrs, win_data* params, bool is_success);
+    void print_file_read_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle);
+    void print_delete_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, addr_t fileinfo);
+    void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo);
+    void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo);
+    void print_eof_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo);
+
+    win_filetracer(drakvuf_t drakvuf, const filetracer_config* config, output_format_t output);
     win_filetracer(const win_filetracer&) = delete;
     win_filetracer& operator=(const win_filetracer&) = delete;
-    ~win_filetracer();
 };
 
 #endif

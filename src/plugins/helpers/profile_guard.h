@@ -101,193 +101,33 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
+#include <libdrakvuf/json-util.h>
+#include <stdexcept>
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <libvmi/libvmi.h>
-
-#include "unixsocketmon.h"
-#include "private.h"
-#include "plugins/output_format.h"
-
-static bool is_printable_string(const std::vector<uint8_t>& message)
+/**
+ * This is a simple wrapper class for automatic releasing an json_object
+ * at the end of the scope.
+ */
+class profile_guard
 {
-    if (message.empty() || message.front() == 0x00)
-        return false;
-
-    // symbol codes from 0x00 to 0x1f excluding \t, \r, \n
-    std::vector<uint8_t> unprintable
+public:
+    explicit profile_guard(const char* profile_file)
+        : obj(json_object_from_file(profile_file))
     {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0b,
-        0x0c, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
-        0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
-    };
-    auto it = std::find_first_of(message.begin(), message.end(), unprintable.begin(), unprintable.end());
-
-    // termination zeroes check
-    return std::all_of(it, message.end(), [](uint8_t i)
+        if (!obj)
+            throw std::runtime_error("Failed to open profile file\n");
+    }
+    ~profile_guard()
     {
-        return i == 0x00;
-    });
-}
-
-bool unixsocketmon::get_socket_family_type(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* family_type)
-{
-    addr_t sock = drakvuf_get_function_argument(drakvuf, info, 1);
-
-    auto vmi = vmi_lock_guard(drakvuf);
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = sock + this->socket_ops
-    );
-
-    addr_t ops;
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ops))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to read proto_ops from socket struct\n");
-        return false;
+        json_object_put(obj);
     }
 
-    ctx.addr = ops + this->proto_ops_family;
-    if (VMI_FAILURE == vmi_read_32(vmi, &ctx, family_type))
+    operator json_object* () const
     {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get socket family type\n");
-        return false;
+        return obj;
     }
 
-    return true;
-}
-
-std::vector<uint8_t> unixsocketmon::get_socket_message(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t* ret_size)
-{
-    addr_t msghdr = drakvuf_get_function_argument(drakvuf, info, 2);
-
-    auto vmi = vmi_lock_guard(drakvuf);
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
-
-    addr_t iovec;
-    ctx.addr = msghdr + this->msghdr_msg_iter + this->iov_iter_iov;
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &iovec))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iovec from msghdr\n");
-        return {};
-    }
-
-    addr_t buf;
-    ctx.addr = iovec + this->iovec_iov_base;
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &buf))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get buffer from iovec struct\n");
-        return {};
-    }
-
-    uint64_t size;
-    ctx.addr = iovec + this->iovec_iov_len;
-    if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &size))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get size of buffer\n");
-        return {};
-    }
-
-    auto print_size = std::min(size, this->print_max_size);
-
-    std::vector<uint8_t> data(print_size, 0);
-    ctx.addr = buf;
-    size_t bytes_read;
-    if (VMI_FAILURE == vmi_read(vmi, &ctx, print_size, data.data(), &bytes_read))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to read data\n");
-        return {};
-    }
-
-    data.resize(bytes_read);
-    if (ret_size) *ret_size = size;
-    return data;
-}
-
-event_response_t unixsocketmon::sock_send_msg_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    uint32_t family_type;
-    if (!get_socket_family_type(drakvuf, info, &family_type))
-        return VMI_EVENT_RESPONSE_NONE;
-    auto socket_family_str = socket_family_to_str((socket_family_t)family_type);
-
-    uint64_t size = 0;
-    auto message = get_socket_message(drakvuf, info, &size);
-
-    unicode_string_t msg =
-    {
-        .length = message.size(),
-        .contents = message.data(),
-        .encoding = "UTF-8"
-    };
-
-    unicode_string_t out;
-    status_t rc = vmi_convert_str_encoding(&msg, &out, "UTF-8");
-
-    if (VMI_FAILURE == rc || !is_printable_string(message))
-    {
-        fmt::print(this->m_output_format, "unixsocketmon", drakvuf, info,
-            keyval("Type", fmt::Rstr(socket_family_str)),
-            keyval("Size", fmt::Nval(size)),
-            keyval("Value", fmt::BinaryString(message.data(), message.size()))
-        );
-    }
-    else
-    {
-        fmt::print(this->m_output_format, "unixsocketmon", drakvuf, info,
-            keyval("Type", fmt::Rstr(socket_family_str)),
-            keyval("Size", fmt::Nval(size)),
-            keyval("Value", fmt::Estr(reinterpret_cast<char*>(out.contents)))
-        );
-    }
-
-    g_free(out.contents);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-unixsocketmon::unixsocketmon(drakvuf_t drakvuf, const unixsocketmon_config* config, output_format_t output)
-    :pluginex(drakvuf, output), print_max_size{config->print_max_size}
-{
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "socket", "ops", &socket_ops))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get struct member\n");
-        return;
-    }
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "proto_ops", "family", &proto_ops_family))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get proto_ops family\n");
-        return;
-    }
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "msghdr", "msg_iter", &msghdr_msg_iter))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get msg_iter\n");
-        return;
-    }
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "iov_iter", "iov", &iov_iter_iov))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iov_iter\n");
-        return;
-    }
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "iovec", "iov_base", &iovec_iov_base))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iov_base\n");
-        return;
-    }
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "iovec", "iov_len", &iovec_iov_len))
-    {
-        PRINT_DEBUG("[UNIXSOCKETMON] Failed to get iov_base\n");
-        return;
-    }
-
-    sockethook = createSyscallHook("sock_sendmsg", &unixsocketmon::sock_send_msg_cb);
-}
+private:
+    json_object* obj;
+};

@@ -189,8 +189,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_FILETRACER
                 case PLUGIN_FILETRACER:
-                    this->plugins[plugin_id] = std::make_unique<filetracer>(this->drakvuf, this->output);
+                {
+                    filetracer_config config =
+                    {
+                        .ole32_profile = options->ole32_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<filetracer>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
                 case PLUGIN_FILEDELETE:

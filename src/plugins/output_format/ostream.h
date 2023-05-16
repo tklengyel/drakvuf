@@ -125,14 +125,16 @@ inline void unputc(std::ostream& os)
 class RestoreFlags
 {
 private:
-    std::ios_base& ios;
+    std::ios& ios;
     std::ios_base::fmtflags const flags;
+    char const fill;
 
 public:
-    explicit RestoreFlags(std::ios_base& ios) : ios{ios}, flags{ios.flags()} {}
+    explicit RestoreFlags(std::ios& ios) : ios{ios}, flags{ios.flags()}, fill{ios.fill()} {}
     ~RestoreFlags()
     {
         ios.flags(flags);
+        ios.fill(fill);
     }
 };
 
