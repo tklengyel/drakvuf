@@ -119,6 +119,14 @@ static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
     return (u64_pid << 32) | u64_tid;
 }
 
+static uint64_t windows_tick_to_unix(long long windowsTicks)
+{
+    uint64_t windows_tick = 10000000UL;
+    uint64_t sec_to_unix_epoch = 11644473600UL;
+
+    return (uint64_t)(windowsTicks / windows_tick - sec_to_unix_epoch);
+}
+
 static auto build_security_descriptor(const win_objattrs_t& attrs)
 {
     std::vector<flagsval> security_descriptor;
@@ -151,10 +159,8 @@ void win_filetracer::print_create_file_obj_info(drakvuf_t drakvuf,
     uint32_t io_information,
     const win_objattrs_t& attrs,
     win_data* params,
-    bool is_success)
+    uint64_t status)
 {
-
-    auto status = is_success ? "SUCCESS" : "FAIL";
     auto file_attrs = parse_flags(params->file_attrs, file_flags_and_attrs, this->m_output_format);
     auto share_access = parse_flags(params->share_access, share_mode, this->m_output_format);
     auto create_disposition = parse_flags(params->create_disposition, disposition, this->m_output_format);
@@ -164,7 +170,7 @@ void win_filetracer::print_create_file_obj_info(drakvuf_t drakvuf,
         : parse_flags(params->desired_access, file_ar, this->m_output_format);
     auto security_descriptor = build_security_descriptor(attrs);
     std::optional<fmt::Nval<int>> io_information_opt;
-    if (is_success)
+    if (!status)
         io_information_opt = fmt::Nval((int)io_information);
 
     fmt::print(this->m_output_format, "filetracer", drakvuf, info,
@@ -178,7 +184,36 @@ void win_filetracer::print_create_file_obj_info(drakvuf_t drakvuf,
         flagsval("ShareAccess", share_access),
         flagsval("CreateDisposition", create_disposition),
         flagsval("CreateOptions", create_opts),
-        keyval("Status", fmt::Rstr(status))
+        keyval("Status", fmt::Xval(status))
+    );
+}
+
+void win_filetracer::print_open_file_obj_info(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    uint32_t handle,
+    uint32_t io_information,
+    const win_objattrs_t& attrs,
+    win_data* params,
+    uint64_t status)
+{
+    auto share_access = parse_flags(params->share_access, share_mode, this->m_output_format);
+    auto open_opts = parse_flags(params->create_opts, create_options, this->m_output_format);
+    auto desired_access = params->create_opts & FILE_DIRECTORY_FILE
+        ? parse_flags(params->desired_access, directory_ar, this->m_output_format)
+        : parse_flags(params->desired_access, file_ar, this->m_output_format);
+    std::optional<fmt::Nval<int>> io_information_opt;
+    if (!status)
+        io_information_opt = fmt::Nval((int)io_information);
+
+    fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+        keyval("FileName", fmt::Estr(attrs.file_path)),
+        keyval("FileHandle", fmt::Xval(handle)),
+        flagsval("ObjectAttributes", attrs.obj_attrs),
+        keyval("IoStatusBlock", io_information_opt),
+        flagsval("DesiredAccess", desired_access),
+        flagsval("ShareAccess", share_access),
+        flagsval("OpenOptions", open_opts),
+        keyval("Status", fmt::Xval(status))
     );
 }
 
@@ -269,6 +304,104 @@ std::tuple<bool, win_objattrs_t> win_filetracer::objattr_read(drakvuf_t drakvuf,
     return std::make_tuple(true, std::move(ret));
 }
 
+std::tuple<bool, file_basic_information_t> win_filetracer::basic_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t basic_file_info)
+{
+    if (!basic_file_info) return {};
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
+
+    uint64_t creation_time = 0;
+    uint64_t last_access_time = 0;
+    uint64_t last_write_time = 0;
+    uint64_t change_time = 0;
+    uint32_t file_attributes = 0;
+
+    ctx.addr = basic_file_info + this->offsets[_FILE_BASIC_INFORMATION_CreationTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &creation_time) )
+        return {};
+
+    ctx.addr = basic_file_info + this->offsets[_FILE_BASIC_INFORMATION_LastAccessTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &last_access_time) )
+        return {};
+
+    ctx.addr = basic_file_info + this->offsets[_FILE_BASIC_INFORMATION_LastWriteTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &last_write_time) )
+        return {};
+
+    ctx.addr = basic_file_info + this->offsets[_FILE_BASIC_INFORMATION_ChangeTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &change_time) )
+        return {};
+
+    ctx.addr = basic_file_info + this->offsets[_FILE_BASIC_INFORMATION_FileAttributes];
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &file_attributes) )
+        return {};
+
+    auto str_file_attr = parse_flags(file_attributes, file_flags_and_attrs, this->m_output_format, "FileAttributes=0");
+
+    file_basic_information_t ret{windows_tick_to_unix(creation_time), windows_tick_to_unix(last_access_time), windows_tick_to_unix(last_write_time), windows_tick_to_unix(change_time), str_file_attr};
+
+    return std::make_tuple(true, std::move(ret));
+}
+
+std::tuple<bool, file_network_open_information_t> win_filetracer::net_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t net_file_info)
+{
+    if (!net_file_info) return {};
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
+
+    uint64_t creation_time = 0;
+    uint64_t last_access_time = 0;
+    uint64_t last_write_time = 0;
+    uint64_t change_time = 0;
+    uint64_t allocation_size = 0;
+    uint64_t end_of_file = 0;
+    uint32_t file_attributes = 0;
+
+    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_CreationTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &creation_time) )
+        return {};
+
+    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_LastAccessTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &last_access_time) )
+        return {};
+
+    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_LastWriteTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &last_write_time) )
+        return {};
+
+    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_ChangeTime];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &change_time) )
+        return {};
+
+    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_AllocationSize];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &allocation_size) )
+        return {};
+
+    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_EndOfFile];
+    if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &end_of_file) )
+        return {};
+
+    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_FileAttributes];
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &file_attributes) )
+        return {};
+
+    auto str_file_attr = parse_flags(file_attributes, file_flags_and_attrs, this->m_output_format, "FileAttributes=0");
+
+    file_network_open_information_t ret{windows_tick_to_unix(creation_time), windows_tick_to_unix(last_access_time), windows_tick_to_unix(last_write_time), windows_tick_to_unix(change_time), allocation_size, end_of_file, str_file_attr};
+
+    return std::make_tuple(true, std::move(ret));
+}
+
 void win_filetracer::print_file_read_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle)
 {
     char* file = drakvuf_get_filename_from_handle(drakvuf, info, handle);
@@ -301,7 +434,6 @@ static char* get_parent_folder(char const* file_name)
     return g_strdup("\\");
 }
 
-
 void win_filetracer::print_delete_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, addr_t fileinfo)
 {
     const char* operation_name = "FileDispositionInformation";
@@ -318,54 +450,125 @@ void win_filetracer::print_delete_file_info(drakvuf_t drakvuf, drakvuf_trap_info
     g_free(file);
 }
 
-void win_filetracer::print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
+void win_filetracer::print_basic_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, const file_basic_information_t& basic_file_info, uint64_t status)
 {
     const char* operation_name = "FileBasicInformation";
+    char* filename_ = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
+    const char* filename = filename_ ? : "<UNKNOWN>";
+    if (!status)
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("Operation", fmt::Rstr(operation_name)),
+            keyval("FileHandle", fmt::Xval(src_file_handle)),
+            keyval("FileName", fmt::Qstr(filename)),
+            keyval("CreationTime", fmt::Nval(basic_file_info.creation_time)),
+            keyval("LastAccessTime", fmt::Nval(basic_file_info.last_access_time)),
+            keyval("LastWriteTime", fmt::Nval(basic_file_info.last_write_time)),
+            keyval("ChangeTime", fmt::Nval(basic_file_info.change_time)),
+            flagsval("FileAttributes", basic_file_info.file_attributes)
+        );
+    }
+    else
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("Operation", fmt::Rstr(operation_name)),
+            keyval("FileHandle", fmt::Xval(src_file_handle)),
+            keyval("FileName", fmt::Qstr(filename)),
+            keyval("Status", fmt::Xval(status))
+        );
+    }
 
-    ACCESS_CONTEXT(ctx);
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    g_free(filename_);
+}
 
-    uint64_t creation = 0;
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_BASIC_INFORMATION_CreationTime];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &creation) )
-        return;
-
-    uint64_t access = 0;
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_BASIC_INFORMATION_LastAccessTime];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &access) )
-        return;
-
-    uint64_t write = 0;
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_BASIC_INFORMATION_LastWriteTime];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &write) )
-        return;
-
-    uint64_t change = 0;
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_BASIC_INFORMATION_ChangeTime];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &change) )
-        return;
-
-    uint32_t attributes = 0;
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_BASIC_INFORMATION_FileAttributes];
-    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &attributes) )
-        return;
-
+void win_filetracer::print_file_net_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, const file_network_open_information_t& file_info, uint64_t status)
+{
+    const char* operation_name = "FileNetworkInformation";
     char* filename_ = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
     const char* filename = filename_ ? : "<UNKNOWN>";
 
-    fmt::print(this->m_output_format, "filetracer", drakvuf, info,
-        keyval("Operation", fmt::Rstr(operation_name)),
-        keyval("FileHandle", fmt::Xval(src_file_handle)),
-        keyval("FileName", fmt::Qstr(filename)),
-        keyval("CreationTime", fmt::Xval(creation)),
-        keyval("LastAccessTime", fmt::Xval(access)),
-        keyval("LastWriteTime", fmt::Xval(write)),
-        keyval("ChangeTime", fmt::Xval(change)),
-        keyval("FileAttributes", fmt::Qstr(parse_flags(attributes, file_flags_and_attrs, this->m_output_format)))
-    );
+    if (!status)
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("Operation", fmt::Rstr(operation_name)),
+            keyval("FileHandle", fmt::Xval(src_file_handle)),
+            keyval("FileName", fmt::Qstr(filename)),
+            keyval("CreationTime", fmt::Nval(file_info.creation_time)),
+            keyval("LastAccessTime", fmt::Nval(file_info.last_access_time)),
+            keyval("LastWriteTime", fmt::Nval(file_info.last_write_time)),
+            keyval("ChangeTime", fmt::Nval(file_info.change_time)),
+            keyval("AllocationSize", fmt::Xval(file_info.allocation_size)),
+            keyval("EndOfFile", fmt::Xval(file_info.end_of_file)),
+            flagsval("FileAttributes", file_info.file_attributes)
+        );
+    }
+    else
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("Operation", fmt::Rstr(operation_name)),
+            keyval("FileHandle", fmt::Xval(src_file_handle)),
+            keyval("FileName", fmt::Qstr(filename)),
+            keyval("Status", fmt::Xval(status))
+        );
+    }
+}
 
-    g_free(filename_);
+void win_filetracer::print_file_query_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs, const file_basic_information_t& file_info, uint64_t status)
+{
+    auto security_descriptor = build_security_descriptor(attrs);
+
+    if (!status)
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("FileName", fmt::Estr(attrs.file_path)),
+            flagsval("ObjectAttributes", attrs.obj_attrs),
+            keyval("SecurityDescriptor", security_descriptor),
+            keyval("CreationTime", fmt::Nval(file_info.creation_time)),
+            keyval("LastAccessTime", fmt::Nval(file_info.last_access_time)),
+            keyval("LastWriteTime", fmt::Nval(file_info.last_write_time)),
+            keyval("ChangeTime", fmt::Nval(file_info.change_time)),
+            flagsval("FileAttributes", file_info.file_attributes)
+        );
+    }
+    else
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("FileName", fmt::Estr(attrs.file_path)),
+            flagsval("ObjectAttributes", attrs.obj_attrs),
+            keyval("SecurityDescriptor", security_descriptor),
+            keyval("Status", fmt::Xval(status))
+        );
+    }
+}
+
+void win_filetracer::print_file_query_full_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs, const file_network_open_information_t& file_info, uint64_t status)
+{
+    auto security_descriptor = build_security_descriptor(attrs);
+
+    if (!status)
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("FileName", fmt::Estr(attrs.file_path)),
+            flagsval("ObjectAttributes", attrs.obj_attrs),
+            keyval("SecurityDescriptor", security_descriptor),
+            keyval("CreationTime", fmt::Nval(file_info.creation_time)),
+            keyval("LastAccessTime", fmt::Nval(file_info.last_access_time)),
+            keyval("LastWriteTime", fmt::Nval(file_info.last_write_time)),
+            keyval("ChangeTime", fmt::Nval(file_info.change_time)),
+            keyval("AllocationSize", fmt::Xval(file_info.allocation_size)),
+            keyval("EndOfFile", fmt::Xval(file_info.end_of_file)),
+            flagsval("FileAttributes", file_info.file_attributes)
+        );
+    }
+    else
+    {
+        fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+            keyval("FileName", fmt::Estr(attrs.file_path)),
+            flagsval("ObjectAttributes", attrs.obj_attrs),
+            keyval("SecurityDescriptor", security_descriptor),
+            keyval("Status", fmt::Xval(status))
+        );
+    }
 }
 
 void win_filetracer::print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
@@ -377,19 +580,19 @@ void win_filetracer::print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvu
     ctx.dtb = info->regs->cr3;
 
     addr_t dst_file_root_handle = 0;
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_RootDirectory];
+    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_RootDirectory];
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &dst_file_root_handle) )
         return;
 
     uint32_t dst_file_name_length = 0;
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_FileNameLength];
+    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_FileNameLength];
     if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &dst_file_name_length) )
         return;
 
     // convert length in bytes to length in wchar symbols
     dst_file_name_length /= 2;
 
-    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_FileName];
+    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_FileName];
     unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(drakvuf, &ctx, dst_file_name_length);
     if ( !dst_file_name_us )
         return;
@@ -464,8 +667,6 @@ event_response_t win_filetracer::create_file_ret_cb(drakvuf_t drakvuf, drakvuf_t
     if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    bool is_success = (info->regs->rax == 0);
-
     uint32_t handle = 0;
     {
         auto vmi = vmi_lock_guard(drakvuf);
@@ -493,7 +694,7 @@ event_response_t win_filetracer::create_file_ret_cb(drakvuf_t drakvuf, drakvuf_t
     }
 
     if (succ)
-        print_create_file_obj_info(drakvuf, info, handle, io_information, file_attrs, params, is_success);
+        print_create_file_obj_info(drakvuf, info, handle, io_information, file_attrs, params, info->regs->rax);
 
     uint64_t hookID = make_hook_id(info);
     this->ret_hooks.erase(hookID);
@@ -542,7 +743,6 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     // Save data
     params->handle = handle;
-    params->rsp = info->regs->rsp;
     params->pid = info->attached_proc_data.pid;
     params->tid = info->attached_proc_data.tid;
     params->obj_attr = attrs;
@@ -560,6 +760,47 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+event_response_t win_filetracer::open_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<win_data>(info);
+
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    uint32_t handle = 0;
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = params->handle
+        );
+        if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
+            PRINT_DEBUG("filetracer: Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", params->handle, params->pid, params->tid);
+    }
+
+    auto [succ, file_attrs] = objattr_read(drakvuf, info, params->obj_attr);
+
+    uint32_t io_information = 0;
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = params->io_status_block + this->offsets[_IO_STATUS_BLOCK_Information]
+        );
+        if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &io_information))
+            PRINT_DEBUG("filetracer: Failed to read _IO_STATUS_BLOCK Information at 0x%lx (PID %d, TID %d)\n", params->io_status_block + this->offsets[_IO_STATUS_BLOCK_Information], params->pid, params->tid);
+    }
+
+    if (succ)
+        print_open_file_obj_info(drakvuf, info, handle, io_information, file_attrs, params, info->regs->rax);
+
+    uint64_t hookID = make_hook_id(info);
+    this->ret_hooks.erase(hookID);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     /*
@@ -572,11 +813,38 @@ event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
       IN ULONG              OpenOptions
     );
     */
-    addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 3);
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    auto desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
+    auto attrs = drakvuf_get_function_argument(drakvuf, info, 3);
+    auto io_status_block = drakvuf_get_function_argument(drakvuf, info, 4);
+    auto share_access = drakvuf_get_function_argument(drakvuf, info, 5);
+    auto open_opts = drakvuf_get_function_argument(drakvuf, info, 6);
 
-    auto [succ, file_attrs] = objattr_read(drakvuf, info, attrs);
-    if (succ)
-        print_file_obj_info(drakvuf, info, file_attrs);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+
+    if (!handle)
+    {
+        PRINT_DEBUG("filetracer: Null pointer pHandle in NtOpenFile\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    uint64_t hookID = make_hook_id(info);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::open_file_ret_cb);
+    auto params = libhook::GetTrapParams<win_data>(hook->trap_);
+
+    // Save data
+    params->handle = handle;
+    params->pid = info->attached_proc_data.pid;
+    params->tid = info->attached_proc_data.tid;
+    params->obj_attr = attrs;
+    params->io_status_block = io_status_block;
+    params->share_access = share_access;
+    params->open_opts = open_opts;
+    params->desired_access = desired_access;
+    params->rsp = ret_addr;
+
+    hook->trap_->name = info->trap->name;
+    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -599,6 +867,24 @@ event_response_t win_filetracer::open_directory_object_cb(drakvuf_t drakvuf, dra
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+event_response_t win_filetracer::query_attributes_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<win_data>(info);
+
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto [succ_1, file_attrs] = objattr_read(drakvuf, info, params->obj_attr);
+    auto [succ_2, file_info] = basic_file_info_read(drakvuf, info, params->file_information);
+
+    if (succ_1 && succ_2)
+        print_file_query_attributes(drakvuf, info, file_attrs, file_info, info->regs->rax);
+
+    uint64_t hookID = make_hook_id(info);
+    this->ret_hooks.erase(hookID);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     /*
@@ -608,10 +894,71 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
     );
     */
     addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t file_information = drakvuf_get_function_argument(drakvuf, info, 2);
 
-    auto [succ, file_attrs] = objattr_read(drakvuf, info, attrs);
-    if (succ)
-        print_file_obj_info(drakvuf, info, file_attrs);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+
+    uint64_t hookID = make_hook_id(info);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb);
+    auto params = libhook::GetTrapParams<win_data>(hook->trap_);
+
+    // Save data
+    params->pid = info->attached_proc_data.pid;
+    params->tid = info->attached_proc_data.tid;
+    params->obj_attr = attrs;
+    params->file_information = file_information;
+    params->rsp = ret_addr;
+
+    hook->trap_->name = info->trap->name;
+    this->ret_hooks[hookID] = std::move(hook);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t win_filetracer::query_full_attributes_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<win_data>(info);
+
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto [succ_1, file_attrs] = objattr_read(drakvuf, info, params->obj_attr);
+    auto [succ_2, file_info] = net_file_info_read(drakvuf, info, params->file_information);
+
+    if (succ_1 && succ_2)
+        print_file_query_full_attributes(drakvuf, info, file_attrs, file_info, info->regs->rax);
+
+    uint64_t hookID = make_hook_id(info);
+    this->ret_hooks.erase(hookID);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    /*
+    NTSTATUS NtQueryFullAttributesFile(
+        [in]  POBJECT_ATTRIBUTES             ObjectAttributes,
+        [out] PFILE_NETWORK_OPEN_INFORMATION FileInformation
+    );
+    */
+    addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t file_information = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+
+    uint64_t hookID = make_hook_id(info);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb);
+    auto params = libhook::GetTrapParams<win_data>(hook->trap_);
+
+    // Save data
+    params->pid = info->attached_proc_data.pid;
+    params->tid = info->attached_proc_data.tid;
+    params->obj_attr = attrs;
+    params->file_information = file_information;
+    params->rsp = ret_addr;
+
+    hook->trap_->name = info->trap->name;
+    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -630,8 +977,9 @@ event_response_t win_filetracer::set_information_file_cb(drakvuf_t drakvuf, drak
 
     if (fileinfoclass == FILE_BASIC_INFORMATION)
     {
-        auto vmi = vmi_lock_guard(drakvuf);
-        print_basic_file_info(vmi, drakvuf, info, handle, fileinfo);
+        auto [succ, file_info] = basic_file_info_read(drakvuf, info, fileinfo);
+        if (succ)
+            print_basic_file_info(drakvuf, info, handle, file_info, 0);
     }
 
     if (fileinfoclass == FILE_RENAME_INFORMATION)
@@ -696,6 +1044,82 @@ event_response_t win_filetracer::write_file_cb(drakvuf_t drakvuf, drakvuf_trap_i
     return 0;
 }
 
+#define FileBasicInformation 4
+#define FileAllInformation 18
+#define FileNetworkOpenInformation 34
+
+event_response_t win_filetracer::query_information_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<win_data>(info);
+
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    if (params->file_information_class == FileBasicInformation)
+    {
+        auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information);
+        if (succ)
+            print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+    }
+
+    if (params->file_information_class == FileAllInformation)
+    {
+        auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information + this->offsets[_FILE_ALL_INFORMATION_BasicInformation]);
+        if (succ)
+            print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+    }
+
+    if (params->file_information_class == FileNetworkOpenInformation)
+    {
+        auto [succ, file_info] = net_file_info_read(drakvuf, info, params->file_information);
+        if (succ)
+            print_file_net_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+    }
+
+    uint64_t hookID = make_hook_id(info);
+    this->ret_hooks.erase(hookID);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    /*
+        __kernel_entry NTSYSCALLAPI NTSTATUS NtQueryInformationFile(
+        [in]  HANDLE                 FileHandle,
+        [out] PIO_STATUS_BLOCK       IoStatusBlock,
+        [out] PVOID                  FileInformation,
+        [in]  ULONG                  Length,
+        [in]  FILE_INFORMATION_CLASS FileInformationClass
+        );
+    */
+    uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
+
+    if (fileinfoclass == FileBasicInformation || fileinfoclass == FileAllInformation || fileinfoclass == FileNetworkOpenInformation)
+    {
+        uint64_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+        addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
+        addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+
+        // Create new trap for return callback
+        uint64_t hookID = make_hook_id(info);
+        auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_information_file_ret_cb);
+        auto params = libhook::GetTrapParams<win_data>(hook->trap_);
+
+        // Save data
+        params->handle = handle;
+        params->rsp = ret_addr;
+        params->pid = info->attached_proc_data.pid;
+        params->tid = info->attached_proc_data.tid;
+        params->file_information = fileinfo;
+        params->file_information_class = fileinfoclass;
+
+        hook->trap_->name = info->trap->name;
+        this->ret_hooks[hookID] = std::move(hook);
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 /* ----------------------------------------------------- */
 
 win_filetracer::win_filetracer(drakvuf_t drakvuf, const filetracer_config* c, output_format_t output)
@@ -707,18 +1131,17 @@ win_filetracer::win_filetracer(drakvuf_t drakvuf, const filetracer_config* c, ou
         return;
     }
 
-    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, this->offsets.size(), this->offsets.data()) )
-        throw -1;
-
     auto ole32_profile_json = profile_guard(c->ole32_profile);
-    if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json, ole32_offset_names, this->ole32_offsets.size(), this->ole32_offsets.data()))
+    if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json, offset_names, this->offsets.size(), this->offsets.data()))
         throw -1;
 
     create_file_hook = createSyscallHook("NtCreateFile", &win_filetracer::create_file_cb);
     open_file_hook = createSyscallHook("NtOpenFile", &win_filetracer::open_file_cb);
     open_directory_object_hook = createSyscallHook("NtOpenDirectoryObject", &win_filetracer::open_directory_object_cb);
     query_attributes_file_hook = createSyscallHook("NtQueryAttributesFile", &win_filetracer::query_attributes_file_cb);
+    query_full_attributes_file_hook = createSyscallHook("NtQueryFullAttributesFile", &win_filetracer::query_full_attributes_file_cb);
     set_information_file_hook = createSyscallHook("NtSetInformationFile", &win_filetracer::set_information_file_cb);
     read_file_hook = createSyscallHook("NtReadFile", &win_filetracer::read_file_cb);
     write_file_hook = createSyscallHook("NtWriteFile", &win_filetracer::write_file_cb);
+    query_information_file_hook = createSyscallHook("NtQueryInformationFile", &win_filetracer::query_information_file_cb);
 }
