@@ -119,16 +119,17 @@ class win_filetracer : public pluginex
 {
 public:
     std::array<size_t, __OFFSET_MAX> offsets;
-    std::array<size_t, __OLE32_OFFSET_MAX> ole32_offsets;
 
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> create_file_hook;
     std::unique_ptr<libhook::SyscallHook> open_file_hook;
     std::unique_ptr<libhook::SyscallHook> open_directory_object_hook;
     std::unique_ptr<libhook::SyscallHook> query_attributes_file_hook;
+    std::unique_ptr<libhook::SyscallHook> query_full_attributes_file_hook;
     std::unique_ptr<libhook::SyscallHook> set_information_file_hook;
     std::unique_ptr<libhook::SyscallHook> read_file_hook;
     std::unique_ptr<libhook::SyscallHook> write_file_hook;
+    std::unique_ptr<libhook::SyscallHook> query_information_file_hook;
 
     /* Return hooks */
     std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
@@ -138,22 +139,34 @@ public:
     event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t open_directory_object_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_full_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t read_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* Return callbacks */
     event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t open_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_attributes_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_full_attributes_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_information_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* File info parsing */
     std::tuple<bool, win_objattrs_t> objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
+    std::tuple<bool, file_basic_information_t> basic_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t basic_file_info);
+    std::tuple<bool, file_network_open_information_t> net_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t net_file_info);
 
     /* Helper functions */
     void print_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs);
-    void print_create_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, uint32_t io_information, const win_objattrs_t& attrs, win_data* params, bool is_success);
+    void print_create_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, uint32_t io_information, const win_objattrs_t& attrs, win_data* params, uint64_t status);
+    void print_open_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, uint32_t io_information, const win_objattrs_t& attrs, win_data* params, uint64_t status);
     void print_file_read_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle);
+    void print_file_query_full_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs, const file_network_open_information_t& file_info, uint64_t status);
+    void print_file_query_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs, const file_basic_information_t& file_info, uint64_t status);
     void print_delete_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, addr_t fileinfo);
-    void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo);
+    void print_basic_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, const file_basic_information_t& basic_file_info, uint64_t status);
+    void print_file_net_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, const file_network_open_information_t& file_info, uint64_t status);
     void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo);
     void print_eof_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo);
 

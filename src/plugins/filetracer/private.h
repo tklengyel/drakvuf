@@ -125,6 +125,26 @@ struct win_objattrs_t
     std::string dacl;
 };
 
+struct file_basic_information_t
+{
+    uint64_t creation_time;
+    uint64_t last_access_time;
+    uint64_t last_write_time;
+    uint64_t change_time;
+    std::string file_attributes;
+};
+
+struct file_network_open_information_t
+{
+    uint64_t creation_time;
+    uint64_t last_access_time;
+    uint64_t last_write_time;
+    uint64_t change_time;
+    uint64_t allocation_size;
+    uint64_t end_of_file;
+    std::string file_attributes;
+};
+
 struct win_data : PluginResult
 {
     win_data()
@@ -138,6 +158,7 @@ struct win_data : PluginResult
         , share_access()
         , create_disposition()
         , create_opts()
+        , open_opts()
         , desired_access()
         , io_status_block()
     {
@@ -154,8 +175,12 @@ struct win_data : PluginResult
     uint64_t share_access;
     uint64_t create_disposition;
     uint64_t create_opts;
+    uint64_t open_opts;
     uint64_t desired_access;
     addr_t io_status_block;
+
+    addr_t file_information;
+    uint32_t file_information_class;
 };
 
 struct linux_data : PluginResult
@@ -237,11 +262,6 @@ enum
     _ACL_AceCount,
     _ACL_AclSize,
     _IO_STATUS_BLOCK_Information,
-    __OFFSET_MAX
-};
-
-enum
-{
     _FILE_RENAME_INFORMATION_RootDirectory,
     _FILE_RENAME_INFORMATION_FileName,
     _FILE_RENAME_INFORMATION_FileNameLength,
@@ -250,7 +270,15 @@ enum
     _FILE_BASIC_INFORMATION_LastWriteTime,
     _FILE_BASIC_INFORMATION_ChangeTime,
     _FILE_BASIC_INFORMATION_FileAttributes,
-    __OLE32_OFFSET_MAX
+    _FILE_NETWORK_OPEN_INFORMATION_CreationTime,
+    _FILE_NETWORK_OPEN_INFORMATION_LastAccessTime,
+    _FILE_NETWORK_OPEN_INFORMATION_LastWriteTime,
+    _FILE_NETWORK_OPEN_INFORMATION_ChangeTime,
+    _FILE_NETWORK_OPEN_INFORMATION_AllocationSize,
+    _FILE_NETWORK_OPEN_INFORMATION_EndOfFile,
+    _FILE_NETWORK_OPEN_INFORMATION_FileAttributes,
+    _FILE_ALL_INFORMATION_BasicInformation,
+    __OFFSET_MAX
 };
 
 enum
@@ -427,10 +455,6 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_ACL_AceCount] = {"_ACL", "AceCount"},
     [_ACL_AclSize] = {"_ACL", "AclSize"},
     [_IO_STATUS_BLOCK_Information] = {"_IO_STATUS_BLOCK", "Information"},
-};
-
-static const char* ole32_offset_names[__OLE32_OFFSET_MAX][2] =
-{
     [_FILE_RENAME_INFORMATION_RootDirectory] = {"_FILE_RENAME_INFORMATION", "RootDirectory"},
     [_FILE_RENAME_INFORMATION_FileName] = {"_FILE_RENAME_INFORMATION", "FileName"},
     [_FILE_RENAME_INFORMATION_FileNameLength] = {"_FILE_RENAME_INFORMATION", "FileNameLength"},
@@ -439,6 +463,14 @@ static const char* ole32_offset_names[__OLE32_OFFSET_MAX][2] =
     [_FILE_BASIC_INFORMATION_LastWriteTime] = {"_FILE_BASIC_INFORMATION", "LastWriteTime"},
     [_FILE_BASIC_INFORMATION_ChangeTime] = {"_FILE_BASIC_INFORMATION", "ChangeTime"},
     [_FILE_BASIC_INFORMATION_FileAttributes] = {"_FILE_BASIC_INFORMATION", "FileAttributes"},
+    [_FILE_NETWORK_OPEN_INFORMATION_CreationTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "CreationTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_LastAccessTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "LastAccessTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_LastWriteTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "LastWriteTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_ChangeTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "ChangeTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_AllocationSize] = {"_FILE_NETWORK_OPEN_INFORMATION", "AllocationSize"},
+    [_FILE_NETWORK_OPEN_INFORMATION_EndOfFile] = {"_FILE_NETWORK_OPEN_INFORMATION", "EndOfFile"},
+    [_FILE_NETWORK_OPEN_INFORMATION_FileAttributes] = {"_FILE_NETWORK_OPEN_INFORMATION", "FileAttributes"},
+    [_FILE_ALL_INFORMATION_BasicInformation] = {"_FILE_ALL_INFORMATION", "BasicInformation"},
 };
 
 static const flags_str_t object_attrs =
