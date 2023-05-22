@@ -126,6 +126,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EPROCESS_VADROOT] = { "_EPROCESS", "VadRoot" },
     [EPROCESS_LISTTHREADHEAD] = { "_EPROCESS", "ThreadListHead" },
     [EPROCESS_SECTIONOBJECT] = { "_EPROCESS", "SectionObject" },
+    [EPROCESS_FLAGS2] = { "_EPROCESS", "Flags2" },
 
     [SECTIONOBJECT_SEGMENT] = { "_SECTION_OBJECT", "Segment" },
     [SECTION_CONTROLAREA] = { "_SECTION", "ControlArea" },
@@ -230,6 +231,8 @@ static const char* win_bitfields_names[__WIN_OFFSETS_MAX][2] =
     [MMVAD_FLAGS_COMMITCHARGE] = { "_MMVAD_FLAGS", "CommitCharge" },
     [MMVAD_FLAGS1_COMMITCHARGE] = { "_MMVAD_FLAGS1", "CommitCharge" },
     [MMVAD_FLAGS_PRIVATEMEMORY] = { "_MMVAD_FLAGS",  "PrivateMemory" },
+
+    [EPROCESS_EXITPROCESSREPORTED] = { "_EPROCESS", "ExitProcessReported" },
 };
 
 #endif

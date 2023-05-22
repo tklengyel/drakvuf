@@ -141,6 +141,13 @@ typedef enum dispatcher_object
 bool win_search_modules( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_process, vmi_pid_t pid, access_context_t* ctx );
 bool win_search_modules_wow( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_peb, vmi_pid_t pid, access_context_t* ctx );
 
+static uint64_t win_read_flag(drakvuf_t drakvuf, uint64_t flags, int idx)
+{
+    bitfield_t bf = &drakvuf->bitfields[idx];
+    uint64_t mask = (1ULL << (bf->end_bit - bf->start_bit)) - 1;
+    return (flags >> bf->start_bit) & mask;
+}
+
 static bool win_get_current_kpcr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* kpcr, addr_t* prcb)
 {
     vmi_instance_t vmi = drakvuf->vmi;
@@ -556,9 +563,7 @@ int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
 bool win_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
 {
-    if (VMI_FAILURE == vmi_read_addr_va(drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_PDBASE], 0, dtb))
-        return false;
-    return true;
+    return (VMI_SUCCESS == vmi_read_addr_va(drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_PDBASE], 0, dtb));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -861,6 +866,28 @@ static addr_t win_process_list_entry_to_process(drakvuf_t drakvuf, addr_t list_e
     return list_entry - drakvuf->offsets[EPROCESS_TASKS];
 }
 
+
+static bool win_process_is_alive(drakvuf_t drakvuf, addr_t eprocess_base)
+{
+    addr_t dtb;
+    if (win_get_process_dtb(drakvuf, eprocess_base, &dtb))
+    {
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = dtb,
+            .addr = eprocess_base + drakvuf->offsets[EPROCESS_FLAGS2],
+        );
+
+        uint32_t flags2;
+        if (VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, &flags2))
+        {
+            return !win_read_flag(drakvuf, flags2, EPROCESS_EXITPROCESSREPORTED);
+        }
+    }
+
+    return false;
+}
+
 bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr)
 {
     addr_t list_head;
@@ -876,9 +903,9 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
 
     do
     {
-        vmi_pid_t pid;
-        addr_t current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS] ;
+        addr_t current_process = win_process_list_entry_to_process(drakvuf, current_list_entry);
 
+        vmi_pid_t pid;
         if (!win_get_process_pid(drakvuf, current_process, &pid))
         {
             PRINT_DEBUG("Failed to read PID of process at %"PRIx64"\n", current_process);
@@ -1227,7 +1254,8 @@ bool win_enumerate_processes( drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t 
     {
         addr_t eprocess = win_process_list_entry_to_process(drakvuf, current_list_entry);
 
-        visitor_func(drakvuf, eprocess, visitor_ctx);
+        if (win_process_is_alive(drakvuf, eprocess))
+            visitor_func(drakvuf, eprocess, visitor_ctx);
 
         current_list_entry = next_list_entry;
 
@@ -1808,19 +1836,12 @@ bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callb
     return false;
 }
 
-static uint64_t win_mmvad_flag(drakvuf_t drakvuf, uint64_t flags, int idx)
-{
-    bitfield_t bf = &drakvuf->bitfields[idx];
-    uint64_t mask = (1ULL << (bf->end_bit - bf->start_bit)) - 1;
-    return (flags >> bf->start_bit) & mask;
-}
-
 bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad)
 {
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     int idx = is_win7 ? MMVAD_FLAGS_MEMCOMMIT : MMVAD_FLAGS1_MEMCOMMIT;
     uint64_t flags = is_win7 ? mmvad->flags : mmvad->flags1;
-    return win_mmvad_flag(drakvuf, flags, idx);
+    return win_read_flag(drakvuf, flags, idx);
 }
 
 uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width)
@@ -1830,25 +1851,25 @@ uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_
     uint64_t flags = is_win7 ? mmvad->flags : mmvad->flags1;
     if (width)
         *width = drakvuf->bitfields[idx].end_bit - drakvuf->bitfields[idx].start_bit;
-    return win_mmvad_flag(drakvuf, flags, idx);
+    return win_read_flag(drakvuf, flags, idx);
 }
 
 uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad)
 {
     int idx = MMVAD_FLAGS_VADTYPE;
-    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
+    return win_read_flag(drakvuf, mmvad->flags, idx);
 }
 
 bool win_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad)
 {
     int idx = MMVAD_FLAGS_PRIVATEMEMORY;
-    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
+    return win_read_flag(drakvuf, mmvad->flags, idx);
 }
 
 uint64_t win_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad)
 {
     int idx = MMVAD_FLAGS_PROTECTION;
-    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
+    return win_read_flag(drakvuf, mmvad->flags, idx);
 }
 
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
