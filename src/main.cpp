@@ -333,6 +333,8 @@ static void print_usage()
         "\t                           Disables hook on KiDeliverApc\n"
         "\t --procdump-disable-kedelayexecutionthread-hook\n"
         "\t                           Disables hook on KeDelayExecutionThread\n"
+        "\t --procdump-exclude-list <file name filter>\n"
+        "\t                           File with list of process name regexes to exclude from dumping\n"
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON
         "\t --codemon-dump-dir <directory>\n"
@@ -491,6 +493,7 @@ int main(int argc, char** argv)
         opt_procdump_new_processes_on_finish,
         opt_procdump_disable_kideliverapc_hook,
         opt_procdump_disable_kedelayexecutionthread_hook,
+        opt_procdump_exclude_list,
         opt_json_clr,
         opt_json_mscorwks,
         opt_disable_sysret,
@@ -574,6 +577,7 @@ int main(int argc, char** argv)
         {"procdump-new-processes-on-finish", no_argument, NULL, opt_procdump_new_processes_on_finish},
         {"procdump-disable-kideliverapc-hook", no_argument, NULL, opt_procdump_disable_kideliverapc_hook},
         {"procdump-disable-kedelayexecutionthread-hook", no_argument, NULL, opt_procdump_disable_kedelayexecutionthread_hook},
+        {"procdump-exclude-list", required_argument, NULL, opt_procdump_exclude_list},
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
@@ -908,6 +912,13 @@ int main(int argc, char** argv)
                 break;
             case opt_procdump_disable_kedelayexecutionthread_hook:
                 options.procdump_disable_kedelayexecutionthread_hook = true;
+                break;
+            case opt_procdump_exclude_list:
+                if (!std::filesystem::exists(optarg))
+                {
+                    fprintf(stderr, "file %s does not exist!\n", optarg);
+                }
+                options.procdump_exclude_file = optarg;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON

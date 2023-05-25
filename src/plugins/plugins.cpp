@@ -455,7 +455,8 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .dump_new_processes_on_finish = options->procdump_new_processes_on_finish,
                         .hal_profile = options->hal_profile,
                         .disable_kideliverapc_hook = options->procdump_disable_kideliverapc_hook,
-                        .disable_kedelayexecutionthread_hook = options->procdump_disable_kedelayexecutionthread_hook
+                        .disable_kedelayexecutionthread_hook = options->procdump_disable_kedelayexecutionthread_hook,
+                        .exclude_file = options->procdump_exclude_file
                     };
                     this->plugins[plugin_id] =
                         std::make_unique<procdump2>(this->drakvuf, &config, this->output);

@@ -113,6 +113,7 @@
 #include <libvmi/libvmi.h>
 
 #include "plugins/plugins_ex.h"
+#include "helpers/exclude_matcher.h"
 
 struct procdump2_config
 {
@@ -124,6 +125,7 @@ struct procdump2_config
     const char* hal_profile;
     bool disable_kideliverapc_hook;
     bool disable_kedelayexecutionthread_hook;
+    const char* exclude_file;
 };
 
 struct procdump2_ctx;
@@ -177,6 +179,7 @@ private:
      * Used only with procdump_new_processes_on_finish.
      */
     std::vector<vmi_pid_t> running_processes_on_start;
+    const exclude_matcher exclude;
 
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> terminate_process_hook;
@@ -232,6 +235,7 @@ private:
      * So be carefull while iterating over it.
      */
     void finish_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void print_dump_exclusion(drakvuf_trap_info_t*);
     std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     bool is_active_process(vmi_pid_t pid);
     bool is_process_handled(vmi_pid_t pid);

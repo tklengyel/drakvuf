@@ -176,6 +176,7 @@ struct plugins_options
     const char* hal_profile;            // PLUGIN_PROCDUMP2
     bool procdump_disable_kideliverapc_hook; // PLUGIN_PROCDUMP2
     bool procdump_disable_kedelayexecutionthread_hook; // PLUGIN_PROCDUMP2
+    const char* procdump_exclude_file; // PLUGIN_PROCDUMP2
     const char* codemon_dump_dir;       // PLUGIN_CODEMON
     const char* codemon_filter_executable;  // PLUGIN_CODEMON
     bool codemon_log_everything;        // PLUGIN_CODEMON
