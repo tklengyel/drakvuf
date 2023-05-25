@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include <fstream>
+#include <iterator>
 
 #include <libdrakvuf/libdrakvuf.h>
 
