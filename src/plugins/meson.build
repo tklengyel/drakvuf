@@ -4,6 +4,7 @@ plugin_sources = [
     'plugins.cpp',
     'plugins_ex.cpp',
     'plugin_utils.cpp',
+    'helpers/exclude_matcher.cpp',
     'output_format/ostream.cpp'
 ]
 
