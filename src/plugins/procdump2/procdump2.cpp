@@ -135,6 +135,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     , dump_new_processes_on_finish(config->dump_new_processes_on_finish)
     , use_compression{config->compress_procdumps}
     , pools(std::make_unique<pool_manager>())
+    , exclude{config->exclude_file, "[PROCDUMP]"}
 {
     if (procdump_dir.empty())
         return;
@@ -303,6 +304,26 @@ void procdump2::start_dump_process(vmi_pid_t pid)
         return;
 
     auto proc_name = drakvuf_get_process_name(drakvuf, process_base, true);
+    if (proc_name && exclude.match(proc_name))
+    {
+        drakvuf_trap_info_t info = {};
+        drakvuf_trap_t trap = {};
+
+        info.timestamp = g_get_real_time();
+        info.trap = &trap;
+
+        if (!drakvuf_get_process_data(drakvuf, process_base, &info.attached_proc_data))
+        {
+            PRINT_DEBUG("Failed to get data of process 0x%" PRIx64 "\n", process_base);
+            return;
+        }
+
+        print_dump_exclusion(&info);
+
+        g_free(const_cast<char*>(info.attached_proc_data.name));
+        return;
+    }
+
     auto ctx = std::make_shared<procdump2_ctx>(
             false,
             process_base,
@@ -936,6 +957,12 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
         return false;
     }
 
+    if (exclude.match(target_process_name))
+    {
+        print_dump_exclusion(info);
+        return false;
+    }
+
     auto ctx = std::make_shared<procdump2_ctx>(
             is_hosted,
             target_process_base,
@@ -1396,6 +1423,17 @@ void procdump2::finish_task(drakvuf_trap_info_t* info,
     if (ctx->pool)
         pools->free(ctx->pool);
     this->active.erase(ctx->target_process_pid);
+}
+
+void procdump2::print_dump_exclusion(drakvuf_trap_info_t* info)
+{
+    PRINT_DEBUG("[PROCDUMP] Skip excluded proces %d (%s)\n"
+        , info->attached_proc_data.pid
+        , info->attached_proc_data.name
+    );
+    fmt::print(m_output_format, "procdump_skip", drakvuf, info,
+        keyval("Message", fmt::Rstr("Excluded by filter"))
+    );
 }
 
 std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info,
