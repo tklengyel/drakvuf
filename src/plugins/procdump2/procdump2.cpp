@@ -309,6 +309,8 @@ void procdump2::start_dump_process(vmi_pid_t pid)
         drakvuf_trap_info_t info = {};
         drakvuf_trap_t trap = {};
 
+        g_free(proc_name);
+
         info.timestamp = g_get_real_time();
         info.trap = &trap;
 
