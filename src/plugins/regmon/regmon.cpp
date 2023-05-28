@@ -111,6 +111,7 @@
 
 #include "plugins/plugins.h"
 #include "plugins/output_format.h"
+#include "plugins/plugin_utils.h"
 
 #include "regmon.h"
 
@@ -132,38 +133,48 @@ enum RegistryValueTypes
     REG_QWORD_LITTLE_ENDIAN = REG_QWORD
 };
 
-static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value)
+enum
 {
-    regmon* reg = (regmon*)info->trap->data;
+    //REG_OPTION_NON_VOLATILE = 0x00000000,
+    REG_OPTION_VOLATILE = 0x00000001,
+    REG_OPTION_CREATE_LINK = 0x00000002,
+    REG_OPTION_BACKUP_RESTORE = 0x00000004,
+    REG_OPTION_OPEN_LINK = 0x00000008,
+    REG_OPTION_DONT_VIRTUALIZE = 0x00000010,
+};
 
+static const flags_str_t reg_options =
+{
+    //REGISTER_FLAG(REG_OPTION_NON_VOLATILE),
+    REGISTER_FLAG(REG_OPTION_VOLATILE),
+    REGISTER_FLAG(REG_OPTION_CREATE_LINK),
+    REGISTER_FLAG(REG_OPTION_BACKUP_RESTORE),
+    REGISTER_FLAG(REG_OPTION_OPEN_LINK),
+    REGISTER_FLAG(REG_OPTION_DONT_VIRTUALIZE)
+};
+
+void regmon::print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value, uint32_t reg_opts)
+{
     std::optional<fmt::Qstr<decltype(value_name)>> value_name_opt;
     std::optional<fmt::Qstr<decltype(value)>> value_opt;
+    std::string flags;
 
     if (value_name)
         value_name_opt = fmt::Qstr(value_name);
     if (value)
         value_opt = fmt::Qstr(value);
+    if (reg_opts)
+        flags = parse_flags(reg_opts, reg_options, this->m_output_format);
 
-    if (reg->format == OUTPUT_DEFAULT)
-    {
-        deffmt::print("regmon", drakvuf, info,
-            keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
-            keyval("Key", fmt::Rstr(key_name)),
-            keyval("ValueName", value_name_opt),
-            keyval("Value", value_opt)
-        );
-    }
-    else
-    {
-        fmt::print(reg->format, "regmon", drakvuf, info,
-            keyval("Key", fmt::Qstr(key_name)),
-            keyval("ValueName", value_name_opt),
-            keyval("Value", value_opt)
-        );
-    }
+    fmt::print(this->m_output_format, "regmon", drakvuf, info,
+        keyval("Key", fmt::Qstr(key_name)),
+        keyval("ValueName", value_name_opt),
+        keyval("Value", value_opt),
+        flagsval("RegOptions", flags)
+    );
 }
 
-static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+event_response_t regmon::log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     uint64_t key_handle,
     char const* value_name,
     char const* data )
@@ -173,7 +184,7 @@ static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* in
     gchar* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
 
     if ( key_path )
-        print_registry_call_info(drakvuf, info, key_path, value_name, data);
+        print_registry_call_info(drakvuf, info, key_path, value_name, data, 0);
 
     g_free( key_path );
 
@@ -185,7 +196,7 @@ static char const* get_value_name(unicode_string_t* us)
     return (us && us->length > 0) ? reinterpret_cast<char const*>(us->contents) : "(Default)";
 }
 
-static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+event_response_t regmon::log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     uint64_t key_handle,
     addr_t value_name_addr, bool with_value_name,
     char const* data )
@@ -205,22 +216,20 @@ static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return status;
 }
 
-static event_response_t log_reg_key( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+event_response_t regmon::log_reg_key( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     uint64_t key_handle)
 {
     return log_reg_impl(drakvuf, info, key_handle, 0L, false, nullptr);
 }
 
-static event_response_t log_reg_key_value( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+event_response_t regmon::log_reg_key_value( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     uint64_t key_handle, addr_t value_name_addr )
 {
     return log_reg_impl(drakvuf, info, key_handle, value_name_addr, true, nullptr);
 }
 
-static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+char* regmon::get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 {
-    regmon* reg = (regmon*)info->trap->data;
-
     if (!attr) return nullptr;
 
     auto vmi = vmi_lock_guard(drakvuf);
@@ -231,12 +240,12 @@ static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     );
 
     addr_t key_handle;
-    ctx.addr = attr + reg->objattr_root;
+    ctx.addr = attr + this->objattr_root;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_handle) )
         return nullptr;
 
     addr_t key_name_addr;
-    ctx.addr = attr + reg->objattr_name;
+    ctx.addr = attr + this->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_name_addr) )
         return nullptr;
 
@@ -258,19 +267,19 @@ static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     return key_path;
 }
 
-static event_response_t log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+event_response_t regmon::log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr, uint32_t reg_opts)
 {
     char* key_path = get_key_path_from_attr(drakvuf, info, attr);
 
     if (key_path)
-        print_registry_call_info(drakvuf, info, key_path, nullptr, nullptr);
+        print_registry_call_info(drakvuf, info, key_path, nullptr, nullptr, reg_opts);
 
     g_free(key_path);
 
     return 0;
 }
 
-static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+unicode_string_t* regmon::get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     uint32_t type, addr_t data_addr, size_t data_size )
 {
     ACCESS_CONTEXT(ctx,
@@ -343,7 +352,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
     return data_us;
 }
 
-static event_response_t log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+event_response_t regmon::log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     uint64_t key_handle, addr_t value_name_addr,
     uint32_t type, addr_t data_addr, size_t data_size )
 {
@@ -361,7 +370,7 @@ static event_response_t log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_
     return status;
 }
 
-static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+event_response_t regmon::log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count )
 {
     /*
@@ -402,7 +411,7 @@ static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_tr
     return log_reg_impl(drakvuf, info, key_handle, value_names.c_str(), nullptr);
 }
 
-static event_response_t delete_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::delete_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwDeleteKey(
@@ -413,7 +422,7 @@ static event_response_t delete_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* i
     return log_reg_key( drakvuf, info, key_handle );
 }
 
-static event_response_t set_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::set_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwSetValueKey(
@@ -433,7 +442,7 @@ static event_response_t set_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t
     return log_reg_key_value_data( drakvuf, info, key_handle, value_name_addr, type, data_addr, data_size );
 }
 
-static event_response_t delete_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::delete_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwDeleteValueKey(
@@ -446,7 +455,7 @@ static event_response_t delete_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_inf
     return log_reg_key_value( drakvuf, info, key_handle, value_name_addr );
 }
 
-static event_response_t create_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::create_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwCreateKey(
@@ -460,10 +469,11 @@ static event_response_t create_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* i
     );
     */
     addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return log_reg_objattr( drakvuf, info, objattr_addr );
+    uint32_t create_options = drakvuf_get_function_argument(drakvuf, info, 6);
+    return log_reg_objattr( drakvuf, info, objattr_addr, create_options );
 }
 
-static event_response_t create_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::create_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwCreateKeyTransacted(
@@ -478,10 +488,11 @@ static event_response_t create_key_transacted_cb( drakvuf_t drakvuf, drakvuf_tra
     );
     */
     addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return log_reg_objattr( drakvuf, info, objattr_addr );
+    uint32_t create_options = drakvuf_get_function_argument(drakvuf, info, 6);
+    return log_reg_objattr( drakvuf, info, objattr_addr, create_options );
 }
 
-static event_response_t enumerate_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::enumerate_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwEnumerateKey(
@@ -497,7 +508,7 @@ static event_response_t enumerate_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t
     return log_reg_key( drakvuf, info, key_handle );
 }
 
-static event_response_t enumerate_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::enumerate_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwEnumerateValueKey(
@@ -513,7 +524,7 @@ static event_response_t enumerate_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_
     return log_reg_key( drakvuf, info, key_handle );
 }
 
-static event_response_t open_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::open_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwOpenKey(
@@ -523,10 +534,10 @@ static event_response_t open_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     );
     */
     addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return log_reg_objattr( drakvuf, info, objattr_addr );
+    return log_reg_objattr( drakvuf, info, objattr_addr, 0 );
 }
 
-static event_response_t open_key_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::open_key_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwOpenKeyEx(
@@ -537,10 +548,11 @@ static event_response_t open_key_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* 
     );
     */
     addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return log_reg_objattr( drakvuf, info, objattr_addr );
+    uint32_t open_options = drakvuf_get_function_argument(drakvuf, info, 4);
+    return log_reg_objattr( drakvuf, info, objattr_addr, open_options );
 }
 
-static event_response_t open_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::open_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwOpenKeyTransacted(
@@ -551,10 +563,10 @@ static event_response_t open_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_
     );
     */
     addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return log_reg_objattr( drakvuf, info, objattr_addr );
+    return log_reg_objattr( drakvuf, info, objattr_addr, 0 );
 }
 
-static event_response_t open_key_transacted_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::open_key_transacted_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwOpenKeyTransactedEx(
@@ -566,10 +578,11 @@ static event_response_t open_key_transacted_ex_cb( drakvuf_t drakvuf, drakvuf_tr
     );
     */
     addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return log_reg_objattr( drakvuf, info, objattr_addr );
+    uint32_t open_options = drakvuf_get_function_argument(drakvuf, info, 4);
+    return log_reg_objattr( drakvuf, info, objattr_addr, open_options );
 }
 
-static event_response_t query_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::query_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwQueryKey(
@@ -584,7 +597,7 @@ static event_response_t query_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return log_reg_key( drakvuf, info, key_handle );
 }
 
-static event_response_t query_multiple_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::query_multiple_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     __kernel_entry NTSTATUS NtQueryMultipleValueKey(
@@ -602,7 +615,7 @@ static event_response_t query_multiple_value_key_cb( drakvuf_t drakvuf, drakvuf_
     return log_reg_key_value_entries( drakvuf, info, key_handle, value_entries_addr, value_entries_count );
 }
 
-static event_response_t query_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+event_response_t regmon::query_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
     /*
     NTSYSAPI NTSTATUS ZwQueryValueKey(
@@ -619,42 +632,28 @@ static event_response_t query_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info
     return log_reg_key_value( drakvuf, info, key_handle, value_name_addr );
 }
 
-static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
-    drakvuf_trap_t* trap,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
-{
-    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
-
-    trap->name = syscall_name;
-    trap->cb   = hook_cb;
-    trap->ttl  = drakvuf_get_limited_traps_ttl(drakvuf);
-
-    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
-}
-
 regmon::regmon(drakvuf_t drakvuf, output_format_t output)
-    : format{output}
+    : pluginex(drakvuf, output)
 {
     if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;
     if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
 
-    assert(sizeof(traps) / sizeof(traps[0]) > 13);
-    register_trap(drakvuf, "NtDeleteKey",            &traps[0],  delete_key_cb);
-    register_trap(drakvuf, "NtSetValueKey",          &traps[1],  set_value_key_cb);
-    register_trap(drakvuf, "NtDeleteValueKey",       &traps[2],  delete_value_key_cb);
-    register_trap(drakvuf, "NtCreateKey",            &traps[3],  create_key_cb);
-    register_trap(drakvuf, "NtCreateKeyTransacted",  &traps[4],  create_key_transacted_cb);
-    register_trap(drakvuf, "NtEnumerateKey",         &traps[5],  enumerate_key_cb);
-    register_trap(drakvuf, "NtEnumerateValueKey",    &traps[6],  enumerate_value_key_cb);
-    register_trap(drakvuf, "NtOpenKey",              &traps[7],  open_key_cb);
-    register_trap(drakvuf, "NtOpenKeyEx",            &traps[8],  open_key_ex_cb);
-    register_trap(drakvuf, "NtOpenKeyTransacted",    &traps[9],  open_key_transacted_cb);
-    register_trap(drakvuf, "NtOpenKeyTransactedEx",  &traps[10], open_key_transacted_ex_cb);
-    register_trap(drakvuf, "NtQueryKey",             &traps[11], query_key_cb);
-    register_trap(drakvuf, "NtQueryMultipleValueKey", &traps[12], query_multiple_value_key_cb);
-    register_trap(drakvuf, "NtQueryValueKey",        &traps[13], query_value_key_cb);
+    delete_key_hook = createSyscallHook("NtDeleteKey", &regmon::delete_key_cb);
+    set_value_key_hook = createSyscallHook("NtSetValueKey", &regmon::set_value_key_cb);
+    delete_value_key_hook = createSyscallHook("NtDeleteValueKey", &regmon::delete_value_key_cb);
+    create_key_hook = createSyscallHook("NtCreateKey", &regmon::create_key_cb);
+    create_key_transacted_hook = createSyscallHook("NtCreateKeyTransacted", &regmon::create_key_transacted_cb);
+    enumerate_key_hook = createSyscallHook("NtEnumerateKey", &regmon::enumerate_key_cb);
+    enumerate_value_key_hook = createSyscallHook("NtEnumerateValueKey", &regmon::enumerate_value_key_cb);
+    open_key_hook = createSyscallHook("NtOpenKey", &regmon::open_key_cb);
+    open_key_ex_hook = createSyscallHook("NtOpenKeyEx", &regmon::open_key_ex_cb);
+    open_key_transacted_hook = createSyscallHook("NtOpenKeyTransacted", &regmon::open_key_transacted_cb);
+    open_key_transacted_ex_hook = createSyscallHook("NtOpenKeyTransactedEx", &regmon::open_key_transacted_ex_cb);
+    query_key_hook = createSyscallHook("NtQueryKey", &regmon::query_key_cb);
+    query_multiple_value_key_hook = createSyscallHook("NtQueryMultipleValueKey", &regmon::query_multiple_value_key_cb);
+    query_value_key_hook = createSyscallHook("NtQueryValueKey", &regmon::query_value_key_cb);
 }
 
 regmon::~regmon(void) {}
