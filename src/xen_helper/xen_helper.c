@@ -143,8 +143,8 @@ bool xen_init_interface(xen_interface_t** xen)
     if ( !_xen->xlw.xtl_handle )
         goto err;
 
-    _xen->xlw.xtl_createlogger_stdiostream = dlsym(_xen->xlw.xtl_handle, "xtl_createlogger_stdiostream");
-    _xen->xlw.xtl_logger_destroy = dlsym(_xen->xlw.xtl_handle, "xtl_logger_destroy");
+    *(void**)&_xen->xlw.xtl_createlogger_stdiostream = dlsym(_xen->xlw.xtl_handle, "xtl_createlogger_stdiostream");
+    *(void**)&_xen->xlw.xtl_logger_destroy = dlsym(_xen->xlw.xtl_handle, "xtl_logger_destroy");
 
     _xen->xl_logger = (xentoollog_logger*) _xen->xlw.xtl_createlogger_stdiostream(stderr, XTL_PROGRESS, 0);
 
@@ -155,11 +155,11 @@ bool xen_init_interface(xen_interface_t** xen)
     if ( !_xen->xlw.xl_handle )
         goto err;
 
-    _xen->xlw.libxl_ctx_alloc = dlsym(_xen->xlw.xl_handle, "libxl_ctx_alloc");
-    _xen->xlw.libxl_ctx_free = dlsym(_xen->xlw.xl_handle, "libxl_ctx_free");
-    _xen->xlw.libxl_name_to_domid = dlsym(_xen->xlw.xl_handle, "libxl_name_to_domid");
-    _xen->xlw.libxl_domid_to_name = dlsym(_xen->xlw.xl_handle, "libxl_domid_to_name");
-    _xen->xlw.libxl_qemu_monitor_command = dlsym(_xen->xlw.xl_handle, "libxl_qemu_monitor_command");
+    *(void**)&_xen->xlw.libxl_ctx_alloc = dlsym(_xen->xlw.xl_handle, "libxl_ctx_alloc");
+    *(void**)&_xen->xlw.libxl_ctx_free = dlsym(_xen->xlw.xl_handle, "libxl_ctx_free");
+    *(void**)&_xen->xlw.libxl_name_to_domid = dlsym(_xen->xlw.xl_handle, "libxl_name_to_domid");
+    *(void**)&_xen->xlw.libxl_domid_to_name = dlsym(_xen->xlw.xl_handle, "libxl_domid_to_name");
+    *(void**)&_xen->xlw.libxl_qemu_monitor_command = dlsym(_xen->xlw.xl_handle, "libxl_qemu_monitor_command");
 
     if (_xen->xlw.libxl_ctx_alloc(&_xen->xl_ctx, LIBXL_VERSION, 0, _xen->xl_logger))
     {
@@ -180,11 +180,11 @@ bool xen_init_interface(xen_interface_t** xen)
     if ( !_xen->xlw.xfm_handle )
         goto err;
 
-    _xen->xlw.xenforeignmemory_open = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_open");
-    _xen->xlw.xenforeignmemory_close = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_close");
-    _xen->xlw.xenforeignmemory_resource_size = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_resource_size");
-    _xen->xlw.xenforeignmemory_map_resource = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_map_resource");
-    _xen->xlw.xenforeignmemory_unmap_resource = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_unmap_resource");
+    *(void**)&_xen->xlw.xenforeignmemory_open = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_open");
+    *(void**)&_xen->xlw.xenforeignmemory_close = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_close");
+    *(void**)&_xen->xlw.xenforeignmemory_resource_size = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_resource_size");
+    *(void**)&_xen->xlw.xenforeignmemory_map_resource = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_map_resource");
+    *(void**)&_xen->xlw.xenforeignmemory_unmap_resource = dlsym(_xen->xlw.xfm_handle, "xenforeignmemory_unmap_resource");
     _xen->fmem = _xen->xlw.xenforeignmemory_open(0, 0);
 
     if ( !_xen->fmem )
