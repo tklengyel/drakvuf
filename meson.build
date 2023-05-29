@@ -7,7 +7,8 @@ project('DRAKVUF (C) Tamas K Lengyel 2014-2023', 'c', 'cpp',
             'default_library=static',
             'warning_level=2',
             'werror=true',
-            'b_pie=true'
+            'b_pie=true',
+            'b_ndebug=if-release'
         ]
 )
 
@@ -34,26 +35,28 @@ config_h = configuration_data()
 config_h.set_quoted('PACKAGE_NAME','DRAKVUF')
 config_h.set_quoted('PACKAGE_VERSION', version)
 
-# Declare compiler flags
-add_project_arguments('-DDRAKVUF_DEBUG', language : ['c', 'cpp'])
-add_project_arguments('-ggdb3', language : ['c', 'cpp'])
-add_project_arguments('-Wformat', language : ['c', 'cpp'])
-add_project_arguments('-Wformat-security', language : ['c', 'cpp'])
-add_project_arguments('-Wferror-limit=0', language : ['cpp'])
-add_project_arguments('-Wcast-qual', language : ['cpp'])
-add_project_arguments('-Wcast-align', language : ['cpp'])
-add_project_arguments('-Wstrict-aliasing', language : ['cpp'])
-add_project_arguments('-Wpointer-arith', language : ['cpp'])
-add_project_arguments('-Winit-self', language : ['cpp'])
-add_project_arguments('-Wshadow', language : ['cpp'])
-add_project_arguments('-Wredundant-decls', language : ['cpp'])
-add_project_arguments('-Wfloat-equal', language : ['cpp'])
-add_project_arguments('-Wundef', language : ['cpp'])
-add_project_arguments('-Wvla', language : ['cpp'])
-add_project_arguments('-Wno-c99-designator', language : ['cpp'])
-add_project_arguments('-Wno-reorder-init-list', language : ['cpp'])
-add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
-add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
+# Declare debug flags
+if get_option('buildtype').startswith('debug')
+    add_project_arguments('-DDRAKVUF_DEBUG', language : ['c', 'cpp'])
+    add_project_arguments('-ggdb3', language : ['c', 'cpp'])
+    add_project_arguments('-Wformat', language : ['c', 'cpp'])
+    add_project_arguments('-Wformat-security', language : ['c', 'cpp'])
+    add_project_arguments('-Wferror-limit=0', language : ['cpp'])
+    add_project_arguments('-Wcast-qual', language : ['cpp'])
+    add_project_arguments('-Wcast-align', language : ['cpp'])
+    add_project_arguments('-Wstrict-aliasing', language : ['cpp'])
+    add_project_arguments('-Wpointer-arith', language : ['cpp'])
+    add_project_arguments('-Winit-self', language : ['cpp'])
+    add_project_arguments('-Wshadow', language : ['cpp'])
+    add_project_arguments('-Wredundant-decls', language : ['cpp'])
+    add_project_arguments('-Wfloat-equal', language : ['cpp'])
+    add_project_arguments('-Wundef', language : ['cpp'])
+    add_project_arguments('-Wvla', language : ['cpp'])
+    add_project_arguments('-Wno-c99-designator', language : ['cpp'])
+    add_project_arguments('-Wno-reorder-init-list', language : ['cpp'])
+    add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
+    add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
+endif
 
 # Runtime hardening
 hardened_link_args=[]
