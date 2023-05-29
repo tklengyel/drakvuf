@@ -152,7 +152,7 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     linux_injector_t injector = info->trap->data;
     base_injector_t base_injector = &injector->base_injector;
 
-    event_response_t event;
+    event_response_t event = 0;
 
     switch (base_injector->step)
     {
