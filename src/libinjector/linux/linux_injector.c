@@ -183,7 +183,7 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
     // reset the override on every run
     base_injector->step_override = false;
 
-    event_response_t event;
+    event_response_t event = 0;
     switch (injector->method)
     {
         case INJECT_METHOD_SHELLCODE:
