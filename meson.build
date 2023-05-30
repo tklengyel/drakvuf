@@ -8,6 +8,9 @@ project('DRAKVUF (C) Tamas K Lengyel 2014-2023', 'c', 'cpp',
             'warning_level=2',
             'werror=true',
             'b_pie=true',
+            'b_lto=true',
+            'b_lto_mode=thin',
+            'b_thinlto_cache=true',
             'b_ndebug=if-release'
         ]
 )
