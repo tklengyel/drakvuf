@@ -227,6 +227,12 @@ if get_option('plugin-linkmon')
     config_h.set('ENABLE_PLUGIN_LINKMON', 1)
 endif
 
+if get_option('plugin-libhooktest')
+    plugin_sources += 'libhooktest/libhooktest.cpp'
+
+    config_h.set('ENABLE_PLUGIN_LIBHOOKTEST', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -260,6 +266,7 @@ summary({
     'ipt' : get_option('plugin-ipt'),
     'rebootmon' : get_option('plugin-rebootmon'),
     'linkmon' : get_option('plugin-linkmon'),
+    'libhooktest' : get_option('plugin-libhooktest'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
