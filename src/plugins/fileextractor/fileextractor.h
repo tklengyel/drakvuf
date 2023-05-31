@@ -203,6 +203,7 @@ private:
 
     /* Dispatchers */
     // TODO Maybe remove "response" in flavor of "error"?
+    error dispatch_task(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
     error dispatch_pending(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
     error dispatch_queryvolumeinfo(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
     error dispatch_queryinfo(vmi_instance_t, drakvuf_trap_info_t*, task_t&);

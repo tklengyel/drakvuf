@@ -286,8 +286,6 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
     if (drakvuf_lookup_injection(drakvuf, info))
         drakvuf_remove_injection(drakvuf, info);
 
-    fileextractor::error status{fileextractor::error::error};
-
     vmi_lock_guard vmi(drakvuf);
 
     // checking the call context
@@ -392,38 +390,7 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
         {
             check_stack_marker(info, vmi, task);
 
-            switch (task->stage)
-            {
-                case task_t::stage_t::pending:
-                    status = dispatch_pending(vmi, info, *task);
-                    break;
-                case task_t::stage_t::queryvolumeinfo:
-                    status = dispatch_queryvolumeinfo(vmi, info, *task);
-                    break;
-                case task_t::stage_t::queryinfo:
-                    status = dispatch_queryinfo(vmi, info, *task);
-                    break;
-                case task_t::stage_t::createsection:
-                    status = dispatch_createsection(vmi, info, *task);
-                    break;
-                case task_t::stage_t::mapview:
-                    status = dispatch_mapview(vmi, info, *task);
-                    break;
-                case task_t::stage_t::allocate_pool:
-                    status = dispatch_allocate_pool(vmi, info, *task);
-                    break;
-                case task_t::stage_t::memcpy:
-                    status = dispatch_memcpy(vmi, info, *task);
-                    break;
-                case task_t::stage_t::unmapview:
-                    status = dispatch_unmapview(vmi, info, *task);
-                    break;
-                case task_t::stage_t::close_handle:
-                    status = dispatch_close_handle(vmi, info, *task);
-                    break;
-                case task_t::stage_t::finished:
-                    break;
-            }
+            auto status = dispatch_task(vmi, info, *task);
 
             if (error::none == status || error::error == status)
             {
@@ -512,8 +479,6 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
     if (drakvuf_lookup_injection(drakvuf, info))
         drakvuf_remove_injection(drakvuf, info);
 
-    fileextractor::error status{fileextractor::error::error};
-
     vmi_lock_guard vmi(drakvuf);
 
     // checking the call context
@@ -596,38 +561,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
                     get_write_offset(vmi, info, offset, &task->write_offset);
             }
 
-            switch (task->stage)
-            {
-                case task_t::stage_t::pending:
-                    status = dispatch_pending(vmi, info, *task);
-                    break;
-                case task_t::stage_t::queryvolumeinfo:
-                    status = dispatch_queryvolumeinfo(vmi, info, *task);
-                    break;
-                case task_t::stage_t::queryinfo:
-                    status = dispatch_queryinfo(vmi, info, *task);
-                    break;
-                case task_t::stage_t::createsection:
-                    status = dispatch_createsection(vmi, info, *task);
-                    break;
-                case task_t::stage_t::mapview:
-                    status = dispatch_mapview(vmi, info, *task);
-                    break;
-                case task_t::stage_t::allocate_pool:
-                    status = dispatch_allocate_pool(vmi, info, *task);
-                    break;
-                case task_t::stage_t::memcpy:
-                    status = dispatch_memcpy(vmi, info, *task);
-                    break;
-                case task_t::stage_t::unmapview:
-                    status = dispatch_unmapview(vmi, info, *task);
-                    break;
-                case task_t::stage_t::close_handle:
-                    status = dispatch_close_handle(vmi, info, *task);
-                    break;
-                case task_t::stage_t::finished:
-                    break;
-            }
+            auto status = dispatch_task(vmi, info, *task);
 
             if (error::none == status || error::error == status)
             {
@@ -794,7 +728,6 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (drakvuf_lookup_injection(drakvuf, info))
         drakvuf_remove_injection(drakvuf, info);
 
-    fileextractor::error status{fileextractor::error::error};
     task_t* task = nullptr;
     for (auto& i: tasks)
         if (drakvuf_check_return_context(drakvuf,
@@ -853,38 +786,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         check_stack_marker(info, vmi, task);
 
-        switch (task->stage)
-        {
-            case task_t::stage_t::pending:
-                status = dispatch_pending(vmi, info, *task);
-                break;
-            case task_t::stage_t::queryvolumeinfo:
-                status = dispatch_queryvolumeinfo(vmi, info, *task);
-                break;
-            case task_t::stage_t::queryinfo:
-                status = dispatch_queryinfo(vmi, info, *task);
-                break;
-            case task_t::stage_t::createsection:
-                status = dispatch_createsection(vmi, info, *task);
-                break;
-            case task_t::stage_t::mapview:
-                status = dispatch_mapview(vmi, info, *task);
-                break;
-            case task_t::stage_t::allocate_pool:
-                status = dispatch_allocate_pool(vmi, info, *task);
-                break;
-            case task_t::stage_t::memcpy:
-                status = dispatch_memcpy(vmi, info, *task);
-                break;
-            case task_t::stage_t::unmapview:
-                status = dispatch_unmapview(vmi, info, *task);
-                break;
-            case task_t::stage_t::close_handle:
-                status = dispatch_close_handle(vmi, info, *task);
-                break;
-            case task_t::stage_t::finished:
-                break;
-        }
+        auto status = dispatch_task(vmi, info, *task);
 
         if (error::error == status || error::none == status)
         {
@@ -966,6 +868,48 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 /*****************************************************************************
  *                                Dispatchers                                *
  *****************************************************************************/
+
+fileextractor::error fileextractor::dispatch_task(
+    vmi_instance_t vmi,
+    drakvuf_trap_info_t* info,
+    task_t& task)
+{
+    error status = error::error;
+    switch (task.stage)
+    {
+        case task_t::stage_t::pending:
+            status = dispatch_pending(vmi, info, task);
+            break;
+        case task_t::stage_t::queryvolumeinfo:
+            status = dispatch_queryvolumeinfo(vmi, info, task);
+            break;
+        case task_t::stage_t::queryinfo:
+            status = dispatch_queryinfo(vmi, info, task);
+            break;
+        case task_t::stage_t::createsection:
+            status = dispatch_createsection(vmi, info, task);
+            break;
+        case task_t::stage_t::mapview:
+            status = dispatch_mapview(vmi, info, task);
+            break;
+        case task_t::stage_t::allocate_pool:
+            status = dispatch_allocate_pool(vmi, info, task);
+            break;
+        case task_t::stage_t::memcpy:
+            status = dispatch_memcpy(vmi, info, task);
+            break;
+        case task_t::stage_t::unmapview:
+            status = dispatch_unmapview(vmi, info, task);
+            break;
+        case task_t::stage_t::close_handle:
+            status = dispatch_close_handle(vmi, info, task);
+            break;
+        case task_t::stage_t::finished:
+            break;
+    }
+    return status;
+}
+
 fileextractor::error fileextractor::dispatch_pending(
     vmi_instance_t vmi,
     drakvuf_trap_info_t* info,
