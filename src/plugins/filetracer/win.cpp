@@ -351,6 +351,7 @@ std::tuple<bool, file_basic_information_t> win_filetracer::basic_file_info_read(
 std::tuple<bool, file_network_open_information_t> win_filetracer::net_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t net_file_info)
 {
     if (!net_file_info) return {};
+    if (!this->ole32_profile) return {};
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -367,31 +368,31 @@ std::tuple<bool, file_network_open_information_t> win_filetracer::net_file_info_
     uint64_t end_of_file = 0;
     uint32_t file_attributes = 0;
 
-    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_CreationTime];
+    ctx.addr = net_file_info + this->ole32_offset_names[_FILE_NETWORK_OPEN_INFORMATION_CreationTime];
     if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &creation_time) )
         return {};
 
-    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_LastAccessTime];
+    ctx.addr = net_file_info + this->ole32_offset_names[_FILE_NETWORK_OPEN_INFORMATION_LastAccessTime];
     if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &last_access_time) )
         return {};
 
-    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_LastWriteTime];
+    ctx.addr = net_file_info + this->ole32_offset_names[_FILE_NETWORK_OPEN_INFORMATION_LastWriteTime];
     if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &last_write_time) )
         return {};
 
-    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_ChangeTime];
+    ctx.addr = net_file_info + this->ole32_offset_names[_FILE_NETWORK_OPEN_INFORMATION_ChangeTime];
     if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &change_time) )
         return {};
 
-    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_AllocationSize];
+    ctx.addr = net_file_info + this->ole32_offset_names[_FILE_NETWORK_OPEN_INFORMATION_AllocationSize];
     if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &allocation_size) )
         return {};
 
-    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_EndOfFile];
+    ctx.addr = net_file_info + this->ole32_offset_names[_FILE_NETWORK_OPEN_INFORMATION_EndOfFile];
     if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &end_of_file) )
         return {};
 
-    ctx.addr = net_file_info + this->offsets[_FILE_NETWORK_OPEN_INFORMATION_FileAttributes];
+    ctx.addr = net_file_info + this->ole32_offset_names[_FILE_NETWORK_OPEN_INFORMATION_FileAttributes];
     if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &file_attributes) )
         return {};
 
@@ -1055,26 +1056,35 @@ event_response_t win_filetracer::query_information_file_ret_cb(drakvuf_t drakvuf
     if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    if (params->file_information_class == FileBasicInformation)
+    switch (params->file_information_class )
     {
-        auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information);
-        if (succ)
-            print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
-    }
+        case FileBasicInformation:
+        {
+            auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information);
+            if (succ)
+                print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+            break;
+        }
+        case FileAllInformation:
+            if ( this->ole32_profile )
+            {
+                auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information + this->ole32_offsets[_FILE_ALL_INFORMATION_BasicInformation]);
+                if (succ)
+                    print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+                break;
+            }
 
-    if (params->file_information_class == FileAllInformation)
-    {
-        auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information + this->offsets[_FILE_ALL_INFORMATION_BasicInformation]);
-        if (succ)
-            print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
-    }
-
-    if (params->file_information_class == FileNetworkOpenInformation)
-    {
-        auto [succ, file_info] = net_file_info_read(drakvuf, info, params->file_information);
-        if (succ)
-            print_file_net_info(drakvuf, info, params->handle, file_info, info->regs->rax);
-    }
+        case FileNetworkOpenInformation:
+            if ( this->ole32_profile )
+            {
+                auto [succ, file_info] = net_file_info_read(drakvuf, info, params->file_information);
+                if (succ)
+                    print_file_net_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+                break;
+            }
+        default:
+            break
+    };
 
     uint64_t hookID = make_hook_id(info);
     this->ret_hooks.erase(hookID);
@@ -1125,15 +1135,17 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
 win_filetracer::win_filetracer(drakvuf_t drakvuf, const filetracer_config* c, output_format_t output)
     : pluginex(drakvuf, output)
 {
-    if (!c->ole32_profile)
-    {
-        PRINT_DEBUG("filetracer: plugin requires the JSON debug info for \"ole32.dll\"!\n");
-        return;
-    }
-
-    auto ole32_profile_json = profile_guard(c->ole32_profile);
-    if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json, offset_names, this->offsets.size(), this->offsets.data()))
+    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, this->offsets.size(), this->offsets.data()) )
         throw -1;
+
+    if ( c->ole32_profile )
+    {
+        auto ole32_profile_json = profile_guard(c->ole32_profile);
+        if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json, ole32_offset_names, this->ole32_offsets.size(), this->ole32_offsets.data()))
+            throw -1;
+
+        this->ole32_profile = true;
+    }
 
     create_file_hook = createSyscallHook("NtCreateFile", &win_filetracer::create_file_cb);
     open_file_hook = createSyscallHook("NtOpenFile", &win_filetracer::open_file_cb);

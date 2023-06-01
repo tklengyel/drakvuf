@@ -270,6 +270,11 @@ enum
     _FILE_BASIC_INFORMATION_LastWriteTime,
     _FILE_BASIC_INFORMATION_ChangeTime,
     _FILE_BASIC_INFORMATION_FileAttributes,
+    __OFFSET_MAX
+};
+
+enum
+{
     _FILE_NETWORK_OPEN_INFORMATION_CreationTime,
     _FILE_NETWORK_OPEN_INFORMATION_LastAccessTime,
     _FILE_NETWORK_OPEN_INFORMATION_LastWriteTime,
@@ -278,7 +283,7 @@ enum
     _FILE_NETWORK_OPEN_INFORMATION_EndOfFile,
     _FILE_NETWORK_OPEN_INFORMATION_FileAttributes,
     _FILE_ALL_INFORMATION_BasicInformation,
-    __OFFSET_MAX
+    __OLE32_OFFSET_MAX
 };
 
 enum
@@ -463,6 +468,10 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_FILE_BASIC_INFORMATION_LastWriteTime] = {"_FILE_BASIC_INFORMATION", "LastWriteTime"},
     [_FILE_BASIC_INFORMATION_ChangeTime] = {"_FILE_BASIC_INFORMATION", "ChangeTime"},
     [_FILE_BASIC_INFORMATION_FileAttributes] = {"_FILE_BASIC_INFORMATION", "FileAttributes"},
+};
+
+static const char* ole32_offset_names[__OLE32_OFFSET_MAX][2] =
+{
     [_FILE_NETWORK_OPEN_INFORMATION_CreationTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "CreationTime"},
     [_FILE_NETWORK_OPEN_INFORMATION_LastAccessTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "LastAccessTime"},
     [_FILE_NETWORK_OPEN_INFORMATION_LastWriteTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "LastWriteTime"},

@@ -120,6 +120,9 @@ class win_filetracer : public pluginex
 public:
     std::array<size_t, __OFFSET_MAX> offsets;
 
+    bool has_ole32;
+    std::array<size_t, __OLE32_OFFSET_MAX> ole32_offsets;
+
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> create_file_hook;
     std::unique_ptr<libhook::SyscallHook> open_file_hook;
