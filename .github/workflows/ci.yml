@@ -105,11 +105,11 @@ jobs:
             - 'ubuntu-latest'
           flags:
             - ''
-            - '-Dbuildtype=debug -Dwerror=true'
-            - '-Dbuildtype=debug -Dwerror=true -Dplugin-syscalls=false'
-            - '-Dbuildtype=debug -Dwerror=true -Db_sanitize=address,undefined'
-            - '-Dbuildtype=debug -Dwerror=true -Drepl=true'
-            - '-Dbuildtype=debug -Dwerror=true -Dthreadsafety=true'
+            - '-Dbuildtype=debug -Dwerror=true -Db_lto=false'
+            - '-Dbuildtype=debug -Dwerror=true -Db_lto=false -Dplugin-syscalls=false'
+            - '-Dbuildtype=debug -Dwerror=true -Db_lto=false -Db_sanitize=address,undefined'
+            - '-Dbuildtype=debug -Dwerror=true -Db_lto=false -Drepl=true'
+            - '-Dbuildtype=debug -Dwerror=true -Db_lto=false -Dthreadsafety=true'
     env:
       CC: clang
       CXX: clang++
@@ -220,7 +220,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['cpp']
         os:
           - 'ubuntu-20.04'
           - 'ubuntu-latest'
@@ -233,7 +232,7 @@ jobs:
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
       with:
-        languages: ${{ matrix.language }}
+        languages: cpp
         queries: security-and-quality
 
     - name: Install dependencies
