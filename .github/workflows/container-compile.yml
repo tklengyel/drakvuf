@@ -16,6 +16,7 @@ jobs:
           - 'debian:bookworm-slim'
           - 'ubuntu:focal'
           - 'ubuntu:jammy'
+          - 'ubuntu:rolling'
 
     runs-on: ubuntu-latest
     container:
