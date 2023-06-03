@@ -65,7 +65,7 @@ jobs:
             python3-pip golang libsystemd-dev
         git submodule update --init xen
         cd xen
-        ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs
+        ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs --disable-werror
         make -j4 debball
         cd ..
 
