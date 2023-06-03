@@ -76,6 +76,10 @@ if get_option('hardening')
     config_h.set('HARDENING', 1)
 endif
 
+if get_option('threadsafety')
+    config_h.set('ENABLE_THREADSAFETY', 1)
+endif
+
 summary({
     'Build': version,
 }, section: 'Version')
