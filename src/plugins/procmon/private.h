@@ -418,7 +418,9 @@ enum
 #ifndef CLONE_PIDFD
     CLONE_PIDFD = 0x00001000ULL,
 #endif
+#ifndef CLONE_NEWTIME
     CLONE_NEWTIME =	0x00000080
+#endif
 };
 
 static const flags_str_t kernel_clone_flags =
