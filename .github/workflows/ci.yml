@@ -286,7 +286,7 @@ jobs:
           # Install packages
           sudo apt-get update -q
           sudo apt-get install -y \
-            clang clang-tools llvm lld \
+            clang clang-tools-15 llvm lld \
             libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
@@ -315,7 +315,7 @@ jobs:
       - name: Scan build
         run: |
           meson build --buildtype debug --native-file llvm.ini
-          analyze-build -v --cdb build/compile_commands.json \
+          analyze-build-15 -v --cdb build/compile_commands.json \
             --status-bugs \
             --disable-checker deadcode.DeadStores
 
