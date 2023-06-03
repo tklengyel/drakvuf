@@ -13,18 +13,17 @@ fi
 
 if [ "$2" = "" ]
 then
-    version=$(grep 'PACKAGE_VERSION' 'src/Makefile' | head -n 1 | cut -f2 "-d=" | xargs echo -n)
-    echo "Auto-detected version: $version"
-
-    if [ "$version" = "" ]
-    then
-        echo "Unable to recognize package version automatically, please provide it explicitly by the command line:"
-       echo "package/mkdeb <distro> <version>"
-    fi
-else
-    version="$2"
-    echo "Using version: $version"
+    echo "Specify DRAKVUF version"
+    exit 1
 fi
+version="$2"
+
+if [ "$3" = "" ]
+then
+    echo "Specify Xen version"
+    exit 1
+fi
+xenversion="$3"
 
 arch=amd64
 
