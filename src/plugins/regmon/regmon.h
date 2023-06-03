@@ -105,28 +105,59 @@
 #ifndef REGMON_H
 #define REGMON_H
 
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 
-class regmon: public plugin
+class regmon: public pluginex
 {
 public:
-    drakvuf_trap_t traps[14] =
-    {
-        [0 ... 13] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .type = BREAKPOINT,
-            .data = (void*)this,
-            .ah_cb = nullptr
-        }
-    };
-
-    output_format_t format;
-
     addr_t objattr_name;
     addr_t objattr_root;
+
+    /* Hooks */
+    std::unique_ptr<libhook::SyscallHook> delete_key_hook;
+    std::unique_ptr<libhook::SyscallHook> set_value_key_hook;
+    std::unique_ptr<libhook::SyscallHook> delete_value_key_hook;
+    std::unique_ptr<libhook::SyscallHook> create_key_hook;
+    std::unique_ptr<libhook::SyscallHook> create_key_transacted_hook;
+    std::unique_ptr<libhook::SyscallHook> enumerate_key_hook;
+    std::unique_ptr<libhook::SyscallHook> enumerate_value_key_hook;
+    std::unique_ptr<libhook::SyscallHook> open_key_hook;
+    std::unique_ptr<libhook::SyscallHook> open_key_ex_hook;
+    std::unique_ptr<libhook::SyscallHook> open_key_transacted_hook;
+    std::unique_ptr<libhook::SyscallHook> open_key_transacted_ex_hook;
+    std::unique_ptr<libhook::SyscallHook> query_key_hook;
+    std::unique_ptr<libhook::SyscallHook> query_multiple_value_key_hook;
+    std::unique_ptr<libhook::SyscallHook> query_value_key_hook;
+
+    /* Callbacks */
+    event_response_t delete_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t set_value_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t delete_value_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_key_transacted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t enumerate_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t enumerate_value_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t open_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t open_key_ex_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t open_key_transacted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t open_key_transacted_ex_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_multiple_value_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t query_value_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* Helper functions */
+    void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value, uint32_t reg_opts);
+    event_response_t log_reg_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle, char const* value_name, char const* data);
+    event_response_t log_reg_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle, addr_t value_name_addr, bool with_value_name, char const* data);
+    event_response_t log_reg_key(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle);
+    event_response_t log_reg_key_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle, addr_t value_name_addr);
+    event_response_t log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr, uint32_t reg_opts);
+    event_response_t log_reg_key_value_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle, addr_t value_name_addr, uint32_t type, addr_t data_addr, size_t data_size);
+    event_response_t log_reg_key_value_entries(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count);
+
+    /* Registry info parsing */
+    char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr);
+    unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t type, addr_t data_addr, size_t data_size);
 
     regmon(drakvuf_t drakvuf, output_format_t output);
     ~regmon();
