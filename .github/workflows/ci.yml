@@ -24,7 +24,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y\
+            build-essential flex bison libjson-c-dev liblzo2-dev \
+            libglib2.0-dev meson ninja-build lld llvm clang
+
       - name: Get submodule hashes version
         id: get-hash
         run: |
@@ -41,17 +44,24 @@ jobs:
       - name: Create Xen debball
         if: steps.cache-xen.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get install -y wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential make gcc clang libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libfuse-dev liblzma-dev kpartx python3-dev python3-pip golang libsystemd-dev ninja-build
+          sudo apt-get install -y \
+            wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev \
+            bzip2 libpci-dev libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev \
+            patch libvncserver-dev libssl-dev iasl libbz2-dev e2fslibs-dev git-core \
+            uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext \   
+            libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libfuse-dev \
+            liblzma-dev kpartx python3-dev python3-pip golang libsystemd-dev ninja-build
           rm -rfv xen
           git submodule update --init xen
           cd xen
-          ./configure --enable-githttp --disable-pvshim
+          ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs
           make -j2 debball
           cd ..
 
       - name: Install Xen debball
         run: |
           sudo apt-get install -f ./xen/dist/xen-*.deb
+          sudo ldconfig
 
       - name: Cache Libvmi files
         id: cache-libvmi
@@ -64,7 +74,7 @@ jobs:
         if: steps.cache-libvmi.outputs.cache-hit != 'true'
         run: |
           rm -rfv libvmi
-          sudo apt-get install -y build-essential autoconf-archive flex bison libjson-c-dev libxen-dev debhelper
+          sudo apt-get install -y build-essential autoconf-archive automake libtool flex bison libjson-c-dev debhelper
           git submodule update --init libvmi
           cd libvmi
           sed -i 's/--disable-kvm/--disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs/g' debian/rules
@@ -95,11 +105,11 @@ jobs:
             - 'ubuntu-latest'
           flags:
             - ''
-            - '--enable-debug'
-            - '--enable-debug --disable-plugin-syscalls'
-            - '--enable-debug --enable-sanitize'
-            - '--enable-debug --enable-repl'
-            - '--enable-debug --enable-threadsafety'
+            - '-Dbuildtype=debug'
+            - '-Dbuildtype=debug -Dplugin-syscalls=false'
+            - '-Dbuildtype=debug -Db_sanitize=address,undefined'
+            - '-Dbuildtype=debug -Drepl=true'
+            - '-Dbuildtype=debug -Dthreadsafety=true'
     env:
       CC: clang
       CXX: clang++
@@ -108,7 +118,58 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y \
+            clang llvm lld build-essential flex bison \
+            libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build
+          sudo pip3 install ctypesgen ipython
+
+      - name: Cache Xen debball
+        uses: actions/cache@v3
+        with:
+          path: xen/dist
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v3
+        with:
+          path: libvmi/dist
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
+          sudo ldconfig
+          cd ../..
+
+      - name: Compile ${{ matrix.flags }}
+        run: |
+          meson build --native-file llvm.ini ${{ matrix.flags }}
+          ninja -C build
+
+  tarbuild:
+    name: Code QL Analyze
+    runs-on: ${{ matrix.os }}
+    needs:
+      - init
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-20.04'
+          - 'ubuntu-latest'
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            clang autoconf-archive automake \
+            libjson-c-dev liblzo2-dev libglib2.0-dev
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
@@ -137,55 +198,10 @@ jobs:
       - name: autoreconf
         run: autoreconf -vif
 
-      - name: Compile ${{ matrix.flags }}
-        run: |
-          ./configure ${{ matrix.flags }}
-          make -j2
-
-  tarbuild:
-    runs-on: ${{ matrix.os }}
-    needs:
-      - init
-    if: ${{ github.event_name == 'pull_request' }}
-    strategy:
-        matrix:
-          os:
-            - 'ubuntu-20.04'
-            - 'ubuntu-latest'
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
-
-      - name: Cache Xen debball
-        uses: actions/cache@v3
-        with:
-          path: xen/dist
-          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
-
-      - name: Cache Libvmi files
-        uses: actions/cache@v3
-        with:
-          path: libvmi/dist
-          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
-
-      - name: Install Xen debball
-        run: |
-          sudo apt-get install -f ./xen/dist/xen-*.deb
-
-      - name: Install LibVMI
-        run: |
-          cd libvmi/dist
-          sudo apt install -f ./*.deb
-          sudo ldconfig
-          cd ../..
-
-      - name: autoreconf
-        run: autoreconf -vif
-
       - name: Compile from make dist tarball
+        env:
+          CC: clang
+          CXX: clang++
         run: |
           ./configure
           make -j2 dist
@@ -195,54 +211,6 @@ jobs:
           ./autogen.sh
           ./configure
           make -j2
-
-  mesonbuild:
-    runs-on: ${{ matrix.os }}
-    needs:
-      - init
-    if: ${{ github.event_name == 'pull_request' }}
-    strategy:
-        matrix:
-          os:
-            - 'ubuntu-20.04'
-            - 'ubuntu-latest'
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang build-essential libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build llvm lld
-
-      - name: Cache Xen debball
-        uses: actions/cache@v3
-        with:
-          path: xen/dist
-          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
-
-      - name: Cache Libvmi files
-        uses: actions/cache@v3
-        with:
-          path: libvmi/dist
-          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
-
-      - name: Install Xen debball
-        run: |
-          sudo apt-get install -f ./xen/dist/xen-*.deb
-
-      - name: Install LibVMI
-        run: |
-          cd libvmi/dist
-          sudo apt install -f ./*.deb
-          sudo ldconfig
-          cd ../..
-
-      - name: Build with meson
-        run: |
-          export CC=clang
-          export CXX=clang++
-
-          meson build --buildtype debug --native-file llvm.ini
-          ninja -C build
 
   codeql-analyze:
     name: Code QL Analyze
@@ -275,7 +243,9 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update -q
-        sudo apt-get install -y clang build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+        sudo apt-get install -y \
+            clang llvm lld build-essential libjson-c-dev \
+            liblzo2-dev libglib2.0-dev meson ninja-build
 
     - name: Cache Xen debball
       uses: actions/cache@v3
@@ -302,9 +272,8 @@ jobs:
 
     - name: Compile and install DRAKVUF
       run: |
-        autoreconf -vif
-        ./configure
-        make -j2
+        meson build --native-file llvm.ini
+        ninja -C build
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
@@ -326,7 +295,9 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang-$VERSION clang-tools-$VERSION autoconf-archive flex bison libjson-c-dev meson ninja-build llvm lld
+          sudo apt-get install -y \
+            clang-$VERSION clang-tools-$VERSION llvm-$VERSION lld-$VERSION \
+            libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -375,7 +346,9 @@ jobs:
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang-$VERSION clang-tools-$VERSION clang-tidy-$VERSION autoconf-archive flex bison libjson-c-dev meson ninja-build llvm lld
+          sudo apt-get install -y \
+            clang-$VERSION clang-tools-$VERSION clang-tidy-$VERSION llvm-$VERSION lld-$VERSION \
+            libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v3

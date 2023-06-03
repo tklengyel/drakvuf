@@ -27,15 +27,16 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         apt-get update -q
-        apt-get install -y autoconf-archive flex bison libjson-c-dev clang build-essential git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev
+        apt-get install -y \
+            autoconf-archive flex bison libjson-c-dev clang build-essential \
+            git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev \
+            clang llvm lld meson ninja-build
         apt-get clean
 
     - name: Configure safe dirs
       run: git config --global --add safe.directory $PWD
 
     - uses: actions/checkout@v3
-      with:
-        fetch-depth: 2
 
     - name: Get Xen version
       id: get-xen-hash
@@ -52,10 +53,19 @@ jobs:
     - name: Create Xen debball
       if: steps.cache-xen.outputs.cache-hit != 'true'
       run: |
-        apt-get install -y wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential make gcc clang libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libpixman-1-dev libaio-dev libfdt-dev cabextract libfuse-dev liblzma-dev autoconf-archive kpartx python3-dev python3-pip golang libsystemd-dev ninja-build
+        apt-get install -y \
+            wget git bcc bin86 gawk bridge-utils iproute2 \
+            libcurl4-openssl-dev bzip2 libpci-dev build-essential \
+            libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev \
+            patch libvncserver-dev libssl-dev iasl libbz2-dev \
+            e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison \
+            flex ocaml-findlib xz-utils gettext libpixman-1-dev \
+            libaio-dev libfdt-dev cabextract libfuse-dev \
+            liblzma-dev autoconf-archive kpartx python3-dev \
+            python3-pip golang libsystemd-dev
         git submodule update --init xen
         cd xen
-        ./configure --enable-githttp --disable-pvshim
+        ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs
         make -j4 debball
         cd ..
 
@@ -74,10 +84,6 @@ jobs:
         cd ..
 
     - name: Compile
-      env:
-        CC: clang
-        CXX: clang++
       run: |
-        autoreconf -vif
-        ./configure --enable-debug
-        make
+        meson build --native-file llvm.ini
+        ninja -C build
