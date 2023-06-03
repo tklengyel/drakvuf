@@ -9,6 +9,9 @@ if [ ${GCC_VERSION} -gt 9 ]; then
     ln -s /usr/bin/gcc-9 /usr/bin/gcc
 fi
 
-./configure --prefix=/usr --enable-githttp --disable-pvshim --enable-systemd --enable-ovmf
+./configure --prefix=/usr --enable-githttp \
+    --disable-pvshim --disable-werror \
+    --with-extra-qemuu-configure-args="--disable-werror" \
+    --enable-systemd --enable-ovmf
 
 exit 0

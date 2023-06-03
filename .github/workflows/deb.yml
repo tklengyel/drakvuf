@@ -16,8 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:buster"
           - "debian:bullseye"
+          - "debian:bookworm"
           - "ubuntu:focal"
           - "ubuntu:jammy"
     steps:
@@ -105,8 +105,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:buster"
           - "debian:bullseye"
+          - "debian:bookworm"
           - "ubuntu:focal"
           - "ubuntu:jammy"
     container:
