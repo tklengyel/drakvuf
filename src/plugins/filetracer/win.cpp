@@ -573,6 +573,8 @@ void win_filetracer::print_file_query_full_attributes(drakvuf_t drakvuf, drakvuf
 
 void win_filetracer::print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
 {
+    if (!this->has_ole32) return;
+
     const char* operation_name = "FileRenameInformation";
 
     ACCESS_CONTEXT(ctx);
@@ -580,19 +582,19 @@ void win_filetracer::print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvu
     ctx.dtb = info->regs->cr3;
 
     addr_t dst_file_root_handle = 0;
-    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_RootDirectory];
+    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_RootDirectory];
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &dst_file_root_handle) )
         return;
 
     uint32_t dst_file_name_length = 0;
-    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_FileNameLength];
+    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_FileNameLength];
     if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &dst_file_name_length) )
         return;
 
     // convert length in bytes to length in wchar symbols
     dst_file_name_length /= 2;
 
-    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_FileName];
+    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_FileName];
     unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(drakvuf, &ctx, dst_file_name_length);
     if ( !dst_file_name_us )
         return;
@@ -975,29 +977,40 @@ event_response_t win_filetracer::set_information_file_cb(drakvuf_t drakvuf, drak
     addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
     uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
 
-    if (fileinfoclass == FILE_BASIC_INFORMATION)
-    {
-        auto [succ, file_info] = basic_file_info_read(drakvuf, info, fileinfo);
-        if (succ)
-            print_basic_file_info(drakvuf, info, handle, file_info, 0);
-    }
 
-    if (fileinfoclass == FILE_RENAME_INFORMATION)
+    switch (fileinfoclass)
     {
-        auto vmi = vmi_lock_guard(drakvuf);
-        print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
-    }
+        case FILE_BASIC_INFORMATION:
+        {
+            auto [succ, file_info] = basic_file_info_read(drakvuf, info, fileinfo);
+            if (succ)
+                print_basic_file_info(drakvuf, info, handle, file_info, 0);
+        }
+        break;
 
-    if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
-    {
-        print_delete_file_info(drakvuf, info, handle, fileinfo);
-    }
+        case FILE_RENAME_INFORMATION:
+            if (this->has_ole32)
+            {
+                auto vmi = vmi_lock_guard(drakvuf);
+                print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
+            }
+            break;
 
-    if (fileinfoclass == FILE_END_OF_FILE_INFORMATION)
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        print_eof_file_info(vmi, drakvuf, info, handle, fileinfo);
-    }
+        case FILE_DISPOSITION_INFORMATION:
+        {
+            print_delete_file_info(drakvuf, info, handle, fileinfo);
+        }
+        break;
+
+        case FILE_END_OF_FILE_INFORMATION:
+        {
+            auto vmi = vmi_lock_guard(drakvuf);
+            print_eof_file_info(vmi, drakvuf, info, handle, fileinfo);
+        }
+        break;
+        default:
+            break;
+    };
 
     return 0;
 }

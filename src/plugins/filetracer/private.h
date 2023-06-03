@@ -262,9 +262,6 @@ enum
     _ACL_AceCount,
     _ACL_AclSize,
     _IO_STATUS_BLOCK_Information,
-    _FILE_RENAME_INFORMATION_RootDirectory,
-    _FILE_RENAME_INFORMATION_FileName,
-    _FILE_RENAME_INFORMATION_FileNameLength,
     _FILE_BASIC_INFORMATION_CreationTime,
     _FILE_BASIC_INFORMATION_LastAccessTime,
     _FILE_BASIC_INFORMATION_LastWriteTime,
@@ -282,6 +279,9 @@ enum
 
 enum
 {
+    _FILE_RENAME_INFORMATION_RootDirectory,
+    _FILE_RENAME_INFORMATION_FileName,
+    _FILE_RENAME_INFORMATION_FileNameLength,
     _FILE_ALL_INFORMATION_BasicInformation,
     __OLE32_OFFSET_MAX
 };
@@ -460,9 +460,6 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_ACL_AceCount] = {"_ACL", "AceCount"},
     [_ACL_AclSize] = {"_ACL", "AclSize"},
     [_IO_STATUS_BLOCK_Information] = {"_IO_STATUS_BLOCK", "Information"},
-    [_FILE_RENAME_INFORMATION_RootDirectory] = {"_FILE_RENAME_INFORMATION", "RootDirectory"},
-    [_FILE_RENAME_INFORMATION_FileName] = {"_FILE_RENAME_INFORMATION", "FileName"},
-    [_FILE_RENAME_INFORMATION_FileNameLength] = {"_FILE_RENAME_INFORMATION", "FileNameLength"},
     [_FILE_BASIC_INFORMATION_CreationTime] = {"_FILE_BASIC_INFORMATION", "CreationTime"},
     [_FILE_BASIC_INFORMATION_LastAccessTime] = {"_FILE_BASIC_INFORMATION", "LastAccessTime"},
     [_FILE_BASIC_INFORMATION_LastWriteTime] = {"_FILE_BASIC_INFORMATION", "LastWriteTime"},
@@ -479,6 +476,9 @@ static const char* offset_names[__OFFSET_MAX][2] =
 
 static const char* ole32_offset_names[__OLE32_OFFSET_MAX][2] =
 {
+    [_FILE_RENAME_INFORMATION_RootDirectory] = {"_FILE_RENAME_INFORMATION", "RootDirectory"},
+    [_FILE_RENAME_INFORMATION_FileName] = {"_FILE_RENAME_INFORMATION", "FileName"},
+    [_FILE_RENAME_INFORMATION_FileNameLength] = {"_FILE_RENAME_INFORMATION", "FileNameLength"},
     [_FILE_ALL_INFORMATION_BasicInformation] = {"_FILE_ALL_INFORMATION", "BasicInformation"},
 };
 
