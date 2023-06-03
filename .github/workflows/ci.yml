@@ -105,11 +105,11 @@ jobs:
             - 'ubuntu-latest'
           flags:
             - ''
-            - '-Dbuildtype=debug'
-            - '-Dbuildtype=debug -Dplugin-syscalls=false'
-            - '-Dbuildtype=debug -Db_sanitize=address,undefined'
-            - '-Dbuildtype=debug -Drepl=true'
-            - '-Dbuildtype=debug -Dthreadsafety=true'
+            - '-Dbuildtype=debug -Dwerror=true'
+            - '-Dbuildtype=debug -Dwerror=true -Dplugin-syscalls=false'
+            - '-Dbuildtype=debug -Dwerror=true -Db_sanitize=address,undefined'
+            - '-Dbuildtype=debug -Dwerror=true -Drepl=true'
+            - '-Dbuildtype=debug -Dwerror=true -Dthreadsafety=true'
     env:
       CC: clang
       CXX: clang++
