@@ -4,7 +4,7 @@
 
 set -e
 
-distro="$1"
+distro=$(echo $1 | tr ":" "-")
 version="$2"
 xenversion="$3"
 
