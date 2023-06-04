@@ -573,6 +573,8 @@ void win_filetracer::print_file_query_full_attributes(drakvuf_t drakvuf, drakvuf
 
 void win_filetracer::print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
 {
+    if (!this->has_ole32) return;
+
     const char* operation_name = "FileRenameInformation";
 
     ACCESS_CONTEXT(ctx);
@@ -580,19 +582,19 @@ void win_filetracer::print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvu
     ctx.dtb = info->regs->cr3;
 
     addr_t dst_file_root_handle = 0;
-    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_RootDirectory];
+    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_RootDirectory];
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &dst_file_root_handle) )
         return;
 
     uint32_t dst_file_name_length = 0;
-    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_FileNameLength];
+    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_FileNameLength];
     if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &dst_file_name_length) )
         return;
 
     // convert length in bytes to length in wchar symbols
     dst_file_name_length /= 2;
 
-    ctx.addr = fileinfo + this->offsets[_FILE_RENAME_INFORMATION_FileName];
+    ctx.addr = fileinfo + this->ole32_offsets[_FILE_RENAME_INFORMATION_FileName];
     unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(drakvuf, &ctx, dst_file_name_length);
     if ( !dst_file_name_us )
         return;
@@ -975,29 +977,40 @@ event_response_t win_filetracer::set_information_file_cb(drakvuf_t drakvuf, drak
     addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
     uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
 
-    if (fileinfoclass == FILE_BASIC_INFORMATION)
-    {
-        auto [succ, file_info] = basic_file_info_read(drakvuf, info, fileinfo);
-        if (succ)
-            print_basic_file_info(drakvuf, info, handle, file_info, 0);
-    }
 
-    if (fileinfoclass == FILE_RENAME_INFORMATION)
+    switch (fileinfoclass)
     {
-        auto vmi = vmi_lock_guard(drakvuf);
-        print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
-    }
+        case FILE_BASIC_INFORMATION:
+        {
+            auto [succ, file_info] = basic_file_info_read(drakvuf, info, fileinfo);
+            if (succ)
+                print_basic_file_info(drakvuf, info, handle, file_info, 0);
+        }
+        break;
 
-    if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
-    {
-        print_delete_file_info(drakvuf, info, handle, fileinfo);
-    }
+        case FILE_RENAME_INFORMATION:
+            if (this->has_ole32)
+            {
+                auto vmi = vmi_lock_guard(drakvuf);
+                print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
+            }
+            break;
 
-    if (fileinfoclass == FILE_END_OF_FILE_INFORMATION)
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        print_eof_file_info(vmi, drakvuf, info, handle, fileinfo);
-    }
+        case FILE_DISPOSITION_INFORMATION:
+        {
+            print_delete_file_info(drakvuf, info, handle, fileinfo);
+        }
+        break;
+
+        case FILE_END_OF_FILE_INFORMATION:
+        {
+            auto vmi = vmi_lock_guard(drakvuf);
+            print_eof_file_info(vmi, drakvuf, info, handle, fileinfo);
+        }
+        break;
+        default:
+            break;
+    };
 
     return 0;
 }
@@ -1055,26 +1068,33 @@ event_response_t win_filetracer::query_information_file_ret_cb(drakvuf_t drakvuf
     if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    if (params->file_information_class == FileBasicInformation)
+    switch (params->file_information_class )
     {
-        auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information);
-        if (succ)
-            print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
-    }
-
-    if (params->file_information_class == FileAllInformation)
-    {
-        auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information + this->offsets[_FILE_ALL_INFORMATION_BasicInformation]);
-        if (succ)
-            print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
-    }
-
-    if (params->file_information_class == FileNetworkOpenInformation)
-    {
-        auto [succ, file_info] = net_file_info_read(drakvuf, info, params->file_information);
-        if (succ)
-            print_file_net_info(drakvuf, info, params->handle, file_info, info->regs->rax);
-    }
+        case FileBasicInformation:
+        {
+            auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information);
+            if (succ)
+                print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+            break;
+        }
+        case FileNetworkOpenInformation:
+        {
+            auto [succ, file_info] = net_file_info_read(drakvuf, info, params->file_information);
+            if (succ)
+                print_file_net_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+            break;
+        }
+        case FileAllInformation:
+            if ( this->has_ole32 )
+            {
+                auto [succ, file_info] = basic_file_info_read(drakvuf, info, params->file_information + this->ole32_offsets[_FILE_ALL_INFORMATION_BasicInformation]);
+                if (succ)
+                    print_basic_file_info(drakvuf, info, params->handle, file_info, info->regs->rax);
+            }
+            break;
+        default:
+            break;
+    };
 
     uint64_t hookID = make_hook_id(info);
     this->ret_hooks.erase(hookID);
@@ -1125,15 +1145,17 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
 win_filetracer::win_filetracer(drakvuf_t drakvuf, const filetracer_config* c, output_format_t output)
     : pluginex(drakvuf, output)
 {
-    if (!c->ole32_profile)
-    {
-        PRINT_DEBUG("filetracer: plugin requires the JSON debug info for \"ole32.dll\"!\n");
-        return;
-    }
-
-    auto ole32_profile_json = profile_guard(c->ole32_profile);
-    if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json, offset_names, this->offsets.size(), this->offsets.data()))
+    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, this->offsets.size(), this->offsets.data()) )
         throw -1;
+
+    if ( c->ole32_profile )
+    {
+        auto ole32_profile_json = profile_guard(c->ole32_profile);
+        if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json, ole32_offset_names, this->ole32_offsets.size(), this->ole32_offsets.data()))
+            throw -1;
+
+        this->has_ole32 = true;
+    }
 
     create_file_hook = createSyscallHook("NtCreateFile", &win_filetracer::create_file_cb);
     open_file_hook = createSyscallHook("NtOpenFile", &win_filetracer::open_file_cb);
