@@ -262,23 +262,28 @@ enum
     _ACL_AceCount,
     _ACL_AclSize,
     _IO_STATUS_BLOCK_Information,
-    _FILE_RENAME_INFORMATION_RootDirectory,
-    _FILE_RENAME_INFORMATION_FileName,
-    _FILE_RENAME_INFORMATION_FileNameLength,
     _FILE_BASIC_INFORMATION_CreationTime,
     _FILE_BASIC_INFORMATION_LastAccessTime,
     _FILE_BASIC_INFORMATION_LastWriteTime,
     _FILE_BASIC_INFORMATION_ChangeTime,
     _FILE_BASIC_INFORMATION_FileAttributes,
-    _FILE_NETWORK_OPEN_INFORMATION_CreationTime,
-    _FILE_NETWORK_OPEN_INFORMATION_LastAccessTime,
-    _FILE_NETWORK_OPEN_INFORMATION_LastWriteTime,
-    _FILE_NETWORK_OPEN_INFORMATION_ChangeTime,
     _FILE_NETWORK_OPEN_INFORMATION_AllocationSize,
+    _FILE_NETWORK_OPEN_INFORMATION_CreationTime,
+    _FILE_NETWORK_OPEN_INFORMATION_ChangeTime,
     _FILE_NETWORK_OPEN_INFORMATION_EndOfFile,
     _FILE_NETWORK_OPEN_INFORMATION_FileAttributes,
-    _FILE_ALL_INFORMATION_BasicInformation,
+    _FILE_NETWORK_OPEN_INFORMATION_LastAccessTime,
+    _FILE_NETWORK_OPEN_INFORMATION_LastWriteTime,
     __OFFSET_MAX
+};
+
+enum
+{
+    _FILE_RENAME_INFORMATION_RootDirectory,
+    _FILE_RENAME_INFORMATION_FileName,
+    _FILE_RENAME_INFORMATION_FileNameLength,
+    _FILE_ALL_INFORMATION_BasicInformation,
+    __OLE32_OFFSET_MAX
 };
 
 enum
@@ -455,9 +460,6 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_ACL_AceCount] = {"_ACL", "AceCount"},
     [_ACL_AclSize] = {"_ACL", "AclSize"},
     [_IO_STATUS_BLOCK_Information] = {"_IO_STATUS_BLOCK", "Information"},
-    [_FILE_RENAME_INFORMATION_RootDirectory] = {"_FILE_RENAME_INFORMATION", "RootDirectory"},
-    [_FILE_RENAME_INFORMATION_FileName] = {"_FILE_RENAME_INFORMATION", "FileName"},
-    [_FILE_RENAME_INFORMATION_FileNameLength] = {"_FILE_RENAME_INFORMATION", "FileNameLength"},
     [_FILE_BASIC_INFORMATION_CreationTime] = {"_FILE_BASIC_INFORMATION", "CreationTime"},
     [_FILE_BASIC_INFORMATION_LastAccessTime] = {"_FILE_BASIC_INFORMATION", "LastAccessTime"},
     [_FILE_BASIC_INFORMATION_LastWriteTime] = {"_FILE_BASIC_INFORMATION", "LastWriteTime"},
@@ -470,6 +472,13 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_FILE_NETWORK_OPEN_INFORMATION_AllocationSize] = {"_FILE_NETWORK_OPEN_INFORMATION", "AllocationSize"},
     [_FILE_NETWORK_OPEN_INFORMATION_EndOfFile] = {"_FILE_NETWORK_OPEN_INFORMATION", "EndOfFile"},
     [_FILE_NETWORK_OPEN_INFORMATION_FileAttributes] = {"_FILE_NETWORK_OPEN_INFORMATION", "FileAttributes"},
+};
+
+static const char* ole32_offset_names[__OLE32_OFFSET_MAX][2] =
+{
+    [_FILE_RENAME_INFORMATION_RootDirectory] = {"_FILE_RENAME_INFORMATION", "RootDirectory"},
+    [_FILE_RENAME_INFORMATION_FileName] = {"_FILE_RENAME_INFORMATION", "FileName"},
+    [_FILE_RENAME_INFORMATION_FileNameLength] = {"_FILE_RENAME_INFORMATION", "FileNameLength"},
     [_FILE_ALL_INFORMATION_BasicInformation] = {"_FILE_ALL_INFORMATION", "BasicInformation"},
 };
 
