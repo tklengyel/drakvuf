@@ -37,6 +37,12 @@ jobs:
           echo xen_commit=${XEN_COMMIT} >> $GITHUB_OUTPUT
           CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
           echo "container=$CONTAINER" >> $GITHUB_OUTPUT
+          DRAKVUFVERSION=$(./scripts/version.sh --dev)
+          echo "DRAKVUF version: $DRAKVUFVERSION"
+          echo "drakvufversion=$DRAKVUFVERSION" >> $GITHUB_OUTPUT
+          XENVERSION=$(./xen/version.sh --full ./xen/xen/Makefile)
+          echo "Xen version: $XENVERSION"
+          echo "xenversion=$XENVERSION" >> $GITHUB_OUTPUT
       - name: Cache Xen intermediate
         uses: actions/cache@v3
         with:
@@ -46,9 +52,7 @@ jobs:
       - name: Build package
         id: build_drakvuf_deb
         run: |
-          drakvufversion=$(./scripts/version.sh --dev)
-          xenversion=$(./xen/version.sh --full ./xen/xen/Makefile)
-          sh package/build.sh ${{ matrix.container }} $drakvufversion $xenversion
+          sh package/build.sh "${{ matrix.container }}" "${{ steps.gen_vars.outputs.drakvufversion }}" "${{ steps.gen_vars.outputs.xenversion }}"
           DRAKVUF_DEB_PATH=$(find package/out/drakvuf*.deb | head -n1)
           DRAKVUF_DEB_NAME=$(basename "$DRAKVUF_DEB_PATH")
           XEN_DEB_PATH=$(find package/out/xen*.deb | head -n1)

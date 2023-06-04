@@ -5,25 +5,25 @@
 set -e
 
 distro="$1"
+version="$2"
+xenversion="$3"
 
 if [ "$distro" = "" ]
 then
     distro=generic
 fi
 
-if [ "$2" = "" ]
+if [ "$version" = "" ]
 then
     echo "Specify DRAKVUF version"
     exit 1
 fi
-version="$2"
 
-if [ "$3" = "" ]
+if [ "$xenversion" = "" ]
 then
     echo "Specify Xen version"
     exit 1
 fi
-xenversion="$3"
 
 arch=amd64
 
@@ -37,8 +37,6 @@ if test -d deb/usr/lib64 ; then
   cp -a deb/usr/lib64/* deb/usr/lib/
   rm -rf deb/usr/lib64
 fi
-
-xenversion=$(ls deb/boot/*.config | xargs basename | awk -F'\.c' '{print $1}' | awk -F'-' '{print $2}')
 
 # Fill in the debian boilerplate
 mkdir -p deb/DEBIAN

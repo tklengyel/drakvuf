@@ -14,7 +14,11 @@ fi
 
 ./configure --prefix=/usr --enable-githttp \
     --disable-pvshim --disable-werror \
-    --with-extra-qemuu-configure-args="--disable-werror" \
+    --with-extra-qemuu-configure-args="--disable-werror --disable-sdl" \
     --enable-systemd $OVMF
+
+echo CONFIG_EXPERT=y > xen/.config
+echo CONFIG_MEM_SHARING=y >> xen/.config
+make -C xen olddefconfig
 
 exit 0
