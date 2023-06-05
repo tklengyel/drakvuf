@@ -11,18 +11,11 @@ RUN mkdir -p /log && \
     sh /tmp/depends.sh
 
 COPY xen /build-xen
-COPY package/patch-xen.sh /build-xen
 COPY package/configure-xen.sh /build-xen
 RUN cd /build-xen && \
-    chmod +x patch-xen.sh && \
     chmod +x configure-xen.sh && \
-    ./patch-xen.sh && \
     ./configure-xen.sh && \
     echo "Building Xen, this may take a few minutes..." && \
-    echo CONFIG_EXPERT=y > xen/.config && \
-    echo CONFIG_MEM_SHARING=y >> xen/.config && \
-    make -C xen olddefconfig && \
-    echo "Running Xen's make dist..." && \
     make -j$(nproc) dist-xen && \
     make -j$(nproc) dist-tools && \
     echo "Install Xen..." && \
