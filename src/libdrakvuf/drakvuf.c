@@ -1071,7 +1071,9 @@ static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
 int drakvuf_event_fd_remove(drakvuf_t drakvuf, int fd)
 {
     PRINT_DEBUG("drakvuf_event_fd_remove fd=%d\n", fd);
+#ifdef DRAKVUF_DEBUG
     int i = 0;
+#endif
     GSList* loop = drakvuf->event_fd_info;
     while (loop)
     {
@@ -1088,7 +1090,9 @@ int drakvuf_event_fd_remove(drakvuf_t drakvuf, int fd)
             return 1;
         }
         loop = loop->next;
+#ifdef DRAKVUF_DEBUG
         i++;
+#endif
     }
     PRINT_DEBUG("drakvuf_event_fd_remove could not find fd!\n");
     return 0;

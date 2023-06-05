@@ -979,7 +979,9 @@ event_response_t codemon::mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_tra
             return VMI_EVENT_RESPONSE_NONE;
     }
 
+#ifdef DRAKVUF_DEBUG
     const auto pid = trap_info->proc_data.pid;
+#endif
 
     //The first argument is the FaultStatus, and the second (rdx) the VirtualAddress which caused the fault.
     addr_t fault_va = drakvuf_get_function_argument(drakvuf, trap_info, 2);
