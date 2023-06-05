@@ -74,7 +74,7 @@ jobs:
           echo cur_datetime=$(date '+%Y-%m-%d %H:%M:%S') >> $GITHUB_OUTPUT
 
       - name: Delete old release
-        uses: dev-drprasad/delete-older-releases@e3510b26d17114d63269aa02d3ebb592936d0981 # pin 0.2.0
+        uses: dev-drprasad/delete-older-releases@653dc03d96473ac9e585c68c8bf5aaccb0dadb61 # pin 0.2.1
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
