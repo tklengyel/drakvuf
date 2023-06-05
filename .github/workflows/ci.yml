@@ -145,7 +145,7 @@ jobs:
 
       - name: Compile ${{ matrix.flags }}
         run: |
-          meson build --native-file llvm.ini ${{ matrix.flags }}
+          meson setup build --native-file llvm.ini ${{ matrix.flags }}
           ninja -C build
 
   tarbuild:
@@ -267,7 +267,7 @@ jobs:
 
     - name: Compile and install DRAKVUF
       run: |
-        meson build --native-file llvm.ini
+        meson setup build --native-file llvm.ini
         ninja -C build
 
     - name: Perform CodeQL Analysis
@@ -314,7 +314,7 @@ jobs:
 
       - name: Scan build
         run: |
-          meson build --buildtype debug --native-file llvm.ini
+          meson setup build --buildtype debug --native-file llvm.ini
           analyze-build-15 -v --cdb build/compile_commands.json \
             --status-bugs \
             --disable-checker deadcode.DeadStores
@@ -473,7 +473,7 @@ jobs:
           printenv
           which infer
           git fetch origin
-          meson build --buildtype debug --native-file llvm.ini
+          meson setup build --buildtype debug --native-file llvm.ini
           cd build
           git diff --name-only HEAD..origin/main > /tmp/index.txt
           infer capture --compilation-database compile_commands.json
@@ -489,7 +489,7 @@ jobs:
       - name: run infer on main
         run: |
           export PATH=/opt/infer/usr/local/bin:/opt/infer/usr/local/lib/infer/infer/bin:$PATH
-          meson build --buildtype debug --native-file llvm.ini
+          meson setup build --buildtype debug --native-file llvm.ini
           cd build
           mv /tmp/infer-out .
           infer capture --reactive --compilation-database compile_commands.json

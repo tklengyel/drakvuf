@@ -86,5 +86,5 @@ jobs:
 
     - name: Compile
       run: |
-        meson build --native-file llvm.ini
+        meson setup build --native-file llvm.ini
         ninja -C build

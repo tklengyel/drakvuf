@@ -20,7 +20,7 @@ RUN export INSTALL_PATH="/build/usr" && \
     export CFLAGS="-I$INSTALL_PATH/include" && \
     cd /build && \
     ldconfig && \
-    meson build --native-file llvm.ini --prefix "/usr" --pkg-config-path "$INSTALL_PATH/lib/pkgconfig" && \
+    meson setup build --native-file llvm.ini --prefix "/usr" --pkg-config-path "$INSTALL_PATH/lib/pkgconfig" && \
     ninja -C build install
 
 WORKDIR /build
