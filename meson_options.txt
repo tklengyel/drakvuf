@@ -4,6 +4,7 @@ option('ipt', type : 'boolean', value : true)
 option('release', type : 'boolean', value : false)
 option('xtf', type : 'boolean', value : 'false')
 option('repl', type : 'boolean', value : 'false')
+option('threadsafety', type : 'boolean', value : 'false')
 
 option('plugin-syscalls', type : 'boolean', value : true)
 option('plugin-poolmon', type : 'boolean', value : true)

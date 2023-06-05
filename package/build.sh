@@ -2,7 +2,9 @@
 
 # run ./package/build.sh
 
-IMAGE="ubuntu:20.04"
+IMAGE="ubuntu:22.04"
+DRAKVUFVERSION=$2
+XENVERSION=$3
 
 if [ ! -z "$1" ]
 then
@@ -38,6 +40,6 @@ else
     if [ $? -ne 0 ]; then echo Failed to load Xen intermediate image ; exit 1 ; fi
 fi
 
-echo Building final image...
-docker build -f package/Dockerfile-final -t deb-build . && docker run -v $(pwd)/package/out:/out deb-build ./package/mkdeb $@
+echo "Building final image..."
+docker build -f package/Dockerfile-final -t deb-build . && docker run -v $(pwd)/package/out:/out deb-build ./package/mkdeb $IMAGE $DRAKVUFVERSION $XENVERSION
 if [ $? -ne 0 ]; then echo Failed to build package ; exit 1 ; fi

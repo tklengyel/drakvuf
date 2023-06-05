@@ -121,12 +121,14 @@ dpkg -i $PACKAGE_DIR/*xen*.deb
 dpkg -i $PACKAGE_DIR/*drakvuf-bundle*.deb
 
 apt-get -f --yes install
-apt-get --quiet --yes install python3-pip
+apt-get --quiet --yes install python3-pip python3-venv
 
+python3 -m venv /opt/volatility3
+source /opt/volatility3/bin/activate
+pip3 install wheel construct pefile
 cd /opt/volatility3
 python3 setup.py build
 python3 -m pip install .
-pip3 install pefile construct
 
 echo "DRAKVUF was successfully installed"
 echo "You should reboot your system now and pick Xen in your GRUB menu"

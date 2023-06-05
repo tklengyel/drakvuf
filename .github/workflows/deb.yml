@@ -16,8 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:buster"
           - "debian:bullseye"
+          - "debian:bookworm"
           - "ubuntu:focal"
           - "ubuntu:jammy"
     steps:
@@ -27,39 +27,34 @@ jobs:
       - name: Generate variables
         id: gen_vars
         run: |
-          SYSTEM_ID=$(echo ${{ matrix.container }} | cut -f1 '-d:')
-          DISTRIBUTION=$(echo ${{ matrix.container }} | cut -f2 '-d:')
-          ARTIFACT_PREFIX="${SYSTEM_ID}_${DISTRIBUTION}"
-          echo "Artifact prefix: $ARTIFACT_PREFIX"
-          echo artifact_prefix=${ARTIFACT_PREFIX} >> $GITHUB_OUTPUT
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
           echo "Xen commit: $XEN_COMMIT"
           echo xen_commit=${XEN_COMMIT} >> $GITHUB_OUTPUT
           CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
           echo "container=$CONTAINER" >> $GITHUB_OUTPUT
+          DRAKVUFVERSION=$(./scripts/version.sh --dev)
+          echo "DRAKVUF version: $DRAKVUFVERSION"
+          echo "drakvufversion=$DRAKVUFVERSION" >> $GITHUB_OUTPUT
+          XENVERSION=$(./xen/version.sh --full ./xen/xen/Makefile)
+          echo "Xen version: $XENVERSION"
+          echo "xenversion=$XENVERSION" >> $GITHUB_OUTPUT
       - name: Cache Xen intermediate
         uses: actions/cache@v3
         with:
           path: |
             package/cache
-          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v5
+          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v6
       - name: Build package
         id: build_drakvuf_deb
         run: |
-          sh package/build.sh ${{ matrix.container }}
+          sh package/build.sh "${{ matrix.container }}" "${{ steps.gen_vars.outputs.drakvufversion }}" "${{ steps.gen_vars.outputs.xenversion }}"
           DRAKVUF_DEB_PATH=$(find package/out/drakvuf*.deb | head -n1)
-          DRAKVUF_DEB_NAME=$(basename "$DRAKVUF_DEB_PATH")
           XEN_DEB_PATH=$(find package/out/xen*.deb | head -n1)
-          XEN_DEB_NAME=$(basename "$XEN_DEB_PATH")
           if [ ! -z $DRAKVUF_DEB_PATH ]; then
-            NEWNAME=${{ steps.gen_vars.outputs.artifact_prefix }}_${DRAKVUF_DEB_NAME}
-            echo drakvuf_deb_name=$NEWNAME >> $GITHUB_OUTPUT
-            cp $DRAKVUF_DEB_PATH ${{ github.workspace}}/$NEWNAME
+            cp $DRAKVUF_DEB_PATH ${{ github.workspace}}
           fi
           if [ ! -z $XEN_DEB_PATH ]; then
-            NEWNAME=${{ steps.gen_vars.outputs.artifact_prefix }}_${XEN_DEB_NAME}
-            echo xen_deb_name=$NEWNAME >> $GITHUB_OUTPUT
-            cp $XEN_DEB_PATH ${{ github.workspace }}/$NEWNAME
+            cp $XEN_DEB_PATH ${{ github.workspace }}
           fi
       - uses: actions/upload-artifact@v3
         with:
@@ -79,7 +74,7 @@ jobs:
           echo cur_datetime=$(date '+%Y-%m-%d %H:%M:%S') >> $GITHUB_OUTPUT
 
       - name: Delete old release
-        uses: dev-drprasad/delete-older-releases@e3510b26d17114d63269aa02d3ebb592936d0981 # pin 0.2.0
+        uses: dev-drprasad/delete-older-releases@653dc03d96473ac9e585c68c8bf5aaccb0dadb61 # pin 0.2.1
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
@@ -105,8 +100,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:buster"
           - "debian:bullseye"
+          - "debian:bookworm"
           - "ubuntu:focal"
           - "ubuntu:jammy"
     container:
