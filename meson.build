@@ -5,7 +5,8 @@ project('DRAKVUF (C) Tamas K Lengyel 2014-2023', 'c', 'cpp',
             'buildtype=release',
             'strip=true',
             'default_library=static',
-            'warning_level=0',
+            'warning_level=2',
+            'werror=true',
             'b_pie=true',
             'b_lto=true',
             'b_lto_mode=thin',
@@ -37,13 +38,16 @@ config_h = configuration_data()
 config_h.set_quoted('PACKAGE_NAME','DRAKVUF')
 config_h.set_quoted('PACKAGE_VERSION', version)
 
-# Declare debug flags
+# Ignore these warnings
+add_project_arguments('-Wno-c99-designator', language : ['cpp'])
+add_project_arguments('-Wno-reorder-init-list', language : ['cpp'])
+add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
+add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
+
+# Declare additional debug flags
 if get_option('buildtype').startswith('debug')
     add_project_arguments('-DDRAKVUF_DEBUG', language : ['c', 'cpp'])
     add_project_arguments('-ggdb3', language : ['c', 'cpp'])
-    add_project_arguments('-Wall', language : ['c', 'cpp'])
-    add_project_arguments('-Wextra', language : ['c', 'cpp'])
-    add_project_arguments('-Werror', language : ['c', 'cpp'])
     add_project_arguments('-Wformat', language : ['c', 'cpp'])
     add_project_arguments('-Wformat-security', language : ['c', 'cpp'])
     add_project_arguments('-Wferror-limit=0', language : ['cpp'])
@@ -57,10 +61,6 @@ if get_option('buildtype').startswith('debug')
     add_project_arguments('-Wfloat-equal', language : ['cpp'])
     add_project_arguments('-Wundef', language : ['cpp'])
     add_project_arguments('-Wvla', language : ['cpp'])
-    add_project_arguments('-Wno-c99-designator', language : ['cpp'])
-    add_project_arguments('-Wno-reorder-init-list', language : ['cpp'])
-    add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
-    add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
 endif
 
 # Runtime hardening
