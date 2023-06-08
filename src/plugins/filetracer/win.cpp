@@ -197,8 +197,8 @@ void win_filetracer::print_open_file_obj_info(drakvuf_t drakvuf,
     uint64_t status)
 {
     auto share_access = parse_flags(params->share_access, share_mode, this->m_output_format);
-    auto open_opts = parse_flags(params->create_opts, create_options, this->m_output_format);
-    auto desired_access = params->create_opts & FILE_DIRECTORY_FILE
+    auto open_opts = parse_flags(params->open_opts, create_options, this->m_output_format);
+    auto desired_access = params->open_opts & FILE_DIRECTORY_FILE
         ? parse_flags(params->desired_access, directory_ar, this->m_output_format)
         : parse_flags(params->desired_access, file_ar, this->m_output_format);
     std::optional<fmt::Nval<int>> io_information_opt;
