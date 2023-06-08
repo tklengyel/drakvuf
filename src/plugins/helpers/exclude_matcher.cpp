@@ -131,15 +131,12 @@ static std::vector<std::regex> parse_exclude_file(const char* exclude_file, cons
         throw -1;
     }
 
-    std::vector<std::string> lines;
-    std::copy(std::istream_iterator<std::string>(fs),
-        std::istream_iterator<std::string>(), std::back_inserter(lines));
-
     std::vector<std::regex> ret;
     try
     {
         auto flags = std::regex::optimize | std::regex::nosubs | std::regex::icase;
-        for (const auto& line : lines)
+        std::string line;
+        while (std::getline(fs, line))
             ret.emplace_back(line, flags);
     }
     catch (const std::regex_error& e)
