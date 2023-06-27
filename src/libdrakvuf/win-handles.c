@@ -133,8 +133,8 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
         return 0;
 
     // _EX_FAST_REF-style pointer, last three bits are used for storing the number of levels
-    addr_t table_base = tablecode & ~HANDLE_MASK;
-    uint32_t table_levels = tablecode & HANDLE_MASK;
+    addr_t table_base = tablecode & (addr_t)~HANDLE_MASK;
+    uint32_t table_levels = tablecode & (addr_t)HANDLE_MASK;
 
     switch (table_levels)
     {
@@ -191,7 +191,7 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
         case VMI_OS_WINDOWS_VISTA:  /* fall-through */
         case VMI_OS_WINDOWS_2008:   /* fall-through */
         case VMI_OS_WINDOWS_7:
-            return obj & ~EX_FAST_REF_MASK;
+            return obj & (addr_t)~EX_FAST_REF_MASK;
         case VMI_OS_WINDOWS_8:
             if ( drakvuf->pm == VMI_PM_IA32E )
                 return ((obj & VMI_BIT_MASK(19, 63)) >> 16) | 0xFFFFE00000000000;

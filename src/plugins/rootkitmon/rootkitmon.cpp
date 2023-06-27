@@ -153,8 +153,8 @@ static bool translate_ksym2p(vmi_instance_t vmi, const char* symbol, addr_t* add
 
 static uint64_t align_by_page(uint64_t value)
 {
-    auto aligned_size   = value & ~(VMI_PS_4KB - 1);
-    auto size_remainder = value &  (VMI_PS_4KB - 1);
+    auto aligned_size   = value & (uint64_t)(~(VMI_PS_4KB - 1));
+    auto size_remainder = value & (uint64_t)(VMI_PS_4KB - 1);
     if (size_remainder)
         aligned_size += VMI_PS_4KB;
     return aligned_size;

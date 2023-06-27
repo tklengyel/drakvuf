@@ -63,6 +63,21 @@ if get_option('buildtype').startswith('debug')
     add_project_arguments('-Wvla', language : ['cpp'])
 endif
 
+sanitizer_link_args=[]
+if get_option('sanitize')
+    add_project_arguments('-fsanitize=undefined,nullability,float-divide-by-zero,local-bounds', language : ['c', 'cpp'])
+    add_project_arguments('-fsanitize=signed-integer-overflow,shift,integer-divide-by-zero,implicit-unsigned-integer-truncation,implicit-signed-integer-truncation', language : ['c', 'cpp'])
+    add_project_arguments('-fsanitize-link-c++-runtime', language: ['cpp'])
+    add_project_arguments('-fsanitize=address', language : ['c', 'cpp'])
+    add_project_arguments('-fsanitize-address-use-after-scope', language : ['c', 'cpp'])
+    add_project_arguments('-fsanitize=leak', language : ['c', 'cpp'])
+    add_project_arguments('-fno-sanitize-recover=all', language : ['c', 'cpp'])
+    add_project_arguments('-fno-omit-frame-pointer', language : ['c', 'cpp'])
+    add_project_arguments('-fno-common', language : ['c', 'cpp'])
+    add_project_arguments('-fno-optimize-sibling-calls', language : ['c', 'cpp'])
+    sanitizer_link_args += '-fsanitize=address,undefined,leak'
+endif
+
 # Runtime hardening
 hardened_link_args=[]
 if get_option('hardening')
@@ -114,7 +129,7 @@ executable('drakvuf',
     dependencies : deps,
     link_language : 'cpp',
     link_with : [libdrakvuf, drakvuf_plugins, libinjector],
-    link_args : hardened_link_args,
+    link_args : [hardened_link_args, sanitizer_link_args],
     install : true,
 )
 
@@ -125,7 +140,7 @@ executable('injector',
     dependencies : deps,
     link_language : 'cpp',
     link_with : [libdrakvuf, libinjector],
-    link_args : hardened_link_args,
+    link_args : [hardened_link_args, sanitizer_link_args],
     install : true,
 )
 
@@ -136,7 +151,7 @@ executable('proc_stat',
     dependencies : deps,
     link_language : 'cpp',
     link_with : libdrakvuf,
-    link_args : hardened_link_args
+    link_args : [hardened_link_args, sanitizer_link_args],
 )
 
 if get_option('xtf')

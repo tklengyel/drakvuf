@@ -20,5 +20,5 @@ libdrakvuf = static_library('drakvuf',
     include_directories : incdir,
     dependencies : [glib, libvmi, jsonc],
     link_with : xen_helper,
-    link_args : hardened_link_args
+    link_args : [hardened_link_args, sanitizer_link_args]
 )

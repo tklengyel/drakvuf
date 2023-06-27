@@ -237,6 +237,9 @@ static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win
         return false;
 
     const addr_t rspbase = drakvuf_get_rspbase(drakvuf, info);
+    if ( rspbase <= info->regs->rsp )
+        return false;
+
     const addr_t diff    = rspbase - info->regs->rsp;
     // Here we check if the call originated from usermode (syscall) or from other driver (iat call).
     // KiSystemCall64 allocates 0x158 + 7 * 8 = 0x190 bytes. The qword at offset 0x28 - return address to usermode:
@@ -369,13 +372,13 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
              * bits 0-3 are argument count information that needs to be shifted out.
              * Must be signed long because the offset may be negative.
              */
-            offset = table[syscall_num] >> 4;
-            syscall_va = _sst[0] + offset;
+            offset = (long)table[syscall_num] >> 4;
+            syscall_va = (addr_t)((long)_sst[0] + offset);
         }
         else
             syscall_va = table[syscall_num];
 
-        addr_t rva = syscall_va - base;
+        addr_t rva = (addr_t)(syscall_va - base);
         if ( this->is32bit )
             rva = static_cast<uint32_t>(rva);
 

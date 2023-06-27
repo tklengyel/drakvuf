@@ -768,11 +768,11 @@ AS_IF([test x"$fsanitize" != x"no"], [
       SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fno-omit-frame-pointer"
       SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fno-omit-frame-pointer"])])
 
-  check_cc_cxx_flag([-fsanitize=address],
-   [check_link_flag([-fsanitize=address],
-     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=address"
-      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=address"
-      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=address"])])
+  check_cc_cxx_flag([-fsanitize=address -fsanitize-address-use-after-scope -fno-common -fno-optimize-sibling-calls],
+   [check_link_flag([-fsanitize=address -fsanitize-address-use-after-scope -fno-common -fno-optimize-sibling-calls],
+     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=address -fsanitize-address-use-after-scope -fno-common -fno-optimize-sibling-calls"
+      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=address -fsanitize-address-use-after-scope -fno-common -fno-optimize-sibling-calls"
+      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=address -fsanitize-address-use-after-scope -fno-common -fno-optimize-sibling-calls"])])
 
   check_cc_cxx_flag([-fsanitize=leak],
    [check_link_flag([-fsanitize=leak],

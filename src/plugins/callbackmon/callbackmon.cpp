@@ -418,7 +418,7 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         while (entry != head && entry)
         {
             addr_t callback = 0;
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry + cb_off, 4, &callback) ||
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, (addr_t)((int64_t)entry + cb_off), 4, &callback) ||
                 VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 4, &entry))
                 throw -1;
             if (callback) out.push_back(callback);
@@ -552,7 +552,7 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     this->power_cb     = consume_callbacks("PopRegisteredPowerSettingCallbacks", get_power_cb_offset(vmi));
     this->shtdwn_cb    = extract_cb(consume_callbacks("IopNotifyShutdownQueueHead", 2 * ptrsize));
     this->shtdwn_lst_cb= extract_cb(consume_callbacks("IopNotifyLastChanceShutdownQueueHead", 2 * ptrsize));
-    this->dbgprint_cb  = consume_callbacks("RtlpDebugPrintCallbackList", -2 * ptrsize);
+    this->dbgprint_cb  = consume_callbacks("RtlpDebugPrintCallbackList", -2 * (long)ptrsize);
     this->fschange_cb  = consume_callbacks("IopFsNotifyChangeQueueHead", 3 * ptrsize);
     this->drvreinit_cb = consume_callbacks("IopDriverReinitializeQueueHead", 3 * ptrsize);
     this->drvreinit2_cb= consume_callbacks("IopBootDriverReinitializeQueueHead", 3 * ptrsize);
@@ -560,7 +560,7 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     this->priority_cb  = consume_callbacks_ex("IopUpdatePriorityCallbackRoutine", 8);
     this->pnp_prof_cb  = consume_callbacks("PnpProfileNotifyList", 4 * ptrsize);
     this->pnp_class_cb = consume_callbacks("PnpDeviceClassNotifyList", 5 * ptrsize);
-    this->emp_cb       = consume_callbacks("EmpCallbackListHead", -3 * ptrsize);
+    this->emp_cb       = consume_callbacks("EmpCallbackListHead", -3 * (long)ptrsize);
     this->w32callouts  = consume_w32callouts();
     this->wfpcallouts  = consume_wfpcallouts(this->config.netio_profile);
 }

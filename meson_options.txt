@@ -1,4 +1,5 @@
 option('hardening', type : 'boolean', value : true)
+option('sanitize', type : 'boolean', value : false)
 option('ipt', type : 'boolean', value : true)
 
 option('release', type : 'boolean', value : false)

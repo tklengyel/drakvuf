@@ -438,7 +438,7 @@ double hypot(double a, double b)
 /* Returns a random number n, while a <= n < b */
 int rand_approx_uniform(int a, int b)
 {
-    return a +_rand() % (b - a + 1);
+    return a + (int)_rand() % (b - a + 1);
 }
 
 /*

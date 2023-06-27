@@ -234,7 +234,7 @@ bool drakvuf_init(
     PRINT_DEBUG("drakvuf_init: adding event_fd done\n");
 
     xen_get_dom_info(drakvuf->xen, domain, &drakvuf->domID, &drakvuf->dom_name);
-    domid_t test = ~0;
+    domid_t test = (domid_t)~0;
     if ( drakvuf->domID == test )
         goto err;
 

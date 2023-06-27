@@ -126,7 +126,7 @@ static std::array<uint8_t, 32> ssdtmon_sha256_calc(vmi_instance_t vmi, addr_t ad
 {
     std::array<uint8_t, 32> out{ 0 };
 
-    addr_t aligned_size = size & ~(VMI_PS_4KB - 1);
+    addr_t aligned_size = size & (size_t)(~(VMI_PS_4KB - 1));
     if (size & (VMI_PS_4KB - 1))
         aligned_size += VMI_PS_4KB;
 
