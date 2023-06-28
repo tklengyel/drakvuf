@@ -117,6 +117,7 @@
 #include <json-c/json_object.h>
 #include <math.h>
 #include <random>
+#include <cassert>
 
 #include <libdrakvuf/libdrakvuf.h> /* eprint_current_time */
 
@@ -527,6 +528,8 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
     int ox, int oy, int dx, int dy, int* newx, int* newy)
 {
     const float DISP_RES = dim->dx < dim->dy ? dim->dy : dim->dx;
+    assert(DISP_RES > 0);
+
     int nx, ny;
     int sleep, s;
     nx = ox + dx;
@@ -566,7 +569,7 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
     int cy = oy;
 
     /* Sleep time between micro movements */
-    sleep = time_frame / (hypot(dx, dy) / DISP_RES);
+    sleep = time_frame / ((hypot(dx, dy) / DISP_RES) ?: 1);
 
     /*
      * Inspired by
