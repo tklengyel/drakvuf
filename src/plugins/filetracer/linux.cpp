@@ -324,7 +324,19 @@ event_response_t linux_filetracer::read_file_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     uint64_t count = drakvuf_get_function_argument(drakvuf, info, 3);
-    int64_t pos = drakvuf_get_function_argument(drakvuf, info, 4);
+    addr_t ppos = drakvuf_get_function_argument(drakvuf, info, 4);
+    int64_t pos = 0;
+
+    if (ppos)
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+
+        ACCESS_CONTEXT(ctx, .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3, .addr = ppos);
+
+        if (VMI_FAILURE == vmi_read_64(vmi, &ctx, (uint64_t*)&pos))
+            pos = 0;
+    }
 
     linux_data params;
     params.args["count"] = std::to_string(count);
