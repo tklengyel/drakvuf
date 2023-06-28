@@ -237,6 +237,9 @@ static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win
         return false;
 
     const addr_t rspbase = drakvuf_get_rspbase(drakvuf, info);
+    if ( rspbase <= info->regs->rsp )
+        return false;
+
     const addr_t diff    = rspbase - info->regs->rsp;
     // Here we check if the call originated from usermode (syscall) or from other driver (iat call).
     // KiSystemCall64 allocates 0x158 + 7 * 8 = 0x190 bytes. The qword at offset 0x28 - return address to usermode:
