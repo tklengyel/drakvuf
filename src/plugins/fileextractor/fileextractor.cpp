@@ -1929,34 +1929,39 @@ void fileextractor::dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t
 
     auto num_pages = aligned_size / VMI_PS_4KB ;
 
-    // sometimes very big size causes std::bad_alloc()
-    if (size > 100000000)
-        return;
-
-    std::vector<void*> access_ptrs(num_pages, nullptr);
-
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
-        return;
-
-    for (size_t i = 0; i < num_pages; i++)
+    try
     {
-        size_t write_size = size;
+        std::vector<void*> access_ptrs(num_pages, nullptr);
 
-        if (write_size > VMI_PS_4KB - intra_page_offset)
-            write_size = VMI_PS_4KB - intra_page_offset;
+        if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
+            return;
 
-        if (access_ptrs[i])
+        for (size_t i = 0; i < num_pages; i++)
         {
-            save_file_chunk_rb(idx, currentbyteoffset, static_cast<uint8_t*>(access_ptrs[i]) + intra_page_offset, write_size);
-            // check for special offset
-            if (((currentbyteoffset & 0xffffffff) ^ FILE_WRITE_TO_END_OF_FILE))
-                currentbyteoffset += write_size;
-            munmap(access_ptrs[i], VMI_PS_4KB);
-        }
+            size_t write_size = size;
 
-        intra_page_offset = 0;
-        size -= write_size;
+            if (write_size > VMI_PS_4KB - intra_page_offset)
+                write_size = VMI_PS_4KB - intra_page_offset;
+
+            if (access_ptrs[i])
+            {
+                save_file_chunk_rb(idx, currentbyteoffset, static_cast<uint8_t*>(access_ptrs[i]) + intra_page_offset, write_size);
+                // check for special offset
+                if (((currentbyteoffset & 0xffffffff) ^ FILE_WRITE_TO_END_OF_FILE))
+                    currentbyteoffset += write_size;
+                munmap(access_ptrs[i], VMI_PS_4KB);
+            }
+
+            intra_page_offset = 0;
+            size -= write_size;
+        }
     }
+    catch (const std::exception& ex)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] failed to read memory buffer: %s\n", ex.what());
+        return;
+    }
+
     return;
 }
 
