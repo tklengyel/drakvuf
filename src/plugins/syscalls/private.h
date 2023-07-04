@@ -573,7 +573,7 @@ static inline std::unordered_map<uint64_t, std::string> prctl_option =
     ENUM(PR_GET_FP_MODE, 46),
     ENUM(PR_CAP_AMBIENT, 47),
     ENUM(PR_SVE_SET_VL, 50),
-    ENUM(PR_SVE_SET_VL, 50),
+    ENUM(PR_SVE_GET_VL, 51),
     ENUM(PR_GET_SPECULATION_CTRL, 52),
     ENUM(PR_SET_SPECULATION_CTRL, 53),
     ENUM(PR_PAC_RESET_KEYS, 54),
