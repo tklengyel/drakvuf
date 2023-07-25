@@ -326,7 +326,7 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
 bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, const syscall_t* syscall_definition, bool is_x64)
 {
-    auto hook = createSyscallHook<linux_syscall_data>(syscall_name, &linux_syscalls::linux_cb, syscall_definition->name);
+    auto hook = createSyscallHook<linux_syscall_data>(syscall_name, &linux_syscalls::linux_cb, syscall_definition->display_name);
     if (!hook)
     {
         PRINT_DEBUG("[SYSCALLS] Failed to register %s\n", syscall_name);
@@ -359,7 +359,7 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
     {
         const syscall_t* syscall_defintion = linuxsc::linux_syscalls_table[syscall_number];
         // Setup filter
-        if (!this->filter.empty() && (this->filter.find(syscall_defintion->name) == this->filter.end()))
+        if (!this->filter.empty() && (this->filter.find(syscall_defintion->display_name) == this->filter.end()))
             continue;
 
         // x32 syscall breakpoint

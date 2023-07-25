@@ -474,6 +474,7 @@ typedef struct
 typedef struct
 {
     const char* name;
+    const char* display_name;
     type_t ret;
     unsigned int num_args;
     const arg_t* args;
@@ -503,14 +504,17 @@ struct wrapper_t : public call_result_t
     uint16_t num;
 };
 
-#define SYSCALL(_name, _ret, ...)                                \
+#define SYSCALL_EX(_name, _alias, _ret, ...)                     \
    static const arg_t _name ## _arg[] = { __VA_ARGS__ };         \
    static const syscall_t _name = {                              \
      .name = #_name,                                             \
+     .display_name = #_alias,                                    \
      .ret = _ret,                                                \
      .num_args = sizeof(_name ## _arg)/sizeof(arg_t),            \
      .args = (const arg_t*)&_name ## _arg                        \
    }
+
+#define SYSCALL(_name, _ret, ...) SYSCALL_EX(_name, _name, _ret, __VA_ARGS__)
 
 struct linux_syscall_data : PluginResult
 {
