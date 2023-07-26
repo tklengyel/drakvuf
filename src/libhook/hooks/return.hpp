@@ -202,7 +202,7 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     // pupulate backref
     hook->params_ = std::make_shared<Params>();
     hook->params_->hook_ = hook.get();
-    hook->trap_->data = static_cast<void*>(hook->params_.get()); 
+    hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {

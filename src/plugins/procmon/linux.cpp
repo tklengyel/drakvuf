@@ -713,9 +713,11 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, const procmon_config* config, ou
         {
             PRINT_DEBUG("[PROCMON] Failed to get symbol of do_open_execat.\n");
             return;
-        } else
+        }
+        else
             do_open_execat_name = "do_open_execat";
-    } else
+    }
+    else
         do_open_execat_name = "__do_open_execat";
 
     exec_hook = createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb);
