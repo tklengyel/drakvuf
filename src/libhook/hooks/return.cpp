@@ -150,4 +150,9 @@ ReturnHook& ReturnHook::operator=(ReturnHook&& rhs) noexcept
     return *this;
 }
 
+std::shared_ptr<CallResult> ReturnHook::params()
+{
+    return this->params_;
+}
+
 } // namespace libhook

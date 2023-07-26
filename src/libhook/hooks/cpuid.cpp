@@ -150,4 +150,9 @@ CpuidHook::CpuidHook(drakvuf_t drakvuf, cb_wrapper_t cb)
       callback_(cb)
 {}
 
+std::shared_ptr<CallResult> CpuidHook::params()
+{
+    return this->params_;
+}
+
 } // namespace libhook

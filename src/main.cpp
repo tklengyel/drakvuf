@@ -581,6 +581,7 @@ int main(int argc, char** argv)
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
+        {"procmon-envs-list", required_argument, NULL, 'q'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
         {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
         {"fast-singlestep", no_argument, NULL, 'F'},
@@ -753,6 +754,16 @@ int main(int argc, char** argv)
                 break;
             case opt_disable_sysret:
                 options.disable_sysret = true;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_PROCMON
+            case 'q':
+                if (!std::filesystem::exists(optarg))
+                {
+                    fprintf(stderr, "file %s does not exist!\n", optarg);
+                    return drakvuf_exit_code_t::FAIL;
+                }
+                options.procmon_filter_file = optarg;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE

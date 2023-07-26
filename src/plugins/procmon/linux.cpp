@@ -103,9 +103,10 @@
  ***************************************************************************/
 
 #include <libvmi/libvmi.h>
-#include <assert.h>
 #include <map>
 #include <string>
+#include <fstream>
+#include <assert.h>
 #include <glib.h>
 
 #include "linux.h"
@@ -184,11 +185,25 @@ static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     return command_line;
 }
 
-static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static std::string map_to_str(const std::map<std::string, std::string>& map, output_format_t format, const std::string& empty = "")
+{
+    std::string output;
+
+    for (const auto& el: map)
+        output += el.first + "=" + el.second + ",";
+
+    if (output.empty())
+        output = empty;
+    else
+        output.resize(output.size() - 1);
+
+    return output;
+}
+
+static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::unordered_set<std::string> filter)
 {
     // drakvuf_get_function_argument - return incorrect value. Real envp stored in r9. Gather with debug
     addr_t envp = info->regs->r9;
-
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
@@ -221,46 +236,82 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
 
         key_end = s.find('=', key_pos);
         if (key_end == std::string::npos)
+        {
+            g_free(env_string);
             break;
+        }
 
         if ((val_pos = s.find_first_not_of("= ", key_end)) == std::string::npos)
+        {
+            g_free(env_string);
             break;
+        }
 
         val_end = s.find('\1', val_pos);
-        envp_map.emplace(s.substr(key_pos, key_end - key_pos), s.substr(val_pos, val_end - val_pos));
+        std::string key = s.substr(key_pos, key_end - key_pos);
+        std::string val = s.substr(val_pos, val_end - val_pos);
+        if (filter.find(key) == filter.end())
+        {
+            g_free(env_string);
+            continue;
+        }
+
+        envp_map.emplace(key, val);
 
         g_free(env_string);
     }
     return envp_map;
 }
 
+void linux_procmon::configure_filter(const procmon_config* cfg)
+{
+    if (cfg->procmon_filter_file)
+    {
+        if (!this->read_procmon_filter(cfg->procmon_filter_file))
+        {
+            PRINT_DEBUG("[PROCMON] Failed to read given file\n");
+            throw -1;
+        }
+    }
+    else
+        this->filter = {"LD_PRELOAD", "PWD", "OLDPWD"};
+}
+
+bool linux_procmon::read_procmon_filter(const char* filter_file)
+{
+    std::ifstream file(filter_file);
+    if (!file.is_open())
+        return false;
+
+    std::string line;
+    while (std::getline(file, line))
+        this->filter.insert(line);
+
+    return true;
+}
+
 void linux_procmon::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<execve_data>(info);
 
-    std::vector<std::pair<std::string, fmt::Estr<std::string>>> extra_args;
-    if (params->envp.find("PWD") != params->envp.end())
-        extra_args.emplace_back("CWD", fmt::Estr(params->envp["PWD"]));
-    if (params->envp.find("OLDPWD") != params->envp.end())
-        extra_args.emplace_back("OLDCWD", fmt::Estr(params->envp["OLDPWD"]));
-    if (params->envp.find("LD_PRELOAD") != params->envp.end())
-        extra_args.emplace_back("LD_PRELOAD", fmt::Estr(params->envp["LD_PRELOAD"]));
+    std::vector<std::pair<std::string, fmt::Estr<std::string>>> envp;
+    if (!params->envp.empty())
+        envp.emplace_back("Environment", fmt::Estr(map_to_str(params->envp, this->m_output_format)));
 
     auto proc_data_backup = info->proc_data;
-
     // Fake caller process data to print correct data
-    info->proc_data.pid = params->pid;
-    info->proc_data.tid = params->tid;
-    info->proc_data.ppid = params->ppid;
     info->proc_data.name = params->process_name.c_str();
 
-    fmt::print(this->m_output_format, "procmon", drakvuf, info,
+    fmt::print(
+        this->m_output_format,
+        "procmon",
+        drakvuf,
+        info,
         keyval("ThreadName", fmt::Estr(params->thread_name)),
-        keyval("NewPid", fmt::Nval(params->new_pid)),
-        keyval("NewTid", fmt::Nval(params->new_tid)),
         keyval("CommandLine", fmt::Estr(params->command_line)),
         keyval("ImagePathName", fmt::Estr(params->image_path_name)),
-        extra_args);
+        std::move(envp)
+    );
 
     // restore original proc_data
     info->proc_data = proc_data_backup;
@@ -271,8 +322,9 @@ void linux_procmon::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 */
 event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto params = libhook::GetTrapParams<execve_data>(info);
-    if (!drakvuf_check_return_context(drakvuf, info, params->new_pid, params->new_tid, params->execat_rsp))
+    auto params_ = libhook::GetTrapParams<open_execat_data>(info);
+    auto params = static_cast<execve_data*>(params_->data.get());
+    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->execat_rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
     if (params->cr3 != info->regs->cr3)
@@ -285,7 +337,6 @@ event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     // This is normal behavior for the kernel. In case of an error, the binary will not be executed.
     // So we can just skip this event
     auto plugin = GetTrapPlugin<linux_procmon>(info);
-    auto vmi = vmi_lock_guard(drakvuf);
     if ((unsigned long)(void*)(file_struct) >= (unsigned long)(-MAX_ERRNO))
     {
         PRINT_DEBUG("[PROCMON] do_execveat_common kernel error. Not an error, just skipping the event.\n");
@@ -293,31 +344,41 @@ event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     }
     else
     {
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = file_struct + plugin->offsets[_FILE_F_PATH] + plugin->offsets[_PATH_DENTRY]);
-
-        addr_t dentry_addr;
-
-        if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &dentry_addr))
+        if (params->fd == AT_FDCWD)
         {
-            char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, file_struct);
-            params->image_path_name = tmp ?: "";
-            g_free(tmp);
+            auto vmi = vmi_lock_guard(drakvuf);
+            ACCESS_CONTEXT(ctx,
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3,
+                .addr = file_struct + this->offsets[_FILE_F_PATH] + this->offsets[_PATH_DENTRY]);
+
+            addr_t dentry_addr;
+            if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &dentry_addr))
+            {
+                char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, dentry_addr);
+                params->image_path_name = tmp ?: "";
+                g_free(tmp);
+            }
+            else
+                PRINT_DEBUG("[PROCMON] Failed to read ImagePathName.\n");
         }
         else
-            PRINT_DEBUG("[PROCMON] Failed to read ImagePathName.\n");
+        {
+            /*
+             * based on the behavior of the kernel
+             * source: https://elixir.bootlin.com/linux/v5.10.183/source/fs/exec.c#L1494
+             */
+            params->image_path_name = "/dev/fd/" + std::to_string(params->fd);
+        }
     }
 
-    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
     auto hookID = make_hook_id(info);
     plugin->internal_ret_traps.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t linux_procmon::do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     /*
     static struct file *do_open_execat(
@@ -326,7 +387,8 @@ event_response_t do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         int flags
     )
     */
-    auto params = libhook::GetTrapParams<execve_data>(info);
+    auto params_ = libhook::GetTrapParams<open_execat_data>(info);
+    auto params = static_cast<execve_data*>(params_->data.get());
     // Check same context: do_execveat_common -> bprm_execve -> do_open_execat
     // Can't use drakvuf_check_return_context because haven't rsp at function start
     if (params->cr3 != info->regs->cr3)
@@ -343,31 +405,19 @@ event_response_t do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     params->execat_rsp = ret_addr;
 
     // Register return trap
-    auto trap = new drakvuf_trap_t();
-    trap->name = "do_open_execat_ret_trap";
-    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-    trap->ah_cb = nullptr;
-    trap->type = BREAKPOINT;
-    trap->breakpoint.pid = 0;
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = ret_addr;
-    trap->breakpoint.module = "linux";
-    trap->cb = do_open_execat_ret_cb;
-    // Pass the params through the do_open_execat functions
-    trap->data = params;
+    auto hookID = make_hook_id(info);
 
-    if (!drakvuf_add_trap(drakvuf, trap))
+    auto ret_hook = createReturnHook<open_execat_data>(info, &linux_procmon::do_open_execat_ret_cb);
+    if (!ret_hook)
     {
         PRINT_DEBUG("[PROCMON] Failed to register return trap from do_open_execat.\n");
-        throw -1;
+        return VMI_EVENT_RESPONSE_NONE;
     }
-
-    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-    auto plugin = GetTrapPlugin<linux_procmon>(info);
-    auto hookID = make_hook_id(info);
-    plugin->internal_ret_traps[hookID] = trap;
-    plugin->internal_traps.erase(hookID);
+    ret_hook->trap_->name = "do_open_execat_ret_trap";
+    auto ret_params = libhook::GetTrapParams<open_execat_data>(ret_hook->trap_);
+    ret_params->data = params_->data;
+    this->internal_ret_traps[hookID] = std::move(ret_hook);
+    internal_traps.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -377,8 +427,7 @@ event_response_t linux_procmon::do_execveat_common_ret_cb(drakvuf_t drakvuf, dra
     PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
 
     auto params = libhook::GetTrapParams<execve_data>(info);
-    // params->new_pid/params->new_tid store actual pid/tid of running process
-    if (!drakvuf_check_return_context(drakvuf, info, params->new_pid, params->new_tid, params->rsp))
+    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
     if (!params->internal_error)
@@ -407,72 +456,41 @@ event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf
     if (!ret_addr)
         return VMI_EVENT_RESPONSE_NONE;
 
-    // Gather information about parent process
-    vmi_pid_t parent_pid = info->proc_data.ppid;
-    addr_t parent_process;
-    if (!drakvuf_get_process_by_pid(drakvuf, parent_pid, &parent_process, nullptr))
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get process by pid\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    proc_data_t parent_proc_data;
-    if (!drakvuf_get_process_data(drakvuf, parent_process, &parent_proc_data))
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get process data of parent process\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
     // Create new trap for return callback
     auto hookID = make_hook_id(info);
     auto hook = this->createReturnHook<execve_data>(info, &linux_procmon::do_execveat_common_ret_cb);
     auto params = libhook::GetTrapParams<execve_data>(hook->trap_);
 
-    params->pid = parent_proc_data.pid;
-    params->tid = parent_proc_data.tid;
-    params->ppid = parent_proc_data.ppid;
-    params->new_pid = info->proc_data.pid;
-    params->new_tid = info->proc_data.tid;
+    params->fd = drakvuf_get_function_argument(drakvuf, info, 1);
+    params->pid = info->proc_data.pid;
+    params->tid = info->proc_data.tid;
+    // Save original process name
+    params->process_name = info->proc_data.name;
+
     params->rsp = ret_addr;
     params->cr3 = info->regs->cr3;
 
     params->command_line = get_command_line(drakvuf, info);
-    params->envp = parse_environment(drakvuf, info);
+    params->envp = parse_environment(drakvuf, info, this->filter);
 
-    if (parent_proc_data.name)
-        params->process_name = parent_proc_data.name;
-    g_free(const_cast<char*>(parent_proc_data.name));
-
-    char* thread_name = drakvuf_get_process_name(drakvuf, parent_process, false);
-    if (thread_name)
-        params->thread_name = thread_name;
+    char* thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
+    params->thread_name = thread_name ?: "";
     g_free(thread_name);
 
     hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
 
-    // Create trap to intercept function on do_open_execat
-    auto trap = new drakvuf_trap_t();
-    trap->name = "do_open_execat_trap";
-    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-    trap->ah_cb = nullptr;
-    trap->type = BREAKPOINT;
-    trap->breakpoint.pid = 0;
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = kernel_base - _text + do_open_execat_addr;
-    trap->breakpoint.module = "linux";
-    trap->cb = do_open_execat_cb;
-    // Pass the params through the do_open_execat functions
-    trap->data = params;
-
-    if (!drakvuf_add_trap(drakvuf, trap))
+    auto open_hook = createSyscallHook<open_execat_data>(this->do_open_execat_name, &linux_procmon::do_open_execat_cb, "do_open_execat_trap");
+    if (nullptr == open_hook)
     {
         PRINT_DEBUG("[PROCMON] Failed to regsiter trap for do_open_execat.\n");
-        throw -1;
+        return VMI_EVENT_RESPONSE_NONE;
     }
 
-    internal_traps[hookID] = trap;
+    auto open_params = libhook::GetTrapParams<open_execat_data>(open_hook->trap_);
+    open_params->data = params->hook_->params();
+    this->internal_traps[hookID] = std::move(open_hook);
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -489,7 +507,11 @@ event_response_t linux_procmon::do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info*
 
     char* thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
 
-    fmt::print(this->m_output_format, "procmon", drakvuf, info,
+    fmt::print(
+        this->m_output_format,
+        "procmon",
+        drakvuf,
+        info,
         keyval("ThreadName", fmt::Estr(thread_name)),
         keyval("ExitStatus", fmt::Nval(exit_status)),
         keyval("ExitStatusStr", fmt::Rstr(exit_status_str))
@@ -503,16 +525,20 @@ event_response_t linux_procmon::do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info*
 event_response_t linux_procmon::send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<send_signal_data>(info);
-    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
+    if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     auto signal_str = signal_to_string((signal_t)params->signal);
 
-    fmt::print(this->m_output_format, "procmon", drakvuf, info,
+    fmt::print(
+        this->m_output_format,
+        "procmon",
+        drakvuf,
+        info,
         keyval("ThreadName", fmt::Estr(params->thread_name)),
-        keyval("TargetPID", fmt::Nval(params->target_pid)),
-        keyval("TargetTID", fmt::Nval(params->target_tid)),
-        keyval("TargetPPID", fmt::Nval(params->target_ppid)),
+        keyval("TargetPID", fmt::Nval(params->target_proc_pid)),
+        keyval("TargetTID", fmt::Nval(params->target_proc_tid)),
+        keyval("TargetPPID", fmt::Nval(params->target_proc_ppid)),
         keyval("TargetProcessName", fmt::Estr(params->target_process_name)),
         keyval("TargetThreadName", fmt::Estr(params->target_thread_name)),
         keyval("Signal", fmt::Nval(params->signal)),
@@ -563,6 +589,7 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     addr_t process_base_of_current_process = info->proc_data.base_addr;
     if (!process_base_of_current_process)
     {
+        g_free(target_thread_name);
         PRINT_DEBUG("[PROCMON] Failed to get process_base of affected process\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -574,17 +601,14 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     auto params = libhook::GetTrapParams<send_signal_data>(hook->trap_);
 
     // Save data about current process
-    params->pid = info->proc_data.pid;
-    params->tid = info->proc_data.tid;
     params->thread_name = current_thread_name ?: "";
-    params->rsp = ret_addr;
 
     // Save data about target process
     params->target_process_name = target_proc_data.name ?: "";
     params->target_thread_name = target_thread_name ?: "";
-    params->target_pid = target_proc_data.pid;
-    params->target_tid = target_proc_data.tid;
-    params->target_ppid = target_proc_data.ppid;
+    params->target_proc_pid = target_proc_data.pid;
+    params->target_proc_tid = target_proc_data.tid;
+    params->target_proc_ppid = target_proc_data.ppid;
     params->signal = signal;
 
     hook->trap_->name = info->trap->name;
@@ -592,19 +616,25 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
 
     g_free(const_cast<char*>(target_proc_data.name));
     g_free(target_thread_name);
+    g_free(current_thread_name);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 event_response_t linux_procmon::kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<kernel_clone_data>(info);
-    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
+    if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     uint64_t new_pid = info->regs->rax;
 
-    fmt::print(this->m_output_format, "procmon", drakvuf, info,
+    fmt::print(
+        this->m_output_format,
+        "procmon",
+        drakvuf,
+        info,
         keyval("Flags", fmt::Estr(parse_flags(params->flags, kernel_clone_flags, this->m_output_format))),
+        keyval("Signal", fmt::Nval(params->exit_signal)),
         keyval("SignalStr", fmt::Estr(signal_to_string((signal_t) params->exit_signal))),
         keyval("NewPid", fmt::Nval(new_pid))
     );
@@ -654,9 +684,6 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
     auto hook = this->createReturnHook<kernel_clone_data>(info, &linux_procmon::kernel_clone_ret_cb);
     auto params = libhook::GetTrapParams<kernel_clone_data>(hook->trap_);
 
-    params->pid = info->proc_data.pid;
-    params->tid = info->proc_data.tid,
-            params->rsp = ret_addr;
     params->flags = flags;
     params->exit_signal = exit_signal;
 
@@ -665,10 +692,11 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output)
+linux_procmon::linux_procmon(drakvuf_t drakvuf, const procmon_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
     struct process_visitor_ctx ctx = { .format = output };
     drakvuf_enumerate_processes(drakvuf, process_visitor, &ctx);
+    configure_filter(config);
 
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_offset_names, this->offsets.size(), this->offsets.data()))
     {
@@ -676,27 +704,17 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output) : plugin
         return;
     }
 
+    addr_t do_open_execat_addr = 0;
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, "__do_open_execat", &do_open_execat_addr))
     {
         if (!drakvuf_get_kernel_symbol_rva(drakvuf, "do_open_execat", &do_open_execat_addr))
         {
             PRINT_DEBUG("[PROCMON] Failed to get symbol of do_open_execat.\n");
             return;
-        }
-    }
-
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text))
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get symbol of _text.\n");
-        return;
-    }
-
-    kernel_base = drakvuf_get_kernel_base(drakvuf);
-    if (!kernel_base)
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get kernel_base.\n");
-        return;
-    }
+        } else
+            do_open_execat_name = "do_open_execat";
+    } else
+        do_open_execat_name = "__do_open_execat";
 
     exec_hook = createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb);
     if (nullptr == exec_hook)

@@ -139,10 +139,13 @@ public:
     SyscallHook& operator=(const SyscallHook&) = delete;
     SyscallHook& operator=(SyscallHook&&) = delete;
 
+    std::shared_ptr<CallResult> params() override;
+
     const std::string syscall_name_ = "";
     const std::string display_name_ = "";
     cb_wrapper_t callback_ = nullptr;
     drakvuf_trap_t* trap_ = nullptr;
+    std::shared_ptr<CallResult> params_;
 
 private:
     [[nodiscard]]
@@ -194,17 +197,17 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
     hook->trap_->name = hook->display_name_.data();
 
     // populate backref
-    auto* params = new Params();
-    params->hook_ = hook.get();
-    hook->trap_->data = static_cast<void*>(params);
+    hook->params_ = std::make_shared<Params>();
+    hook->params_->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for syscall hook\n");
-        delete static_cast<CallResult*>(hook->trap_->data);
         hook->trap_->data = nullptr;
         delete hook->trap_;
         hook->trap_ = nullptr;
+        hook->params_.reset();
         return {};
     }
 

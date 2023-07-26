@@ -193,4 +193,9 @@ drakvuf_trap_t* SyscallHook::createLinuxTrap(drakvuf_t drakvuf, const std::strin
     return trap;
 }
 
+std::shared_ptr<CallResult> SyscallHook::params()
+{
+    return this->params_;
+}
+
 } // namespace libhook

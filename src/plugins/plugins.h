@@ -198,6 +198,7 @@ struct plugins_options
     const char* services_profile;       // PLUGIN_DKOMMON
     const char* netio_profile;          // PLUGIN_CALLBACKMON
     const char* ndis_profile;           // PLUGIN_CALLBACKMON
+    const char* procmon_filter_file;    // PLUGIN_PROCMON
     uint64_t hidevm_delay;              // PLUGIN_HIDEVM
     uint64_t unixsocketmon_max_size;    // PLUGIN_UNIXSOCKETMON
     bool rebootmon_abort_on_power_off;  // PLUGIN_REBOOTMON
