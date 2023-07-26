@@ -119,7 +119,7 @@ MemAccessHook::~MemAccessHook()
         };
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
         {
-            delete static_cast<CallResult*>(trap->data);
+            trap->data = nullptr;
             delete trap;
         });
     }

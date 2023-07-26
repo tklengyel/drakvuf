@@ -320,8 +320,9 @@ void linux_procmon::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 /*
     exec-family
 */
-event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t linux_procmon::do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    PRINT_DEBUG("[testmon] do_open_execat_ret_cb hit\n");
     auto params_ = libhook::GetTrapParams<open_execat_data>(info);
     auto params = static_cast<execve_data*>(params_->data.get());
     if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->execat_rsp))
@@ -336,7 +337,6 @@ event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     // Check for errors: https://elixir.bootlin.com/linux/v5.9.14/source/fs/exec.c#L1930
     // This is normal behavior for the kernel. In case of an error, the binary will not be executed.
     // So we can just skip this event
-    auto plugin = GetTrapPlugin<linux_procmon>(info);
     if ((unsigned long)(void*)(file_struct) >= (unsigned long)(-MAX_ERRNO))
     {
         PRINT_DEBUG("[PROCMON] do_execveat_common kernel error. Not an error, just skipping the event.\n");
@@ -373,7 +373,7 @@ event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     }
 
     auto hookID = make_hook_id(info);
-    plugin->internal_ret_traps.erase(hookID);
+    this->internal_ret_traps.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -417,7 +417,7 @@ event_response_t linux_procmon::do_open_execat_cb(drakvuf_t drakvuf, drakvuf_tra
     auto ret_params = libhook::GetTrapParams<open_execat_data>(ret_hook->trap_);
     ret_params->data = params_->data;
     this->internal_ret_traps[hookID] = std::move(ret_hook);
-    internal_traps.erase(hookID);
+    this->internal_traps.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -430,9 +430,11 @@ event_response_t linux_procmon::do_execveat_common_ret_cb(drakvuf_t drakvuf, dra
     if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
+    PRINT_DEBUG("[testmon] print info\n");
     if (!params->internal_error)
         linux_procmon::print_info(drakvuf, info);
 
+    PRINT_DEBUG("[testmon] execve_ret_cb erase\n");
     uint64_t hookID = make_hook_id(info);
     ret_hooks.erase(hookID);
 
