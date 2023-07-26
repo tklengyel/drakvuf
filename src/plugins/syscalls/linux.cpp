@@ -146,7 +146,7 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
     std::vector<uint64_t> arguments;
 
     // unknown syscall, so skip
-    if (nr > NUM_SYSCALLS_LINUX)
+    if ((this->is32bit && nr > NUM_SYSCALLS_LINUX_X32) || (!this->is32bit && nr > NUM_SYSCALLS_LINUX_X64))
         return arguments;
 
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
@@ -351,13 +351,15 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
     // and if this isn't the case, we simply warn the user that some syscalls couldn't be installed correctly
     // For example, old kernels don't support new syscalls, and hooks can't be installed
     bool check = true;
+    static const syscall_t** syscall_table = (this->is32bit)? linuxsc::linux_syscalls_table_x32 : linuxsc::linux_syscalls_table_x64;
+    uint64_t num_syscalls = (this->is32bit)? NUM_SYSCALLS_LINUX_X32 : NUM_SYSCALLS_LINUX_X64;
 
     // Iterate over all syscalls and setup breakpoint on each function instead of do_syscall_64
     // This increase performance, especially with filter file
     char syscall_name[256] = {0};
-    for (uint64_t syscall_number = 0; syscall_number < NUM_SYSCALLS_LINUX; syscall_number++)
+    for (uint64_t syscall_number = 0; syscall_number < num_syscalls; syscall_number++)
     {
-        const syscall_t* syscall_defintion = linuxsc::linux_syscalls_table[syscall_number];
+        const syscall_t* syscall_defintion = syscall_table[syscall_number];
         // Setup filter
         if (!this->filter.empty() && (this->filter.find(syscall_defintion->display_name) == this->filter.end()))
             continue;
