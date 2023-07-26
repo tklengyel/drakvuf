@@ -229,9 +229,9 @@ void linux_filetracer::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
         extra_args.emplace_back(keyval("Mode", fmt::Rstr(params->modes)));
     if (!params->flags.empty())
         extra_args.emplace_back(keyval("Flag", fmt::Rstr(params->flags)));
-    if (params->uid != -1)
+    if (params->uid)
         extra_args.emplace_back(keyval("UID", fmt::Rstr(std::to_string(*(params->uid)))));
-    if (params->gid != -1)
+    if (params->gid)
         extra_args.emplace_back(keyval("GID", fmt::Rstr(std::to_string(*(params->gid)))));
     if (params->file_handle)
         extra_args.emplace_back(keyval("FileHandle", fmt::Rstr(std::to_string(params->file_handle))));
