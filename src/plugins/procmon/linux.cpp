@@ -322,7 +322,6 @@ void linux_procmon::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 */
 event_response_t linux_procmon::do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    PRINT_DEBUG("[testmon] do_open_execat_ret_cb hit\n");
     auto params_ = libhook::GetTrapParams<open_execat_data>(info);
     auto params = static_cast<execve_data*>(params_->data.get());
     if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->execat_rsp))
@@ -430,11 +429,9 @@ event_response_t linux_procmon::do_execveat_common_ret_cb(drakvuf_t drakvuf, dra
     if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
-    PRINT_DEBUG("[testmon] print info\n");
     if (!params->internal_error)
         linux_procmon::print_info(drakvuf, info);
 
-    PRINT_DEBUG("[testmon] execve_ret_cb erase\n");
     uint64_t hookID = make_hook_id(info);
     ret_hooks.erase(hookID);
 
