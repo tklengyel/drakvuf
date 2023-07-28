@@ -156,4 +156,9 @@ ManualHook& ManualHook::operator=(ManualHook&& rhs) noexcept
     return *this;
 }
 
+std::shared_ptr<CallResult> ManualHook::params()
+{
+    return nullptr;
+}
+
 } // namespace libhook

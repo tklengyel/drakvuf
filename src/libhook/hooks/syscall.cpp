@@ -119,7 +119,7 @@ SyscallHook::~SyscallHook()
         };
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
         {
-            delete static_cast<CallResult*>(trap->data);
+            trap->data = nullptr;
             delete trap;
         });
     }
@@ -191,6 +191,11 @@ drakvuf_trap_t* SyscallHook::createLinuxTrap(drakvuf_t drakvuf, const std::strin
     };
 
     return trap;
+}
+
+std::shared_ptr<CallResult> SyscallHook::params()
+{
+    return this->params_;
 }
 
 } // namespace libhook

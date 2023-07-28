@@ -124,7 +124,7 @@ ReturnHook::~ReturnHook()
         };
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
         {
-            delete static_cast<CallResult*>(trap->data);
+            trap->data = nullptr;
             delete trap;
         });
     }
@@ -148,6 +148,11 @@ ReturnHook& ReturnHook::operator=(ReturnHook&& rhs) noexcept
     std::swap(this->callback_, rhs.callback_);
     std::swap(this->trap_, rhs.trap_);
     return *this;
+}
+
+std::shared_ptr<CallResult> ReturnHook::params()
+{
+    return this->params_;
 }
 
 } // namespace libhook

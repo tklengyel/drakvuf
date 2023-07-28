@@ -287,8 +287,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_PROCMON
                 case PLUGIN_PROCMON:
-                    this->plugins[plugin_id] = std::make_unique<procmon>(this->drakvuf, this->output);
+                {
+                    procmon_config config =
+                    {
+                        .procmon_filter_file = options->procmon_filter_file,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<procmon>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
                 case PLUGIN_BSODMON:

@@ -117,7 +117,7 @@ public:
     std::unique_ptr<win_procmon> wp;
     std::unique_ptr<linux_procmon> lp;
 
-    procmon(drakvuf_t drakvuf, output_format_t output);
+    procmon(drakvuf_t drakvuf, const procmon_config* config, output_format_t output);
     ~procmon() = default;
 };
 

@@ -148,8 +148,11 @@ public:
      */
     CpuidHook& operator=(CpuidHook&&) noexcept;
 
+    std::shared_ptr<CallResult> params() override;
+
     cb_wrapper_t callback_ = nullptr;
     drakvuf_trap_t* trap_ = nullptr;
+    std::shared_ptr<CallResult> params_;
 
 protected:
     /**
@@ -180,17 +183,17 @@ auto CpuidHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
     static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
 
     // populate backref
-    auto* params = new Params();
-    params->hook_ = hook.get();
-    hook->trap_->data = static_cast<void*>(params);
+    hook->params_ = std::make_shared<Params>();
+    hook->params_->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create cpuid trap!\n");
-        delete static_cast<CallResult*>(hook->trap_->data);
         hook->trap_->data = nullptr;
         delete hook->trap_;
         hook->trap_ = nullptr;
+        hook->params_.reset();
         return std::unique_ptr<CpuidHook>();
     }
 

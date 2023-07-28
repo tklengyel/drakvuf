@@ -233,16 +233,23 @@ void linux_filetracer::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
         extra_args.emplace_back(keyval("UID", fmt::Rstr(std::to_string(*(params->uid)))));
     if (params->gid)
         extra_args.emplace_back(keyval("GID", fmt::Rstr(std::to_string(*(params->gid)))));
+    if (params->file_handle)
+        extra_args.emplace_back(keyval("FileHandle", fmt::Rstr(std::to_string(params->file_handle))));
     for (auto& arg : params->args)
         extra_args.emplace_back(std::make_pair(arg.first, fmt::Rstr(arg.second)));
 
     addr_t current_process = drakvuf_get_current_process(drakvuf, info);
     const char* thread_name = drakvuf_get_process_name(drakvuf, current_process, false);
 
-    fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+    fmt::print(
+        this->m_output_format,
+        "filetracer",
+        drakvuf,
+        info,
         keyval("Permissions", fmt::Rstr(to_oct_str(params->permissions))),
         keyval("ThreadName", fmt::Rstr(thread_name)),
-        extra_args);
+        std::move(extra_args)
+    );
 
     g_free(const_cast<char*>(thread_name));
 }
@@ -264,7 +271,7 @@ char* linux_filetracer::read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 event_response_t linux_filetracer::open_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<linux_data>(info);
-    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
+    if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t file_struct = info->regs->rax;
@@ -299,9 +306,7 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
 
     // Save data
-    params->pid = info->proc_data.pid;
-    params->tid = info->proc_data.tid;
-    params->rsp = ret_addr;
+    params->setResultCallParams(info);
 
     hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
@@ -415,6 +420,22 @@ event_response_t linux_filetracer::llseek_file_cb(drakvuf_t drakvuf, drakvuf_tra
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+event_response_t linux_filetracer::memfd_create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<linux_data>(info);
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    params->file_handle = info->regs->rax;
+
+    if (params->file_handle > -1 && !params->filename.empty())
+        print_info(drakvuf, info, params);
+
+    uint64_t hookID = make_hook_id(info);
+    this->ret_hooks.erase(hookID);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // int __x64_sys_memfd_create (
@@ -442,14 +463,27 @@ event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakv
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    linux_data params;
-    char* tmp = read_filename(drakvuf, info, file_name_addr);
-    params.filename = tmp ?: "";
-    g_free(tmp);
-    params.flags = parse_flags(flags, linux_memfd_flags, this->m_output_format);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    if (!ret_addr)
+        return VMI_EVENT_RESPONSE_NONE;
 
-    if (!params.filename.empty())
-        print_info(drakvuf, info, &params);
+
+    // Create new trap for return callback
+    uint64_t hookID = make_hook_id(info);
+    auto hook = this->createReturnHook<linux_data>(info, &linux_filetracer::memfd_create_file_ret_cb);
+    auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
+
+    // Save data
+    params->setResultCallParams(info);
+
+    char* tmp = read_filename(drakvuf, info, file_name_addr);
+    params->filename = tmp ?: "";
+    g_free(tmp);
+
+    params->flags = parse_flags(flags, linux_memfd_flags, this->m_output_format);
+
+    hook->trap_->name = info->trap->name;
+    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }

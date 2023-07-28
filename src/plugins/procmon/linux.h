@@ -106,21 +106,26 @@
 #define PROCMON_LINUX_H
 
 #include "private.h"
+#include <unordered_set>
+
+struct procmon_config
+{
+    const char* procmon_filter_file;
+};
+
 
 class linux_procmon : public pluginex
 {
 public:
     /* Symbols */
-    addr_t do_open_execat_addr = 0;
-    addr_t kernel_base = 0;
-    addr_t _text = 0;
+    std::string do_open_execat_name;
 
     /* Offsets */
     std::array<size_t, procmon_ns::__LINUX_OFFSET_MAX> offsets;
 
     /* Traps */
-    std::unordered_map<uint64_t, drakvuf_trap_t*> internal_traps;
-    std::unordered_map<uint64_t, drakvuf_trap_t*> internal_ret_traps;
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::SyscallHook>> internal_traps;
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> internal_ret_traps;
 
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> exec_hook;
@@ -133,19 +138,26 @@ public:
 
     /* Callbacks */
     event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* Return callbacks */
     event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+    /* Filter file */
+    std::unordered_set<std::string> filter;
+
     /* Helper functions */
     void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    void configure_filter(const procmon_config* config);
+    bool read_procmon_filter(const char* filter_file);
 
-    linux_procmon(drakvuf_t drakvuf, output_format_t output);
+    linux_procmon(drakvuf_t drakvuf, const procmon_config* config, output_format_t output);
     linux_procmon(const linux_procmon&) = delete;
     linux_procmon& operator=(const linux_procmon&) = delete;
 };

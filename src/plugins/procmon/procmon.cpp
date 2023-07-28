@@ -106,11 +106,11 @@
 #include "win.h"
 #include "linux.h"
 
-procmon::procmon(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output)
+procmon::procmon(drakvuf_t drakvuf, const procmon_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
     auto os = drakvuf_get_os_type(drakvuf);
     if (os == VMI_OS_WINDOWS)
         this->wp = std::make_unique<win_procmon>(drakvuf, output);
     else
-        this->lp = std::make_unique<linux_procmon>(drakvuf, output);
+        this->lp = std::make_unique<linux_procmon>(drakvuf, config, output);
 }

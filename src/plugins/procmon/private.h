@@ -117,13 +117,10 @@ struct execve_data : PluginResult
         : PluginResult()
         , pid()
         , tid()
-        , ppid()
-        , new_pid()
-        , new_tid()
         , rsp()
         , execat_rsp()
         , cr3()
-        , process_name()
+        , fd()
         , thread_name()
         , image_path_name()
         , command_line()
@@ -134,13 +131,12 @@ struct execve_data : PluginResult
 
     vmi_pid_t pid;
     uint32_t tid;
-    vmi_pid_t ppid;
-    vmi_pid_t new_pid;
-    uint32_t new_tid;
+
     addr_t rsp;
     addr_t execat_rsp;
     addr_t cr3;
 
+    int fd;
     std::string process_name;
     std::string thread_name;
     std::string image_path_name;
@@ -150,16 +146,23 @@ struct execve_data : PluginResult
     bool internal_error = false;
 };
 
+struct open_execat_data : PluginResult
+{
+    open_execat_data()
+        : PluginResult()
+    {
+    }
+
+    std::shared_ptr<CallResult> data;
+};
+
 struct send_signal_data : PluginResult
 {
     send_signal_data()
         : PluginResult()
-        , pid()
-        , target_pid()
-        , tid()
-        , target_tid()
-        , target_ppid()
-        , rsp()
+        , target_proc_pid()
+        , target_proc_tid()
+        , target_proc_ppid()
         , target_process_name()
         , thread_name()
         , target_thread_name()
@@ -167,12 +170,9 @@ struct send_signal_data : PluginResult
     {
     }
 
-    vmi_pid_t pid;
-    vmi_pid_t target_pid;
-    uint32_t tid;
-    uint32_t target_tid;
-    vmi_pid_t target_ppid;
-    addr_t rsp;
+    vmi_pid_t target_proc_pid;
+    uint32_t target_proc_tid;
+    vmi_pid_t target_proc_ppid;
 
     std::string target_process_name;
     std::string thread_name;
@@ -475,7 +475,8 @@ static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
 
 } // procmon_ns
 
-#define ARG_MAX 131072
-#define MAX_ERRNO 4095
+#define ARG_MAX     131072
+#define MAX_ERRNO   4095
+#define AT_FDCWD    -100
 
 #endif
