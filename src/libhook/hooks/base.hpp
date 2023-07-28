@@ -110,6 +110,8 @@
 namespace libhook
 {
 
+struct CallResult;
+
 using callback_t = event_response_t(*)(drakvuf_t drakvuf, drakvuf_trap_info* info);
 using cb_wrapper_t = std::function<event_response_t(drakvuf_t, drakvuf_trap_info*)>;
 
@@ -145,6 +147,8 @@ public:
      * important to be noexcept, otherwise bad things will happen
      */
     BaseHook& operator=(BaseHook&&) noexcept;
+
+    virtual std::shared_ptr<CallResult> params() = 0;
 
 protected:
     /*

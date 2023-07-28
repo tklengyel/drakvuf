@@ -251,6 +251,10 @@ static void print_usage()
         "\t                           File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
         "\t --disable-sysret          Do not monitor syscall results\n"
 #endif
+#ifdef ENABLE_PLUGIN_PROCMON
+        "\t -q, --procmon-envs-list <procmon filter>\n"
+        "\t                           File with list of environment variables for printing in procmon\n"
+#endif
 #ifdef ENABLE_PLUGIN_BSODMON
         "\t -b                        Exit from execution as soon as a BSoD is detected\n"
         "\t --bsodmon-ignore-stop\n"
@@ -581,6 +585,7 @@ int main(int argc, char** argv)
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
+        {"procmon-envs-list", required_argument, NULL, 'q'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
         {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
         {"fast-singlestep", no_argument, NULL, 'F'},
@@ -622,7 +627,7 @@ int main(int argc, char** argv)
         {"rebootmon-abort-on-power-off", no_argument, NULL, opt_rebootmon_abort_on_power_off},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hFC";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:q:Mc:nblgj:k:w:W:hFC";
 
     int long_index = 0;
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
@@ -753,6 +758,16 @@ int main(int argc, char** argv)
                 break;
             case opt_disable_sysret:
                 options.disable_sysret = true;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_PROCMON
+            case 'q':
+                if (!std::filesystem::exists(optarg))
+                {
+                    fprintf(stderr, "file %s does not exist!\n", optarg);
+                    return drakvuf_exit_code_t::FAIL;
+                }
+                options.procmon_filter_file = optarg;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE

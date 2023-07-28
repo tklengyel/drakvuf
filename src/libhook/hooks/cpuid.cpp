@@ -119,7 +119,7 @@ CpuidHook::~CpuidHook()
         };
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
         {
-            delete static_cast<CallResult*>(trap->data);
+            trap->data = nullptr;
             delete trap;
         });
     }
@@ -149,5 +149,10 @@ CpuidHook::CpuidHook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : BaseHook(drakvuf),
       callback_(cb)
 {}
+
+std::shared_ptr<CallResult> CpuidHook::params()
+{
+    return this->params_;
+}
 
 } // namespace libhook

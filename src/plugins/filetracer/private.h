@@ -187,10 +187,8 @@ struct linux_data : PluginResult
 {
     linux_data()
         : PluginResult()
-        , pid()
-        , tid()
+        , file_handle()
         , permissions()
-        , rsp()
         , filename()
         , flags()
         , modes()
@@ -200,10 +198,8 @@ struct linux_data : PluginResult
     {
     }
 
-    vmi_pid_t pid;
-    uint32_t tid;
+    int file_handle;
     int permissions;
-    addr_t rsp;
 
     std::string filename;
     std::string flags;

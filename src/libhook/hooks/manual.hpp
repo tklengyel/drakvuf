@@ -158,6 +158,8 @@ public:
      */
     ManualHook& operator=(ManualHook&&) noexcept;
 
+    std::shared_ptr<CallResult> params() override;
+
     drakvuf_trap_t* trap_ = nullptr;
     drakvuf_trap_free_t free_routine_ = nullptr;
 

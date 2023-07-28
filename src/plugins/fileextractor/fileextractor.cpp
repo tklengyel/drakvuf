@@ -774,7 +774,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         "\n"
         , info->event_uid
         , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , task->target.ret_pid, task->stage
+        , task->target.ret_pid, (int)task->stage
     );
 
     // check that the file has not been extracted
@@ -1477,7 +1477,7 @@ void fileextractor::check_stack_marker(
                 "expected %#lx, result %#lx\n"
                 , info->event_uid
                 , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , task->target.ret_pid, task->stage
+                , task->target.ret_pid, (int)task->stage
                 , task->stack_marker_va(), task->stack_marker(), stack_marker
             );
         }
@@ -2160,7 +2160,7 @@ bool fileextractor::stop_impl()
                 "pid %d, name '''%s''', stage %d\n"
                 , tasks.size()
                 , i.second->target.ret_pid, i.second->filename.data()
-                , i.second->stage);
+                , (int)i.second->stage);
             return false;
         }
 
