@@ -1613,6 +1613,8 @@ static const syscall_t* linux_syscalls_table_x32[] =
     [332] = &statx,
 };
 
+/* use separate table, because on x64 kernels stat, fstat, lstat syscalls are
+   serviced by sys_newstat, sys_newfstat, sys_newlstat methods, respectively */
 static const syscall_t* linux_syscalls_table_x64[] =
 {
     [0] = &read,
