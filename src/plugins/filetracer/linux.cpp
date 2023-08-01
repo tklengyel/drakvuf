@@ -602,12 +602,22 @@ event_response_t linux_filetracer::truncate_file_cb(drakvuf_t drakvuf, drakvuf_t
         unsigned int time_attrs,
         struct file *filp
     )
+
+    in 5.12+:
+    int do_truncate(
+        struct user_namespace *mnt_userns,
+        struct dentry *dentry,
+        loff_t length,
+        unsigned int time_attrs,
+        struct file *filp
+    )
     */
 
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
-    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 1);
-    uint64_t length = drakvuf_get_function_argument(drakvuf, info, 2);
+    auto ver = drakvuf_get_kernel_version(drakvuf, info);
+    addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 2 : 1);
+    uint64_t length = drakvuf_get_function_argument(drakvuf, info, VERSION_GE(ver, 5, 12) ? 3 : 2);
 
     linux_data params;
     params.args["length"] = std::to_string(length);
