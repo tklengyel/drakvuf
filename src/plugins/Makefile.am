@@ -489,7 +489,7 @@ if PLUGIN_PROCMON
 check_PROGRAMS += procmon/check
 procmon_check_SOURCES = procmon/check.cpp
 procmon_check_CFLAGS = $(CHECK_CFLAGS)
-procmon_check_LDADD = $(CHECK_LIBS) procmon/winnt.lo
+procmon_check_LDADD = $(CHECK_LIBS) procmon/linux_utils.lo procmon/winnt.lo
 endif
 
 # Unit tests for output format
