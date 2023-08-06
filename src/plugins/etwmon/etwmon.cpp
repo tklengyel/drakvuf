@@ -255,12 +255,14 @@ provider_t::provider_t(etwmon* plugin, vmi_instance_t vmi, addr_t base) : base(b
     }
 }
 
-void etwmon::report(drakvuf_t drakvuf, const char* type, const char* name, const char* action)
+void etwmon::report(drakvuf_t drakvuf, const char* type, const char* name, const char* action, addr_t value, addr_t prev_value)
 {
     fmt::print(format, "etwmon", drakvuf, nullptr,
-        keyval("Type",   fmt::Qstr(type)),
+        keyval("Type",   fmt::Estr(type)),
         keyval("Name",   fmt::Estr(name)),
-        keyval("Action", fmt::Qstr(action))
+        keyval("Action", fmt::Estr(action)),
+        keyval("Value",  fmt::Xval(value)),
+        keyval("PreviousValue", fmt::Xval(prev_value))
     );
 }
 
@@ -581,13 +583,13 @@ bool etwmon::stop_impl()
             });
             if (n_logger != snapshot->loggers.end())
             {
-                if (logger.clock_fn != n_logger->clock_fn)
+                if (logger.clock_fn != n_logger->clock_fn && logger.clock_fn)
                 {
-                    report(drakvuf, "GetCpuClock", n_logger->name.c_str(), "Modified");
+                    report(drakvuf, "GetCpuClock", n_logger->name.c_str(), "Modified", n_logger->clock_fn, logger.clock_fn);
                 }
-                else if (logger.cb_ctx == n_logger->cb_ctx)
+                else if (logger.cb_ctx != n_logger->cb_ctx)
                 {
-                    report(drakvuf, "CallbackContext", n_logger->name.c_str(), "Modified");
+                    report(drakvuf, "CallbackContext", n_logger->name.c_str(), "Modified", n_logger->cb_ctx, logger.cb_ctx);
                 }
             }
         }
@@ -618,7 +620,7 @@ bool etwmon::stop_impl()
                     if (n_reg != n_provider->regs.end())
                     {
                         if (n_reg->callback != reg.callback)
-                            report(drakvuf, "RegCallback", provider.guid.str().c_str(), "Modified");
+                            report(drakvuf, "RegCallback", provider.guid.str().c_str(), "Modified", n_reg->callback, reg.callback);
                     }
                 }
             }
@@ -628,18 +630,18 @@ bool etwmon::stop_impl()
         {
             if (this->global_callbacks.at(i) != snapshot->global_callbacks.at(i))
             {
-                report(drakvuf, "GlobalCallback", "Anonymous", "Modified");
+                report(drakvuf, "GlobalCallback", "Anonymous", "Modified", snapshot->global_callbacks.at(i), this->global_callbacks.at(i));
             }
         }
 
         for (size_t i = 0; i < this->global_handles.size(); i++)
         {
             if (this->global_handles.at(i) != snapshot->global_handles.at(i))
-                report(drakvuf, "GlobalHandle", "Anonymous", "Modified");
+                report(drakvuf, "GlobalHandle", "Anonymous", "Modified", snapshot->global_handles.at(i), this->global_handles.at(i));
         }
 
         if (this->active_system_loggers != snapshot->active_system_loggers)
-            report(drakvuf, "SystemLoggerSettings", "ActiveSystemLoggers", "Modified");
+            report(drakvuf, "SystemLoggerSettings", "ActiveSystemLoggers", "Modified", snapshot->active_system_loggers, this->active_system_loggers);
     }
     catch (const std::exception& e)
     {
