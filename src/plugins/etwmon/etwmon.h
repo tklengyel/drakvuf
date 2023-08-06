@@ -113,7 +113,7 @@ public:
     virtual bool stop_impl() override;
 
     etwmon(const etwmon& other);
-    void report(drakvuf_t drakvuf, const char* type, const char* name, const char* action);
+    void report(drakvuf_t drakvuf, const char* type, const char* name, const char* action, addr_t value = 0, addr_t prev_value = 0);
 
     bool is_supported(drakvuf_t drakvuf, bool quite);
     void enumerate_loggers(vmi_instance_t vmi);
@@ -125,7 +125,7 @@ public:
     win_build_info_t winver;
     size_t address_width;
 
-    std::array<size_t, etwmon_ns::__OFFSET_MAX> offsets;
+    std::array<size_t, etwmon_ns::__OFFSET_MAX> offsets{};
 
     addr_t logger_cb_ctx_rva;
     addr_t etw_state_rva;
