@@ -198,6 +198,8 @@ sources += procmon/procmon.cpp
 sources += procmon/procmon.h
 sources += procmon/linux.cpp
 sources += procmon/linux.h
+sources += procmon/linux_utils.cpp
+sources += procmon/linux_utils.h
 sources += procmon/private.h
 sources += procmon/win.cpp
 sources += procmon/win.h
@@ -487,7 +489,7 @@ if PLUGIN_PROCMON
 check_PROGRAMS += procmon/check
 procmon_check_SOURCES = procmon/check.cpp
 procmon_check_CFLAGS = $(CHECK_CFLAGS)
-procmon_check_LDADD = $(CHECK_LIBS) procmon/winnt.lo
+procmon_check_LDADD = $(CHECK_LIBS) procmon/linux_utils.lo procmon/winnt.lo
 endif
 
 # Unit tests for output format

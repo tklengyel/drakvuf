@@ -102,76 +102,31 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <check.h>
-
 #include "linux_utils.h"
-#include "winnt.h"
 
-START_TEST(test_protection_attributes_stringify)
+std::pair<std::string, std::string> parse_environment_variable(const char* var)
 {
-    ck_assert(stringify_protection_attributes(PAGE_NOACCESS) == std::string("PAGE_NOACCESS"));
-    ck_assert(stringify_protection_attributes(PAGE_EXECUTE_READWRITE) == std::string("PAGE_EXECUTE_READWRITE"));
-    ck_assert(stringify_protection_attributes(PAGE_GUARD | PAGE_NOCACHE) == std::string("PAGE_GUARD;PAGE_NOCACHE"));
-}
-END_TEST
+    // based on: https://stackoverflow.com/questions/38812780/split-string-into-key-value-pairs-using-c
+    std::string key, value;
+    std::string::size_type key_pos = 0;
+    std::string::size_type key_end;
+    std::string::size_type val_pos;
+    std::string::size_type val_end;
 
-START_TEST(test_environment_variable_parse)
-{
-    ck_assert(parse_environment_variable("PATH=/usr/local/bin:/usr/bin:/bin") == make_pair(std::string("PATH"), std::string("/usr/local/bin:/usr/bin:/bin")));
-    ck_assert(parse_environment_variable("empty=") == make_pair(std::string("empty"), std::string()));
-    ck_assert(parse_environment_variable("empty=    ") == make_pair(std::string("empty"), std::string()));
-    ck_assert(parse_environment_variable("spaces=    test") == make_pair(std::string("spaces"), std::string("test")));
-    ck_assert(parse_environment_variable("not variable") == make_pair(std::string(), std::string()));
-    ck_assert(parse_environment_variable("notvar") == make_pair(std::string(), std::string()));
-    ck_assert(parse_environment_variable("") == make_pair(std::string(), std::string()));
-    ck_assert(parse_environment_variable(nullptr) == make_pair(std::string(), std::string()));
-}
-END_TEST
+    std::string s(var ?: "");
 
-Suite* protection_attributes_suite(void)
-{
-    Suite* s;
-    TCase* tc_core;
+    key_end = s.find('=', key_pos);
+    if (key_end == std::string::npos)
+        goto out;
 
-    s = suite_create("Stringify protection attributes");
+    key = s.substr(key_pos, key_end - key_pos);
 
-    /* Core test case */
-    tc_core = tcase_create("Core");
+    if ((val_pos = s.find_first_not_of("= ", key_end)) != std::string::npos)
+    {
+        val_end = s.find('\1', val_pos);
+        value = s.substr(val_pos, val_end - val_pos);
+    }
 
-    tcase_add_test(tc_core, test_protection_attributes_stringify);
-    suite_add_tcase(s, tc_core);
-
-    return s;
-}
-
-Suite* environment_variables_suite(void)
-{
-    Suite* s;
-    TCase* tc_core;
-
-    s = suite_create("Parse environment variables");
-
-    /* Core test case */
-    tc_core = tcase_create("Core");
-
-    tcase_add_test(tc_core, test_environment_variable_parse);
-    suite_add_tcase(s, tc_core);
-
-    return s;
-}
-
-int main(void)
-{
-    int number_failed;
-    Suite* s;
-    SRunner* sr;
-
-    s = protection_attributes_suite();
-    sr = srunner_create(s);
-    srunner_add_suite(sr, environment_variables_suite());
-
-    srunner_run_all(sr, CK_NORMAL);
-    number_failed = srunner_ntests_failed(sr);
-    srunner_free(sr);
-    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+out:
+    return make_pair(key, value);
 }
