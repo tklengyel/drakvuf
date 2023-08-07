@@ -110,6 +110,7 @@
 #include <glib.h>
 
 #include "linux.h"
+#include "linux_utils.h"
 #include "plugins/output_format.h"
 #include "plugins/helpers/hooks.h"
 
@@ -215,11 +216,6 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
 
     for (uint32_t envpc = 0; envpc < ARG_MAX; envpc++, envp += sizeof(addr_t))
     {
-        std::string::size_type key_pos = 0;
-        std::string::size_type key_end;
-        std::string::size_type val_pos;
-        std::string::size_type val_end;
-
         addr_t env_str_ptr;
         ctx.addr = envp;
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &env_str_ptr))
@@ -230,35 +226,13 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
         if (env_string == nullptr)
             break;
 
-        // based on: https://stackoverflow.com/questions/38812780/split-string-into-key-value-pairs-using-c
-        std::string s(env_string);
-        key_pos = 0;
+        auto[key, val] = parse_environment_variable(env_string);
+        g_free(env_string);
 
-        key_end = s.find('=', key_pos);
-        if (key_end == std::string::npos)
-        {
-            g_free(env_string);
-            break;
-        }
-
-        if ((val_pos = s.find_first_not_of("= ", key_end)) == std::string::npos)
-        {
-            g_free(env_string);
-            break;
-        }
-
-        val_end = s.find('\1', val_pos);
-        std::string key = s.substr(key_pos, key_end - key_pos);
-        std::string val = s.substr(val_pos, val_end - val_pos);
-        if (filter.find(key) == filter.end())
-        {
-            g_free(env_string);
+        if (key.empty() || filter.find(key) == filter.end())
             continue;
-        }
 
         envp_map.emplace(key, val);
-
-        g_free(env_string);
     }
     return envp_map;
 }

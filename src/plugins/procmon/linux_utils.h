@@ -102,76 +102,19 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <check.h>
+#ifndef PROCMON_LINUX_UTILS_H
+#define PROCMON_LINUX_UTILS_H
 
-#include "linux_utils.h"
-#include "winnt.h"
+#include <string>
+#include <utility>
 
-START_TEST(test_protection_attributes_stringify)
-{
-    ck_assert(stringify_protection_attributes(PAGE_NOACCESS) == std::string("PAGE_NOACCESS"));
-    ck_assert(stringify_protection_attributes(PAGE_EXECUTE_READWRITE) == std::string("PAGE_EXECUTE_READWRITE"));
-    ck_assert(stringify_protection_attributes(PAGE_GUARD | PAGE_NOCACHE) == std::string("PAGE_GUARD;PAGE_NOCACHE"));
-}
-END_TEST
+/**
+ * Parses "variable=value" string and return pair of key and value strings.
+ * Omit spaces after equal sign. Value may be an empty string.
+ *
+ * @param var string to parse
+ * @return pair of key and value strings or pair of empty strings in case of errors
+ */
+std::pair<std::string, std::string> parse_environment_variable(const char* var);
 
-START_TEST(test_environment_variable_parse)
-{
-    ck_assert(parse_environment_variable("PATH=/usr/local/bin:/usr/bin:/bin") == make_pair(std::string("PATH"), std::string("/usr/local/bin:/usr/bin:/bin")));
-    ck_assert(parse_environment_variable("empty=") == make_pair(std::string("empty"), std::string()));
-    ck_assert(parse_environment_variable("empty=    ") == make_pair(std::string("empty"), std::string()));
-    ck_assert(parse_environment_variable("spaces=    test") == make_pair(std::string("spaces"), std::string("test")));
-    ck_assert(parse_environment_variable("not variable") == make_pair(std::string(), std::string()));
-    ck_assert(parse_environment_variable("notvar") == make_pair(std::string(), std::string()));
-    ck_assert(parse_environment_variable("") == make_pair(std::string(), std::string()));
-    ck_assert(parse_environment_variable(nullptr) == make_pair(std::string(), std::string()));
-}
-END_TEST
-
-Suite* protection_attributes_suite(void)
-{
-    Suite* s;
-    TCase* tc_core;
-
-    s = suite_create("Stringify protection attributes");
-
-    /* Core test case */
-    tc_core = tcase_create("Core");
-
-    tcase_add_test(tc_core, test_protection_attributes_stringify);
-    suite_add_tcase(s, tc_core);
-
-    return s;
-}
-
-Suite* environment_variables_suite(void)
-{
-    Suite* s;
-    TCase* tc_core;
-
-    s = suite_create("Parse environment variables");
-
-    /* Core test case */
-    tc_core = tcase_create("Core");
-
-    tcase_add_test(tc_core, test_environment_variable_parse);
-    suite_add_tcase(s, tc_core);
-
-    return s;
-}
-
-int main(void)
-{
-    int number_failed;
-    Suite* s;
-    SRunner* sr;
-
-    s = protection_attributes_suite();
-    sr = srunner_create(s);
-    srunner_add_suite(sr, environment_variables_suite());
-
-    srunner_run_all(sr, CK_NORMAL);
-    number_failed = srunner_ntests_failed(sr);
-    srunner_free(sr);
-    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
-}
+#endif
