@@ -118,8 +118,7 @@ AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wpointer-arith -Winit-self -Wshadow \
              -Wswitch-enum -Wstrict-prototypes \
              -Wmissing-prototypes -Wredundant-decls \
-             -Wfloat-equal -Wundef -Wvla \
-             -Wc++-compat
+             -Wfloat-equal -Wundef -Wvla
 endif
 
 if HARDENING
