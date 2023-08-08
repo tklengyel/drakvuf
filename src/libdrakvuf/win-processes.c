@@ -469,7 +469,7 @@ char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
     addr_t peb = 0;
     ctx.addr = eprocess_base + drakvuf->offsets[EPROCESS_PEB];
-    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &peb))
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &peb) || peb == 0)
         return NULL;
 
     addr_t proc_params = 0;
@@ -514,7 +514,7 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
     if (!eprocess_base)
         return -1;
 
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb) || peb == 0)
         return -1;
 
     if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
@@ -542,7 +542,7 @@ unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_
     if (!eprocess_base)
         return NULL;
 
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb) || peb == 0)
         return NULL;
 
     if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
@@ -781,7 +781,7 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
     if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return false;
 
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb) || peb == 0)
         return false;
 
     ctx.addr = peb + drakvuf->offsets[PEB_LDR];
