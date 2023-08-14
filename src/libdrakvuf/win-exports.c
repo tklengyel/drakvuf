@@ -187,7 +187,7 @@ addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char* mod
 
     if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return 0;
-    if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+    if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb) || peb == 0)
         return 0;
 
     ctx.addr = peb + drakvuf->offsets[PEB_LDR];
