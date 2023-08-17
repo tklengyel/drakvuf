@@ -245,9 +245,17 @@ public:
     std::array<size_t, __OFFSET_MAX> offsets;
 
     std::vector<usermode_cb_registration> plugins;
-    // map pid -> list of hooked dlls
+
+    // map pid -> list of loaded/hooked dlls
     std::map<vmi_pid_t, std::vector<dll_t>> loaded_dlls;
-    std::map<vmi_pid_t, bool> proc_ntdll_hooked;
+
+    struct module_context_t
+    {
+        std::optional<mmvad_info_t> mmvad;
+        bool is_hooked;
+    };
+
+    std::map<vmi_pid_t, module_context_t> proc_ntdll;
 
 #ifndef LIBUSERMODE_USE_INJECTION
     std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
@@ -282,7 +290,7 @@ private:
 
 proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info);
 bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func);
-event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr);
+event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, mmvad_info_t* mmvad, bool *is_hooked);
 bool is_pagetable_loaded(vmi_instance_t vmi, const drakvuf_trap_info* info, addr_t vaddr);
 event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
 
