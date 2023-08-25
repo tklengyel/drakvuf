@@ -1,4 +1,5 @@
 incdir = include_directories('..', '../..')
+zlib_dep = dependency('zlib', required: true)
 
 plugin_sources = [
     'plugins.cpp',
@@ -233,21 +234,59 @@ if get_option('plugin-libhooktest')
     config_h.set('ENABLE_PLUGIN_LIBHOOKTEST', 1)
 endif
 
+
 if get_option('plugin-regmon')
     plugin_sources += 'regmon/regmon.cpp'
-
     config_h.set('ENABLE_PLUGIN_REGMON', 1)
 endif
 
+
 if get_option('plugin-procmon')
     plugin_sources += 'procmon/procmon.cpp'
-    plugin_sources += 'procmon/linux_utils.cpp'
     plugin_sources += 'procmon/linux.cpp'
+    plugin_sources += 'procmon/linux_utils.cpp'
     plugin_sources += 'procmon/privileges.cpp'
     plugin_sources += 'procmon/win.cpp'
     plugin_sources += 'procmon/winnt.cpp'
-
     config_h.set('ENABLE_PLUGIN_PROCMON', 1)
+endif
+
+
+if get_option('plugin-socketmon')
+    plugin_sources += 'socketmon/socketmon.cpp'
+    config_h.set('ENABLE_PLUGIN_SOCKETMON', 1)
+endif
+
+
+if get_option('plugin-ssdtmon')
+    plugin_sources += 'ssdtmon/ssdtmon.cpp'
+    config_h.set('ENABLE_PLUGIN_SSDTMON', 1)
+endif
+
+
+if get_option('plugin-procdump')
+    plugin_sources += 'procdump/procdump.cpp'
+    plugin_sources += 'procdump/writer.cpp'
+    deps += zlib_dep
+    config_h.set('ENABLE_PLUGIN_PROCDUMP', 1)
+endif
+
+
+if get_option('plugin-rpcmon')
+    plugin_sources += 'rpcmon/rpcmon.cpp'
+    config_h.set('ENABLE_PLUGIN_RPCMON', 1)
+endif
+
+
+if get_option('plugin-tlsmon')
+    plugin_sources += 'tlsmon/tlsmon.cpp'
+    config_h.set('ENABLE_PLUGIN_TLSMON', 1)
+endif
+
+
+if get_option('plugin-windowmon')
+    plugin_sources += 'windowmon/windowmon.cpp'
+    config_h.set('ENABLE_PLUGIN_WINDOWMON', 1)
 endif
 
 summary({
@@ -276,17 +315,24 @@ summary({
     'spraymon': get_option('plugin-spraymon'),
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
-    'ebpfmon' : get_option('plugin-ebpfmon'),
-    'memaccessmon' : get_option('plugin-memaccessmon'),
-    'unixsocketmon' : get_option('plugin-unixsocketmon'),
-    'etwmon' : get_option('plugin-etwmon'),
-    'ipt' : get_option('plugin-ipt'),
-    'rebootmon' : get_option('plugin-rebootmon'),
-    'linkmon' : get_option('plugin-linkmon'),
-    'libhooktest' : get_option('plugin-libhooktest'),
-    'regmon' : get_option('plugin-regmon'),
-    'procmon' : get_option('plugin-procmon'),
+    'ebpfmon': get_option('plugin-ebpfmon'),
+    'memaccessmon': get_option('plugin-memaccessmon'),
+    'unixsocketmon': get_option('plugin-unixsocketmon'),
+    'etwmon': get_option('plugin-etwmon'),
+    'ipt': get_option('plugin-ipt'),
+    'rebootmon': get_option('plugin-rebootmon'),
+    'linkmon': get_option('plugin-linkmon'),
+    'libhooktest': get_option('plugin-libhooktest'),
+    'regmon': get_option('plugin-regmon'),
+    'procmon': get_option('plugin-procmon'),
+    'socketmon': get_option('plugin-socketmon'),
+    'ssdtmon': get_option('plugin-ssdtmon'),
+    'procdump': get_option('plugin-procdump'),
+    'rpcmon': get_option('plugin-rpcmon'),
+    'tlsmon': get_option('plugin-tlsmon'),
+    'windowmon': get_option('plugin-windowmon'),
 }, section: 'Plugins (-Dplugin-<x>)')
+
 
 summary({
     'filedelete': get_option('plugin-filedelete'),
