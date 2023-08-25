@@ -233,6 +233,23 @@ if get_option('plugin-libhooktest')
     config_h.set('ENABLE_PLUGIN_LIBHOOKTEST', 1)
 endif
 
+if get_option('plugin-regmon')
+    plugin_sources += 'regmon/regmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_REGMON', 1)
+endif
+
+if get_option('plugin-procmon')
+    plugin_sources += 'procmon/procmon.cpp'
+    plugin_sources += 'procmon/linux_utils.cpp'
+    plugin_sources += 'procmon/linux.cpp'
+    plugin_sources += 'procmon/privileges.cpp'
+    plugin_sources += 'procmon/win.cpp'
+    plugin_sources += 'procmon/winnt.cpp'
+
+    config_h.set('ENABLE_PLUGIN_PROCMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -267,6 +284,8 @@ summary({
     'rebootmon' : get_option('plugin-rebootmon'),
     'linkmon' : get_option('plugin-linkmon'),
     'libhooktest' : get_option('plugin-libhooktest'),
+    'regmon' : get_option('plugin-regmon'),
+    'procmon' : get_option('plugin-procmon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
