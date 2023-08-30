@@ -409,7 +409,7 @@ static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* i
                 if (auto sub = name.find_last_of("/\\"); sub != std::string::npos)
                     name.erase(0, sub + 1);
 
-                auto *vctx = (visitor_context_t*)callback_data;
+                auto* vctx = (visitor_context_t*)callback_data;
 
                 if (name.find(vctx->name) != std::string::npos)
                 {
