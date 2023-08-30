@@ -353,7 +353,7 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* in
     return ret;
 }
 
-event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, mmvad_info_t* mmvad, bool *is_hooked)
+event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, mmvad_info_t* mmvad, bool* is_hooked)
 {
     auto plugin = get_trap_plugin<userhook>(info);
 
@@ -363,7 +363,7 @@ event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, mmvad_in
         dll_meta = create_dll_meta(drakvuf, info, plugin, mmvad);
 
     event_response_t res = VMI_EVENT_RESPONSE_NONE;
-    
+
     if (is_hooked)
         *is_hooked = false;
 
@@ -388,7 +388,7 @@ static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     };
 
     userhook::module_context_t* ctx = nullptr;
-    
+
     auto it = plugin->proc_ntdll.find(info->attached_proc_data.pid);
     if (it != plugin->proc_ntdll.end())
     {
@@ -409,7 +409,7 @@ static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* i
                 if (auto sub = name.find_last_of("/\\"); sub != std::string::npos)
                     name.erase(0, sub + 1);
 
-                auto *vctx = (visitor_context_t *)callback_data;
+                auto *vctx = (visitor_context_t*)callback_data;
 
                 if (name.find(vctx->name) != std::string::npos)
                 {
@@ -439,7 +439,7 @@ static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         hook_dll(drakvuf, info, &ctx->mmvad.value(), &ctx->is_hooked);
 }
 
-static bool get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_address, mmvad_info_t *mmvad)
+bool get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_address, mmvad_info_t* mmvad)
 {
     mmvad_info_t mmvad_;
     if (!drakvuf_find_mmvad(drakvuf, eprocess, base_address, &mmvad_))
@@ -447,7 +447,7 @@ static bool get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_add
 
     if (drakvuf_mmvad_type(drakvuf, &mmvad_) != 2) // VAD_TYPE_DLL
         return false;
-    
+
     *mmvad = mmvad_;
     return true;
 }
