@@ -155,7 +155,11 @@ static event_response_t map_view_of_section_ret_cb_2(drakvuf_t drakvuf, drakvuf_
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    return hook_dll(drakvuf, info, params->base_address_ptr);
+    mmvad_info_t mmvad;
+    if (get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address_ptr, &mmvad))
+        return hook_dll(drakvuf, info, &mmvad, 0);
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static void check_stack_marker(
