@@ -155,9 +155,9 @@ static event_response_t map_view_of_section_ret_cb_2(drakvuf_t drakvuf, drakvuf_
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    mmvad_info_t mmvad;
-    if (get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address_ptr, &mmvad))
-        return hook_dll(drakvuf, info, &mmvad, 0);
+    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address_ptr);
+    if (mmvad)
+        return hook_dll(drakvuf, info, &*mmvad, 0);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
