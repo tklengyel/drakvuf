@@ -398,20 +398,17 @@ static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     {
         auto visitor = [](drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data)
         {
+            auto* vctx = reinterpret_cast<visitor_context_t*>(callback_data);
+
             if (!mmvad->file_name_ptr)
                 return false;
 
-            if (drakvuf_mmvad_type(drakvuf, mmvad) != 2) // VAD_TYPE_DLL
+            if (drakvuf_mmvad_type(drakvuf, mmvad) != VAD_TYPE_DLL)
                 return false;
 
             if (auto name = drakvuf_read_unicode(drakvuf, mmvad->file_name_ptr); !name.empty())
             {
-                if (auto sub = name.find_last_of("/\\"); sub != std::string::npos)
-                    name.erase(0, sub + 1);
-
-                auto* vctx = (visitor_context_t*)callback_data;
-
-                if (name.find(vctx->name) != std::string::npos)
+                if (is_dll_name_matched(name, vctx->name))
                 {
                     vctx->mmvad = *mmvad;
                     return true;
@@ -439,17 +436,16 @@ static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         hook_dll(drakvuf, info, &ctx->mmvad.value(), &ctx->is_hooked);
 }
 
-bool get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_address, mmvad_info_t* mmvad)
+std::optional<mmvad_info_t> get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_address)
 {
-    mmvad_info_t mmvad_;
-    if (!drakvuf_find_mmvad(drakvuf, eprocess, base_address, &mmvad_))
-        return false;
+    mmvad_info_t mmvad;
+    if (!drakvuf_find_mmvad(drakvuf, eprocess, base_address, &mmvad))
+        return {};
 
-    if (drakvuf_mmvad_type(drakvuf, &mmvad_) != 2) // VAD_TYPE_DLL
-        return false;
+    if (drakvuf_mmvad_type(drakvuf, &mmvad) == VAD_TYPE_DLL)
+        return mmvad;
 
-    *mmvad = mmvad_;
-    return true;
+    return {};
 }
 
 /**
@@ -464,11 +460,9 @@ static event_response_t protect_virtual_memory_hook_ret_cb(drakvuf_t drakvuf, dr
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    event_response_t ret = VMI_EVENT_RESPONSE_NONE;
+    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address);
 
-    mmvad_info_t mmvad;
-    if (get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address, &mmvad))
-        ret = hook_dll(drakvuf, info, &mmvad, 0);
+    auto ret = mmvad ? hook_dll(drakvuf, info, &*mmvad, 0) : VMI_EVENT_RESPONSE_NONE;
 
     if (!drakvuf_lookup_injection(drakvuf, info))
         plugin->destroy_trap(info->trap);
@@ -562,11 +556,9 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    event_response_t ret = VMI_EVENT_RESPONSE_NONE;
+    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, base_address);
 
-    mmvad_info_t mmvad;
-    if (get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, base_address, &mmvad))
-        ret = hook_dll(drakvuf, info, &mmvad, 0);
+    auto ret = mmvad ? hook_dll(drakvuf, info, &*mmvad, 0) : VMI_EVENT_RESPONSE_NONE;
 
     if (!drakvuf_lookup_injection(drakvuf, info))
         plugin->destroy_trap(info->trap);

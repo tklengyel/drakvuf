@@ -115,6 +115,8 @@
 
 class userhook; // Forward declaration.
 
+#define VAD_TYPE_DLL 2
+
 enum offset
 {
     KTHREAD_TRAPFRAME,
@@ -290,7 +292,7 @@ private:
 
 proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info);
 bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func);
-bool get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_address, mmvad_info_t* mmvad);
+std::optional<mmvad_info_t> get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_address);
 event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, mmvad_info_t* mmvad, bool* is_hooked);
 bool is_pagetable_loaded(vmi_instance_t vmi, const drakvuf_trap_info* info, addr_t vaddr);
 event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
