@@ -470,6 +470,18 @@ static event_response_t protect_virtual_memory_hook_ret_cb(drakvuf_t drakvuf, dr
     return ret;
 }
 
+static status_t read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr, addr_t* base_address)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = base_address_ptr
+    );
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    return vmi_read_addr(vmi, &ctx, base_address);
+}
+
 static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     search_process_system_dlls(drakvuf, info);
@@ -485,17 +497,8 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t base_address;
-    {
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = base_address_ptr
-        );
-
-        auto vmi = vmi_lock_guard(drakvuf);
-        if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &base_address))
-            return VMI_EVENT_RESPONSE_NONE;
-    }
+    if (VMI_SUCCESS != read_addr(drakvuf, info, base_address_ptr, &base_address))
+        return VMI_EVENT_RESPONSE_NONE;
 
     /* We have to finish handling NtProtectVirtualMemory on return to avoid
      * possible injection collision with "search_process_system_dlls" function
@@ -525,18 +528,6 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static status_t read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const addr_t& base_address_ptr, addr_t base_address)
-{
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = base_address_ptr
-    );
-
-    auto vmi = vmi_lock_guard(drakvuf);
-    return vmi_read_addr(vmi, &ctx, &base_address);
-}
-
 /**
  * This is used in order to observe when 64 bit process is loading a new DLL.
  * If the DLL is interesting, we perform further investigation and try to equip user mode hooks.
@@ -549,8 +540,8 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    addr_t base_address{0};
-    if (VMI_SUCCESS != read_addr(drakvuf, info, params->base_address_ptr, base_address))
+    addr_t base_address;
+    if (VMI_SUCCESS != read_addr(drakvuf, info, params->base_address_ptr, &base_address))
     {
         plugin->destroy_trap(info->trap);
         return VMI_EVENT_RESPONSE_NONE;
