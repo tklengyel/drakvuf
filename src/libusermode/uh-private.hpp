@@ -235,6 +235,13 @@ struct copy_on_write_result_t : public call_result_t
     std::vector<hook_target_entry_t*> hooks;
 };
 
+struct copy_memory_result_t : public call_result_t
+{
+    copy_memory_result_t() : call_result_t(), base_address() {}
+
+    addr_t base_address;
+};
+
 class userhook : public pluginex
 {
 public:
