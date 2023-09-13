@@ -25,7 +25,7 @@ if [ $(apt-cache show gcc-9 2>/dev/null | wc -l) -gt 0 ]; then
     apt-get --quiet --yes install gcc-9
 fi
 
-wget -O /usr/local/go1.15.3.linux-amd64.tar.gz https://go.dev/dl/go1.15.3.linux-amd64.tar.gz
+wget http://go.dev/dl/go1.15.3.linux-amd64.tar.gz -O /usr/local/go1.15.3.linux-amd64.tar.gz
 tar -C /usr/local -xzf /usr/local/go1.15.3.linux-amd64.tar.gz
 
 HAS_PYTHON_IS_PYTHON=$(apt-cache search --names-only '^python-is-python2$')
