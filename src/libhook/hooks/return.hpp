@@ -119,8 +119,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
-    -> std::unique_ptr<ReturnHook>;
+    static ReturnHook* create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl);
 
     /**
      * unhook on dctor
@@ -163,8 +162,7 @@ protected:
 };
 
 template<typename Params>
-auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
--> std::unique_ptr<ReturnHook>
+ReturnHook* ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
 
@@ -192,8 +190,7 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
         return GetTrapHook<ReturnHook>(info)->callback_(drakvuf, info);
     };
 
-    // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb));
+    auto hook = new ReturnHook(drakvuf, cb);
     hook->trap_ = trap;
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
@@ -201,7 +198,7 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
 
     // pupulate backref
     hook->params_ = std::make_shared<Params>();
-    hook->params_->hook_ = hook.get();
+    hook->params_->hook_ = hook;
     hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
@@ -211,7 +208,8 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
         delete hook->trap_;
         hook->trap_ = nullptr;
         hook->params_.reset();
-        return {};
+        delete hook;
+        return nullptr;
     }
 
     PRINT_DEBUG("[LIBHOOK] return hook OK\n");

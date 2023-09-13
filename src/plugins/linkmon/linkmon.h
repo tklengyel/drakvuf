@@ -124,9 +124,6 @@ private:
 
     std::array<size_t, linkmon_ns::__OFFSET_MAX> offsets;
 
-    std::unique_ptr<libhook::SyscallHook> ntfscontrolfile_hook;
-    std::unique_ptr<libhook::SyscallHook> setinformation_hook;
-
     event_response_t ntfscontrolfile_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t setinformation_cb(drakvuf_t, drakvuf_trap_info_t*);
 

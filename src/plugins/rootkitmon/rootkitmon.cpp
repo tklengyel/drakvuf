@@ -372,8 +372,8 @@ static void initialize_ci_checks(drakvuf_t drakvuf, rootkitmon* plugin, const ro
     vmi_read_8_va(vmi, plugin->ci_enabled_va, 4, &plugin->ci_enabled);
     plugin->ci_callbacks = calc_checksum(vmi, plugin->ci_callbacks_va, get_ci_table_size(vmi));
 
-    plugin->syscall_hooks.push_back(plugin->createSyscallHook("SeValidateImageHeader", check_cb));
-    plugin->syscall_hooks.push_back(plugin->createSyscallHook("SeValidateImageData", check_cb));
+    plugin->createSyscallHook("SeValidateImageHeader", check_cb);
+    plugin->createSyscallHook("SeValidateImageData", check_cb);
 }
 
 static void initialize_ob_checks(vmi_instance_t vmi, rootkitmon* plugin)
@@ -881,6 +881,7 @@ event_response_t rootkitmon::rop_callback(drakvuf_t drakvuf, drakvuf_trap_info_t
             report(drakvuf, plugin->format, "SecurityFeature", "EFLAGS.SMAP", "Disabled");
         }
         // Release memory hook. If EFLAGS.SMAP wasn't set at this point, we don't need this bp anymore
+        plugin->remove_hook(plugin->rop_hooks[info->trap->breakpoint.addr]);
         plugin->rop_hooks.erase(info->trap->breakpoint.addr);
     }
 
@@ -935,7 +936,7 @@ event_response_t rootkitmon::cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
+void rootkitmon::register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
     const char* func_name, hook_cb_t callback)
 {
     addr_t func_rva = 0;
@@ -975,13 +976,9 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t
         PRINT_DEBUG("[ROOTKITMON] Failed to hook %s\n", func_name);
         throw -1;
     }
-    else
-    {
-        return hook;
-    }
 }
 
-std::unique_ptr<libhook::ManualHook> rootkitmon::register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access)
+void rootkitmon::register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access)
 {
     auto trap = new drakvuf_trap_t();
     trap->type = MEMACCESS;
@@ -1002,10 +999,6 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_mem_hook(hook_cb_t cal
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to hook 0x%lx\n", pa >> 12);
         throw -1;
-    }
-    else
-    {
-        return hook;
     }
 }
 
@@ -1246,7 +1239,7 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
     if (!config->fwpkclnt_profile)
         PRINT_DEBUG("[ROOTKITMON] No profile for fwpkclnt.sys was given!\n");
     else
-        manual_hooks.push_back(register_profile_hook(drakvuf, config->fwpkclnt_profile, "fwpkclnt.sys", "FwpmCalloutAdd0", wfp_cb));
+        register_profile_hook(drakvuf, config->fwpkclnt_profile, "fwpkclnt.sys", "FwpmCalloutAdd0", wfp_cb);
 
     if (!config->fltmgr_profile)
     {
@@ -1311,7 +1304,8 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
         PRINT_DEBUG("[ROOTKITMON] Failed to translate symbol to physical address\n");
         throw -1;
     }
-    manual_hooks.push_back(register_mem_hook(halprivatetable_overwrite_cb, this->halprivatetable, VMI_MEMACCESS_W));
+
+    register_mem_hook(halprivatetable_overwrite_cb, this->halprivatetable, VMI_MEMACCESS_W);
 
     if (!drakvuf_get_kernel_struct_size(drakvuf, "_OBJECT_HEADER", &this->object_header_size) ||
         !drakvuf_get_kernel_struct_size(drakvuf, "_FAST_IO_DISPATCH", &this->fastio_size) ||
@@ -1370,7 +1364,7 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
     trap->data = (void*)this;
     trap->ah_cb = nullptr;
     trap->cb = &rootkitmon::msr_callback;
-    this->msr_hook = createManualHook(trap, [](drakvuf_trap_t* trap_)
+    createManualHook(trap, [](drakvuf_trap_t* trap_)
     {
         delete trap_;
     });
@@ -1382,7 +1376,7 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
     cr4_trap->data = (void*)this;
     cr4_trap->ah_cb = nullptr;
     cr4_trap->cb = &rootkitmon::cr4_callback;
-    this->cr4_hook = createManualHook(cr4_trap, [](drakvuf_trap_t* trap_)
+    createManualHook(cr4_trap, [](drakvuf_trap_t* trap_)
     {
         delete trap_;
     });

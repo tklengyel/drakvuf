@@ -123,8 +123,7 @@ public:
      * Factory function to create the trap and perform hooking at the same time.
      */
     [[nodiscard]]
-    static auto create(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t)
-    -> std::unique_ptr<ManualHook>;
+    static ManualHook* create(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t);
 
     /**
      * Unhook in dctor

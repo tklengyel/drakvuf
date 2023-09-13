@@ -172,15 +172,12 @@ void fileextractor::createfile_cb_impl(drakvuf_t,
     drakvuf_trap_info_t* info,
     addr_t handle, bool del, bool append)
 {
-    auto hook_id = make_hook_id(info);
     auto hook = createReturnHook<createfile_result_t>(info,
             &fileextractor::createfile_ret_cb);
     auto params = libhook::GetTrapParams<createfile_result_t>(hook->trap_);
     params->handle = handle;
     params->append = append;
     params->del = del;
-
-    createfile_ret_hooks[hook_id] = std::move(hook);
 }
 
 event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
@@ -190,8 +187,7 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
     if (!params_copy.verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto hook_id = make_hook_id(info);
-    createfile_ret_hooks.erase(hook_id);
+    this->remove_hook(params_copy.hook_);
 
     // Return if NtCreateFile/NtOpenFile failed
     if (info->regs->rax)
@@ -620,7 +616,6 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
             // return hook setup
             if (task->append)
                 offset = 0;
-            auto hook_id = make_hook_id(info);
             auto hook = createReturnHook<writefile_result_t>(info,
                     &fileextractor::writefile_ret_cb);
             auto params = libhook::GetTrapParams<writefile_result_t>(hook->trap_);
@@ -645,8 +640,6 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
                 get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
                 params->byteoffset = task->currentbyteoffset;
             }
-            writefile_ret_hooks[hook_id] = std::move(hook);
-
         }
     }
 
@@ -673,8 +666,9 @@ event_response_t fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
     int idx = params->idx;
 
     dump_mem_to_file(info->regs->cr3, str, idx, byteoffset, len);
-    auto hook_id = make_hook_id(info);
-    writefile_ret_hooks.erase(hook_id);
+
+    this->remove_hook(params->hook_);
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -1965,13 +1959,6 @@ void fileextractor::dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t
     return;
 }
 
-uint64_t fileextractor::make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 uint64_t fileextractor::make_task_id(vmi_pid_t pid, handle_t handle)
 {
     uint64_t u64_pid = pid;
@@ -2129,12 +2116,12 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
         throw -1;
     }
 
-    this->setinformation_hook = createSyscallHook("NtSetInformationFile", &fileextractor::setinformation_cb);
-    this->writefile_hook = createSyscallHook("NtWriteFile", &fileextractor::writefile_cb);
-    this->close_hook = createSyscallHook("NtClose", &fileextractor::close_cb);
-    this->createsection_hook = createSyscallHook("ZwCreateSection", &fileextractor::createsection_cb);
-    this->createfile_hook = createSyscallHook("NtCreateFile", &fileextractor::createfile_cb);
-    this->openfile_hook = createSyscallHook("NtOpenFile", &fileextractor::openfile_cb);
+    createSyscallHook("NtSetInformationFile", &fileextractor::setinformation_cb);
+    createSyscallHook("NtWriteFile", &fileextractor::writefile_cb);
+    createSyscallHook("NtClose", &fileextractor::close_cb);
+    createSyscallHook("ZwCreateSection", &fileextractor::createsection_cb);
+    createSyscallHook("NtCreateFile", &fileextractor::createfile_cb);
+    createSyscallHook("NtOpenFile", &fileextractor::openfile_cb);
 }
 
 /* NOTE One should run drakvuf loop to restore VM state.

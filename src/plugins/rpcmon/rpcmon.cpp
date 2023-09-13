@@ -114,14 +114,6 @@
 #include "rpcmon.h"
 #include "private.h"
 
-
-static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 namespace
 {
 
@@ -409,8 +401,7 @@ event_response_t rpcmon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
         keyval("ExtraNum", fmt_extra_num)
     );
 
-    uint64_t hookID = make_hook_id(info);
-    ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -451,7 +442,6 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         arguments.push_back(argument);
     }
 
-    uint64_t hookID = make_hook_id(info);
     auto hook = plugin->createReturnHook<RpcmonReturnHookData>(info,
             &rpcmon::usermode_return_hook_cb, drakvuf_get_limited_traps_ttl(drakvuf));
     auto params = libhook::GetTrapParams<RpcmonReturnHookData>(hook->trap_);
@@ -460,7 +450,6 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     params->target = target;
 
     hook->trap_->name = target->target_name.c_str();
-    plugin->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -544,9 +533,4 @@ rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
 rpcmon::~rpcmon()
 {
 
-}
-
-bool rpcmon::stop_impl()
-{
-    return ret_hooks.empty() && pluginex::stop_impl();
 }

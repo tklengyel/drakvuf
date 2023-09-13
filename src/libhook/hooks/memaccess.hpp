@@ -118,8 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
-    -> std::unique_ptr<MemAccessHook>;
+    static MemAccessHook* create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl);
 
     /**
      * unhook on dctor
@@ -162,13 +161,11 @@ protected:
 };
 
 template<typename Params>
-auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
--> std::unique_ptr<MemAccessHook>
+MemAccessHook* MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
 {
     PRINT_DEBUG("[LIBHOOK] creating MemAccessHook hook\n");
 
-    // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<MemAccessHook>(new MemAccessHook(drakvuf, cb));
+    auto hook = new MemAccessHook(drakvuf, cb);
     hook->trap_ = new drakvuf_trap_t();
 
     hook->trap_->name = "libhook MemAccessHook";
@@ -187,7 +184,7 @@ auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memac
 
     // populate backref
     hook->params_ = std::make_shared<Params>();
-    hook->params_->hook_ = hook.get();
+    hook->params_->hook_ = hook;
     hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
@@ -197,7 +194,8 @@ auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memac
         delete hook->trap_;
         hook->trap_ = nullptr;
         hook->params_.reset();
-        return std::unique_ptr<MemAccessHook>();
+        delete hook;
+        return nullptr;
     }
 
     PRINT_DEBUG("[LIBHOOK] MemAccessHook hook OK\n");

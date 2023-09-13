@@ -324,7 +324,7 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
                             {
                                 this->addr_InputBuffer_Status = 0;
                                 this->addr_IoStatusBlock_Information = 0;
-                                this->NtClose_hook[hook_ID] = this->createSyscallHook("NtClose", &hidevm::NtClose_cb);
+                                this->NtClose_hook[hook_ID] = std::unique_ptr<libhook::SyscallHook>(this->createSyscallHook("NtClose", &hidevm::NtClose_cb, {}, UNLIMITED_TTL, false));
                                 fmt::print(this->format, "hidevm", drakvuf, info,
                                     keyval("Reason", fmt::Qstr("MSAcpi_ThermalZoneTemperature query spoofed"))
                                 );
@@ -451,10 +451,10 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                     this->addr_WmiKmRequestOpenBlock_Handle = InputBuffer + WmiKmRequestOpenBlock_Handle;
                     // After validating GUID value we set 1st stage hook
                     this->stage = STAGE_WMI_OPEN_BLOCK;
-                    auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb);
+                    auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb, UNLIMITED_TTL, false);
                     // Save original PID and TID to validate that next steps are in the same chain
                     this->pid_tid = hook_ID;
-                    this->ret_hooks[hook_ID] = std::move(hook);
+                    this->ret_hooks[hook_ID] = std::unique_ptr<libhook::ReturnHook>(hook);
                 }
                 vmi_free_unicode_str(guid_object_name);
                 free(guid_object_name_utf8.contents);
@@ -506,8 +506,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                     this->addr_InputBuffer_Status = InputBuffer + WmiKmRequestQueryGuidInfo_Status;
                     this->addr_IoStatusBlock_Information = IoStatusBlock + this->iostatusblock_information;
 
-                    auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb);
-                    this->ret_hooks[hook_ID] = std::move(hook);
+                    this->ret_hooks[hook_ID] = std::unique_ptr<libhook::ReturnHook>(this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb, UNLIMITED_TTL, false));
                 }
             }
         }
@@ -557,8 +556,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                     // If this is a first call with IOCTL_WMI_QUERY_ALL_DATA we set the first stage
                     if (!this->query_stage)
                         this->query_stage = 1;
-                    auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb);
-                    this->ret_hooks[hook_ID] = std::move(hook);
+                    this->ret_hooks[hook_ID] = std::unique_ptr<libhook::ReturnHook>(this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb, UNLIMITED_TTL, false));
                 }
             }
         }
@@ -764,7 +762,7 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
         throw -1;
     }
 
-    this->NtDeviceIoControlFile_hook = createSyscallHook("NtDeviceIoControlFile", &hidevm::NtDeviceIoControlFile_cb);
+    createSyscallHook("NtDeviceIoControlFile", &hidevm::NtDeviceIoControlFile_cb);
 
     // Usermode hooking for WQL spoofing
     if (!drakvuf_are_userhooks_supported(drakvuf))

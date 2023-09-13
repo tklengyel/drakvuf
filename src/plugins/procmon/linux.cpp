@@ -144,13 +144,6 @@ void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
 
 } // namespace
 
-uint64_t make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->proc_data.pid;
-    uint64_t u64_tid = info->proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t argv = drakvuf_get_function_argument(drakvuf, info, 4);
@@ -345,8 +338,7 @@ event_response_t linux_procmon::do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf
         }
     }
 
-    auto hookID = make_hook_id(info);
-    this->internal_ret_traps.erase(hookID);
+    this->remove_hook(params->hook_);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -378,8 +370,6 @@ event_response_t linux_procmon::do_open_execat_cb(drakvuf_t drakvuf, drakvuf_tra
     params->execat_rsp = ret_addr;
 
     // Register return trap
-    auto hookID = make_hook_id(info);
-
     auto ret_hook = createReturnHook<open_execat_data>(info, &linux_procmon::do_open_execat_ret_cb);
     if (!ret_hook)
     {
@@ -389,8 +379,7 @@ event_response_t linux_procmon::do_open_execat_cb(drakvuf_t drakvuf, drakvuf_tra
     ret_hook->trap_->name = "do_open_execat_ret_trap";
     auto ret_params = libhook::GetTrapParams<open_execat_data>(ret_hook->trap_);
     ret_params->data = params_->data;
-    this->internal_ret_traps[hookID] = std::move(ret_hook);
-    this->internal_traps.erase(hookID);
+    //this->internal_traps.erase(hookID); // wtf
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -406,8 +395,7 @@ event_response_t linux_procmon::do_execveat_common_ret_cb(drakvuf_t drakvuf, dra
     if (!params->internal_error)
         linux_procmon::print_info(drakvuf, info);
 
-    uint64_t hookID = make_hook_id(info);
-    ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -430,7 +418,6 @@ event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf
         return VMI_EVENT_RESPONSE_NONE;
 
     // Create new trap for return callback
-    auto hookID = make_hook_id(info);
     auto hook = this->createReturnHook<execve_data>(info, &linux_procmon::do_execveat_common_ret_cb);
     auto params = libhook::GetTrapParams<execve_data>(hook->trap_);
 
@@ -451,7 +438,6 @@ event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf
     g_free(thread_name);
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     auto open_hook = createSyscallHook<open_execat_data>(this->do_open_execat_name, &linux_procmon::do_open_execat_cb, "do_open_execat_trap");
     if (nullptr == open_hook)
@@ -462,7 +448,6 @@ event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf
 
     auto open_params = libhook::GetTrapParams<open_execat_data>(open_hook->trap_);
     open_params->data = params->hook_->params();
-    this->internal_traps[hookID] = std::move(open_hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -518,8 +503,7 @@ event_response_t linux_procmon::send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         keyval("SignalStr", fmt::Rstr(signal_str))
     );
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -569,7 +553,6 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     char* current_thread_name = drakvuf_get_process_name(drakvuf, process_base_of_current_process, false);
 
     // Create new trap for return callback
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<send_signal_data>(info, &linux_procmon::send_signal_ret_cb);
     auto params = libhook::GetTrapParams<send_signal_data>(hook->trap_);
 
@@ -585,7 +568,6 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     params->signal = signal;
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     g_free(const_cast<char*>(target_proc_data.name));
     g_free(target_thread_name);
@@ -612,8 +594,7 @@ event_response_t linux_procmon::kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_t
         keyval("NewPid", fmt::Nval(new_pid))
     );
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -653,7 +634,6 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<kernel_clone_data>(info, &linux_procmon::kernel_clone_ret_cb);
     auto params = libhook::GetTrapParams<kernel_clone_data>(hook->trap_);
 
@@ -661,7 +641,6 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
     params->exit_signal = exit_signal;
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -691,31 +670,36 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, const procmon_config* config, ou
     else
         do_open_execat_name = "__do_open_execat";
 
-    exec_hook = createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb);
+    std::unique_ptr<libhook::SyscallHook> exec_hook(createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb, std::nullopt, false));
     if (nullptr == exec_hook)
     {
         PRINT_DEBUG("[PROCMON] Method do_execveat_common not found. You are probably using an older kernel version below 5.9\n");
         return;
     }
 
-    exit_hook = createSyscallHook("do_exit", &linux_procmon::do_exit_cb);
+    std::unique_ptr<libhook::SyscallHook> exit_hook(createSyscallHook("do_exit", &linux_procmon::do_exit_cb, std::nullopt, false));
     if (nullptr == exit_hook)
     {
         PRINT_DEBUG("[PROCMON] Method do_exit not found.\n");
         return;
     }
 
-    signal_hook = createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal");
+    std::unique_ptr<libhook::SyscallHook> signal_hook(createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal", false));
     if (nullptr == signal_hook)
     {
         PRINT_DEBUG("[PROCMON] Method __send_signal not found.\n");
         return;
     }
 
-    kernel_clone_hook = createSyscallHook("kernel_clone", &linux_procmon::kernel_clone_cb);
+    std::unique_ptr<libhook::SyscallHook> kernel_clone_hook(createSyscallHook("kernel_clone", &linux_procmon::kernel_clone_cb, std::nullopt, false));
     if (nullptr == kernel_clone_hook)
     {
         PRINT_DEBUG("[PROCMON] Method kernel_clone not found.\n");
         return;
     }
+
+    this->register_hook(std::move(exec_hook));
+    this->register_hook(std::move(exit_hook));
+    this->register_hook(std::move(signal_hook));
+    this->register_hook(std::move(kernel_clone_hook));
 }

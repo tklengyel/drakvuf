@@ -780,27 +780,10 @@ event_response_t codemon::write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     auto exec_hook_params = libhook::GetTrapParams<AccessFaultResult>(exec_hook->trap_);
     exec_hook_params->page_va = params->page_va;
 
-    this->remove_memaccess_hook(trap_info);
-    this->memaccess_hooks.insert(std::move(exec_hook));
+    this->remove_hook(params->hook_);
 
     PRINT_DEBUG("[CODEMON] Replaced write hook on GFN 0x%lx with execute hook\n", trap_info->trap->memaccess.gfn);
     return VMI_EVENT_RESPONSE_NONE;
-}
-
-void codemon::remove_memaccess_hook(drakvuf_trap_info_t* trap_info)
-{
-    for (auto it = this->memaccess_hooks.begin(); it != this->memaccess_hooks.end(); ++it)
-    {
-        if ((*it)->trap_ == trap_info->trap)
-        {
-            // this is ok to erase element, while iterating over, since we instantly return and stop iteration
-            this->memaccess_hooks.erase(it);
-            return;
-        }
-    }
-
-    PRINT_DEBUG("[CODEMON] attempted to remove a hook which doesn't exist, this should never happen\n");
-    throw -1;
 }
 
 /**
@@ -821,7 +804,7 @@ event_response_t codemon::execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     {
         if (strcasestr(trap_info->proc_data.name, (*this->filter_executable).c_str()) == NULL)
         {
-            this->remove_memaccess_hook(trap_info);
+            this->remove_hook(params->hook_);
             PRINT_DEBUG("[CODEMON] Removed filtered hook for PA 0x%lx", trap_info->trap_pa);
             return VMI_EVENT_RESPONSE_NONE;
         }
@@ -832,7 +815,7 @@ event_response_t codemon::execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     if (!dump_metadata)
     {
         PRINT_DEBUG("[CODEMON] failed to allocate dump_metadata_struct, unhooking\n");
-        this->remove_memaccess_hook(trap_info);
+        this->remove_hook(params->hook_);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -854,8 +837,7 @@ event_response_t codemon::execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     write_hook_params->page_va = params->page_va;
 
     // Replace current execute hook with write hook
-    this->memaccess_hooks.insert(std::move(write_hook));
-    this->remove_memaccess_hook(trap_info);
+    this->remove_hook(params->hook_);
 
     PRINT_DEBUG("[CODEMON] Replaced execute hook X on GFN 0x%lx with write hook W\n", trap_info->trap->memaccess.gfn);
     free_all(dump_metadata.get());
@@ -903,7 +885,7 @@ event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drak
                     // if this isn't the first time, then we've already tried page faulting and it didn't help
                     PRINT_DEBUG("[CODEMON] Failed to load page via page fault, CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
                     this->pf_in_progress.erase(std::make_pair(params->target_pid, params->target_tid));
-                    this->mmAccessFaultReturnHook.reset();
+                    this->remove_hook(params->hook_);
                     return VMI_EVENT_RESPONSE_NONE;
                 }
 
@@ -917,7 +899,7 @@ event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drak
                 else
                 {
                     PRINT_DEBUG("[CODEMON] Failed to request page fault for CR3=0x%lx, Addr=0x%lx\n", trap_info->regs->cr3, params->page_va);
-                    this->mmAccessFaultReturnHook.reset();
+                    this->remove_hook(params->hook_);
                     return VMI_EVENT_RESPONSE_NONE;
                 }
             }
@@ -940,21 +922,20 @@ event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drak
         if (!exec_hook)
         {
             PRINT_DEBUG("[CODEMON] Failed to create execute trap X. Not monitoring GFN 0x%lx\n", gfn);
-            this->mmAccessFaultReturnHook.reset();
+            this->remove_hook(params->hook_);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
         auto exec_hook_params = libhook::GetTrapParams<AccessFaultResult>(exec_hook->trap_);
         exec_hook_params->page_va = page_va;
 
-        this->memaccess_hooks.insert(std::move(exec_hook));
         this->monitored_pages.insert(monitored_page_identifier);
         PRINT_DEBUG("[CODEMON] Set up execute trap X on GFN 0x%lx\n", gfn);
     }
 
     // Destroys this return trap, because it is specific for specific page_va.
     // This was the trap being called when the physical address got computed.
-    this->mmAccessFaultReturnHook.reset();
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -1002,14 +983,14 @@ event_response_t codemon::mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     //This can be done right here at the entry of MmAccessFault, since the RIP is the top stack element right now and the esp points to it. So by breakpoint_by_pid_searcher we retrieve this return address and set a hook to it (the address where the execution continues after returning from MmAccessFault).
 
     // Adds a return hook, a hook which will be called after function completes and returns.
-    this->mmAccessFaultReturnHook = createReturnHook<AccessFaultResult>(trap_info, &codemon::mm_access_fault_return_hook_cb);
-    if (!this->mmAccessFaultReturnHook)
+    auto mmAccessFaultReturnHook = createReturnHook<AccessFaultResult>(trap_info, &codemon::mm_access_fault_return_hook_cb);
+    if (!mmAccessFaultReturnHook)
     {
         PRINT_DEBUG("[CODEMON] Could not create accessFaultReturnTrap\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto params = libhook::GetTrapParams<AccessFaultResult>(this->mmAccessFaultReturnHook->trap_);
+    auto params = libhook::GetTrapParams<AccessFaultResult>(mmAccessFaultReturnHook->trap_);
     params->setResultCallParams(trap_info);
     params->page_va = fault_va;
 
@@ -1105,11 +1086,11 @@ codemon::codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_
     if (config->filter_executable)
         this->filter_executable = config->filter_executable;
 
-    this->mmAccessFaultHook = createSyscallHook("MmAccessFault", &codemon::mm_access_fault_hook_cb);
-    if (!this->mmAccessFaultHook)
+    auto mmAccessFaultHook = createSyscallHook("MmAccessFault", &codemon::mm_access_fault_hook_cb);
+    if (!mmAccessFaultHook)
         throw -1;
 
-    this->kiSystemServiceHandlerHook = createSyscallHook("KiSystemServiceHandler", &codemon::ki_system_service_handler_cb);
-    if (!this->kiSystemServiceHandlerHook)
+    auto kiSystemServiceHandlerHook = createSyscallHook("KiSystemServiceHandler", &codemon::ki_system_service_handler_cb);
+    if (!kiSystemServiceHandlerHook)
         throw -1;
 }

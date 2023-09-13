@@ -289,5 +289,5 @@ unixsocketmon::unixsocketmon(drakvuf_t drakvuf, const unixsocketmon_config* conf
         return;
     }
 
-    sockethook = createSyscallHook("sock_sendmsg", &unixsocketmon::sock_send_msg_cb);
+    createSyscallHook("sock_sendmsg", &unixsocketmon::sock_send_msg_cb);
 }

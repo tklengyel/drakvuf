@@ -167,16 +167,6 @@ private:
 
     int sequence_number = 0;
 
-    /* Hooks */
-    std::unique_ptr<libhook::SyscallHook> setinformation_hook;
-    std::unique_ptr<libhook::SyscallHook> writefile_hook;
-    std::unique_ptr<libhook::SyscallHook> close_hook;
-    std::unique_ptr<libhook::SyscallHook> createsection_hook;
-    std::unique_ptr<libhook::SyscallHook> createfile_hook;
-    std::unique_ptr<libhook::SyscallHook> openfile_hook;
-    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> createfile_ret_hooks;
-    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> writefile_ret_hooks;
-
     /* VA of functions to be injected */
     addr_t queryvolumeinfo_va = 0;
     addr_t queryinfo_va = 0;
@@ -250,7 +240,6 @@ private:
         void* buffer,
         size_t size);
     void dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t offset, size_t size);
-    uint64_t make_hook_id(drakvuf_trap_info_t*);
     uint64_t make_task_id(vmi_pid_t pid, handle_t handle);
     uint64_t make_task_id(task_t&);
     void free_pool(addr_t va);

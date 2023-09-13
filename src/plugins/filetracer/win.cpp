@@ -112,13 +112,6 @@ using namespace filetracer_ns;
 
 extern const flags_str_t generic_ar;
 
-static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 static uint64_t windows_tick_to_unix(long long windowsTicks)
 {
     uint64_t windows_tick = 10000000UL;
@@ -698,8 +691,7 @@ event_response_t win_filetracer::create_file_ret_cb(drakvuf_t drakvuf, drakvuf_t
     if (succ)
         print_create_file_obj_info(drakvuf, info, handle, io_information, file_attrs, params, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -739,7 +731,6 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     }
 
     // Create new trap for return callback
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<win_data>(info, &win_filetracer::create_file_ret_cb);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
@@ -757,7 +748,6 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     params->rsp = ret_addr;
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -798,8 +788,7 @@ event_response_t win_filetracer::open_file_ret_cb(drakvuf_t drakvuf, drakvuf_tra
     if (succ)
         print_open_file_obj_info(drakvuf, info, handle, io_information, file_attrs, params, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -830,7 +819,6 @@ event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<win_data>(info, &win_filetracer::open_file_ret_cb);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
@@ -846,7 +834,6 @@ event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
     params->rsp = ret_addr;
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -882,8 +869,7 @@ event_response_t win_filetracer::query_attributes_file_ret_cb(drakvuf_t drakvuf,
     if (succ_1 && succ_2)
         print_file_query_attributes(drakvuf, info, file_attrs, file_info, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -900,7 +886,6 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
@@ -912,7 +897,6 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
     params->rsp = ret_addr;
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -930,8 +914,7 @@ event_response_t win_filetracer::query_full_attributes_file_ret_cb(drakvuf_t dra
     if (succ_1 && succ_2)
         print_file_query_full_attributes(drakvuf, info, file_attrs, file_info, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -948,7 +931,6 @@ event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
@@ -960,7 +942,6 @@ event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf
     params->rsp = ret_addr;
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -1096,8 +1077,7 @@ event_response_t win_filetracer::query_information_file_ret_cb(drakvuf_t drakvuf
             break;
     };
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -1121,7 +1101,6 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
         addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
         // Create new trap for return callback
-        uint64_t hookID = make_hook_id(info);
         auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_information_file_ret_cb);
         auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
@@ -1134,7 +1113,6 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
         params->file_information_class = fileinfoclass;
 
         hook->trap_->name = info->trap->name;
-        this->ret_hooks[hookID] = std::move(hook);
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -1157,13 +1135,13 @@ win_filetracer::win_filetracer(drakvuf_t drakvuf, const filetracer_config* c, ou
         this->has_ole32 = true;
     }
 
-    create_file_hook = createSyscallHook("NtCreateFile", &win_filetracer::create_file_cb);
-    open_file_hook = createSyscallHook("NtOpenFile", &win_filetracer::open_file_cb);
-    open_directory_object_hook = createSyscallHook("NtOpenDirectoryObject", &win_filetracer::open_directory_object_cb);
-    query_attributes_file_hook = createSyscallHook("NtQueryAttributesFile", &win_filetracer::query_attributes_file_cb);
-    query_full_attributes_file_hook = createSyscallHook("NtQueryFullAttributesFile", &win_filetracer::query_full_attributes_file_cb);
-    set_information_file_hook = createSyscallHook("NtSetInformationFile", &win_filetracer::set_information_file_cb);
-    read_file_hook = createSyscallHook("NtReadFile", &win_filetracer::read_file_cb);
-    write_file_hook = createSyscallHook("NtWriteFile", &win_filetracer::write_file_cb);
-    query_information_file_hook = createSyscallHook("NtQueryInformationFile", &win_filetracer::query_information_file_cb);
+    createSyscallHook("NtCreateFile", &win_filetracer::create_file_cb);
+    createSyscallHook("NtOpenFile", &win_filetracer::open_file_cb);
+    createSyscallHook("NtOpenDirectoryObject", &win_filetracer::open_directory_object_cb);
+    createSyscallHook("NtQueryAttributesFile", &win_filetracer::query_attributes_file_cb);
+    createSyscallHook("NtQueryFullAttributesFile", &win_filetracer::query_full_attributes_file_cb);
+    createSyscallHook("NtSetInformationFile", &win_filetracer::set_information_file_cb);
+    createSyscallHook("NtReadFile", &win_filetracer::read_file_cb);
+    createSyscallHook("NtWriteFile", &win_filetracer::write_file_cb);
+    createSyscallHook("NtQueryInformationFile", &win_filetracer::query_information_file_cb);
 }

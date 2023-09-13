@@ -686,10 +686,10 @@ event_response_t win_syscalls::load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_in
     {
         if (strstr(service_name_casefold, "win32k.sys"))
         {
-            this->load_driver_hook = {};
+            this->remove_hook(this->load_driver_hook);
 
             if (setup_win32k_syscalls(drakvuf))
-                this->create_process_hook = {};
+                this->remove_hook(this->create_process_hook);
         }
         g_free(service_name_casefold);
     }
@@ -714,10 +714,8 @@ event_response_t win_syscalls::create_process_cb(drakvuf_t drakvuf, drakvuf_trap
     {
         if (strstr(image_path_casefold, "explorer.exe"))
         {
-            this->create_process_hook = {};
-
-            auto hook = createReturnHook<PluginResult>(info, &win_syscalls::create_process_ret_cb);
-            this->wait_process_creation_hook = std::move(hook);
+            this->remove_hook(this->create_process_hook);
+            createReturnHook<PluginResult>(info, &win_syscalls::create_process_ret_cb);
         }
         g_free(image_path_casefold);
     }
@@ -731,10 +729,10 @@ event_response_t win_syscalls::create_process_ret_cb(drakvuf_t drakvuf, drakvuf_
     if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    this->wait_process_creation_hook = {};
+    this->remove_hook(params->hook_);
 
     if (setup_win32k_syscalls(drakvuf))
-        this->load_driver_hook = {};
+        this->remove_hook(this->load_driver_hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }

@@ -125,13 +125,6 @@ static std::string to_oct_str(uint64_t n)
     return ss.str();
 }
 
-uint64_t linux_filetracer::make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->proc_data.pid;
-    uint64_t u64_tid = info->proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 /* -----------------FILE INFO PARSING------------------ */
 
 bool linux_filetracer::get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t file_addr)
@@ -280,8 +273,7 @@ event_response_t linux_filetracer::open_file_ret_cb(drakvuf_t drakvuf, drakvuf_t
         if (get_file_info(drakvuf, info, params, file_struct))
             print_info(drakvuf, info, params);
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -301,7 +293,6 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
         return VMI_EVENT_RESPONSE_NONE;
 
     // Create new trap for return callback
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<linux_data>(info, &linux_filetracer::open_file_ret_cb);
     auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
 
@@ -309,7 +300,6 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     params->setResultCallParams(info);
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -431,8 +421,7 @@ event_response_t linux_filetracer::memfd_create_file_ret_cb(drakvuf_t drakvuf, d
     if (params->file_handle > -1 && !params->filename.empty())
         print_info(drakvuf, info, params);
 
-    uint64_t hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -469,7 +458,6 @@ event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakv
 
 
     // Create new trap for return callback
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<linux_data>(info, &linux_filetracer::memfd_create_file_ret_cb);
     auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
 
@@ -483,7 +471,6 @@ event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakv
     params->flags = parse_flags(flags, linux_memfd_flags, this->m_output_format);
 
     hook->trap_->name = info->trap->name;
-    this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -1010,32 +997,32 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output) : 
     }
 
     // File operations hooks
-    open_file_hook = createSyscallHook("do_filp_open", &linux_filetracer::open_file_cb);
-    read_file_hook = createSyscallHook("vfs_read", &linux_filetracer::read_file_cb);
-    write_file_hook = createSyscallHook("vfs_write", &linux_filetracer::write_file_cb);
-    close_file_hook = createSyscallHook("filp_close", &linux_filetracer::close_file_cb);
-    llseek_file_hook = createSyscallHook("vfs_llseek", &linux_filetracer::llseek_file_cb);
-    memfd_create_file_hook = createSyscallHook("__x64_sys_memfd_create", &linux_filetracer::memfd_create_file_cb, "memfd_create");
-    mknod_file_hook = createSyscallHook("vfs_mknod", &linux_filetracer::mknod_file_cb);
-    rename_file_hook = createSyscallHook("vfs_rename", &linux_filetracer::rename_file_cb);
-    truncate_file_hook = createSyscallHook("do_truncate", &linux_filetracer::truncate_file_cb);
-    allocate_file_hook = createSyscallHook("vfs_allocate", &linux_filetracer::allocate_file_cb);
+    createSyscallHook("do_filp_open", &linux_filetracer::open_file_cb);
+    createSyscallHook("vfs_read", &linux_filetracer::read_file_cb);
+    createSyscallHook("vfs_write", &linux_filetracer::write_file_cb);
+    createSyscallHook("filp_close", &linux_filetracer::close_file_cb);
+    createSyscallHook("vfs_llseek", &linux_filetracer::llseek_file_cb);
+    createSyscallHook("__x64_sys_memfd_create", &linux_filetracer::memfd_create_file_cb, "memfd_create");
+    createSyscallHook("vfs_mknod", &linux_filetracer::mknod_file_cb);
+    createSyscallHook("vfs_rename", &linux_filetracer::rename_file_cb);
+    createSyscallHook("do_truncate", &linux_filetracer::truncate_file_cb);
+    createSyscallHook("vfs_allocate", &linux_filetracer::allocate_file_cb);
 
     // File attributes change hooks
-    chmod_file_hook = createSyscallHook("chmod_common", &linux_filetracer::chmod_file_cb);
-    chown_file_hook = createSyscallHook("chown_common", &linux_filetracer::chown_file_cb);
-    utimes_file_hook = createSyscallHook("vfs_utimes", &linux_filetracer::utimes_file_cb);
-    access_file_hook = createSyscallHook("do_faccessat", &linux_filetracer::access_file_cb);
+    createSyscallHook("chmod_common", &linux_filetracer::chmod_file_cb);
+    createSyscallHook("chown_common", &linux_filetracer::chown_file_cb);
+    createSyscallHook("vfs_utimes", &linux_filetracer::utimes_file_cb);
+    createSyscallHook("do_faccessat", &linux_filetracer::access_file_cb);
 
     // Directory operations hooks
-    mkdir_hook = createSyscallHook("vfs_mkdir", &linux_filetracer::mkdir_cb);
-    rmdir_hook = createSyscallHook("vfs_rmdir", &linux_filetracer::rmdir_cb);
-    chdir_hook = createSyscallHook("set_fs_pwd", &linux_filetracer::chdir_cb);
-    chroot_hook = createSyscallHook("set_fs_root", &linux_filetracer::chroot_cb);
+    createSyscallHook("vfs_mkdir", &linux_filetracer::mkdir_cb);
+    createSyscallHook("vfs_rmdir", &linux_filetracer::rmdir_cb);
+    createSyscallHook("set_fs_pwd", &linux_filetracer::chdir_cb);
+    createSyscallHook("set_fs_root", &linux_filetracer::chroot_cb);
 
     // Link operations hooks
-    link_file_hook = createSyscallHook("vfs_link", &linux_filetracer::link_file_cb);
-    unlink_file_hook = createSyscallHook("vfs_unlink", &linux_filetracer::unlink_file_cb);
-    symbolic_link_file_hook = createSyscallHook("vfs_symlink", &linux_filetracer::symbolic_link_file_cb);
-    read_link_hook = createSyscallHook("vfs_readlink", &linux_filetracer::read_link_cb);
+    createSyscallHook("vfs_link", &linux_filetracer::link_file_cb);
+    createSyscallHook("vfs_unlink", &linux_filetracer::unlink_file_cb);
+    createSyscallHook("vfs_symlink", &linux_filetracer::symbolic_link_file_cb);
+    createSyscallHook("vfs_readlink", &linux_filetracer::read_link_cb);
 }

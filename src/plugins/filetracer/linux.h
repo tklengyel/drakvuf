@@ -116,37 +116,6 @@ public:
     std::array<size_t, __LINUX_OFFSET_MAX> offsets;
     std::array<size_t, __PT_REGS_MAX> regs;
 
-    /* Hooks */
-    // File operations hooks
-    std::unique_ptr<libhook::SyscallHook> open_file_hook;
-    std::unique_ptr<libhook::SyscallHook> read_file_hook;
-    std::unique_ptr<libhook::SyscallHook> write_file_hook;
-    std::unique_ptr<libhook::SyscallHook> close_file_hook;
-    std::unique_ptr<libhook::SyscallHook> llseek_file_hook;
-    std::unique_ptr<libhook::SyscallHook> memfd_create_file_hook;
-    std::unique_ptr<libhook::SyscallHook> mknod_file_hook;
-    std::unique_ptr<libhook::SyscallHook> rename_file_hook;
-    std::unique_ptr<libhook::SyscallHook> truncate_file_hook;
-    std::unique_ptr<libhook::SyscallHook> allocate_file_hook;
-    // File attributes change hooks
-    std::unique_ptr<libhook::SyscallHook> chmod_file_hook;
-    std::unique_ptr<libhook::SyscallHook> chown_file_hook;
-    std::unique_ptr<libhook::SyscallHook> utimes_file_hook;
-    std::unique_ptr<libhook::SyscallHook> access_file_hook;
-    // Directory operations hooks
-    std::unique_ptr<libhook::SyscallHook> mkdir_hook;
-    std::unique_ptr<libhook::SyscallHook> rmdir_hook;
-    std::unique_ptr<libhook::SyscallHook> chdir_hook;
-    std::unique_ptr<libhook::SyscallHook> chroot_hook;
-    // Link operations hooks
-    std::unique_ptr<libhook::SyscallHook> link_file_hook;
-    std::unique_ptr<libhook::SyscallHook> unlink_file_hook;
-    std::unique_ptr<libhook::SyscallHook> symbolic_link_file_hook;
-    std::unique_ptr<libhook::SyscallHook> read_link_hook;
-
-    /* Return hooks */
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
-
     /* Callbacks */
     // File operations callbacks
     event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -180,7 +149,6 @@ public:
     event_response_t memfd_create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* Helper functions */
-    uint64_t make_hook_id(drakvuf_trap_info_t* info);
     void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params);
 
     /* File info parsing */

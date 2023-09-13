@@ -106,17 +106,16 @@
 namespace libhook
 {
 
-auto ManualHook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
--> std::unique_ptr<ManualHook>
+ManualHook* ManualHook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
 {
     PRINT_DEBUG("[LIBHOOK] creating manual hook\n");
 
-    // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<ManualHook>(new ManualHook(drakvuf, trap, free_routine));
+    auto hook = new ManualHook(drakvuf, trap, free_routine);
     if (!drakvuf_add_trap(hook->drakvuf_, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for manual hook\n");
-        return std::unique_ptr<ManualHook>();
+        delete hook;
+        return nullptr;
     }
 
     PRINT_DEBUG("[LIBHOOK] manual hook OK\n");

@@ -123,9 +123,9 @@ public:
     rootkitmon& operator=(const rootkitmon&) = delete;
     ~rootkitmon() = default;
 
-    std::unique_ptr<libhook::ManualHook> register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
+    void register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
         const char* func_name, hook_cb_t callback);
-    std::unique_ptr<libhook::ManualHook> register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access);
+    void register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access);
 
     std::set<rootkitmon_ns::driver_t> enumerate_object_directory(vmi_instance_t vmi, const char* name);
     unicode_string_t* get_object_type_name(vmi_instance_t vmi, addr_t object);
@@ -183,9 +183,6 @@ public:
     std::unordered_map<unsigned int, rootkitmon_ns::descriptors_t> descriptors;
     // VCPU -> MSR_LSTAR
     std::unordered_map<unsigned int, addr_t> msr_lstar;
-    std::vector<std::unique_ptr<libhook::ManualHook>> manual_hooks;
-    std::vector<std::unique_ptr<libhook::SyscallHook>> syscall_hooks;
-    std::unique_ptr<libhook::ManualHook> msr_hook;
-    std::map<uint64_t, std::unique_ptr<libhook::ManualHook>> rop_hooks;
-    std::unique_ptr<libhook::ManualHook> cr4_hook;
+
+    std::unordered_map<uint64_t, libhook::ManualHook*> rop_hooks;
 };

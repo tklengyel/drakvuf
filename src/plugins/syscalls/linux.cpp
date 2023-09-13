@@ -113,13 +113,6 @@
 
 using namespace syscalls_ns;
 
-static uint64_t make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->proc_data.pid;
-    uint64_t u64_tid = info->proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 bool linux_syscalls::get_pt_regs_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* pt_regs_addr, addr_t* nr)
 {
     auto vmi = vmi_lock_guard(drakvuf);
@@ -289,8 +282,7 @@ event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
     this->print_sysret(drakvuf, info, (uint64_t)params->num);
 
-    auto hookID = make_hook_id(info);
-    this->ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -318,9 +310,6 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     hook->trap_->name = info->trap->name;
 
-    auto hookID = make_hook_id(info);
-    this->ret_hooks[hookID] = std::move(hook);
-
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -339,9 +328,6 @@ bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, 
     params->type = is_x64 ? SYSCALL_TYPE_LINUX_X64 : SYSCALL_TYPE_LINUX_X32;
     params->sc = syscall_definition;
 
-    // If there is a collision when two functions point to the same address (for example getpid/getppid),
-    // then we will take only the last one that got into the map, in this case __x64_sys_*
-    this->hooks[hook->trap_->breakpoint.addr] = std::move(hook);
     return true;
 }
 

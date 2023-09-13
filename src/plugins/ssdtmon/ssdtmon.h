@@ -115,7 +115,7 @@ struct ssdtmon_config
 class ssdtmon: public pluginex
 {
 private:
-    std::unique_ptr<libhook::ManualHook> register_mem_hook(hook_cb_t callback, addr_t pa);
+    void register_mem_hook(hook_cb_t callback, addr_t pa);
 
 public:
     output_format_t format;
@@ -129,8 +129,6 @@ public:
 
     addr_t sdt_va, sdt_shadow_va;
     std::array<uint8_t, 32> sdt_crc, sdt_shadow_crc;
-
-    std::vector<std::unique_ptr<libhook::ManualHook>> ssdt_traps;
 
     ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_t output);
     ~ssdtmon();

@@ -127,7 +127,7 @@ public:
     uint8_t stage = 0;
     uint8_t query_stage = 0;
 
-    std::unique_ptr<libhook::SyscallHook> NtDeviceIoControlFile_hook;
+    // don't use pluginex::hooks because we need to handle hooks by threads (PID + TID)
     std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
     std::unordered_map<uint64_t, std::unique_ptr<libhook::SyscallHook>> NtClose_hook;
 

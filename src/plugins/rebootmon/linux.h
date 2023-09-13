@@ -114,13 +114,6 @@ struct rebootmon_config;
 class linux_rebootmon : public pluginex
 {
 private:
-    /* Hooks */
-    std::unique_ptr<libhook::SyscallHook> reboot_hook;
-    std::unique_ptr<libhook::SyscallHook> machine_restart_hook;
-    std::unique_ptr<libhook::SyscallHook> machine_emergency_restart_hook;
-    std::unique_ptr<libhook::SyscallHook> machine_halt_hook;
-    std::unique_ptr<libhook::SyscallHook> machine_power_off_hook;
-
     /* Callbacks */
     event_response_t reboot_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t machine_restart_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

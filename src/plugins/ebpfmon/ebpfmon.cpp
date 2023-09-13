@@ -197,7 +197,7 @@ event_response_t ebpfmon::sys_bpf_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 ebpfmon::ebpfmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output)
 {
-    ebpfhook = createSyscallHook("__do_sys_bpf", &ebpfmon::sys_bpf_cb, "bpf");
+    auto ebpfhook = createSyscallHook("__do_sys_bpf", &ebpfmon::sys_bpf_cb, "bpf");
     if (nullptr == ebpfhook)
     {
         PRINT_DEBUG("[EBPFMON] Method __do_sys_bpf not found.\n");

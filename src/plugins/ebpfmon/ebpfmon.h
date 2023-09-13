@@ -110,8 +110,6 @@
 class ebpfmon: public pluginex
 {
 public:
-    std::unique_ptr<libhook::SyscallHook> ebpfhook;
-
     ebpfmon(drakvuf_t drakvuf, output_format_t output);
     event_response_t sys_bpf_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap);
 };

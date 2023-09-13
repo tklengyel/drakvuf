@@ -165,7 +165,7 @@ ptracemon::ptracemon(drakvuf_t drakvuf, output_format_t output) : pluginex(drakv
         return;
     }
 
-    syshook = createSyscallHook("__x64_sys_ptrace", &ptracemon::ptrace_cb, "ptrace");
+    auto syshook = createSyscallHook("__x64_sys_ptrace", &ptracemon::ptrace_cb, "ptrace");
     if (nullptr == syshook)
     {
         PRINT_DEBUG("[PTRACEMON] Method __x64_sys_ptrace not found\n");

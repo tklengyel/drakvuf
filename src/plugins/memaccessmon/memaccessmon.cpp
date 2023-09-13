@@ -216,7 +216,7 @@ memaccessmon::memaccessmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output), format(output)
 {
     PRINT_DEBUG("[MEMACCESSMON] Starting initialization...\n");
-    this->write_hook = createSyscallHook("NtWriteVirtualMemory", &memaccessmon::readwrite_cb);
-    this->read_hook = createSyscallHook("NtReadVirtualMemory", &memaccessmon::readwrite_cb);
-    this->read_ex_hook = createSyscallHook("NtReadVirtualMemoryEx", &memaccessmon::readwrite_cb);
+    createSyscallHook("NtWriteVirtualMemory", &memaccessmon::readwrite_cb);
+    createSyscallHook("NtReadVirtualMemory", &memaccessmon::readwrite_cb);
+    createSyscallHook("NtReadVirtualMemoryEx", &memaccessmon::readwrite_cb);
 }

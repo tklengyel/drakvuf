@@ -123,7 +123,6 @@ public:
     bool stop_impl() override;
 
 private:
-    std::unique_ptr<libhook::SyscallHook> syscall;
     addr_t eprocess_win32process;
     //_W32PROCESS offsets
     size_t gdihandlecountpeak;

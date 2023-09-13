@@ -266,15 +266,15 @@ ipt::ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output)
         }
     }
 
-    this->cr3_hook = createCr3Hook(&ipt::cr3_cb);
-    if (!this->cr3_hook)
+    auto cr3_hook = createCr3Hook(&ipt::cr3_cb);
+    if (!cr3_hook)
     {
         PRINT_DEBUG("[IPT] Failed to register CR3 trap");
         throw -1;
     }
 
-    this->catchall_hook = createCatchAllHook(&ipt::catchall_cb);
-    if (!this->catchall_hook)
+    auto catchall_hook = createCatchAllHook(&ipt::catchall_cb);
+    if (!catchall_hook)
     {
         PRINT_DEBUG("[IPT] Failed to register catchall trap");
         throw -1;

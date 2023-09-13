@@ -123,13 +123,6 @@ struct ApimonReturnHookData : PluginResult
 
 };
 
-static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin  = get_trap_plugin<apimon>(info);
@@ -199,8 +192,7 @@ event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
         keyval("Extra", fmt_extra)
     );
 
-    uint64_t hookID = make_hook_id(info);
-    ret_hooks.erase(hookID);
+    this->remove_hook(params->hook_);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -241,7 +233,6 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         arguments.push_back(argument);
     }
 
-    uint64_t hookID = make_hook_id(info);
     auto hook = plugin->createReturnHook<ApimonReturnHookData>(info,
             &apimon::usermode_return_hook_cb, drakvuf_get_limited_traps_ttl(drakvuf));
     auto params = libhook::GetTrapParams<ApimonReturnHookData>(hook->trap_);
@@ -250,7 +241,6 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     params->target = target;
 
     hook->trap_->name = target->target_name.c_str();
-    plugin->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -418,11 +408,6 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 
     breakpoint_in_system_process_searcher bp;
     register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete"));
-}
-
-bool apimon::stop_impl()
-{
-    return ret_hooks.empty() && pluginex::stop_impl();
 }
 
 apimon::~apimon()

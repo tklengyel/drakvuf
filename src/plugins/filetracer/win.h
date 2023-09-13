@@ -123,20 +123,6 @@ public:
     bool has_ole32;
     std::array<size_t, __OLE32_OFFSET_MAX> ole32_offsets;
 
-    /* Hooks */
-    std::unique_ptr<libhook::SyscallHook> create_file_hook;
-    std::unique_ptr<libhook::SyscallHook> open_file_hook;
-    std::unique_ptr<libhook::SyscallHook> open_directory_object_hook;
-    std::unique_ptr<libhook::SyscallHook> query_attributes_file_hook;
-    std::unique_ptr<libhook::SyscallHook> query_full_attributes_file_hook;
-    std::unique_ptr<libhook::SyscallHook> set_information_file_hook;
-    std::unique_ptr<libhook::SyscallHook> read_file_hook;
-    std::unique_ptr<libhook::SyscallHook> write_file_hook;
-    std::unique_ptr<libhook::SyscallHook> query_information_file_hook;
-
-    /* Return hooks */
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
-
     /* Callbacks */
     event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

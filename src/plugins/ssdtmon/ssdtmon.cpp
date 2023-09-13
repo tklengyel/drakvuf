@@ -247,7 +247,7 @@ static bool get_driver_base(drakvuf_t drakvuf, ssdtmon* plugin, const char* driv
     return false;
 }
 
-std::unique_ptr<libhook::ManualHook> ssdtmon::register_mem_hook(hook_cb_t callback, addr_t pa)
+void ssdtmon::register_mem_hook(hook_cb_t callback, addr_t pa)
 {
     auto trap = new drakvuf_trap_t
     {
@@ -271,8 +271,6 @@ std::unique_ptr<libhook::ManualHook> ssdtmon::register_mem_hook(hook_cb_t callba
         PRINT_DEBUG("[SSDTMON] Failed to hook 0x%lx\n", pa >> 12);
         throw -1;
     }
-
-    return hook;
 }
 
 /* ----------------------------------------------------- */
@@ -361,7 +359,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
                     throw -1;
                 }
 
-                this->ssdt_traps.push_back(register_mem_hook(write_cb, page_paddr));
+                register_mem_hook(write_cb, page_paddr);
                 this->w32p_ssdt.emplace_back(page_paddr, page_payload_len);
 
                 if (page == 0)
@@ -414,7 +412,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
         this->kiservicelimit,
         sizeof(uint32_t)*this->kiservicelimit);
 
-    this->ssdt_traps.push_back(register_mem_hook(write_cb, kiservicetable));
+    register_mem_hook(write_cb, kiservicetable);
 
     addr_t sdt_rva, sdt_shadow_rva;
 

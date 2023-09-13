@@ -119,8 +119,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::optional<std::string>& display_name)
-    -> std::unique_ptr<SyscallHook>;
+    static SyscallHook* create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::optional<std::string>& display_name);
 
     /**
      * unhook on dctor
@@ -164,8 +163,7 @@ protected:
 };
 
 template<typename Params>
-auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::optional<std::string>& opt_display_name)
--> std::unique_ptr<SyscallHook>
+SyscallHook* SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl, const std::optional<std::string>& opt_display_name)
 {
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
     static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
@@ -190,15 +188,14 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
     if (!trap)
         return {};
 
-    // not using std::make_unique because ctor is private
     const std::string& display_name = opt_display_name ? *opt_display_name : syscall_name;
-    auto hook = std::unique_ptr<SyscallHook>(new SyscallHook(drakvuf, syscall_name, cb, display_name));
+    auto hook = new SyscallHook(drakvuf, syscall_name, cb, display_name);
     hook->trap_ = trap;
     hook->trap_->name = hook->display_name_.data();
 
     // populate backref
     hook->params_ = std::make_shared<Params>();
-    hook->params_->hook_ = hook.get();
+    hook->params_->hook_ = hook;
     hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
@@ -208,7 +205,8 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
         delete hook->trap_;
         hook->trap_ = nullptr;
         hook->params_.reset();
-        return {};
+        delete hook;
+        return nullptr;
     }
 
     PRINT_DEBUG("[LIBHOOK] return hook OK\n");

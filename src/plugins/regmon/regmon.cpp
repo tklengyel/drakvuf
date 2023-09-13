@@ -640,20 +640,20 @@ regmon::regmon(drakvuf_t drakvuf, output_format_t output)
     if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
 
-    delete_key_hook = createSyscallHook("NtDeleteKey", &regmon::delete_key_cb);
-    set_value_key_hook = createSyscallHook("NtSetValueKey", &regmon::set_value_key_cb);
-    delete_value_key_hook = createSyscallHook("NtDeleteValueKey", &regmon::delete_value_key_cb);
-    create_key_hook = createSyscallHook("NtCreateKey", &regmon::create_key_cb);
-    create_key_transacted_hook = createSyscallHook("NtCreateKeyTransacted", &regmon::create_key_transacted_cb);
-    enumerate_key_hook = createSyscallHook("NtEnumerateKey", &regmon::enumerate_key_cb);
-    enumerate_value_key_hook = createSyscallHook("NtEnumerateValueKey", &regmon::enumerate_value_key_cb);
-    open_key_hook = createSyscallHook("NtOpenKey", &regmon::open_key_cb);
-    open_key_ex_hook = createSyscallHook("NtOpenKeyEx", &regmon::open_key_ex_cb);
-    open_key_transacted_hook = createSyscallHook("NtOpenKeyTransacted", &regmon::open_key_transacted_cb);
-    open_key_transacted_ex_hook = createSyscallHook("NtOpenKeyTransactedEx", &regmon::open_key_transacted_ex_cb);
-    query_key_hook = createSyscallHook("NtQueryKey", &regmon::query_key_cb);
-    query_multiple_value_key_hook = createSyscallHook("NtQueryMultipleValueKey", &regmon::query_multiple_value_key_cb);
-    query_value_key_hook = createSyscallHook("NtQueryValueKey", &regmon::query_value_key_cb);
+    createSyscallHook("NtDeleteKey", &regmon::delete_key_cb);
+    createSyscallHook("NtSetValueKey", &regmon::set_value_key_cb);
+    createSyscallHook("NtDeleteValueKey", &regmon::delete_value_key_cb);
+    createSyscallHook("NtCreateKey", &regmon::create_key_cb);
+    createSyscallHook("NtCreateKeyTransacted", &regmon::create_key_transacted_cb);
+    createSyscallHook("NtEnumerateKey", &regmon::enumerate_key_cb);
+    createSyscallHook("NtEnumerateValueKey", &regmon::enumerate_value_key_cb);
+    createSyscallHook("NtOpenKey", &regmon::open_key_cb);
+    createSyscallHook("NtOpenKeyEx", &regmon::open_key_ex_cb);
+    createSyscallHook("NtOpenKeyTransacted", &regmon::open_key_transacted_cb);
+    createSyscallHook("NtOpenKeyTransactedEx", &regmon::open_key_transacted_ex_cb);
+    createSyscallHook("NtQueryKey", &regmon::query_key_cb);
+    createSyscallHook("NtQueryMultipleValueKey", &regmon::query_multiple_value_key_cb);
+    createSyscallHook("NtQueryValueKey", &regmon::query_value_key_cb);
 }
 
 regmon::~regmon(void) {}

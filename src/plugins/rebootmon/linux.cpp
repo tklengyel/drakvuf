@@ -179,8 +179,9 @@ event_response_t linux_rebootmon::machine_power_off_cb(drakvuf_t drakvuf, drakvu
 linux_rebootmon::linux_rebootmon(drakvuf_t drakvuf, const rebootmon_config* c, output_format_t output) :
     pluginex(drakvuf, output), abort_on_power_off(c->abort_on_power_off)
 {
+
 #define REGISTER_HOOK_EX(name, syscall, cb, alias) \
-    name ## _hook = createSyscallHook(#syscall, &linux_rebootmon::cb, #alias); \
+    auto name ## _hook = createSyscallHook(#syscall, &linux_rebootmon::cb, #alias); \
     if (!name ## _hook) \
     { \
         PRINT_DEBUG("[REBOOTMON] Method " #syscall " does not found.\n"); \

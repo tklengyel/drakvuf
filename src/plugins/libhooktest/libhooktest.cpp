@@ -107,7 +107,7 @@ event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     PRINT_DEBUG("[LIBHOOKTEST] CR3 changed\n");
     auto plugin = GetTrapPlugin<libhooktest>(info);
-    plugin->cr3_hook.reset();
+    this->remove_hook(plugin->cr3_hook);
     PRINT_DEBUG("[LIBHOOKTEST] CR3 unhooked\n");
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -115,13 +115,15 @@ event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 event_response_t libhooktest::protectVirtualMemoryCb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     PRINT_DEBUG("[LIBHOOKTEST] NtProtectVirtualMemory called\n");
-    this->ret_hooks.push_back(createReturnHook(info, &libhooktest::protectVirtualMemoryRetCb));
+    this->ret_hooks.insert(createReturnHook(info, &libhooktest::protectVirtualMemoryRetCb));
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 event_response_t libhooktest::protectVirtualMemoryRetCb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     PRINT_DEBUG("[LIBHOOKTEST] NtProtectVirtualMemory Return Hook called\n");
+    for (auto& ret_hook : this->ret_hooks)
+        this->remove_hook(ret_hook);
     this->ret_hooks.clear();
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -132,5 +134,5 @@ libhooktest::libhooktest(drakvuf_t drakvuf, output_format_t output)
     PRINT_DEBUG("[LIBHOOKTEST] works\n");
 
     this->cr3_hook = createCr3Hook(&cr3_cb);
-    this->sys_hook = createSyscallHook("NtProtectVirtualMemory", &libhooktest::protectVirtualMemoryCb);
+    createSyscallHook("NtProtectVirtualMemory", &libhooktest::protectVirtualMemoryCb);
 }

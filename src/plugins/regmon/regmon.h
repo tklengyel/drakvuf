@@ -113,22 +113,6 @@ public:
     addr_t objattr_name;
     addr_t objattr_root;
 
-    /* Hooks */
-    std::unique_ptr<libhook::SyscallHook> delete_key_hook;
-    std::unique_ptr<libhook::SyscallHook> set_value_key_hook;
-    std::unique_ptr<libhook::SyscallHook> delete_value_key_hook;
-    std::unique_ptr<libhook::SyscallHook> create_key_hook;
-    std::unique_ptr<libhook::SyscallHook> create_key_transacted_hook;
-    std::unique_ptr<libhook::SyscallHook> enumerate_key_hook;
-    std::unique_ptr<libhook::SyscallHook> enumerate_value_key_hook;
-    std::unique_ptr<libhook::SyscallHook> open_key_hook;
-    std::unique_ptr<libhook::SyscallHook> open_key_ex_hook;
-    std::unique_ptr<libhook::SyscallHook> open_key_transacted_hook;
-    std::unique_ptr<libhook::SyscallHook> open_key_transacted_ex_hook;
-    std::unique_ptr<libhook::SyscallHook> query_key_hook;
-    std::unique_ptr<libhook::SyscallHook> query_multiple_value_key_hook;
-    std::unique_ptr<libhook::SyscallHook> query_value_key_hook;
-
     /* Callbacks */
     event_response_t delete_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t set_value_key_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

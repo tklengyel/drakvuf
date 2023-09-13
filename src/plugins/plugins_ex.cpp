@@ -134,31 +134,43 @@ pluginex::~pluginex()
 bool pluginex::stop_impl()
 {
     destroy_all_traps();
+    hooks.clear();
     return true;
 }
 
 void pluginex::destroy_all_traps()
 {
-    while (!traps.empty())
-        destroy_trap(traps.front());
+    for (auto trap : traps)
+        destroy_trap(trap);
+
+    traps.clear();
 }
 
-std::unique_ptr<libhook::ManualHook> pluginex::createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine)
+libhook::ManualHook* pluginex::createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine, bool save)
 {
-    return libhook::ManualHook::create(this->drakvuf, info, free_routine);
+    auto hook = libhook::ManualHook::create(this->drakvuf, info, free_routine);
+    if (!hook)
+    {
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
+        return nullptr;
+    }
+
+    if (save)
+        hooks[hook].reset(hook);
+
+    return hook;
 }
 
 
 void pluginex::destroy_trap(drakvuf_trap_t* target)
 {
-    auto it = std::find(traps.begin(), traps.end(), target);
-    if (it == traps.end())
+    if (traps.find(target) == traps.end())
     {
         PRINT_DEBUG("[PLUGINEX] BUG: attempted to destroy non-existant trap");
         throw -1;
     }
-    traps.erase(it);
     delete_trap(target);
+    traps.erase(target);
 }
 
 void pluginex::delete_trap(drakvuf_trap_t* target)

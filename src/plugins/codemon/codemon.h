@@ -151,23 +151,16 @@ public:
     //Counts how often an actual dump occured
     unsigned int dump_id = 0;
 
-    // hooks and callbacks for MmAccessFault
-    std::unique_ptr<libhook::SyscallHook> mmAccessFaultHook;
-    std::unique_ptr<libhook::ReturnHook> mmAccessFaultReturnHook;
+    // callbacks for MmAccessFault
     event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
     event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
 
-    // hooks and callbacks for memory execution/write
-    std::set<std::unique_ptr<libhook::MemAccessHook>> memaccess_hooks;
+    // callbacks for memory execution/write
     event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
     event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info);
 
-    // responsible for removing traps from memaccess_hooks field based on drakvuf_trap_info_t
-    void remove_memaccess_hook(drakvuf_trap_info_t* trap_info);
-
     // used for forcing windows to load swapped pages
     event_response_t ki_system_service_handler_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    std::unique_ptr<libhook::SyscallHook> kiSystemServiceHandlerHook;
     x86_registers_t backup_regs;
     std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
 

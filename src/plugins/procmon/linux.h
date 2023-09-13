@@ -123,19 +123,6 @@ public:
     /* Offsets */
     std::array<size_t, procmon_ns::__LINUX_OFFSET_MAX> offsets;
 
-    /* Traps */
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::SyscallHook>> internal_traps;
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> internal_ret_traps;
-
-    /* Hooks */
-    std::unique_ptr<libhook::SyscallHook> exec_hook;
-    std::unique_ptr<libhook::SyscallHook> exit_hook;
-    std::unique_ptr<libhook::SyscallHook> signal_hook;
-    std::unique_ptr<libhook::SyscallHook> kernel_clone_hook;
-
-    /* Return hooks */
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
-
     /* Callbacks */
     event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

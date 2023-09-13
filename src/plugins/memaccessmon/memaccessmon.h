@@ -120,9 +120,6 @@ public:
     event_response_t readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     output_format_t format;
-    std::unique_ptr<libhook::SyscallHook> write_hook;
-    std::unique_ptr<libhook::SyscallHook> read_hook;
-    std::unique_ptr<libhook::SyscallHook> read_ex_hook;
 
     std::unordered_map<uint32_t, std::vector<mmvad_context>> vads;
 };

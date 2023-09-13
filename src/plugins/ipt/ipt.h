@@ -164,9 +164,6 @@ private:
     int num_vcpus_ = 0;
     drakvuf_t drakvuf_ = nullptr;
     std::array<ipt_vcpu, MAX_DRAKVUF_VCPU> vcpus;
-
-    std::unique_ptr<libhook::Cr3Hook> cr3_hook;
-    std::unique_ptr<libhook::CatchAllHook> catchall_hook;
 };
 
 #endif

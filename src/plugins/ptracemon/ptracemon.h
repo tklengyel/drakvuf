@@ -112,7 +112,6 @@ class ptracemon : public pluginex
 {
 public:
     std::array<size_t, ptracemon_ns::__PT_REGS_MAX> offsets;
-    std::unique_ptr<libhook::SyscallHook> syshook;
 
     ptracemon(drakvuf_t drakuvf, output_format_t output);
     event_response_t ptrace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

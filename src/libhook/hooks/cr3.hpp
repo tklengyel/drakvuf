@@ -118,8 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, cb_wrapper_t cb, int ttl)
-    -> std::unique_ptr<Cr3Hook>;
+    static Cr3Hook* create(drakvuf_t, cb_wrapper_t cb, int ttl);
 
     /**
      * unhook on dctor
@@ -162,13 +161,11 @@ protected:
 };
 
 template<typename Params>
-auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
--> std::unique_ptr<Cr3Hook>
+Cr3Hook* Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
 {
     PRINT_DEBUG("[LIBHOOK] creating cr3 hook\n");
 
-    // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<Cr3Hook>(new Cr3Hook(drakvuf, cb));
+    auto hook = new Cr3Hook(drakvuf, cb);
     hook->trap_ = new drakvuf_trap_t();
 
     hook->trap_->name = "libhook cr3";
@@ -185,7 +182,7 @@ auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
 
     // populate backref
     hook->params_ = std::make_shared<Params>();
-    hook->params_->hook_ = hook.get();
+    hook->params_->hook_ = hook;
     hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
@@ -195,7 +192,8 @@ auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
         delete hook->trap_;
         hook->trap_ = nullptr;
         hook->params_.reset();
-        return std::unique_ptr<Cr3Hook>();
+        delete hook;
+        return nullptr;
     }
 
     PRINT_DEBUG("[LIBHOOK] cr3 hook OK\n");

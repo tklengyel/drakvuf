@@ -182,10 +182,8 @@ private:
     const exclude_matcher exclude;
 
     /* Hooks */
-    std::unique_ptr<libhook::SyscallHook> terminate_process_hook;
-    std::unique_ptr<libhook::SyscallHook> deliver_apc_hook;
-    std::unique_ptr<libhook::SyscallHook> delay_execution_hook;
-    std::unique_ptr<libhook::SyscallHook> clean_process_memory_hook;
+    libhook::SyscallHook* deliver_apc_hook;
+    libhook::SyscallHook* delay_execution_hook;
 
     /* VA of functions to be injected */
     addr_t malloc_va{0};

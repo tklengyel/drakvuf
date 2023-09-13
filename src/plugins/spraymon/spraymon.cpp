@@ -263,7 +263,7 @@ spraymon::spraymon(drakvuf_t drakvuf, const spraymon_config* config,
         PRINT_DEBUG("[SPRAYMON] Failed to get kernel struct member offsets.\n");
         throw -1;
     }
-    syscall = createSyscallHook("PsSetProcessWin32Process", &spraymon::hook_setwin32process_cb);
+    createSyscallHook("PsSetProcessWin32Process", &spraymon::hook_setwin32process_cb);
     PRINT_DEBUG("[SPRAYMON]  PLUGIN STARTED\n");
 }
 
