@@ -563,6 +563,13 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
     if (drakvuf_lookup_injection(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
+    // IN HANDLE SectionHandle
+    addr_t section_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    // IN HANDLE ProcessHandle
+    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 2);
+    // IN OUT PVOID *BaseAddress
+    addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
+
     auto plugin = get_trap_plugin<userhook>(info);
     auto trap = plugin->register_trap<map_view_of_section_result_t>(
             info,
@@ -578,12 +585,9 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     params->set_result_call_params(info);
 
-    // IN HANDLE SectionHandle
-    params->section_handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    // IN HANDLE ProcessHandle
-    params->process_handle = drakvuf_get_function_argument(drakvuf, info, 2);
-    // IN OUT PVOID *BaseAddress
-    params->base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
+    params->section_handle = section_handle;
+    params->process_handle = process_handle;
+    params->base_address_ptr = base_address_ptr;
 
     return VMI_EVENT_RESPONSE_NONE;
 }
