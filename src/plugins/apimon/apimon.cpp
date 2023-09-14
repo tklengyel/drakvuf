@@ -243,13 +243,12 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
     uint64_t hookID = make_hook_id(info);
     auto hook = plugin->createReturnHook<ApimonReturnHookData>(info,
-            &apimon::usermode_return_hook_cb, drakvuf_get_limited_traps_ttl(drakvuf));
+            &apimon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
     auto params = libhook::GetTrapParams<ApimonReturnHookData>(hook->trap_);
 
     params->arguments = std::move(arguments);
     params->target = target;
 
-    hook->trap_->name = target->target_name.c_str();
     plugin->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;

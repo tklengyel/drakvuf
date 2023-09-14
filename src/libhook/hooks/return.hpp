@@ -119,7 +119,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
+    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
     -> std::unique_ptr<ReturnHook>;
 
     /**
@@ -154,16 +154,17 @@ public:
     cb_wrapper_t callback_ = nullptr;
     drakvuf_trap_t* trap_ = nullptr;
     std::shared_ptr<CallResult> params_;
+    char* display_name_;
 
 protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
-    ReturnHook(drakvuf_t, cb_wrapper_t cb);
+    ReturnHook(drakvuf_t, cb_wrapper_t cb, const char* display_name);
 };
 
 template<typename Params>
-auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
+auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
 -> std::unique_ptr<ReturnHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
@@ -184,7 +185,6 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     trap->breakpoint.module = info->trap->breakpoint.module;
 
     trap->type = BREAKPOINT;
-    trap->name = "ReturnHook";
     trap->ah_cb = nullptr;
     trap->ttl = ttl;
     trap->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -193,8 +193,9 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     };
 
     // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb));
+    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb, display_name ?: "ReturnHook"));
     hook->trap_ = trap;
+    hook->trap_->name = hook->display_name_;
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
     static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");

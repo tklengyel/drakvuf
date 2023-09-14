@@ -740,7 +740,7 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     // Create new trap for return callback
     uint64_t hookID = make_hook_id(info);
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::create_file_ret_cb);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::create_file_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -756,7 +756,6 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     params->desired_access = desired_access;
     params->rsp = ret_addr;
 
-    hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -831,7 +830,7 @@ event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
     }
 
     uint64_t hookID = make_hook_id(info);
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::open_file_ret_cb);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::open_file_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -845,7 +844,6 @@ event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
     params->desired_access = desired_access;
     params->rsp = ret_addr;
 
-    hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -901,7 +899,7 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     uint64_t hookID = make_hook_id(info);
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -911,7 +909,6 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
     params->file_information = file_information;
     params->rsp = ret_addr;
 
-    hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -949,7 +946,7 @@ event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     uint64_t hookID = make_hook_id(info);
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -959,7 +956,6 @@ event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf
     params->file_information = file_information;
     params->rsp = ret_addr;
 
-    hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -1122,7 +1118,7 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
 
         // Create new trap for return callback
         uint64_t hookID = make_hook_id(info);
-        auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_information_file_ret_cb);
+        auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_information_file_ret_cb, info->trap->name);
         auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
         // Save data
@@ -1133,7 +1129,6 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
         params->file_information = fileinfo;
         params->file_information_class = fileinfoclass;
 
-        hook->trap_->name = info->trap->name;
         this->ret_hooks[hookID] = std::move(hook);
     }
 
