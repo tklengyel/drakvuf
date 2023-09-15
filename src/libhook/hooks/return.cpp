@@ -125,12 +125,24 @@ ReturnHook::~ReturnHook()
             PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
             return VMI_EVENT_RESPONSE_NONE;
         };
-        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+        if (this->display_name_ != this->trap_->name)
         {
-            trap->data = nullptr;
-            g_free(const_cast<char*>(trap->name));
-            delete trap;
-        });
+            g_free(this->display_name_);
+            drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+            {
+                trap->data = nullptr;
+                delete trap;
+            });
+        }
+        else
+        {
+            drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+            {
+                trap->data = nullptr;
+                g_free(const_cast<char*>(trap->name));
+                delete trap;
+            });
+        }
         this->display_name_ = nullptr;
     }
     else
