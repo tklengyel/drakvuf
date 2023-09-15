@@ -379,7 +379,6 @@ event_response_t linux_procmon::do_open_execat_cb(drakvuf_t drakvuf, drakvuf_tra
     ret_hook->trap_->name = "do_open_execat_ret_trap";
     auto ret_params = libhook::GetTrapParams<open_execat_data>(ret_hook->trap_);
     ret_params->data = params_->data;
-    //this->internal_traps.erase(hookID); // wtf
 
     return VMI_EVENT_RESPONSE_NONE;
 }
