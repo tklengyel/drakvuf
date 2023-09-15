@@ -370,13 +370,12 @@ event_response_t linux_procmon::do_open_execat_cb(drakvuf_t drakvuf, drakvuf_tra
     params->execat_rsp = ret_addr;
 
     // Register return trap
-    auto ret_hook = createReturnHook<open_execat_data>(info, &linux_procmon::do_open_execat_ret_cb);
+    auto ret_hook = createReturnHook<open_execat_data>(info, &linux_procmon::do_open_execat_ret_cb, "do_open_execat_ret_trap");
     if (!ret_hook)
     {
         PRINT_DEBUG("[PROCMON] Failed to register return trap from do_open_execat.\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
-    ret_hook->trap_->name = "do_open_execat_ret_trap";
     auto ret_params = libhook::GetTrapParams<open_execat_data>(ret_hook->trap_);
     ret_params->data = params_->data;
 
@@ -417,7 +416,7 @@ event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf
         return VMI_EVENT_RESPONSE_NONE;
 
     // Create new trap for return callback
-    auto hook = this->createReturnHook<execve_data>(info, &linux_procmon::do_execveat_common_ret_cb);
+    auto hook = this->createReturnHook<execve_data>(info, &linux_procmon::do_execveat_common_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<execve_data>(hook->trap_);
 
     params->fd = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -435,8 +434,6 @@ event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf
     char* thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
     params->thread_name = thread_name ?: "";
     g_free(thread_name);
-
-    hook->trap_->name = info->trap->name;
 
     auto open_hook = createSyscallHook<open_execat_data>(this->do_open_execat_name, &linux_procmon::do_open_execat_cb, "do_open_execat_trap");
     if (nullptr == open_hook)
@@ -552,7 +549,7 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     char* current_thread_name = drakvuf_get_process_name(drakvuf, process_base_of_current_process, false);
 
     // Create new trap for return callback
-    auto hook = this->createReturnHook<send_signal_data>(info, &linux_procmon::send_signal_ret_cb);
+    auto hook = this->createReturnHook<send_signal_data>(info, &linux_procmon::send_signal_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<send_signal_data>(hook->trap_);
 
     // Save data about current process
@@ -565,8 +562,6 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     params->target_proc_tid = target_proc_data.tid;
     params->target_proc_ppid = target_proc_data.ppid;
     params->signal = signal;
-
-    hook->trap_->name = info->trap->name;
 
     g_free(const_cast<char*>(target_proc_data.name));
     g_free(target_thread_name);
@@ -633,13 +628,12 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto hook = this->createReturnHook<kernel_clone_data>(info, &linux_procmon::kernel_clone_ret_cb);
+    auto hook = this->createReturnHook<kernel_clone_data>(info, &linux_procmon::kernel_clone_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<kernel_clone_data>(hook->trap_);
 
     params->flags = flags;
     params->exit_signal = exit_signal;
 
-    hook->trap_->name = info->trap->name;
     return VMI_EVENT_RESPONSE_NONE;
 }
 

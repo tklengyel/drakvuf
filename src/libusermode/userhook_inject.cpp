@@ -144,22 +144,18 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     return true;
 }
 
-/**
- * This is used in order to observe when 64 bit process is loading a new DLL.
- * If the DLL is interesting, we perform further investigation and try to equip user mode hooks.
- */
-static event_response_t map_view_of_section_ret_cb_2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t copy_memory_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto params = get_trap_params<map_view_of_section_result_t>(info);
+    auto params = get_trap_params<copy_memory_result_t>(info);
 
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address_ptr);
-    if (mmvad)
-        return hook_dll(drakvuf, info, &*mmvad, 0);
+    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address);
 
-    return VMI_EVENT_RESPONSE_NONE;
+    auto ret = mmvad ? hook_dll(drakvuf, info, &*mmvad, 0) : VMI_EVENT_RESPONSE_NONE;
+
+    return ret;
 }
 
 static void check_stack_marker(
@@ -203,7 +199,6 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
     }
 
     drakvuf_trap_t* trap = nullptr;
-    map_view_of_section_result_t* params = nullptr;
     if (!dll_meta->in_progress)
     {
         if (plugin->is_stopping())
@@ -217,13 +212,19 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
         dll_meta->in_progress = true;
 
         breakpoint_by_dtb_searcher bp;
-        trap = plugin->register_trap<map_view_of_section_result_t>(
+        trap = plugin->register_trap<copy_memory_result_t>(
                 info,
-                map_view_of_section_ret_cb_2,
+                copy_memory_ret_cb,
                 bp.for_virt_addr(info->regs->rip).for_dtb(info->regs->cr3),
-                "NtMapViewOfSection ret v2");
+                "MmCopyVirtualMemory ret");
         if (!trap)
             return VMI_EVENT_RESPONSE_NONE;
+
+        auto params = get_trap_params<copy_memory_result_t>(trap);
+        if (!params)
+            return VMI_EVENT_RESPONSE_NONE;
+
+        params->base_address = dll_meta->v.real_dll_base;
     }
     else
     {
@@ -240,11 +241,6 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
         PRINT_DEBUG("[USERHOOK] Continue processing this dll_meta\n");
     }
 
-
-    params = get_trap_params<map_view_of_section_result_t>(trap);
-    if (!params)
-        return VMI_EVENT_RESPONSE_NONE;
-
     while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
     {
         page_info_t pinfo;
@@ -260,6 +256,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
         {
             PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
             dll_meta->pf_current_addr += VMI_PS_4KB;
+            auto params = get_trap_params<copy_memory_result_t>(trap);
             params->set_result_call_params(info, stack_pointer);
             return VMI_EVENT_RESPONSE_NONE;
         }
@@ -314,6 +311,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
                     if (inject_copy_memory(plugin, drakvuf, info, trap->cb, dll_meta->set_stack_marker(), exec_func, &stack_pointer))
                     {
                         target.state = HOOK_PAGEFAULT_RETRY;
+                        auto params = get_trap_params<copy_memory_result_t>(trap);
                         params->set_result_call_params(info, stack_pointer);
                         return VMI_EVENT_RESPONSE_NONE;
                     }

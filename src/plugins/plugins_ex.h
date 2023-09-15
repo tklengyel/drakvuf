@@ -475,7 +475,7 @@ public:
     libhook::ManualHook* createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine, bool save = true);
 
     template<typename Params = PluginResult, typename Callback>
-    libhook::ReturnHook* createReturnHook(drakvuf_trap_info* info, Callback cb, int ttl = UNLIMITED_TTL, bool save = true);
+    libhook::ReturnHook* createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name = nullptr, int ttl = UNLIMITED_TTL, bool save = true);
 
     template<typename Params = PluginResult, typename Callback>
     libhook::SyscallHook* createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name = {}, int ttl = UNLIMITED_TTL, bool save = true);
@@ -592,11 +592,11 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
 }
 
 template<typename Params, typename Callback>
-libhook::ReturnHook* pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, int ttl, bool save)
+libhook::ReturnHook* pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name, int ttl, bool save)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
-    auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, this->wrap_plugin_cb(cb), ttl);
+    auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, this->wrap_plugin_cb(cb), display_name, ttl);
     if (!hook)
     {
         PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");

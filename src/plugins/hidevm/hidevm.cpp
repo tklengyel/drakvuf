@@ -506,7 +506,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                     this->addr_InputBuffer_Status = InputBuffer + WmiKmRequestQueryGuidInfo_Status;
                     this->addr_IoStatusBlock_Information = IoStatusBlock + this->iostatusblock_information;
 
-                    this->ret_hooks[hook_ID] = std::unique_ptr<libhook::ReturnHook>(this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb, UNLIMITED_TTL, false));
+                    this->ret_hooks[hook_ID] = std::unique_ptr<libhook::ReturnHook>(this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb, {}, UNLIMITED_TTL, false));
                 }
             }
         }
@@ -556,7 +556,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                     // If this is a first call with IOCTL_WMI_QUERY_ALL_DATA we set the first stage
                     if (!this->query_stage)
                         this->query_stage = 1;
-                    this->ret_hooks[hook_ID] = std::unique_ptr<libhook::ReturnHook>(this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb, UNLIMITED_TTL, false));
+                    this->ret_hooks[hook_ID] = std::unique_ptr<libhook::ReturnHook>(this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb, {}, UNLIMITED_TTL, false));
                 }
             }
         }
