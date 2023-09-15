@@ -302,13 +302,12 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     // Create new trap for return callback
     uint64_t hookID = make_hook_id(info);
-    auto hook = this->createReturnHook<linux_data>(info, &linux_filetracer::open_file_ret_cb);
+    auto hook = this->createReturnHook<linux_data>(info, &linux_filetracer::open_file_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
 
     // Save data
     params->setResultCallParams(info);
 
-    hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -470,7 +469,7 @@ event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakv
 
     // Create new trap for return callback
     uint64_t hookID = make_hook_id(info);
-    auto hook = this->createReturnHook<linux_data>(info, &linux_filetracer::memfd_create_file_ret_cb);
+    auto hook = this->createReturnHook<linux_data>(info, &linux_filetracer::memfd_create_file_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
 
     // Save data
@@ -482,7 +481,6 @@ event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakv
 
     params->flags = parse_flags(flags, linux_memfd_flags, this->m_output_format);
 
-    hook->trap_->name = info->trap->name;
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
