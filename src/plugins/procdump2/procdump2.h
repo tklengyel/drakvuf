@@ -181,9 +181,7 @@ private:
     std::vector<vmi_pid_t> running_processes_on_start;
     const exclude_matcher exclude;
 
-    /* Hooks */
-    libhook::SyscallHook* deliver_apc_hook;
-    libhook::SyscallHook* delay_execution_hook;
+    bool is_plugin_enabled = false;
 
     /* VA of functions to be injected */
     addr_t malloc_va{0};

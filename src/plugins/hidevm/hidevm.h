@@ -129,7 +129,7 @@ public:
 
     // don't use pluginex::hooks because we need to handle hooks by threads (PID + TID)
     std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::SyscallHook>> NtClose_hook;
+    std::unordered_set<uint64_t> NtClose_hooked;
 
     addr_t objattr_length;
     addr_t objattr_name;

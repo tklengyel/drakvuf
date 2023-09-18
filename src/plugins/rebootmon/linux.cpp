@@ -181,8 +181,7 @@ linux_rebootmon::linux_rebootmon(drakvuf_t drakvuf, const rebootmon_config* c, o
 {
 
 #define REGISTER_HOOK_EX(name, syscall, cb, alias) \
-    auto name ## _hook = createSyscallHook(#syscall, &linux_rebootmon::cb, #alias); \
-    if (!name ## _hook) \
+    if (!createSyscallHook(#syscall, &linux_rebootmon::cb, #alias)) \
     { \
         PRINT_DEBUG("[REBOOTMON] Method " #syscall " does not found.\n"); \
         throw -1; \

@@ -663,36 +663,27 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, const procmon_config* config, ou
     else
         do_open_execat_name = "__do_open_execat";
 
-    std::unique_ptr<libhook::SyscallHook> exec_hook(createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb, std::nullopt, false));
-    if (nullptr == exec_hook)
+    if (!createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb))
     {
         PRINT_DEBUG("[PROCMON] Method do_execveat_common not found. You are probably using an older kernel version below 5.9\n");
         return;
     }
 
-    std::unique_ptr<libhook::SyscallHook> exit_hook(createSyscallHook("do_exit", &linux_procmon::do_exit_cb, std::nullopt, false));
-    if (nullptr == exit_hook)
+    if (!createSyscallHook("do_exit", &linux_procmon::do_exit_cb))
     {
         PRINT_DEBUG("[PROCMON] Method do_exit not found.\n");
         return;
     }
 
-    std::unique_ptr<libhook::SyscallHook> signal_hook(createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal", false));
-    if (nullptr == signal_hook)
+    if (!createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal"))
     {
         PRINT_DEBUG("[PROCMON] Method __send_signal not found.\n");
         return;
     }
 
-    std::unique_ptr<libhook::SyscallHook> kernel_clone_hook(createSyscallHook("kernel_clone", &linux_procmon::kernel_clone_cb, std::nullopt, false));
-    if (nullptr == kernel_clone_hook)
+    if (!createSyscallHook("kernel_clone", &linux_procmon::kernel_clone_cb))
     {
         PRINT_DEBUG("[PROCMON] Method kernel_clone not found.\n");
         return;
     }
-
-    this->register_hook(std::move(exec_hook));
-    this->register_hook(std::move(exit_hook));
-    this->register_hook(std::move(signal_hook));
-    this->register_hook(std::move(kernel_clone_hook));
 }

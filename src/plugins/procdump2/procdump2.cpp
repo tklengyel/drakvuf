@@ -230,10 +230,16 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     createSyscallHook("MmCleanProcessAddressSpace", &procdump2::clean_process_memory_cb);
 
     if (!config->disable_kedelayexecutionthread_hook)
-        this->delay_execution_hook = createSyscallHook("KeDelayExecutionThread", &procdump2::delay_execution_cb);
+    {
+        createSyscallHook("KeDelayExecutionThread", &procdump2::delay_execution_cb);
+        is_plugin_enabled = true;
+    }
 
     if (!config->disable_kideliverapc_hook)
-        this->deliver_apc_hook = createSyscallHook("KiDeliverApc", &procdump2::deliver_apc_cb);
+    {
+        createSyscallHook("KiDeliverApc", &procdump2::deliver_apc_cb);
+        is_plugin_enabled = true;
+    }
 
     if (config->dump_new_processes_on_finish)
         running_processes_on_start = get_running_processes();
@@ -245,8 +251,6 @@ procdump2::~procdump2()
 
 bool procdump2::stop_impl()
 {
-    bool is_plugin_enabled = this->delay_execution_hook || this->deliver_apc_hook;
-
     if (!begin_stop_at)
         begin_stop_at = g_get_real_time() / G_USEC_PER_SEC;
 

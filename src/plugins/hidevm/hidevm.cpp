@@ -129,7 +129,7 @@ event_response_t hidevm::NtClose_cb(drakvuf_t, drakvuf_trap_info_t* info)
     uint64_t hook_ID = make_hook_id(info);
 
     // We need to set our fake handle value with 0 to avoid invalid handle exception
-    if (this->NtClose_hook.count(hook_ID))
+    if (this->NtClose_hooked.count(hook_ID))
     {
         uint64_t Handle = drakvuf_get_function_argument(drakvuf, info, 1);
         if (Handle == this->FakeWmiGuidHandle)
@@ -140,7 +140,7 @@ event_response_t hidevm::NtClose_cb(drakvuf_t, drakvuf_trap_info_t* info)
             }
             this->stage = 0;
             this->query_stage = 0;
-            this->NtClose_hook.erase(hook_ID);
+            this->NtClose_hooked.erase(hook_ID);
         }
     }
 
@@ -324,7 +324,8 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
                             {
                                 this->addr_InputBuffer_Status = 0;
                                 this->addr_IoStatusBlock_Information = 0;
-                                this->NtClose_hook[hook_ID] = std::unique_ptr<libhook::SyscallHook>(this->createSyscallHook("NtClose", &hidevm::NtClose_cb, {}, UNLIMITED_TTL, false));
+                                this->NtClose_hooked.insert(hook_ID);
+                                this->createSyscallHook("NtClose", &hidevm::NtClose_cb);
                                 fmt::print(this->format, "hidevm", drakvuf, info,
                                     keyval("Reason", fmt::Qstr("MSAcpi_ThermalZoneTemperature query spoofed"))
                                 );
