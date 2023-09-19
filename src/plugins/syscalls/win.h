@@ -124,8 +124,8 @@ public:
     std::string win32k_profile;
     bool win32k_initialized;
 
-    libhook::SyscallHook* load_driver_hook;
-    libhook::SyscallHook* create_process_hook;
+    libhook::SyscallHook* load_driver_hook = nullptr;
+    libhook::SyscallHook* create_process_hook = nullptr;
 
     bool setup_win32k_syscalls(drakvuf_t drakvuf);
 

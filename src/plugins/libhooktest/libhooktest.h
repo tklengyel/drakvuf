@@ -116,6 +116,6 @@ public:
     event_response_t protectVirtualMemoryCb(drakvuf_t, drakvuf_trap_info*);
     event_response_t protectVirtualMemoryRetCb(drakvuf_t, drakvuf_trap_info*);
 
-    libhook::Cr3Hook* cr3_hook;
+    libhook::Cr3Hook* cr3_hook = nullptr;
     std::unordered_set<libhook::ReturnHook*> ret_hooks;
 };
