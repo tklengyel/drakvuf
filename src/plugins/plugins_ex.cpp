@@ -140,10 +140,8 @@ bool pluginex::stop_impl()
 
 void pluginex::destroy_all_traps()
 {
-    for (auto trap : traps)
-        destroy_trap(trap);
-
-    traps.clear();
+    while (!traps.empty())
+        destroy_trap(*traps.begin());
 }
 
 libhook::ManualHook* pluginex::createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine, bool save)
