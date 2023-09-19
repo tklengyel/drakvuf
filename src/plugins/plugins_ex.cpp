@@ -162,13 +162,14 @@ libhook::ManualHook* pluginex::createManualHook(drakvuf_trap_t* info, drakvuf_tr
 
 void pluginex::destroy_trap(drakvuf_trap_t* target)
 {
-    if (traps.find(target) == traps.end())
+    auto it = traps.find(target);
+    if (it == traps.end())
     {
         PRINT_DEBUG("[PLUGINEX] BUG: attempted to destroy non-existant trap");
         throw -1;
     }
+    traps.erase(it);
     delete_trap(target);
-    traps.erase(target);
 }
 
 void pluginex::delete_trap(drakvuf_trap_t* target)
