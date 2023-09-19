@@ -121,6 +121,8 @@ struct execve_data : PluginResult
         , execat_rsp()
         , cr3()
         , fd()
+        , process_name()
+        , filename()
         , thread_name()
         , image_path_name()
         , command_line()
@@ -138,6 +140,7 @@ struct execve_data : PluginResult
 
     int fd;
     std::string process_name;
+    std::string filename;
     std::string thread_name;
     std::string image_path_name;
     std::string command_line;
