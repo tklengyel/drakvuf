@@ -201,30 +201,20 @@ static inline size_t get_power_cb_offset(vmi_instance_t vmi)
         return vmi_get_address_width(vmi) == 8 ? 0x40 : 0x28;
 }
 
-static void driver_visitor(drakvuf_t drakvuf, addr_t ldr_table, void* ctx)
+static bool driver_visitor(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
 {
     auto data = static_cast<pass_ctx*>(ctx);
 
     vmi_lock_guard vmi(drakvuf);
-    addr_t base;
-    uint32_t size;
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_table + data->plugin->ldr_data_base_rva, 4, &base) ||
-        VMI_SUCCESS != vmi_read_32_va(vmi, ldr_table + data->plugin->ldr_data_size_rva, 4, &size))
-    {
-        PRINT_DEBUG("[CALLBACKMON] Can't read driver base and size for ldr_table %" PRIx64 "\n", ldr_table);
-        return;
-    }
 
-    if (data->cb_va >= base && data->cb_va < base + size)
+    if (data->cb_va >= module_info->base_addr && data->cb_va < module_info->base_addr + module_info->size)
     {
-        unicode_string_t* module_name = drakvuf_read_unicode_va(drakvuf, ldr_table + data->plugin->ldr_data_name_rva, 4);
-        if (module_name && module_name->contents)
+        if (module_info->full_name)
         {
-            data->name.assign(reinterpret_cast<char*>(module_name->contents));
-            vmi_free_unicode_str(module_name);
+            data->name.assign(reinterpret_cast<char*>(module_info->full_name->contents));
         }
 
-        data->base_va = base;
+        data->base_va = module_info->base_addr;
     }
 }
 
