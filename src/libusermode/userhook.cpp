@@ -152,15 +152,23 @@ static std::string drakvuf_read_unicode(drakvuf_t drakvuf, addr_t addr)
     return str;
 }
 
+static status_t read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr, addr_t* base_address)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = base_address_ptr
+    );
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    return vmi_read_addr(vmi, &ctx, base_address);
+}
+
 proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
-    proc_data_t proc_data = info->proc_data;
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
-            proc_data = info->attached_proc_data;
-    }
-    return proc_data;
+    if (VMI_OS_WINDOWS == drakvuf_get_os_type(drakvuf))
+        return info->attached_proc_data;
+    return info->proc_data;
 }
 
 /**
@@ -174,19 +182,26 @@ static dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         return nullptr;
 
     proc_data_t proc_data = get_proc_data(drakvuf, info);
-
-    auto vec_it = plugin->loaded_dlls.find(proc_data.pid);
-
-    if (vec_it == plugin->loaded_dlls.end())
-        return nullptr;
-
-    for (auto& dll_meta : vec_it->second)
+    if (auto it = plugin->loaded_dlls.find(proc_data.pid); it != plugin->loaded_dlls.end())
     {
-        if (!dll_meta.v.is_hooked && dll_meta.v.thread_id == thread_id)
-            return &dll_meta;
+        for (auto& dll_meta : it->second)
+        {
+            if (!dll_meta.v.is_hooked && dll_meta.v.thread_id == thread_id)
+                return &dll_meta;
+        }
     }
 
     return nullptr;
+}
+
+static bool is_already_hooked(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, const mmvad_info_t* mmvad)
+{
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
+    if (auto it = plugin->loaded_dlls.find(proc_data.pid); it != plugin->loaded_dlls.end())
+        for (auto const& dll_meta : it->second)
+            if (dll_meta.v.real_dll_base == mmvad->starting_vpn << 12)
+                return true;
+    return false;
 }
 
 /**
@@ -203,13 +218,11 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         return nullptr;
     }
 
-    if (auto vec_it = plugin->loaded_dlls.find(proc_data.pid); vec_it != plugin->loaded_dlls.end())
-        for (auto const& dll_meta : vec_it->second)
-            if (dll_meta.v.real_dll_base == mmvad->starting_vpn << 12)
-            {
-                PRINT_DEBUG("[USERHOOK] DLL %d!%llx is already hooked\n", proc_data.pid, (unsigned long long)mmvad->starting_vpn << 12);
-                return nullptr;
-            }
+    if (is_already_hooked(drakvuf, info, plugin, mmvad))
+    {
+        PRINT_DEBUG("[USERHOOK] DLL %d!%llx is already hooked\n", proc_data.pid, (unsigned long long)mmvad->starting_vpn << 12);
+        return nullptr;
+    }
 
     uint32_t thread_id;
     if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
@@ -289,10 +302,11 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
 
 bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
 {
-    if (VMI_OS_WINDOWS == vmi_get_ostype((vmi)))
-        target->pid = info->attached_proc_data.pid;
-    else
-        target->pid = info->proc_data.pid;
+    if (target->trap)
+    {
+        PRINT_DEBUG("[USERHOOK] Logical error: make trap on already trapped target\n");
+        abort();
+    }
 
     drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
     trap->type = BREAKPOINT;
@@ -353,49 +367,52 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* in
     return ret;
 }
 
-event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, mmvad_info_t* mmvad, bool* is_hooked)
+static std::optional<mmvad_info_t> get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t dll_base)
+{
+    mmvad_info_t mmvad;
+    if (!drakvuf_find_mmvad(drakvuf, eprocess, dll_base, &mmvad))
+        return {};
+
+    if (drakvuf_mmvad_type(drakvuf, &mmvad) == VAD_TYPE_DLL)
+        return mmvad;
+
+    return {};
+}
+
+static event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t dll_base)
 {
     auto plugin = get_trap_plugin<userhook>(info);
+    auto proc_data = get_proc_data(drakvuf, info);
 
     dll_t* dll_meta = get_pending_dll(drakvuf, info, plugin);
 
     if (!dll_meta)
-        dll_meta = create_dll_meta(drakvuf, info, plugin, mmvad);
-
-    event_response_t res = VMI_EVENT_RESPONSE_NONE;
-
-    if (is_hooked)
-        *is_hooked = false;
-
-    if (dll_meta)
     {
-        res = perform_hooking(drakvuf, info, plugin, dll_meta);
-        if (is_hooked)
-            *is_hooked = dll_meta->v.is_hooked;
+        auto mmvad = get_module_mmvad(drakvuf, proc_data.base_addr, dll_base);
+        if (mmvad)
+            dll_meta = create_dll_meta(drakvuf, info, plugin, &*mmvad);
     }
 
-    return res;
+    return dll_meta ? perform_hooking(drakvuf, info, plugin, dll_meta) : VMI_EVENT_RESPONSE_NONE;
 }
 
-static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static void try_hook_ntdll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, userhook* plugin)
 {
-    auto plugin = get_trap_plugin<userhook>(info);
-
-    struct visitor_context_t
-    {
-        std::string name;
-        mmvad_info_t mmvad;
-    };
+    auto proc_data = get_proc_data(drakvuf, info);
 
     userhook::module_context_t* ctx = nullptr;
-
-    auto it = plugin->proc_ntdll.find(info->attached_proc_data.pid);
-    if (it != plugin->proc_ntdll.end())
+    if (auto it = plugin->proc_ntdll.find(proc_data.pid); it != plugin->proc_ntdll.end())
     {
         ctx = &it->second;
     }
     else
     {
+        struct visitor_context_t
+        {
+            std::string name;
+            mmvad_info_t mmvad;
+        };
+
         auto visitor = [](drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data)
         {
             auto* vctx = reinterpret_cast<visitor_context_t*>(callback_data);
@@ -418,34 +435,33 @@ static void search_process_system_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* i
             return false;
         };
 
-        visitor_context_t vctx;
-        vctx.name = "ntdll.dll";
-
-        if (drakvuf_traverse_mmvad(drakvuf, info->attached_proc_data.base_addr, visitor, &vctx))
+        visitor_context_t vctx{ "ntdll.dll", {} };
+        if (drakvuf_traverse_mmvad(drakvuf, proc_data.base_addr, visitor, &vctx))
         {
-            ctx = &(plugin->proc_ntdll[info->attached_proc_data.pid] = {vctx.mmvad, false});
+            ctx = &(plugin->proc_ntdll[proc_data.pid] = {vctx.mmvad, false});
         }
         else
         {
             // add in map without mmvad to just skip the process later
-            ctx = &(plugin->proc_ntdll[info->attached_proc_data.pid] = {std::nullopt, false});
+            ctx = &(plugin->proc_ntdll[proc_data.pid] = {std::nullopt, false});
         }
     }
 
     if (ctx && !ctx->is_hooked && ctx->mmvad)
-        hook_dll(drakvuf, info, &ctx->mmvad.value(), &ctx->is_hooked);
-}
+    {
+        auto mmvad = &ctx->mmvad.value();
+        if (is_already_hooked(drakvuf, info, plugin, mmvad))
+        {
+            ctx->is_hooked = true;
+            return;
+        }
 
-std::optional<mmvad_info_t> get_module_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t base_address)
-{
-    mmvad_info_t mmvad;
-    if (!drakvuf_find_mmvad(drakvuf, eprocess, base_address, &mmvad))
-        return {};
-
-    if (drakvuf_mmvad_type(drakvuf, &mmvad) == VAD_TYPE_DLL)
-        return mmvad;
-
-    return {};
+        if (auto dll_meta = create_dll_meta(drakvuf, info, plugin, mmvad); dll_meta)
+        {
+            perform_hooking(drakvuf, info, plugin, dll_meta);
+            ctx->is_hooked = dll_meta->v.is_hooked;
+        }
+    }
 }
 
 /**
@@ -460,9 +476,7 @@ static event_response_t protect_virtual_memory_hook_ret_cb(drakvuf_t drakvuf, dr
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address);
-
-    auto ret = mmvad ? hook_dll(drakvuf, info, &*mmvad, 0) : VMI_EVENT_RESPONSE_NONE;
+    auto ret = hook_dll(drakvuf, info, params->base_address);
 
     if (!drakvuf_lookup_injection(drakvuf, info))
         plugin->destroy_trap(info->trap);
@@ -470,23 +484,18 @@ static event_response_t protect_virtual_memory_hook_ret_cb(drakvuf_t drakvuf, dr
     return ret;
 }
 
-static status_t read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr, addr_t* base_address)
-{
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = base_address_ptr
-    );
-
-    auto vmi = vmi_lock_guard(drakvuf);
-    return vmi_read_addr(vmi, &ctx, base_address);
-}
-
 static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    search_process_system_dlls(drakvuf, info);
+    auto plugin = get_trap_plugin<userhook>(info);
+    auto dll_meta = get_pending_dll(drakvuf, info, plugin);
+    if (dll_meta)
+        return perform_hooking(drakvuf, info, plugin, dll_meta);
+
+    try_hook_ntdll(drakvuf, info, plugin);
+
     if (drakvuf_lookup_injection(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
+
 
     // IN HANDLE ProcessHandle
     uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -501,13 +510,12 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
         return VMI_EVENT_RESPONSE_NONE;
 
     /* We have to finish handling NtProtectVirtualMemory on return to avoid
-     * possible injection collision with "search_process_system_dlls" function
+     * possible injection collision with "try_hook_ntdll" function
      * from the beginning of the function.
      * If some system dll, e.g. "ntdll.dll", been processed then state injection
      * been used to restore pre-injection state. Thus preventing "hook_dll"
      * function from other injections.
      */
-    auto plugin = get_trap_plugin<userhook>(info);
     auto trap = plugin->register_trap<protect_virtual_memory_result_t>(
             info,
             protect_virtual_memory_hook_ret_cb,
@@ -522,7 +530,6 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     params->set_result_call_params(info);
 
-    // IN OUT PVOID *BaseAddress
     params->base_address = base_address;
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -547,9 +554,7 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, base_address);
-
-    auto ret = mmvad ? hook_dll(drakvuf, info, &*mmvad, 0) : VMI_EVENT_RESPONSE_NONE;
+    auto ret = hook_dll(drakvuf, info, base_address);
 
     if (!drakvuf_lookup_injection(drakvuf, info))
         plugin->destroy_trap(info->trap);
@@ -559,7 +564,13 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
 
 static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    search_process_system_dlls(drakvuf, info);
+    auto plugin = get_trap_plugin<userhook>(info);
+    auto dll_meta = get_pending_dll(drakvuf, info, plugin);
+    if (dll_meta)
+        return perform_hooking(drakvuf, info, plugin, dll_meta);
+
+    try_hook_ntdll(drakvuf, info, plugin);
+
     if (drakvuf_lookup_injection(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -570,7 +581,6 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
     // IN OUT PVOID *BaseAddress
     addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
 
-    auto plugin = get_trap_plugin<userhook>(info);
     auto trap = plugin->register_trap<map_view_of_section_result_t>(
             info,
             map_view_of_section_ret_cb,
@@ -655,6 +665,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    auto proc_data = get_proc_data(drakvuf, info);
     for (auto& hook : params->hooks)
     {
         if (hook->trap)
@@ -665,6 +676,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
             drakvuf_remove_trap(drakvuf, hook->trap, wrap_delete);
             hook->state = HOOK_FAILED;
             hook->trap = nullptr;
+            hook->pid = proc_data.pid;
 
             make_trap(vmi, drakvuf, info, hook, hook_va);
         }
@@ -796,8 +808,8 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT), m_drak
         drakvuf_kernel_symbol_to_va(drakvuf, "MmCopyVirtualMemory");
 
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
-        !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
+    if (!register_trap<call_result_t>(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
+        !register_trap<call_result_t>(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
 #ifndef LIBUSERMODE_USE_INJECTION
         !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler"), nullptr, UNLIMITED_TTL) ||
 #endif

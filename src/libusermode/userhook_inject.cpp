@@ -108,6 +108,29 @@
 #include "userhook.hpp"
 #include "uh-private.hpp"
 
+static void check_stack_marker(drakvuf_t drakvuf, drakvuf_trap_info_t* info, dll_t* task)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = task->stack_marker_va());
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    uint64_t stack_marker;
+    if ( VMI_SUCCESS == vmi_read_64(vmi, &ctx, &stack_marker) &&
+        stack_marker != task->stack_marker())
+    {
+        PRINT_DEBUG("[USERHOOK] [%8zu] [%d:%d] "
+            "Stack marker check failed at %#lx: "
+            "expected %#lx, result %#lx\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , task->stack_marker_va(), task->stack_marker()
+            , stack_marker
+        );
+    }
+}
 
 bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
@@ -144,48 +167,10 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     return true;
 }
 
-static event_response_t copy_memory_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto params = get_trap_params<copy_memory_result_t>(info);
-
-    if (!params->verify_result_call_params(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto mmvad = get_module_mmvad(drakvuf, info->attached_proc_data.base_addr, params->base_address);
-
-    auto ret = mmvad ? hook_dll(drakvuf, info, &*mmvad, 0) : VMI_EVENT_RESPONSE_NONE;
-
-    return ret;
-}
-
-static void check_stack_marker(
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    vmi_lock_guard& vmi,
-    dll_t* task)
-{
-    ACCESS_CONTEXT(ctx);
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-    ctx.addr = task->stack_marker_va();
-    uint64_t stack_marker;
-
-    if ( VMI_SUCCESS == vmi_read_64(vmi, &ctx, &stack_marker) &&
-        stack_marker != task->stack_marker())
-    {
-        PRINT_DEBUG("[USERHOOK] [%8zu] [%d:%d] "
-            "Stack marker check failed at %#lx: "
-            "expected %#lx, result %#lx\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , task->stack_marker_va(), task->stack_marker()
-            , stack_marker
-        );
-    }
-}
-
 event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
 {
+    auto proc_data = get_proc_data(drakvuf, info);
+
     auto vmi = vmi_lock_guard(drakvuf);
 
     // we have to make sure that addresses between [pf_current_addr, pf_max_addr]
@@ -194,51 +179,25 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
 
     if (drakvuf_lookup_injection(drakvuf, info))
     {
-        check_stack_marker(drakvuf, info, vmi, dll_meta);
+        check_stack_marker(drakvuf, info, dll_meta);
         drakvuf_remove_injection(drakvuf, info);
     }
 
-    drakvuf_trap_t* trap = nullptr;
-    if (!dll_meta->in_progress)
+    if (plugin->is_stopping())
     {
-        if (plugin->is_stopping())
+        PRINT_DEBUG("[USERHOOK] Premature stop\n");
+        if (dll_meta->in_progress)
         {
-            PRINT_DEBUG("[USERHOOK] Premature stop\n");
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        PRINT_DEBUG("[USERHOOK] Start processing this dll_meta\n");
-        memcpy(&dll_meta->regs, info->regs, sizeof(x86_registers_t));
-        dll_meta->in_progress = true;
-
-        breakpoint_by_dtb_searcher bp;
-        trap = plugin->register_trap<copy_memory_result_t>(
-                info,
-                copy_memory_ret_cb,
-                bp.for_virt_addr(info->regs->rip).for_dtb(info->regs->cr3),
-                "MmCopyVirtualMemory ret");
-        if (!trap)
-            return VMI_EVENT_RESPONSE_NONE;
-
-        auto params = get_trap_params<copy_memory_result_t>(trap);
-        if (!params)
-            return VMI_EVENT_RESPONSE_NONE;
-
-        params->base_address = dll_meta->v.real_dll_base;
-    }
-    else
-    {
-        trap = info->trap;
-        if (plugin->is_stopping())
-        {
-            PRINT_DEBUG("[USERHOOK] Premature stop\n");
             drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &dll_meta->regs, true);
             dll_meta->in_progress = false;
-            plugin->destroy_trap(trap);
-            return VMI_EVENT_RESPONSE_NONE;
         }
+        return VMI_EVENT_RESPONSE_NONE;
+    }
 
-        PRINT_DEBUG("[USERHOOK] Continue processing this dll_meta\n");
+    if (!dll_meta->in_progress)
+    {
+        dll_meta->in_progress = true;
+        memcpy(&dll_meta->regs, info->regs, sizeof(x86_registers_t));
     }
 
     while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
@@ -252,19 +211,17 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
         }
 
         addr_t stack_pointer;
-        if (inject_copy_memory(plugin, drakvuf, info, trap->cb, dll_meta->set_stack_marker(), dll_meta->pf_current_addr, &stack_pointer))
+        if (inject_copy_memory(plugin, drakvuf, info, info->trap->cb, dll_meta->set_stack_marker(), dll_meta->pf_current_addr, &stack_pointer))
         {
             PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
             dll_meta->pf_current_addr += VMI_PS_4KB;
-            auto params = get_trap_params<copy_memory_result_t>(trap);
-            params->set_result_call_params(info, stack_pointer);
-            return VMI_EVENT_RESPONSE_NONE;
+            get_trap_params<call_result_t>(info->trap)->set_result_call_params(info, stack_pointer);
         }
         else
         {
             PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n", (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-            return VMI_EVENT_RESPONSE_NONE;
         }
+        return VMI_EVENT_RESPONSE_NONE;
     }
 
     // export info should be available, try hooking DLLs
@@ -302,28 +259,24 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
 
                 if (is_pagetable_loaded(vmi, info, exec_func))
                 {
+                    target.pid = proc_data.pid;
                     if (make_trap(vmi, drakvuf, info, &target, exec_func))
                         target.state = HOOK_OK;
                 }
                 else
                 {
                     addr_t stack_pointer;
-                    if (inject_copy_memory(plugin, drakvuf, info, trap->cb, dll_meta->set_stack_marker(), exec_func, &stack_pointer))
+                    if (inject_copy_memory(plugin, drakvuf, info, info->trap->cb, dll_meta->set_stack_marker(), exec_func, &stack_pointer))
                     {
                         target.state = HOOK_PAGEFAULT_RETRY;
-                        auto params = get_trap_params<copy_memory_result_t>(trap);
-                        params->set_result_call_params(info, stack_pointer);
-                        return VMI_EVENT_RESPONSE_NONE;
+                        get_trap_params<call_result_t>(info->trap)->set_result_call_params(info, stack_pointer);
                     }
                     else
                     {
                         PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
                             (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-                        drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &dll_meta->regs, true);
-                        dll_meta->in_progress = false;
-                        plugin->destroy_trap(trap);
-                        return VMI_EVENT_RESPONSE_NONE;
                     }
+                    return VMI_EVENT_RESPONSE_NONE;
                 }
             }
             else if (target.state == HOOK_PAGEFAULT_RETRY)
@@ -332,6 +285,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
 
                 if (is_pagetable_loaded(vmi, info, exec_func))
                 {
+                    target.pid = proc_data.pid;
                     if (make_trap(vmi, drakvuf, info, &target, exec_func))
                         target.state = HOOK_OK;
                 }
@@ -350,10 +304,12 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
     }
 
     PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");
-    drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &dll_meta->regs, true);
-    dll_meta->in_progress = false;
+    if (dll_meta->in_progress)
+    {
+        drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &dll_meta->regs, true);
+        dll_meta->in_progress = false;
+    }
     dll_meta->v.is_hooked = true;
-    plugin->destroy_trap(trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 

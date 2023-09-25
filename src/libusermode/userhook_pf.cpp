@@ -243,6 +243,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
                 }
                 else
                 {
+                    target.pid = proc_data.pid;
                     if (make_trap(vmi, drakvuf, info, &target, exec_func))
                         target.state = HOOK_OK;
                 }
@@ -254,6 +255,7 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
 
                 if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) == VMI_SUCCESS)
                 {
+                    target.pid = proc_data.pid;
                     if (make_trap(vmi, drakvuf, info, &target, exec_func))
                         target.state = HOOK_OK;
                 }
