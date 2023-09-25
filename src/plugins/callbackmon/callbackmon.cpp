@@ -216,6 +216,7 @@ static bool driver_visitor(drakvuf_t drakvuf, const module_info_t* module_info, 
 
         data->base_va = module_info->base_addr;
     }
+    return true;
 }
 
 static inline std::pair<std::string, addr_t> get_module_by_addr(drakvuf_t drakvuf, callbackmon* plugin, addr_t addr)
