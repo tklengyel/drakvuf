@@ -237,6 +237,33 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
     return envp_map;
 }
 
+/*
+ * extract filename from arguments (do_execveat_common)
+ */
+static std::string get_filename_from_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto vmi = vmi_lock_guard(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = drakvuf_get_function_argument(drakvuf, info, 2)
+    );
+
+    addr_t addr;
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &addr))
+        return {};
+
+    ctx.addr = addr;
+    char* tmp = vmi_read_str(vmi, &ctx);
+    if (!tmp)
+        return {};
+
+    std::string filename(tmp);
+    g_free(tmp);
+
+    return filename;
+}
+
 void linux_procmon::configure_filter(const procmon_config* cfg)
 {
     if (cfg->procmon_filter_file)
@@ -331,6 +358,10 @@ event_response_t linux_procmon::do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf
                 char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, dentry_addr);
                 params->image_path_name = tmp ?: "";
                 g_free(tmp);
+
+                // some fexecve calls pass with the AT_FDCWD parameter, so handle it
+                if (params->image_path_name.empty())
+                    params->image_path_name = params->filename;
             }
             else
                 PRINT_DEBUG("[PROCMON] Failed to read ImagePathName.\n");
@@ -341,7 +372,7 @@ event_response_t linux_procmon::do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf
              * based on the behavior of the kernel
              * source: https://elixir.bootlin.com/linux/v5.10.183/source/fs/exec.c#L1494
              */
-            params->image_path_name = "/dev/fd/" + std::to_string(params->fd);
+            params->image_path_name = "/proc/self/fd/" + std::to_string(params->fd);
         }
     }
 
@@ -434,6 +465,7 @@ event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf
     auto params = libhook::GetTrapParams<execve_data>(hook->trap_);
 
     params->fd = drakvuf_get_function_argument(drakvuf, info, 1);
+    params->filename = get_filename_from_execve(drakvuf, info);
     params->pid = info->proc_data.pid;
     params->tid = info->proc_data.tid;
     // Save original process name
