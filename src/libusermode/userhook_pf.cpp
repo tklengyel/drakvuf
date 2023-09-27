@@ -102,8 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LIBUSERMODE_USE_INJECTION
-
 #include "userhook.hpp"
 #include "uh-private.hpp"
 
@@ -119,12 +117,9 @@ event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     PRINT_DEBUG("[USERHOOK] Entered system service handler\n");
 
     auto plugin = get_trap_plugin<userhook>(info);
-
     proc_data_t proc_data = get_proc_data(drakvuf, info);
 
-    uint32_t thread_id = proc_data.tid;
-
-    if (!thread_id)
+    if (!proc_data.tid)
     {
         PRINT_DEBUG("[USERHOOK] Failed to get thread id in system service handler!\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -156,7 +151,7 @@ event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
+event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
 {
     proc_data_t proc_data = get_proc_data(drakvuf, info);
 
@@ -277,5 +272,3 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
     dll_meta->v.is_hooked = true;
     return VMI_EVENT_RESPONSE_NONE;
 }
-
-#endif

@@ -134,6 +134,7 @@
 #include "tlsmon/tlsmon.h"
 #include "codemon/codemon.h"
 #include "libhooktest/libhooktest.h"
+#include "libusermode/userhook.hpp"
 #include "exploitmon/exploitmon.h"
 #include "ipt/ipt.h"
 #include "hidsim/hidsim.h"
@@ -157,6 +158,9 @@ drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _outp
 int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
     const plugins_options* options)
 {
+
+    userhooks_set_injection_mode(options->userhook_injection_mode);
+
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
