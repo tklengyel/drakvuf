@@ -534,22 +534,15 @@ bool rootkitmon::enumerate_cores(vmi_instance_t vmi)
  * It is used to calculate checksums of driver sections.
  * @driver - LDR_DATA_TABLE_ENTRY pointer.
 */
-static void driver_visitor(drakvuf_t drakvuf, addr_t driver, void* ctx)
+static bool driver_visitor(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx)
 {
-    auto plugin = static_cast<rootkitmon*>(ctx);
-    addr_t imagebase;
+    auto plugin = static_cast<rootkitmon*>(visitor_ctx);
     vmi_lock_guard vmi(drakvuf);
-    // Read driver image base
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, driver + plugin->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &imagebase))
-    {
-        PRINT_DEBUG("[ROOTKITMON] Failed to read driver image base\n");
-        throw -1;
-    }
 
     ACCESS_CONTEXT(a_ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
         .pid = 4,
-        .addr = imagebase
+        .addr = module_info->base_addr
     );
 
     // Map 1 4KB page with PE header
@@ -557,20 +550,21 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t driver, void* ctx)
     if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module) || !module )
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to map guest VA 0x%lx\n", a_ctx.addr);
-        return;
+        return true;
     }
 
     sha256_checksum_t driver_hash{ 0 };
 
     // Checksum every section and save it into `driver_sections_checksums`
-    for (const auto& [virt_addr, virt_size] : get_pe_sections(module, imagebase))
+    for (const auto& [virt_addr, virt_size] : get_pe_sections(module, module_info->base_addr))
     {
         auto aligned_size = align_by_page(virt_size);
         auto section_hash = calc_checksum(vmi, virt_addr, aligned_size);
         driver_hash       = merge(driver_hash, section_hash);
     }
-    plugin->driver_sections_checksums[driver] = std::move(driver_hash);
+    plugin->driver_sections_checksums[module_info->base_addr] = std::move(driver_hash);
     munmap(module, VMI_PS_4KB);
+    return true;
 }
 
 void rootkitmon::check_driver_integrity(drakvuf_t drakvuf)
