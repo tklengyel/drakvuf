@@ -105,6 +105,8 @@
 #ifndef LIBINJECTOR_H
 #define LIBINJECTOR_H
 
+#include <libdrakvuf/libdrakvuf.h>
+
 #ifdef __cplusplus
 extern "C" {
 #define NOEXCEPT noexcept
@@ -113,8 +115,6 @@ extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
-
-#include <libdrakvuf/libdrakvuf.h>
 
 typedef struct injector* injector_t;
 

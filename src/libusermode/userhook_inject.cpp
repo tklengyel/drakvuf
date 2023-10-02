@@ -102,8 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifdef LIBUSERMODE_USE_INJECTION
-
 #include <libinjector/libinjector.h>
 #include "userhook.hpp"
 #include "uh-private.hpp"
@@ -167,7 +165,7 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     return true;
 }
 
-event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
+event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
 {
     auto proc_data = get_proc_data(drakvuf, info);
 
@@ -312,5 +310,3 @@ event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* 
     dll_meta->v.is_hooked = true;
     return VMI_EVENT_RESPONSE_NONE;
 }
-
-#endif

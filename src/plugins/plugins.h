@@ -165,6 +165,7 @@ struct plugins_options
     bool memdump_disable_shellcode_detect; // PLUGIN_MEMDUMP
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
+    bool userhook_injection_mode;       // PLUGIN_MEMDUMP, PLUGIN_APIMON, PLUGIN_RPCMON
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
     uint32_t procdump_timeout;          // PLUGIN_PROCDUMP

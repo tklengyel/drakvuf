@@ -234,25 +234,26 @@ event_response_t hook_process_cb(
 {
     rh_data_t* rh_data = static_cast<rh_data_t*>(info->trap->data);
     userhook* userhook_plugin = rh_data->userhook_plugin;
+    auto proc_data = get_proc_data(drakvuf, info);
 
-#ifdef LIBUSERMODE_USE_INJECTION
-    if (!rh_data->inject_in_progress)
+    if (userhook_plugin->injection_mode)
     {
-        if (info->proc_data.pid != rh_data->target_process_pid)
-            return VMI_EVENT_RESPONSE_NONE;
-    }
-    else
-    {
-        if (!drakvuf_check_return_context(drakvuf, info, rh_data->target_process_pid, rh_data->target_process_tid, rh_data->target_process_rsp))
-            return VMI_EVENT_RESPONSE_NONE;
+        if (!rh_data->inject_in_progress)
+        {
+            if (proc_data.pid != rh_data->target_process_pid)
+                return VMI_EVENT_RESPONSE_NONE;
+        }
+        else
+        {
+            if (!drakvuf_check_return_context(drakvuf, info, rh_data->target_process_pid, rh_data->target_process_tid, rh_data->target_process_rsp))
+                return VMI_EVENT_RESPONSE_NONE;
 
-        memcpy(info->regs, &rh_data->regs, sizeof(x86_registers_t));
-        rh_data->inject_in_progress = false;
+            memcpy(info->regs, &rh_data->regs, sizeof(x86_registers_t));
+            rh_data->inject_in_progress = false;
+        }
     }
-#else
-    if (info->proc_data.pid != rh_data->target_process_pid)
+    else if (proc_data.pid != rh_data->target_process_pid)
         return VMI_EVENT_RESPONSE_NONE;
-#endif
 
     if (rh_data->state == HOOK_FIRST_TRY)
     {
@@ -283,14 +284,14 @@ event_response_t hook_process_cb(
         }
     }
 
-#ifndef LIBUSERMODE_USE_INJECTION
-    userhook_plugin->pf_in_progress.erase(std::make_pair(info->proc_data.pid, info->proc_data.tid));
-#endif
+    if (!userhook_plugin->injection_mode)
+    {
+        userhook_plugin->pf_in_progress.erase(std::make_pair(proc_data.pid, proc_data.tid));
+    }
 
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
     {
-        // Lock vmi.
         auto vmi = vmi_lock_guard(drakvuf);
         if (VMI_SUCCESS != vmi_pagetable_lookup(vmi, rh_data->target_process_dtb, rh_data->func_addr, &func_pa))
         {
@@ -302,31 +303,29 @@ event_response_t hook_process_cb(
             }
 
             // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
-#ifndef LIBUSERMODE_USE_INJECTION
-            if (VMI_SUCCESS == vmi_request_page_fault(vmi, info->vcpu, rh_data->func_addr, 0))
-#else
-            memcpy(&rh_data->regs, info->regs, sizeof(x86_registers_t));
-            rh_data->target_process_tid = info->proc_data.tid;
-            rh_data->target_process_rsp = info->regs->rsp;
-            rh_data->inject_in_progress = true;
-            addr_t stack_pointer;
-            if (inject_copy_memory(userhook_plugin, drakvuf, info, info->trap->cb, nullptr, rh_data->func_addr, &stack_pointer))
-#endif
+            if (userhook_plugin->injection_mode)
+            {
+                memcpy(&rh_data->regs, info->regs, sizeof(x86_registers_t));
+                rh_data->target_process_tid = proc_data.tid;
+                rh_data->target_process_rsp = info->regs->rsp;
+                rh_data->inject_in_progress = true;
+                addr_t stack_pointer;
+                if (inject_copy_memory(userhook_plugin, drakvuf, info, info->trap->cb, nullptr, rh_data->func_addr, &stack_pointer))
+                {
+                    rh_data->state = HOOK_PAGEFAULT_RETRY;
+                    return VMI_EVENT_RESPONSE_NONE;
+                }
+            }
+            else if (VMI_SUCCESS == vmi_request_page_fault(vmi, info->vcpu, rh_data->func_addr, 0))
             {
                 rh_data->state = HOOK_PAGEFAULT_RETRY;
-#ifndef LIBUSERMODE_USE_INJECTION
-                userhook_plugin->pf_in_progress.insert(std::make_pair(info->proc_data.pid, info->proc_data.tid));
-#endif
+                userhook_plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
                 return VMI_EVENT_RESPONSE_NONE;
             }
-            else
-            {
-                userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
-                return VMI_EVENT_RESPONSE_NONE;
-            }
-
+            userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
         }
-    } // Unlock Vmi.
+    }
 
     // We have managed to resolve the physical address. Place the trap.
     drakvuf_trap_t* trap = new drakvuf_trap_t();
@@ -344,7 +343,6 @@ event_response_t hook_process_cb(
     userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
-
 
 static
 event_response_t wait_for_target_process_cb(
