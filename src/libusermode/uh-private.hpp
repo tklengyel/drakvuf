@@ -238,7 +238,6 @@ struct copy_on_write_result_t : public call_result_t
 class userhook : public pluginex
 {
 public:
-    drakvuf_t m_drakvuf = nullptr;
     addr_t copy_virt_mem_va{0};
 
     userhook(userhook const&) = delete;
@@ -259,15 +258,10 @@ public:
 
     std::map<vmi_pid_t, module_context_t> proc_ntdll;
 
-#ifndef LIBUSERMODE_USE_INJECTION
-    std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
-#endif
+    const bool injection_mode;
+    std::set<std::pair<vmi_pid_t, uint32_t /*tid*/>> pf_in_progress;
 
-    static userhook& get_instance(drakvuf_t drakvuf)
-    {
-        static userhook instance(drakvuf);
-        return instance;
-    }
+    static userhook& get_instance(drakvuf_t drakvuf);
 
     static bool is_supported(drakvuf_t drakvuf);
     void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
@@ -280,7 +274,7 @@ public:
     void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
 private:
-    userhook(drakvuf_t drakvuf); // Force get_instance().
+    userhook(drakvuf_t drakvuf, bool injection_mode_enabled); // Force get_instance().
     ~userhook();
 
     // We need to keep these for memory management purposes.
@@ -293,17 +287,17 @@ private:
 proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info);
 bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func);
 bool is_pagetable_loaded(vmi_instance_t vmi, const drakvuf_trap_info* info, addr_t vaddr);
-event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
 
-#ifdef LIBUSERMODE_USE_INJECTION
+event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
+event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
+
 bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
     uint64_t* stack_marker,
     addr_t addr,
     addr_t* stack_pointer);
-#else
+
 event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-#endif
 
 #endif

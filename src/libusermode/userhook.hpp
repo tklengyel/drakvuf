@@ -282,4 +282,7 @@ void drakvuf_request_userhook_on_running_process(drakvuf_t drakvuf, addr_t targe
 
 
 void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
+
+void userhooks_set_injection_mode(bool enable);
+
 #endif
