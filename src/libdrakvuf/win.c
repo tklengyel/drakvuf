@@ -154,9 +154,9 @@ bool win_enumerate_module_info_ctx(drakvuf_t drakvuf, addr_t module_list_head, a
         addr_t base_addr;
         if (vmi_read_addr(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
-            addr_t size = 0;
+            uint32_t size = 0;
             ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE];
-            if (vmi_read_addr(vmi, ctx, &size) == VMI_SUCCESS)
+            if (vmi_read_32(vmi, ctx, &size) == VMI_SUCCESS)
             {
                 ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
                 unicode_string_t* base_name = drakvuf_read_unicode_common(drakvuf, ctx);
