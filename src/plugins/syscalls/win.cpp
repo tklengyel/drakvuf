@@ -256,7 +256,7 @@ static std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t addr,
                 {
                     .name = std::move(name),
                     .base = mmvad.starting_vpn << 12,
-                    .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
+                        .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
                 });
                 vmi_free_unicode_str(u_name);
                 return mods.back().name;
