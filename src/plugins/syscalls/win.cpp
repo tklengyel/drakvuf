@@ -116,7 +116,18 @@
 
 using namespace syscalls_ns;
 
-static constexpr auto ki_syscall_user_ret_offset = 0x28;
+static bool enum_modules_cb(drakvuf_t dravkuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
+{
+    auto plugin   = static_cast<win_syscalls*>(ctx);
+    auto& modules = plugin->procs[module_info->pid];
+    modules.push_back(
+    {
+        .name = (const char*)module_info->base_name->contents,
+        .base = module_info->base_addr,
+        .size = module_info->size
+    });
+    return true;
+}
 
 static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -203,46 +214,75 @@ static std::vector<uint64_t> extract_args(drakvuf_t drakvuf, drakvuf_trap_info_t
     return args;
 }
 
-static bool resolve_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* dllname, addr_t* base, addr_t* size)
+static std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t addr, addr_t process, vmi_pid_t pid, win_syscalls* s)
 {
-    resolve_ctx_t ctx{ .name = dllname };
-
-    drakvuf_enumerate_process_modules(drakvuf, info->proc_data.base_addr,
-        [](drakvuf_t dravkuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
+    auto lookup = [&]() -> std::optional<std::string>
     {
-        auto c = static_cast<resolve_ctx_t*>(ctx);
-
-        if (!strcmp((const char*)module_info->base_name->contents, c->name))
+        if (const auto& mods = s->procs.find(pid); mods != s->procs.end())
         {
-            c->base    = module_info->base_addr;
-            c->size    = module_info->size;
-            *need_stop = true;
+            for (const auto& module : mods->second)
+            {
+                if (addr >= module.base && addr < module.base + module.size)
+                {
+                    return module.name;
+                }
+            }
         }
-        return true;
-    }, &ctx);
-
-    if (ctx.size && ctx.base)
+        return {};
+    };
+    if (auto name = lookup())
     {
-        *base = ctx.base;
-        *size = ctx.size;
-        return true;
+        return name;
     }
-    return false;
+    // Didn't find in cache, try to resolve.
+    //
+    if (pid == 4)
+    {
+        if (drakvuf_enumerate_drivers(drakvuf, enum_modules_cb, s))
+        {
+            return lookup();
+        }
+        return {};
+    }
+    else if (mmvad_info_t mmvad{}; drakvuf_find_mmvad(drakvuf, process, addr, &mmvad))
+    {
+        auto& mods = s->procs[pid];
+        if (mmvad.file_name_ptr)
+        {
+            if (auto u_name = drakvuf_read_unicode_va(drakvuf, mmvad.file_name_ptr, 0))
+            {
+                std::string name = (const char*)u_name->contents;
+                mods.push_back(
+                {
+                    .name = std::move(name),
+                    .base = mmvad.starting_vpn << 12,
+                    .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
+                });
+                vmi_free_unicode_str(u_name);
+                return mods.back().name;
+            }
+        }
+    }
+    return {};
 }
 
-static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s, const char* subsystem)
+static addr_t get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode)
 {
-    // Only x64 nt syscalls are supported.
-    if (s->is32bit || !s->kernel_size || strcmp(subsystem, "nt"))
-        return false;
+    vmi_lock_guard vmi(drakvuf);
 
-    const addr_t rspbase = drakvuf_get_rspbase(drakvuf, info);
-    if ( rspbase <= info->regs->rsp )
-        return false;
-
-    const addr_t diff    = rspbase - info->regs->rsp;
-    // Here we check if the call originated from usermode (syscall) or from other driver (iat call).
-    // KiSystemCall64 allocates 0x158 + 7 * 8 = 0x190 bytes. The qword at offset 0x28 - return address to usermode:
+    if (mode == MAXIMUM_MODE)
+    {
+        return 0;
+    }
+    if (mode == KERNEL_MODE)
+    {
+        // Read return address.
+        //
+        return drakvuf_get_function_return_address(drakvuf, info);
+    }
+    // Read usermode address.
+    //
+    // The qword at offset 0x28 - return address to usermode:
     // -0x00:  mov     rsp, gs:1A8h
     // -0x08:  push    2Bh
     // -0x10:  push    qword ptr gs:10h
@@ -253,38 +293,38 @@ static bool is_inlined_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win
     // -0x30:  sub     rsp, 8
     // -0x38:  push    rbp
     // -0x190: sub     rsp, 158h
-    // Since we hook Nt* functions, there are situations when the call originated from other driver and not from usermode.
-    // This checks if stack displacement is less than 0x190 + 8 (call instruction) + N (number of function arguments that are pushed on the stack).
-    if (diff > 0x220 || diff < 0x190)
-        return false;
+    //
+    addr_t user_ret_addr{};
+    vmi_read_addr_va(vmi, drakvuf_get_rspbase(drakvuf, info) - 0x28, 0, &user_ret_addr);
+    return user_ret_addr;
+}
 
-    addr_t user_ret_addr = 0;
-    addr_t func_ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-    // Function return address should be within ntoskrnl.exe.
-    if (func_ret_addr < s->kernel_base || s->kernel_base + s->kernel_size < func_ret_addr)
-        return false;
-
-    // Read return address to usermode.
-    vmi_lock_guard vmi(drakvuf);
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, rspbase - ki_syscall_user_ret_offset, 0, &user_ret_addr))
-        return false;
-
-    // Resolve ntdll.dll.
-    if (!s->ntdll_base)
+/// Get module that called Nt (syscall) function and previous mode.
+///
+static std::pair<privilege_mode_t, std::optional<std::string>>
+    get_syscall_retinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s)
+{
+    if (s->is32bit)
     {
-        // Should never happen.
-        if (!resolve_dll(drakvuf, info, "ntdll.dll", &s->ntdll_base, &s->ntdll_size))
-            return false;
+        return { MAXIMUM_MODE, {} };
     }
-    // Is return address outside ntdll.dll?
-    bool inlined = s->ntdll_base > user_ret_addr || user_ret_addr > s->ntdll_base + s->ntdll_size;
-    // Try to locate wow64cpu.dll at runtime. We can't check if its wow64 process because we are in kernel.
-    if (!s->wow64cpu_base && inlined)
-        resolve_dll(drakvuf, info, "wow64cpu.dll", &s->wow64cpu_base, &s->wow64cpu_size);
-    // The module is outsize ntdll.dll so we check for wow64cpu.dll.
-    if (s->wow64cpu_base && inlined)
-        inlined = inlined && (user_ret_addr < s->wow64cpu_base || user_ret_addr > s->wow64cpu_base + s->wow64cpu_size);
-    return inlined;
+
+    privilege_mode_t mode = MAXIMUM_MODE;
+    if (!drakvuf_get_current_thread_previous_mode(drakvuf, info, &mode))
+    {
+        PRINT_DEBUG("[SYSCALLS] Failed to get previous mode\n");
+    }
+    auto ret = get_syscall_retaddr(drakvuf, info, mode);
+
+    if (mode == KERNEL_MODE)
+    {
+        return { mode, resolve_module(drakvuf, ret, info->proc_data.base_addr, 4, s) };
+    }
+    else if (mode == USER_MODE)
+    {
+        return { mode, resolve_module(drakvuf, ret, info->attached_proc_data.base_addr, info->attached_proc_data.pid, s) };
+    }
+    return { MAXIMUM_MODE, {} };
 }
 
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -292,27 +332,24 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     auto s = get_trap_plugin<win_syscalls>(info);
     auto w = get_trap_params<wrapper_t>(info);
     const syscall_t* sc = w->sc;
+    auto num_args = sc ? sc->num_args : 0;
 
-    std::vector<uint64_t> args = extract_args(drakvuf, info, s->register_size, sc ? sc->num_args : 0);
+    auto args = extract_args(drakvuf, info, s->register_size, num_args);
+    auto [mode, module] = get_syscall_retinfo(drakvuf, info, s);
+    s->print_syscall(drakvuf, info, w->num, w->type, sc, std::move(args), mode, std::move(module));
 
-    auto inlined = is_inlined_syscall(drakvuf, info, s, w->type);
-    s->print_syscall(drakvuf, info, w->num, w->type, sc, args, inlined);
-
-    if ( s->disable_sysret || s->is_stopping() )
-        return 0;
+    if (s->disable_sysret || s->is_stopping())
+        return VMI_EVENT_RESPONSE_NONE;
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-    if ( !ret_addr )
-        return 0;
+    if (!ret_addr)
+        return VMI_EVENT_RESPONSE_NONE;
 
-    auto trap = s->register_trap<wrapper_t>(
-            info,
-            ret_cb,
-            breakpoint_by_dtb_searcher());
+    auto trap = s->register_trap<wrapper_t>(info, ret_cb, breakpoint_by_dtb_searcher());
     if (!trap)
     {
         PRINT_DEBUG("Failed to trap syscall return %hu\n", w->num);
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     }
     trap->breakpoint.module = w->type;
 
@@ -332,7 +369,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wr->type = w->type;
     wr->sc = w->sc;
 
-    return 0;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, std::array<addr_t, 2> _sst, json_object* json)
@@ -461,31 +498,16 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
 
 win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output)
     : syscalls_base(drakvuf, config, output)
-    , strings_to_free(NULL)
-    , kernel_size  { 0 }
-    , ntdll_base   { 0 }
-    , wow64cpu_base{ 0 }
-    , ntdll_size   { 0 }
-    , wow64cpu_size{ 0 }
     , win32k_profile{ config->win32k_profile ?: "" }
-    , win32k_initialized{ false }
 {
     auto vmi = vmi_lock_guard(drakvuf);
 
-    addr_t start = 0;
-
     if ( !this->is32bit )
     {
-        if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiSystemServiceStart", &start) )
-        {
-            fprintf(stderr, "[SYSCALLS] Failed to get symbol KiSystemServiceStart\n");
-            throw -1;
-        }
-
         system_service_table_x64 _sst[2] = {};
         if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x64), (void*)&_sst, NULL) )
         {
-            fprintf(stderr, "[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
+            PRINT_DEBUG("[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
             throw -1;
         }
 
@@ -496,16 +518,10 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     }
     else
     {
-        if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiFastCallEntry", &start) )
-        {
-            fprintf(stderr, "[SYSCALLS] Failed to get symbol KiFastCallEntry\n");
-            throw -1;
-        }
-
         system_service_table_x86 _sst[2] = {};
         if ( VMI_FAILURE == vmi_read_ksym(vmi, "KeServiceDescriptorTableShadow", 2*sizeof(system_service_table_x86), (void*)&_sst, NULL) )
         {
-            fprintf(stderr, "[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
+            PRINT_DEBUG("[SYSCALLS] Failed to read ksym KeServiceDescriptorTableShadow\n");
             throw -1;
         }
 
@@ -515,39 +531,10 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
         this->sst[1][1] = _sst[1].ServiceLimit;
     }
 
-    start += this->kernel_base;
-
     addr_t dtb;
     if ( VMI_FAILURE == vmi_pid_to_dtb(vmi, 0, &dtb) )
     {
-        fprintf(stderr, "[SYSCALLS] Failed to get dtb.\n");
-        throw -1;
-    }
-
-    // Get ntoskrnl size.
-    pass_ctx_t pass;
-    pass.plugin = this;
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage", &pass.size_rva) ||
-        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "BaseDllName", &pass.name_rva))
-    {
-        fprintf(stderr, "[SYSCALLS] Failed to get _LDR_DATA_TABLE_ENTRY members rva\n");
-        throw -1;
-    }
-
-    drakvuf_enumerate_drivers(drakvuf, [](drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx)
-    {
-        auto pass   = static_cast<pass_ctx_t*>(visitor_ctx);
-        auto plugin = static_cast<win_syscalls*>(pass->plugin);
-        if (!strcmp((const char*)module_info->base_name->contents, "ntoskrnl.exe"))
-        {
-            plugin->kernel_size = module_info->size;
-        }
-        return true;
-    }, &pass);
-
-    if (!this->kernel_size)
-    {
-        fprintf(stderr, "[SYSCALLS] Failed to get kernel image size\n");
+        PRINT_DEBUG("[SYSCALLS] Failed to get dtb.\n");
         throw -1;
     }
 
@@ -561,38 +548,38 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
     PRINT_DEBUG("NtBuildNumber: %u\n", ntbuild);
     PRINT_DEBUG("NT syscall table: 0x%lx. Limit: %lu\n", this->sst[0][0], this->sst[0][1]);
     PRINT_DEBUG("Win32k syscall table: 0x%lx. Limit: %lu\n", this->sst[1][0], this->sst[1][1]);
-    PRINT_DEBUG("Windows syscall entry: 0x%lx\n", start);
 #endif
 
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
     {
-        fprintf(stderr, "[SYSCALLS] Failed to get ImagePathName from _RTL_USER_PROCESS_PARAMETERS\n");
+        PRINT_DEBUG("[SYSCALLS] Failed to get ImagePathName from _RTL_USER_PROCESS_PARAMETERS\n");
         throw -1;
     }
 
     if (!trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, this->sst[0], vmi_get_kernel_json(vmi)))
     {
-        fprintf(stderr, "[SYSCALLS] Failed to trap NT syscall table entries\n");
+        PRINT_DEBUG("[SYSCALLS] Failed to trap NT syscall table entries\n");
         throw -1;
     }
 
-    if (config->win32k_profile)
+    if (!this->setup_win32k_syscalls(drakvuf))
     {
-        if (!this->setup_win32k_syscalls(drakvuf))
-        {
-            PRINT_DEBUG("[SYSCALLS] Delay second syscall table hooks initialization\n");
-
-            this->load_driver_hook = this->createSyscallHook("NtLoadDriver", &win_syscalls::load_driver_cb);
-            this->create_process_hook = this->createSyscallHook("NtCreateUserProcess", &win_syscalls::create_process_cb);
-        }
+        PRINT_DEBUG("[SYSCALLS] Delay hooks initialization\n");
+        this->load_driver_hook = this->createSyscallHook("NtLoadDriver", &win_syscalls::load_driver_cb);
+        this->create_process_hook = this->createSyscallHook("NtCreateUserProcess", &win_syscalls::create_process_cb);
     }
-    else
-        PRINT_DEBUG("[SYSCALLS] Skipping second syscall table since no json profile for win32k is provided\n");
+    this->delete_process_hook = this->createSyscallHook("PspProcessDelete", &win_syscalls::delete_process_cb);
 }
 
 bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
 {
     auto vmi = vmi_lock_guard(drakvuf);
+
+    if (this->win32k_profile == "")
+    {
+        PRINT_DEBUG("Skipping second syscall table since no json profile for win32k is provided\n");
+        return true;
+    }
 
     addr_t modlist;
     if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &modlist))
@@ -645,8 +632,18 @@ bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
 
 char* win_syscalls::win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
-    vmi_lock_guard vmi(drakvuf);
-    if ( arg.type == POBJECT_ATTRIBUTES )
+    if (arg.type == PUNICODE_STRING)
+    {
+        unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
+        if (us)
+        {
+            char* str = (char*)us->contents;
+            us->contents = nullptr; // move ownership
+            vmi_free_unicode_str(us);
+            return str;
+        }
+    }
+    else if ( arg.type == POBJECT_ATTRIBUTES )
     {
         char* filename = drakvuf_get_filename_from_object_attributes(drakvuf, info, val);
         if ( filename ) return filename;
@@ -730,10 +727,22 @@ event_response_t win_syscalls::create_process_ret_cb(drakvuf_t drakvuf, drakvuf_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+event_response_t win_syscalls::delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t process = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    if (vmi_pid_t pid; drakvuf_get_process_pid(drakvuf, process, &pid))
+    {
+        this->procs.erase(pid);
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 void win_syscalls::print_syscall(
     drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    int nr, std::string&& module, const syscall_t* sc,
-    const std::vector<uint64_t>& args, bool inlined
+    int nr, const char* module, const syscall_t* sc,
+    std::vector<uint64_t> args, privilege_mode_t mode,
+    std::optional<std::string> from_dll
 )
 {
     if (sc)
@@ -756,24 +765,23 @@ void win_syscalls::print_syscall(
         }
     }
 
+    std::optional<fmt::Estr<std::string>> from_dll_opt;
+    std::optional<fmt::Rstr<const char*>> priv_mode_opt;
+
+    if (from_dll.has_value())
+        from_dll_opt = fmt::Estr(std::move(*from_dll));
+
+    if (mode != MAXIMUM_MODE)
+        priv_mode_opt = fmt::Rstr(mode == USER_MODE ? "User" : "Kernel");
+
     fmt::print(this->m_output_format, "syscall", drakvuf, info,
         keyval("Module", fmt::Qstr(std::move(module))),
         keyval("vCPU", fmt::Nval(info->vcpu)),
         keyval("CR3", fmt::Xval(info->regs->cr3)),
         keyval("Syscall", fmt::Nval(nr)),
         keyval("NArgs", fmt::Nval(args.size())),
-        keyval("Inlined", fmt::Qstr(inlined ? "True" : "False")),
-        this->fmt_args
+        keyval("PreviousMode", priv_mode_opt),
+        keyval("FromModule", from_dll_opt),
+        std::move(fmt_args)
     );
-}
-
-win_syscalls::~win_syscalls()
-{
-    GSList* loop = this->strings_to_free;
-    while (loop)
-    {
-        g_free(loop->data);
-        loop = loop->next;
-    }
-    g_slist_free(this->strings_to_free);
 }
