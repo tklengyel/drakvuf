@@ -122,7 +122,7 @@ static bool enum_modules_cb(drakvuf_t dravkuf, const module_info_t* module_info,
     auto& modules = plugin->procs[module_info->pid];
     modules.push_back(
     {
-        .name = (const char*)module_info->base_name->contents,
+        .name = (const char*)module_info->full_name->contents,
         .base = module_info->base_addr,
         .size = module_info->size
     });
@@ -218,7 +218,8 @@ static std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t addr,
 {
     auto lookup = [&]() -> std::optional<std::string>
     {
-        if (const auto& mods = s->procs.find(pid); mods != s->procs.end())
+        const auto& mods = s->procs.find(pid);
+        if (mods != s->procs.end())
         {
             for (const auto& module : mods->second)
             {
