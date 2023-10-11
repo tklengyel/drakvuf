@@ -122,7 +122,7 @@ static const char* xc_functions[] =
     "xc_evtchn_open",
     "xc_evtchn_close",
     "xc_evtchn_fd",
-    "xc_domain_getinfo",
+    "xc_domain_getinfolist",
     "xc_domctl",
     "xc_domain_pause",
     "xc_domain_unpause",
@@ -164,8 +164,8 @@ struct xenlibwrapper
             int (*xc_evtchn_fd)
             (xc_evtchn* xce);
 
-            int (*xc_domain_getinfo)
-            (xc_interface* xch, uint32_t first_domid, unsigned int max_doms, xc_dominfo_t* info);
+            int (*xc_domain_getinfolist)
+            (xc_interface* xch, uint32_t first_domid, unsigned int max_doms, xc_domaininfo_t* info);
 
             int (*xc_domctl)
             (xc_interface* xch, struct xen_domctl* domctl);
