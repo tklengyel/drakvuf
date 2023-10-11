@@ -271,10 +271,10 @@ int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
     else
     {
 
-        xc_dominfo_t info = { 0 };
+        xc_domaininfo_t info = { 0 };
 
-        if ( 1 == xen->xlw.xc_domain_getinfo(xen->xc, _domID, 1, &info)
-            && info.domid == _domID)
+        if ( 1 == xen->xlw.xc_domain_getinfolist(xen->xc, _domID, 1, &info)
+            && info.domain == _domID)
         {
             _name = xen->xlw.libxl_domid_to_name(xen->xl_ctx, _domID);
         }
@@ -292,10 +292,10 @@ int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
 
 uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID)
 {
-    xc_dominfo_t info = { 0 };
+    xc_domaininfo_t info = { 0 };
 
-    if ( 1 == xen->xlw.xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID)
-        return info.max_memkb;
+    if ( 1 == xen->xlw.xc_domain_getinfolist(xen->xc, domID, 1, &info) && info.domain == domID)
+        return info.max_pages << (XC_PAGE_SHIFT-10);
 
     return 0;
 }
@@ -325,9 +325,9 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
 {
     do
     {
-        xc_dominfo_t info = {0};
+        xc_domaininfo_t info = {0};
 
-        if (1 == xen->xlw.xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID && info.paused)
+        if (1 == xen->xlw.xc_domain_getinfolist(xen->xc, domID, 1, &info) && info.domain == domID && (info.flags & XEN_DOMINF_paused))
             xen->xlw.xc_domain_unpause(xen->xc, domID);
         else
             break;
