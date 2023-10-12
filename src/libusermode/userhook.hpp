@@ -213,7 +213,7 @@ struct dll_view_t
 {
     // relevant while loading
     addr_t dtb;
-    uint32_t thread_id;
+    uint32_t tid;
     addr_t real_dll_base;
     mmvad_info_t mmvad;
     bool is_hooked;

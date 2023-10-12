@@ -189,16 +189,12 @@ proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
  */
 static dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin)
 {
-    uint32_t thread_id;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
-        return nullptr;
-
     proc_data_t proc_data = get_proc_data(drakvuf, info);
     if (auto it = plugin->loaded_dlls.find(proc_data.pid); it != plugin->loaded_dlls.end())
     {
         for (auto& dll_meta : it->second)
         {
-            if (!dll_meta.v.is_hooked && dll_meta.v.thread_id == thread_id)
+            if (!dll_meta.v.is_hooked && dll_meta.v.tid == proc_data.tid)
                 return &dll_meta;
         }
     }
@@ -236,17 +232,10 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         return nullptr;
     }
 
-    uint32_t thread_id;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
-    {
-        PRINT_DEBUG("[USERHOOK] Failed to get TID\n");
-        return nullptr;
-    }
-
     dll_t dll_meta =
     {
         .v.dtb = info->regs->cr3,
-        .v.thread_id = thread_id,
+        .v.tid = proc_data.tid,
         .v.real_dll_base = (mmvad->starting_vpn << 12),
         .v.mmvad = *mmvad,
         .v.is_hooked = false
