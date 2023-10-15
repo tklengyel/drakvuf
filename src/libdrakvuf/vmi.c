@@ -1924,7 +1924,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     /* domain->max_pages is mostly just an annoyance that we can safely ignore */
     rc = xen_set_maxmemkb(drakvuf->xen, drakvuf->domID, ~0);
     PRINT_DEBUG("Max mem set? %i\n", rc);
-    if (rc < 0)
+    if (!rc)
         return 0;
 
     drakvuf->sink_page_gfn = ++(drakvuf->max_gpfn);
