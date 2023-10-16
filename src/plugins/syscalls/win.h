@@ -115,9 +115,6 @@ public:
 
     std::array<std::array<addr_t, 2>, 2> sst;
 
-    addr_t kernel_size;
-    addr_t ntdll_base, wow64cpu_base;
-    size_t ntdll_size, wow64cpu_size;
     std::unordered_map<vmi_pid_t, std::vector<syscalls_ns::syscalls_module>> procs;
 
     addr_t image_path_name;
@@ -126,6 +123,7 @@ public:
 
     std::unique_ptr<libhook::SyscallHook> load_driver_hook;
     std::unique_ptr<libhook::SyscallHook> create_process_hook;
+    std::unique_ptr<libhook::SyscallHook> delete_process_hook;
     std::unique_ptr<libhook::ReturnHook> wait_process_creation_hook;
 
     bool setup_win32k_syscalls(drakvuf_t drakvuf);
@@ -133,14 +131,14 @@ public:
     event_response_t load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, std::array<addr_t, 2> _sst, json_object* json);
     virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
 
-    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, std::string&& module, const syscalls_ns::syscall_t* sc, const std::vector<uint64_t>& args, bool inlined);
+    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* module, const syscalls_ns::syscall_t* sc, std::vector<uint64_t> args, privilege_mode_t mode, std::optional<std::string> from_dll);
 
     win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
-    ~win_syscalls();
 };
 
 namespace syscalls_ns
