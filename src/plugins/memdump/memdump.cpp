@@ -979,12 +979,12 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     }
 
     if (c->clr_profile)
-        this->setup_dotnet_hooks(drakvuf, "clr.dll", c->clr_profile);
+        this->setup_dotnet_hooks("clr.dll", c->clr_profile);
     else
         PRINT_DEBUG("clr.dll profile not found, memdump will proceed without .NET hooks\n");
 
     if (c->mscorwks_profile)
-        this->setup_dotnet_hooks(drakvuf, "mscorwks.dll", c->mscorwks_profile);
+        this->setup_dotnet_hooks("mscorwks.dll", c->mscorwks_profile);
     else
         PRINT_DEBUG("mscorwks.dll profile not found, memdump will proceed without .NET hooks\n");
 
@@ -1011,10 +1011,15 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
         if (!register_trap(nullptr, shellcode_cb, bp.for_syscall_name("NtFreeVirtualMemory")))
             throw -1;
 
-    this->userhook_init(drakvuf, c, output);
+    this->userhook_init(c, output);
 }
 
 memdump::~memdump()
 {
     userhook_destroy();
+}
+
+bool memdump::stop_impl()
+{
+    return this->userhooks_stop() && pluginex::stop_impl();
 }

@@ -547,5 +547,5 @@ rpcmon::~rpcmon()
 
 bool rpcmon::stop_impl()
 {
-    return ret_hooks.empty() && pluginex::stop_impl();
+    return drakvuf_stop_userhooks(drakvuf) && pluginex::stop_impl();
 }

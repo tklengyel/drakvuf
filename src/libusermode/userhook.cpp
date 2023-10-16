@@ -208,7 +208,7 @@ static bool is_already_hooked(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     if (auto it = plugin->loaded_dlls.find(proc_data.pid); it != plugin->loaded_dlls.end())
         for (auto const& dll_meta : it->second)
             if (dll_meta.v.real_dll_base == mmvad->starting_vpn << 12)
-                return true;
+                return dll_meta.v.is_hooked;
     return false;
 }
 
@@ -385,14 +385,13 @@ static std::optional<mmvad_info_t> get_module_mmvad(drakvuf_t drakvuf, addr_t ep
     return {};
 }
 
-static event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t dll_base)
+static event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t dll_base, userhook* plugin)
 {
-    auto plugin = get_trap_plugin<userhook>(info);
     auto proc_data = get_proc_data(drakvuf, info);
 
     dll_t* dll_meta = get_pending_dll(drakvuf, info, plugin);
 
-    if (!dll_meta)
+    if (!dll_meta && !plugin->is_stopping())
     {
         auto mmvad = get_module_mmvad(drakvuf, proc_data.base_addr, dll_base);
         if (mmvad)
@@ -411,7 +410,7 @@ static void try_hook_ntdll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, userhoo
     {
         ctx = &it->second;
     }
-    else
+    else if (!plugin->is_stopping())
     {
         struct visitor_context_t
         {
@@ -482,9 +481,9 @@ static event_response_t protect_virtual_memory_hook_ret_cb(drakvuf_t drakvuf, dr
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto ret = hook_dll(drakvuf, info, params->base_address);
+    auto ret = hook_dll(drakvuf, info, params->base_address, plugin);
 
-    if (!drakvuf_lookup_injection(drakvuf, info))
+    if (!plugin->is_injection_in_progress(drakvuf, info))
         plugin->destroy_trap(info->trap);
 
     return ret;
@@ -499,9 +498,8 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     try_hook_ntdll(drakvuf, info, plugin);
 
-    if (drakvuf_lookup_injection(drakvuf, info))
+    if (plugin->is_injection_in_progress(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
-
 
     // IN HANDLE ProcessHandle
     uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -513,6 +511,9 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     addr_t base_address;
     if (VMI_SUCCESS != read_addr(drakvuf, info, base_address_ptr, &base_address))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    if (plugin->is_stopping())
         return VMI_EVENT_RESPONSE_NONE;
 
     /* We have to finish handling NtProtectVirtualMemory on return to avoid
@@ -560,9 +561,9 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto ret = hook_dll(drakvuf, info, base_address);
+    auto ret = hook_dll(drakvuf, info, base_address, plugin);
 
-    if (!drakvuf_lookup_injection(drakvuf, info))
+    if (!plugin->is_injection_in_progress(drakvuf, info))
         plugin->destroy_trap(info->trap);
 
     return ret;
@@ -577,7 +578,10 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     try_hook_ntdll(drakvuf, info, plugin);
 
-    if (drakvuf_lookup_injection(drakvuf, info))
+    if (plugin->is_injection_in_progress(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    if (plugin->is_stopping())
         return VMI_EVENT_RESPONSE_NONE;
 
     // IN HANDLE SectionHandle
@@ -653,6 +657,9 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     plugin->destroy_trap(info->trap);
 
+    if (plugin->is_stopping())
+        return VMI_EVENT_RESPONSE_NONE;
+
     auto vmi = vmi_lock_guard(drakvuf);
 
     // sometimes the physical address was incorrectly cached in this moment, so we need to flush it
@@ -694,6 +701,9 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin = get_trap_plugin<userhook>(info);
+
+    if (plugin->is_stopping())
+        return VMI_EVENT_RESPONSE_NONE;
 
     addr_t vaddr = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t pte = drakvuf_get_function_argument(drakvuf, info, 2);
@@ -852,6 +862,54 @@ userhook::~userhook()
     running_rh_traps.clear();
 }
 
+void userhook::increment_injection_in_progress_count(const proc_data_t& proc_data)
+{
+    if (injection_mode)
+    {
+        ++this->injection_in_progress;
+    }
+    else
+    {
+        pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
+    }
+}
+
+void userhook::decrement_injection_in_progress_count(const proc_data_t& proc_data)
+{
+    if (injection_mode)
+    {
+        if (injection_in_progress > 0) --injection_in_progress;
+    }
+    else
+    {
+        pf_in_progress.erase(std::make_pair(proc_data.pid, proc_data.tid));
+    }
+}
+
+bool userhook::is_injection_in_progress(drakvuf_t drakvuf, drakvuf_trap_info_t* info) const
+{
+    if (injection_mode)
+    {
+        return drakvuf_lookup_injection(drakvuf, info);
+    }
+    else
+    {
+        auto proc_data = get_proc_data(drakvuf, info);
+        return pf_in_progress.find(std::make_pair(proc_data.pid, proc_data.tid)) != pf_in_progress.end();
+    }
+}
+
+
+bool userhook::no_injection_in_progress() const
+{
+    return injection_in_progress == 0 && pf_in_progress.empty();
+}
+
+bool userhook::stop_impl()
+{
+    return this->no_injection_in_progress() && pluginex::stop_impl();
+}
+
 void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg)
 {
     userhook::get_instance(drakvuf).register_plugin(drakvuf, *reg);
@@ -861,6 +919,11 @@ bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, con
 {
     userhook::get_instance(drakvuf).request_usermode_hook(drakvuf, dll, target, callback, extra);
     return true;
+}
+
+bool drakvuf_stop_userhooks(drakvuf_t drakvuf)
+{
+    return userhook::get_instance(drakvuf).stop();
 }
 
 std::optional<HookActions> get_hook_actions(const std::string& str)

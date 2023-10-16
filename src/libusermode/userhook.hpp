@@ -285,4 +285,11 @@ void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvu
 
 void userhooks_set_injection_mode(bool enable);
 
+/**
+ * Requests to stop the userhooks subsystem.
+ * @param[in] drakvuf drakvuf context
+ * @return true if userhooks subsystem has been stopped, false otherwise.
+ */
+bool drakvuf_stop_userhooks(drakvuf_t drakvuf);
+
 #endif

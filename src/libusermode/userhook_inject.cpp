@@ -179,6 +179,7 @@ event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_t
     {
         check_stack_marker(drakvuf, info, dll_meta);
         drakvuf_remove_injection(drakvuf, info);
+        plugin->decrement_injection_in_progress_count(proc_data);
     }
 
     if (plugin->is_stopping())
@@ -214,6 +215,7 @@ event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_t
             PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
             dll_meta->pf_current_addr += VMI_PS_4KB;
             get_trap_params<call_result_t>(info->trap)->set_result_call_params(info, stack_pointer);
+            plugin->increment_injection_in_progress_count(proc_data);
         }
         else
         {
@@ -268,6 +270,7 @@ event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_t
                     {
                         target.state = HOOK_PAGEFAULT_RETRY;
                         get_trap_params<call_result_t>(info->trap)->set_result_call_params(info, stack_pointer);
+                        plugin->increment_injection_in_progress_count(proc_data);
                     }
                     else
                     {

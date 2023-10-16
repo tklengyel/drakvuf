@@ -120,7 +120,7 @@ public:
     rpcmon(drakvuf_t drakvuf, output_format_t output);
     ~rpcmon();
 
-    bool stop_impl() override;
+    virtual bool stop_impl() override;
 
     event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info);
 
