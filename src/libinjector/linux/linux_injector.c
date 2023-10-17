@@ -388,7 +388,7 @@ static bool inject(drakvuf_t drakvuf, linux_injector_t injector)
 
     if (!drakvuf_add_trap(drakvuf, &trap_exit))
     {
-        fprintf(stderr, "Failed to set trap kernel_panic_cb callback\n");
+        fprintf(stderr, "Failed to set trap kernel_exit_cb callback\n");
         return false;
     }
 
