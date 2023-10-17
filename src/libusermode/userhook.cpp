@@ -923,7 +923,7 @@ bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, con
 
 bool drakvuf_stop_userhooks(drakvuf_t drakvuf)
 {
-    return userhook::get_instance(drakvuf).stop();
+    return !userhook::is_supported(drakvuf) || userhook::get_instance(drakvuf).stop();
 }
 
 std::optional<HookActions> get_hook_actions(const std::string& str)
