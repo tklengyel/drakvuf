@@ -236,24 +236,21 @@ event_response_t hook_process_cb(
     userhook* userhook_plugin = rh_data->userhook_plugin;
     auto proc_data = get_proc_data(drakvuf, info);
 
-    if (userhook_plugin->injection_mode)
+    if (userhook_plugin->injection_mode && rh_data->inject_in_progress)
     {
-        if (!rh_data->inject_in_progress)
-        {
-            if (proc_data.pid != rh_data->target_process_pid)
-                return VMI_EVENT_RESPONSE_NONE;
-        }
-        else
-        {
-            if (!drakvuf_check_return_context(drakvuf, info, rh_data->target_process_pid, rh_data->target_process_tid, rh_data->target_process_rsp))
-                return VMI_EVENT_RESPONSE_NONE;
+        if (!drakvuf_check_return_context(drakvuf, info, rh_data->target_process_pid, rh_data->target_process_tid, rh_data->target_process_rsp))
+            return VMI_EVENT_RESPONSE_NONE;
 
-            memcpy(info->regs, &rh_data->regs, sizeof(x86_registers_t));
-            rh_data->inject_in_progress = false;
-        }
+        memcpy(info->regs, &rh_data->regs, sizeof(x86_registers_t));
+        rh_data->inject_in_progress = false;
     }
-    else if (proc_data.pid != rh_data->target_process_pid)
-        return VMI_EVENT_RESPONSE_NONE;
+    else
+    {
+        if (proc_data.pid != rh_data->target_process_pid)
+            return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    userhook_plugin->decrement_injection_in_progress_count(proc_data);
 
     if (rh_data->state == HOOK_FIRST_TRY)
     {
@@ -284,11 +281,6 @@ event_response_t hook_process_cb(
         }
     }
 
-    if (!userhook_plugin->injection_mode)
-    {
-        userhook_plugin->pf_in_progress.erase(std::make_pair(proc_data.pid, proc_data.tid));
-    }
-
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
     {
@@ -313,13 +305,14 @@ event_response_t hook_process_cb(
                 if (inject_copy_memory(userhook_plugin, drakvuf, info, info->trap->cb, nullptr, rh_data->func_addr, &stack_pointer))
                 {
                     rh_data->state = HOOK_PAGEFAULT_RETRY;
+                    userhook_plugin->increment_injection_in_progress_count(proc_data);
                     return VMI_EVENT_RESPONSE_NONE;
                 }
             }
             else if (VMI_SUCCESS == vmi_request_page_fault(vmi, info->vcpu, rh_data->func_addr, 0))
             {
                 rh_data->state = HOOK_PAGEFAULT_RETRY;
-                userhook_plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
+                userhook_plugin->increment_injection_in_progress_count(proc_data);
                 return VMI_EVENT_RESPONSE_NONE;
             }
             userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);

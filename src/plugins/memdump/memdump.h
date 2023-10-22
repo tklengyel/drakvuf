@@ -147,11 +147,14 @@ public:
     memdump& operator=(const memdump&) = delete;
     ~memdump();
 
-    void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
+    virtual bool stop_impl() override;
+
+    void userhook_init(const memdump_config* c, output_format_t output);
     void userhook_destroy();
+    bool userhooks_stop();
 
 private:
-    void setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const char* profile);
+    void setup_dotnet_hooks(const char* dll_name, const char* profile);
 };
 
 #endif

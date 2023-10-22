@@ -157,7 +157,7 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
     PRINT_DEBUG("[MEMDUMP] DLL hooked - done\n");
 }
 
-void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
+void memdump::userhook_init(const memdump_config* c, output_format_t output)
 {
     if (!drakvuf_are_userhooks_supported(drakvuf))
     {
@@ -195,7 +195,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
     drakvuf_register_usermode_callback(drakvuf, &reg);
 }
 
-void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const char* profile)
+void memdump::setup_dotnet_hooks(const char* dll_name, const char* profile)
 {
     PRINT_DEBUG("%s profile found, will setup usermode hooks for .NET\n", dll_name);
 
@@ -225,4 +225,9 @@ void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const 
 void memdump::userhook_destroy()
 {
 
+}
+
+bool memdump::userhooks_stop()
+{
+    return drakvuf_stop_userhooks(drakvuf);
 }

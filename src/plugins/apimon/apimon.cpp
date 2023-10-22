@@ -421,7 +421,7 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 
 bool apimon::stop_impl()
 {
-    return ret_hooks.empty() && pluginex::stop_impl();
+    return drakvuf_stop_userhooks(drakvuf) && pluginex::stop_impl();
 }
 
 apimon::~apimon()
