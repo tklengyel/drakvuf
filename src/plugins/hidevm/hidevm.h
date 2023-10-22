@@ -160,6 +160,7 @@ public:
     hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t output);
     ~hidevm() = default;
 
+    virtual bool stop_impl() override;
 };
 
 #endif

@@ -243,6 +243,8 @@ public:
     userhook(userhook const&) = delete;
     userhook& operator=(userhook const&) = delete;
 
+    virtual bool stop_impl() override;
+
     std::array<size_t, __OFFSET_MAX> offsets;
 
     std::vector<usermode_cb_registration> plugins;
@@ -259,7 +261,13 @@ public:
     std::map<vmi_pid_t, module_context_t> proc_ntdll;
 
     const bool injection_mode;
+    int injection_in_progress = 0;
     std::set<std::pair<vmi_pid_t, uint32_t /*tid*/>> pf_in_progress;
+
+    void increment_injection_in_progress_count(const proc_data_t& proc_data);
+    void decrement_injection_in_progress_count(const proc_data_t& proc_data);
+    bool is_injection_in_progress(drakvuf_t drakvuf, drakvuf_trap_info_t* info) const;
+    bool no_injection_in_progress() const;
 
     static userhook& get_instance(drakvuf_t drakvuf);
 

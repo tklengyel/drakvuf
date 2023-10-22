@@ -137,8 +137,9 @@ public:
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();
 
+    virtual bool stop_impl() override;
+
     std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t process, addr_t addr, vmi_pid_t pid);
-    bool stop_impl() override;
 
     event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info);
 

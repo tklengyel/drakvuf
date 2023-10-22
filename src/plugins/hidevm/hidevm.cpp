@@ -816,3 +816,8 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
         }
     }
 }
+
+bool hidevm::stop_impl()
+{
+    return drakvuf_stop_userhooks(drakvuf) && pluginex::stop_impl();
+}
