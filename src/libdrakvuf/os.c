@@ -1084,6 +1084,16 @@ addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t epro
     return ret;
 }
 
+void drakvuf_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid, uint32_t* tid, addr_t* rsp)
+{
+    if ( drakvuf->osi.set_return_context )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        drakvuf->osi.set_return_context(drakvuf, info, pid, tid, rsp);
+        drakvuf_release_vmi(drakvuf);
+    }
+}
+
 bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     bool ret = false;

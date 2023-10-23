@@ -500,6 +500,13 @@ bool fill_wow_offsets( drakvuf_t drakvuf, size_t size, const char* names [][2] )
     return 1 ;
 }
 
+void win_set_return_context(drakvuf_t drakvuf __attribute__((unused)), drakvuf_trap_info_t* info, vmi_pid_t* pid, uint32_t* tid, addr_t* rsp)
+{
+    *pid = info->attached_proc_data.pid;
+    *tid = info->attached_proc_data.tid;
+    *rsp = info->regs->rsp;
+}
+
 bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     return (info->attached_proc_data.pid == pid)
@@ -613,6 +620,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_user_stack32 = win_get_user_stack32;
     drakvuf->osi.get_user_stack64 = win_get_user_stack64;
     drakvuf->osi.get_wow_peb = win_get_wow_peb;
+    drakvuf->osi.set_return_context = win_set_return_context;
     drakvuf->osi.check_return_context = win_check_return_context;
     drakvuf->osi.get_rspbase = win_get_rspbase;
     drakvuf->osi.get_kernel_symbol_rva = win_get_kernel_symbol_rva;
