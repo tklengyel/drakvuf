@@ -314,7 +314,7 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     auto hook = this->createReturnHook<linux_syscall_data>(info, &linux_syscalls::linux_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
-    params->setResultCallParams(info);
+    params->setResultCallParams(drakvuf, info);
 
     auto hookID = make_hook_id(info);
     this->ret_hooks[hookID] = std::move(hook);

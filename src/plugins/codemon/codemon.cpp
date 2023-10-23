@@ -1010,7 +1010,7 @@ event_response_t codemon::mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     }
 
     auto params = libhook::GetTrapParams<AccessFaultResult>(this->mmAccessFaultReturnHook->trap_);
-    params->setResultCallParams(trap_info);
+    params->setResultCallParams(drakuf, trap_info);
     params->page_va = fault_va;
 
     return VMI_EVENT_RESPONSE_NONE;
