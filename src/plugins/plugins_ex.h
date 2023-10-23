@@ -600,7 +600,7 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
     {
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         auto params = libhook::GetTrapParams(hook->trap_);
-        params->setResultCallParams(info);
+        params->setResultCallParams(drakvuf, info);
     }
     else
         PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");

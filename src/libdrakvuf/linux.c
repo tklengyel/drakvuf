@@ -157,6 +157,13 @@ addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return ret_addr;
 }
 
+void linux_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid, uint32_t* tid, addr_t* rsp)
+{
+    *pid = info->proc_data.pid;
+    *tid = info->proc_data.tid;
+    *rsp = linux_get_function_return_address(drakvuf, info);
+}
+
 bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     return (info->proc_data.pid == pid)
@@ -355,6 +362,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.export_lib_address = get_lib_address;
     drakvuf->osi.get_function_argument = linux_get_function_argument;
     drakvuf->osi.get_function_return_address = linux_get_function_return_address;
+    drakvuf->osi.set_return_context = linux_set_return_context;
     drakvuf->osi.check_return_context = linux_check_return_context;
     drakvuf->osi.enumerate_processes = linux_enumerate_processes;
     drakvuf->osi.get_current_process_environ = linux_get_current_process_environ;

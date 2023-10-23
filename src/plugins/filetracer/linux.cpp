@@ -306,7 +306,7 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
 
     // Save data
-    params->setResultCallParams(info);
+    params->setResultCallParams(drakvuf, info);
 
     this->ret_hooks[hookID] = std::move(hook);
 
@@ -473,7 +473,7 @@ event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakv
     auto params = libhook::GetTrapParams<linux_data>(hook->trap_);
 
     // Save data
-    params->setResultCallParams(info);
+    params->setResultCallParams(drakvuf, info);
 
     char* tmp = read_filename(drakvuf, info, file_name_addr);
     params->filename = tmp ?: "";
