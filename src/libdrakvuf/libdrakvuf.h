@@ -566,6 +566,10 @@ bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     uint32_t* thread_id) NOEXCEPT;
 
+void drakvuf_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    vmi_pid_t* target_pid, uint32_t* target_tid,
+    addr_t* target_rsp) NOEXCEPT;
+
 /*
  * To catch the moment of exiting the currently executing function,
  * we put a breakpoint on the instruction located at the function's
