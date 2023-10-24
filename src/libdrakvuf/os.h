@@ -160,6 +160,9 @@ typedef struct os_interface
     bool (*get_process_tid)
     (drakvuf_t drakvuf, addr_t process_base, uint32_t* tid);
 
+    bool (*get_process_pgid)
+    (drakvuf_t drakvuf, addr_t process_base, uint32_t* pgid);
+
     int64_t (*get_current_process_userid)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 

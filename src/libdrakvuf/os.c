@@ -383,6 +383,20 @@ bool drakvuf_get_process_thread_id(drakvuf_t drakvuf, addr_t process_base, uint3
     return ret;
 }
 
+bool drakvuf_get_process_group_id(drakvuf_t drakvuf, addr_t process_base, uint32_t* pgid)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_process_pgid )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_process_pgid(drakvuf, process_base, pgid);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 char* drakvuf_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {
     char* ret = NULL;
@@ -447,6 +461,20 @@ bool drakvuf_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.get_process_dtb(drakvuf, process_base, dtb);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_get_process_arguments(drakvuf_t drakvuf, addr_t process_base, addr_t* argv)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_process_arguments )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_process_arguments(drakvuf, process_base, argv);
         drakvuf_release_vmi(drakvuf);
     }
 
