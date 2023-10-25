@@ -295,9 +295,9 @@ void linux_procmon::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<execve_data>(info);
 
-    std::vector<fmt::KeyvalAarg> envp;
+    std::vector<std::pair<std::string, fmt::Aarg>> envp;
     if (!params->envp.empty())
-        envp.emplace_back(keyval("Environment", fmt::Estr(map_to_str(params->envp, this->m_output_format))));
+        envp.emplace_back("Environment", fmt::Estr(map_to_str(params->envp, this->m_output_format)));
 
     auto proc_data_backup = info->proc_data;
     // Fake caller process data to print correct data
