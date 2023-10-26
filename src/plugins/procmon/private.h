@@ -111,52 +111,35 @@
 namespace procmon_ns
 {
 
+struct task_creds
+{
+    uint32_t uid = -1;
+    uint32_t suid = -1;
+    uint32_t euid = -1;
+};
+
 struct execve_data : PluginResult
 {
     execve_data()
         : PluginResult()
-        , pid()
-        , tid()
-        , rsp()
-        , execat_rsp()
-        , cr3()
-        , fd()
+        , bprm()
         , process_name()
-        , filename()
         , thread_name()
         , image_path_name()
         , command_line()
-        , envp()
-        , internal_error()
+        , old_creds()
+        , new_creds()
     {
     }
 
-    vmi_pid_t pid;
-    uint32_t tid;
-
-    addr_t rsp;
-    addr_t execat_rsp;
-    addr_t cr3;
-
-    int fd;
+    addr_t bprm;
     std::string process_name;
-    std::string filename;
     std::string thread_name;
     std::string image_path_name;
     std::string command_line;
     std::map<std::string, std::string> envp;
-
-    bool internal_error = false;
-};
-
-struct open_execat_data : PluginResult
-{
-    open_execat_data()
-        : PluginResult()
-    {
-    }
-
-    std::shared_ptr<CallResult> data;
+    task_creds old_creds;
+    task_creds new_creds;
 };
 
 struct send_signal_data : PluginResult
@@ -188,16 +171,10 @@ struct kernel_clone_data : PluginResult
 {
     kernel_clone_data()
         : PluginResult()
-        , pid()
-        , tid()
-        , rsp()
         , flags()
         , exit_signal()
     {
     }
-    vmi_pid_t pid;
-    uint32_t tid;
-    addr_t rsp;
 
     uint64_t flags;
     uint32_t exit_signal;
@@ -310,6 +287,7 @@ static inline const char* exit_status_to_string(exit_status_t status)
 
 typedef enum signal
 {
+    SIGNAL_CHECK              = 0x00, // check if process is still running
     SIGNAL_HUP                =	0x01,
     SIGNAL_INT                = 0x02,
     SIGNAL_QUIT               = 0x03,
@@ -347,6 +325,8 @@ static inline const char* signal_to_string(signal_t signal)
 {
     switch (signal)
     {
+        case SIGNAL_CHECK:
+            return "SIGCHECK";
         case SIGNAL_HUP:
             return "SIGHUP";
         case SIGNAL_INT:
@@ -463,6 +443,18 @@ enum
 {
     _KERNEL_CLONE_ARGS_FLAGS,
     _KERNEL_CLONE_ARGS_EXIT_SIGNAL,
+    _LINUX_BINPRM_P,
+    _LINUX_BINPRM_HAVE_EXECFD,
+    _LINUX_BINPRM_ARGC,
+    _LINUX_BINPRM_ENVC,
+    _LINUX_BINPRM_FILENAME,
+    _LINUX_BINPRM_INTERP,
+    _LINUX_BINPRM_FDPATH,
+    _LINUX_BINPRM_EXECFD,
+    _TASK_STRUCT_REAL_CRED,
+    _CRED_UID,
+    _CRED_SUID,
+    _CRED_EUID,
     _FILE_F_PATH,
     _PATH_DENTRY,
     __LINUX_OFFSET_MAX
@@ -472,14 +464,24 @@ static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
 {
     [_KERNEL_CLONE_ARGS_FLAGS] = {"kernel_clone_args", "flags"},
     [_KERNEL_CLONE_ARGS_EXIT_SIGNAL] = {"kernel_clone_args", "exit_signal"},
+    [_LINUX_BINPRM_P] = {"linux_binprm", "p"},
+    [_LINUX_BINPRM_HAVE_EXECFD] = {"linux_binprm", "have_execfd"},
+    [_LINUX_BINPRM_ARGC] = {"linux_binprm", "argc"},
+    [_LINUX_BINPRM_ENVC] = {"linux_binprm", "envc"},
+    [_LINUX_BINPRM_FILENAME] = {"linux_binprm", "filename"},
+    [_LINUX_BINPRM_INTERP] = {"linux_binprm", "interp"},
+    [_LINUX_BINPRM_FDPATH] = {"linux_binprm", "fdpath"},
+    [_LINUX_BINPRM_EXECFD] = {"linux_binprm", "execfd"},
+    [_TASK_STRUCT_REAL_CRED] = {"task_struct", "real_cred"},
+    [_CRED_UID] = {"cred", "uid"},
+    [_CRED_SUID] = {"cred", "suid"},
+    [_CRED_EUID] = {"cred", "euid"},
     [_FILE_F_PATH] = {"file", "f_path"},
     [_PATH_DENTRY] = {"path", "dentry"},
 };
 
 } // procmon_ns
 
-#define ARG_MAX     131072
-#define MAX_ERRNO   4095
-#define AT_FDCWD    -100
+#define MAX_ARG_STRLEN (4096 * 32)
 
 #endif

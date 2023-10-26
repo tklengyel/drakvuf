@@ -118,6 +118,8 @@ bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pi
 
 bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid);
 
+bool linux_get_process_pgid(drakvuf_t drakvuf, addr_t process_base, uint32_t* pgid);
+
 char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
 
 int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base);
@@ -154,6 +156,8 @@ bool linux_get_process_arguments(drakvuf_t drakvuf, addr_t process_base, addr_t*
 bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva);
 
 bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va);
+
+const kernel_version_t* linux_get_kernel_version_from_process(drakvuf_t drakvuf, addr_t process_base);
 
 const kernel_version_t* linux_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 

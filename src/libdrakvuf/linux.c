@@ -278,10 +278,8 @@ static char* linux_get_banner(drakvuf_t drakvuf)
 }
 #endif
 
-static char* linux_read_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static char* linux_read_kernel_version(drakvuf_t drakvuf, addr_t process_base)
 {
-    addr_t process_base = linux_get_current_process(drakvuf, info);
-
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = drakvuf->kpgd);
@@ -300,28 +298,53 @@ static char* linux_read_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
 
-const kernel_version_t* linux_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static char* linux_read_kernel_version_from_current(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t process_base = linux_get_current_process(drakvuf, info);
+    return linux_read_kernel_version(drakvuf, process_base);
+}
+
+static void linux_parse_kernel_version(drakvuf_t drakvuf, char* version)
+{
+    int major, minor, patch;
+    int scanned = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
+    g_free(version);
+
+    if (scanned == 3)
+    {
+        drakvuf->kernel_ver.major = major;
+        drakvuf->kernel_ver.minor = minor;
+        drakvuf->kernel_ver.patch = patch;
+        drakvuf->kernel_ver_initialized = true;
+    }
+}
+
+const kernel_version_t* linux_get_kernel_version_from_process(drakvuf_t drakvuf, addr_t process_base)
 {
     if (!drakvuf->kernel_ver_initialized)
     {
-        char* version = linux_read_kernel_version(drakvuf, info);
+        char* version = linux_read_kernel_version(drakvuf, process_base);
         if (!version)
         {
             PRINT_DEBUG("Failed to extract linux kernel version\n");
             return NULL;
         }
+        linux_parse_kernel_version(drakvuf, version);
+    }
+    return &drakvuf->kernel_ver;
+}
 
-        int major, minor, patch;
-        int scanned = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
-        g_free(version);
-
-        if (scanned == 3)
+const kernel_version_t* linux_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if (!drakvuf->kernel_ver_initialized)
+    {
+        char* version = linux_read_kernel_version_from_current(drakvuf, info);
+        if (!version)
         {
-            drakvuf->kernel_ver.major = major;
-            drakvuf->kernel_ver.minor = minor;
-            drakvuf->kernel_ver.patch = patch;
-            drakvuf->kernel_ver_initialized = true;
+            PRINT_DEBUG("Failed to extract linux kernel version\n");
+            return NULL;
         }
+        linux_parse_kernel_version(drakvuf, version);
     }
     return &drakvuf->kernel_ver;
 }
@@ -355,6 +378,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
     drakvuf->osi.get_process_pid = linux_get_process_pid;
     drakvuf->osi.get_process_tid = linux_get_process_tid;
+    drakvuf->osi.get_process_pgid = linux_get_process_pgid;
     drakvuf->osi.get_process_ppid = linux_get_process_ppid;
     drakvuf->osi.get_process_data = linux_get_process_data;
     drakvuf->osi.get_process_dtb = linux_get_process_dtb;

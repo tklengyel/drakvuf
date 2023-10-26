@@ -106,6 +106,9 @@
 #include <map>
 #include <string>
 #include <fstream>
+#include <utility>
+#include <cstring>
+#include <string.h>
 #include <assert.h>
 #include <glib.h>
 
@@ -151,39 +154,116 @@ uint64_t make_hook_id(drakvuf_trap_info_t* info)
     return (u64_pid << 32) | u64_tid;
 }
 
-static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+bool linux_procmon::get_struct_field_pointer(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t struct_addr, int offset_field, addr_t* value)
 {
-    addr_t argv = drakvuf_get_function_argument(drakvuf, info, 4);
+    auto vmi = vmi_lock_guard(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = struct_addr + this->offsets[offset_field]
+    );
+
+    return (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, value));
+}
+
+bool linux_procmon::get_cred_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t struct_cred, int offset_field, uint32_t* value)
+{
+    auto vmi = vmi_lock_guard(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = struct_cred + this->offsets[offset_field]
+    );
+    return ( VMI_SUCCESS == vmi_read_32(vmi, &ctx, value) );
+}
+
+task_creds linux_procmon::get_current_credentials(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t struct_cred;
+    if (!get_struct_field_pointer(drakvuf, info, info->proc_data.base_addr, _TASK_STRUCT_REAL_CRED, &struct_cred))
+        return {};
+
+    task_creds creds = {};
+
+    if (!get_cred_value(drakvuf, info, struct_cred, _CRED_UID, &creds.uid))
+        return {};
+
+    if (!get_cred_value(drakvuf, info, struct_cred, _CRED_SUID, &creds.suid))
+        return {};
+
+    if (!get_cred_value(drakvuf, info, struct_cred, _CRED_EUID, &creds.euid))
+        return {};
+
+    return creds;
+}
+
+std::string linux_procmon::get_string_from_struct(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t struct_base, int offset_field)
+{
+    addr_t struct_string_ptr;
+    if (!get_struct_field_pointer(drakvuf, info, struct_base, offset_field, &struct_string_ptr))
+        return {};
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3);
+        .dtb = info->regs->cr3,
+        .addr = struct_string_ptr
+    );
 
+    auto tmp = vmi_read_str(vmi, &ctx);
+    std::string result = tmp ?: "";
+    g_free(tmp);
+
+    return result;
+}
+
+static std::pair<std::string, std::map<std::string, std::string>> parse_top_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::unordered_set<std::string> filter, uint64_t p, uint32_t argc, uint32_t envc)
+{
+    if (!p)
+        return {};
+
+    // setup variables
+    auto vmi = vmi_lock_guard(drakvuf);
+    auto stack = p;
+
+    // parse argv
     std::string command_line;
-    for (uint32_t argc = 0; argc < ARG_MAX; argc++, argv += sizeof(addr_t))
+    for (uint32_t i = 0; i < argc; i++)
     {
-        addr_t current_argv_ptr;
-        ctx.addr = argv;
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &current_argv_ptr))
+        auto tmp = vmi_read_str_va(vmi, stack, info->proc_data.pid);
+        if (tmp == nullptr)
             break;
 
-        ctx.addr = current_argv_ptr;
-        char* argument = vmi_read_str(vmi, &ctx);
-        if (argument == nullptr)
-            break;
-
-        command_line.append(argument);
+        stack += strnlen(tmp, MAX_ARG_STRLEN) + 1; // null byte
+        command_line.append(tmp);
         command_line.push_back(' ');
 
-        g_free(argument);
+        g_free(tmp);
     }
 
     // Just remove last space
     if (!command_line.empty())
         command_line.pop_back();
 
-    return command_line;
+    // parse envp
+    std::map<std::string, std::string> envp_map;
+    for (uint32_t i = 0; i < envc; i++)
+    {
+        auto env_string = vmi_read_str_va(vmi, stack, info->proc_data.pid);
+        if (env_string == nullptr)
+            break;
+
+        stack += strnlen(env_string, MAX_ARG_STRLEN) + 1; // null byte
+        auto [key, value] = parse_environment_variable(env_string);
+        g_free(env_string);
+
+        if (key.empty() || filter.find(key) == filter.end())
+            continue;
+
+        envp_map.emplace(key, value);
+    }
+
+    return make_pair(command_line, envp_map);
 }
 
 static std::string map_to_str(const std::map<std::string, std::string>& map, output_format_t format, const std::string& empty = "")
@@ -199,69 +279,6 @@ static std::string map_to_str(const std::map<std::string, std::string>& map, out
         output.resize(output.size() - 1);
 
     return output;
-}
-
-static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::unordered_set<std::string> filter)
-{
-    // drakvuf_get_function_argument - return incorrect value. Real envp stored in r9. Gather with debug
-    addr_t envp = info->regs->r9;
-    auto vmi = vmi_lock_guard(drakvuf);
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = envp);
-
-    std::map<std::string, std::string> envp_map;
-
-    for (uint32_t envpc = 0; envpc < ARG_MAX; envpc++, envp += sizeof(addr_t))
-    {
-        addr_t env_str_ptr;
-        ctx.addr = envp;
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &env_str_ptr))
-            break;
-
-        ctx.addr = env_str_ptr;
-        char* env_string = vmi_read_str(vmi, &ctx);
-        if (env_string == nullptr)
-            break;
-
-        auto[key, val] = parse_environment_variable(env_string);
-        g_free(env_string);
-
-        if (key.empty() || filter.find(key) == filter.end())
-            continue;
-
-        envp_map.emplace(key, val);
-    }
-    return envp_map;
-}
-
-/*
- * extract filename from arguments (do_execveat_common)
- */
-static std::string get_filename_from_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto vmi = vmi_lock_guard(drakvuf);
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = drakvuf_get_function_argument(drakvuf, info, 2)
-    );
-
-    addr_t addr;
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &addr))
-        return {};
-
-    ctx.addr = addr;
-    char* tmp = vmi_read_str(vmi, &ctx);
-    if (!tmp)
-        return {};
-
-    std::string filename(tmp);
-    g_free(tmp);
-
-    return filename;
 }
 
 void linux_procmon::configure_filter(const procmon_config* cfg)
@@ -289,212 +306,6 @@ bool linux_procmon::read_procmon_filter(const char* filter_file)
         this->filter.insert(line);
 
     return true;
-}
-
-void linux_procmon::print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto params = libhook::GetTrapParams<execve_data>(info);
-
-    std::vector<std::pair<std::string, fmt::Estr<std::string>>> envp;
-    if (!params->envp.empty())
-        envp.emplace_back("Environment", fmt::Estr(map_to_str(params->envp, this->m_output_format)));
-
-    auto proc_data_backup = info->proc_data;
-    // Fake caller process data to print correct data
-    info->proc_data.name = params->process_name.c_str();
-
-    fmt::print(
-        this->m_output_format,
-        "procmon",
-        drakvuf,
-        info,
-        keyval("ThreadName", fmt::Estr(params->thread_name)),
-        keyval("CommandLine", fmt::Estr(params->command_line)),
-        keyval("ImagePathName", fmt::Estr(params->image_path_name)),
-        std::move(envp)
-    );
-
-    // restore original proc_data
-    info->proc_data = proc_data_backup;
-}
-
-/*
-    exec-family
-*/
-event_response_t linux_procmon::do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto params_ = libhook::GetTrapParams<open_execat_data>(info);
-    auto params = static_cast<execve_data*>(params_->data.get());
-    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->execat_rsp))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    if (params->cr3 != info->regs->cr3)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    // At this point we have correct ImagePathName
-    addr_t file_struct = info->regs->rax;
-
-    // Check for errors: https://elixir.bootlin.com/linux/v5.9.14/source/fs/exec.c#L1930
-    // This is normal behavior for the kernel. In case of an error, the binary will not be executed.
-    // So we can just skip this event
-    if ((unsigned long)(void*)(file_struct) >= (unsigned long)(-MAX_ERRNO))
-    {
-        PRINT_DEBUG("[PROCMON] do_execveat_common kernel error. Not an error, just skipping the event.\n");
-        params->internal_error = true;
-    }
-    else
-    {
-        if (params->fd == AT_FDCWD)
-        {
-            auto vmi = vmi_lock_guard(drakvuf);
-            ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = file_struct + this->offsets[_FILE_F_PATH] + this->offsets[_PATH_DENTRY]);
-
-            addr_t dentry_addr;
-            if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &dentry_addr))
-            {
-                char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, dentry_addr);
-                params->image_path_name = tmp ?: "";
-                g_free(tmp);
-
-                // some fexecve calls pass with the AT_FDCWD parameter, so handle it
-                if (params->image_path_name.empty())
-                    params->image_path_name = params->filename;
-            }
-            else
-                PRINT_DEBUG("[PROCMON] Failed to read ImagePathName.\n");
-        }
-        else
-        {
-            /*
-             * based on the behavior of the kernel
-             * source: https://elixir.bootlin.com/linux/v5.10.183/source/fs/exec.c#L1494
-             */
-            params->image_path_name = "/proc/self/fd/" + std::to_string(params->fd);
-        }
-    }
-
-    auto hookID = make_hook_id(info);
-    this->internal_ret_traps.erase(hookID);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-event_response_t linux_procmon::do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    /*
-    static struct file *do_open_execat(
-        int fd,
-        struct filename *name,
-        int flags
-    )
-    */
-    auto params_ = libhook::GetTrapParams<open_execat_data>(info);
-    auto params = static_cast<execve_data*>(params_->data.get());
-    // Check same context: do_execveat_common -> bprm_execve -> do_open_execat
-    // Can't use drakvuf_check_return_context because haven't rsp at function start
-    if (params->cr3 != info->regs->cr3)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-    if (!ret_addr)
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get return address for do_open_execat.\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // Save return address of this function
-    params->execat_rsp = ret_addr;
-
-    // Register return trap
-    auto hookID = make_hook_id(info);
-
-    auto ret_hook = createReturnHook<open_execat_data>(info, &linux_procmon::do_open_execat_ret_cb, "do_open_execat_ret_trap");
-    if (!ret_hook)
-    {
-        PRINT_DEBUG("[PROCMON] Failed to register return trap from do_open_execat.\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    auto ret_params = libhook::GetTrapParams<open_execat_data>(ret_hook->trap_);
-    ret_params->data = params_->data;
-    this->internal_ret_traps[hookID] = std::move(ret_hook);
-    this->internal_traps.erase(hookID);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-event_response_t linux_procmon::do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
-
-    auto params = libhook::GetTrapParams<execve_data>(info);
-    if (!drakvuf_check_return_context(drakvuf, info, params->pid, params->tid, params->rsp))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    if (!params->internal_error)
-        linux_procmon::print_info(drakvuf, info);
-
-    uint64_t hookID = make_hook_id(info);
-    ret_hooks.erase(hookID);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-event_response_t linux_procmon::do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    /*
-    static int do_execveat_common(
-        int fd,
-        struct filename *filename,
-        struct user_arg_ptr argv,
-        struct user_arg_ptr envp,
-        int flags
-    )
-     */
-    PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
-
-    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-    if (!ret_addr)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    // Create new trap for return callback
-    auto hookID = make_hook_id(info);
-    auto hook = this->createReturnHook<execve_data>(info, &linux_procmon::do_execveat_common_ret_cb, info->trap->name);
-    auto params = libhook::GetTrapParams<execve_data>(hook->trap_);
-
-    params->fd = drakvuf_get_function_argument(drakvuf, info, 1);
-    params->filename = get_filename_from_execve(drakvuf, info);
-    params->pid = info->proc_data.pid;
-    params->tid = info->proc_data.tid;
-    // Save original process name
-    params->process_name = info->proc_data.name;
-
-    params->rsp = ret_addr;
-    params->cr3 = info->regs->cr3;
-
-    params->command_line = get_command_line(drakvuf, info);
-    params->envp = parse_environment(drakvuf, info, this->filter);
-
-    char* thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
-    params->thread_name = thread_name ?: "";
-    g_free(thread_name);
-
-    this->ret_hooks[hookID] = std::move(hook);
-
-    auto open_hook = createSyscallHook<open_execat_data>(this->do_open_execat_name, &linux_procmon::do_open_execat_cb, "do_open_execat_trap");
-    if (nullptr == open_hook)
-    {
-        PRINT_DEBUG("[PROCMON] Failed to regsiter trap for do_open_execat.\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    auto open_params = libhook::GetTrapParams<open_execat_data>(open_hook->trap_);
-    open_params->data = params->hook_->params();
-    this->internal_traps[hookID] = std::move(open_hook);
-
-    return VMI_EVENT_RESPONSE_NONE;
 }
 
 event_response_t linux_procmon::do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
@@ -693,6 +504,163 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+void linux_procmon::print_info(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    std::vector<std::pair<std::string, std::variant<fmt::Nval<int>, fmt::Nval<unsigned int>, fmt::Estr<std::string>>>> extra_args
+)
+{
+    auto params = libhook::GetTrapParams<execve_data>(info);
+
+    std::vector<std::pair<std::string, fmt::Estr<std::string>>> envp;
+    if (!params->envp.empty())
+        envp.emplace_back(keyval("Environment", fmt::Estr(map_to_str(params->envp, this->m_output_format))));
+
+    auto proc_data_backup = info->proc_data;
+    // Fake caller process data to print correct data
+    info->proc_data.name = params->process_name.c_str();
+
+    fmt::print(
+        this->m_output_format,
+        "procmon",
+        drakvuf,
+        info,
+        keyval("ThreadName", fmt::Estr(params->thread_name)),
+        keyval("CommandLine", fmt::Estr(params->command_line)),
+        keyval("ImagePathName", fmt::Estr(params->image_path_name)),
+        keyval("ouid", fmt::Nval(params->old_creds.uid)),
+        keyval("osuid", fmt::Nval(params->old_creds.euid)),
+        keyval("oeuid", fmt::Nval(params->old_creds.uid)),
+        keyval("suid", fmt::Nval(params->new_creds.euid)),
+        keyval("euid", fmt::Nval(params->new_creds.uid)),
+        std::move(envp),
+        std::move(extra_args)
+    );
+
+    // restore original proc_data
+    info->proc_data = proc_data_backup;
+}
+
+
+/*
+ * callback for execve
+*/
+event_response_t linux_procmon::execve_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<execve_data>(info);
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3);
+
+    uint32_t argc;
+    ctx.addr = params->bprm + offsets[_LINUX_BINPRM_ARGC];
+    if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &argc))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    uint32_t envc;
+    ctx.addr = params->bprm + offsets[_LINUX_BINPRM_ENVC];
+    if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &envc))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    uint64_t p;
+    ctx.addr = params->bprm + offsets[_LINUX_BINPRM_P];
+    if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &p))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    // collect main information
+    auto [command_line, envp] = parse_top_stack(drakvuf, info, this->filter, p, argc, envc);
+    params->command_line = command_line;
+    params->envp = envp;
+    params->image_path_name = info->proc_data.name;
+    params->new_creds = get_current_credentials(drakvuf, info);
+
+    // collect extra usefull information
+    // std::vector<std::pair<std::string, fmt::Estr<std::string>>> extra_args;
+    std::vector<std::pair<std::string, std::variant<fmt::Nval<int>, fmt::Nval<unsigned int>, fmt::Estr<std::string>>>> extra_args;
+    auto interp = get_string_from_struct(drakvuf, info, params->bprm, _LINUX_BINPRM_INTERP);
+    if (!interp.empty())
+        extra_args.emplace_back(keyval("interp", fmt::Estr(interp)));
+
+    auto fdpath = get_string_from_struct(drakvuf, info, params->bprm, _LINUX_BINPRM_FDPATH);
+    if (!fdpath.empty())
+        extra_args.emplace_back(keyval("fdpath", fmt::Estr(fdpath)));
+
+    auto filename = get_string_from_struct(drakvuf, info, params->bprm, _LINUX_BINPRM_FILENAME);
+    if (!filename.empty())
+        extra_args.emplace_back(keyval("FileName", fmt::Estr(filename)));
+
+    uint32_t pgid;
+    if (drakvuf_get_process_group_id(drakvuf, info->proc_data.base_addr, &pgid))
+        extra_args.emplace_back(keyval("PGID", fmt::Nval(pgid)));
+
+    uint8_t special_flags;
+    ctx.addr = params->bprm + offsets[_LINUX_BINPRM_HAVE_EXECFD];
+    if (VMI_SUCCESS == vmi_read_8(vmi, &ctx, &special_flags))
+    {
+        // check if have_execfd set
+        if (VMI_GET_BIT(special_flags, 0))
+        {
+            extra_args.emplace_back(keyval("have_execfd", fmt::Nval(1)));
+
+            uint32_t execfd;
+            ctx.addr = params->bprm + offsets[_LINUX_BINPRM_EXECFD];
+            if (VMI_SUCCESS == vmi_read_32(vmi, &ctx, &execfd))
+                extra_args.emplace_back(keyval("execfd", fmt::Nval(execfd)));
+        }
+
+        // check if secureexec set
+        if (VMI_GET_BIT(special_flags, 2))
+            extra_args.emplace_back(keyval("secureexec", fmt::Nval(1)));
+    }
+
+    print_info(drakvuf, info, extra_args);
+
+    uint64_t hookID = make_hook_id(info);
+    this->ret_hooks.erase(hookID);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+/*
+ * A very conceptual approach, since the interception occurs very deep in the kernel and before the actual execution of the program
+ * source: https://elixir.bootlin.com/linux/v6.5.7/source/fs/exec.c#L1245
+ *
+ * How this logic works:
+ * 1. Before begin_new_exec, the current variable contains the process that called execve
+ *    At this stage, it is impossible to read bprm->p as a virtual address, since it is not bound to any process
+ * 2. After begin_new_exec, the current variable already contains the "new" process,
+ *    and the old one was successfully cleaned by the system, so now bprm->p can be read as a virtual address
+ * 3. It is important to understand that when the callback function is called, the process has not
+ *    actually started by the system yet, so we can safely extract argv, envp
+ *
+ * Probably there is an implementation much simpler and more elegant, but...
+*/
+event_response_t linux_procmon::execve_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    /*
+        int begin_new_exec(struct linux_binprm * bprm)
+     */
+
+    auto hook = this->createReturnHook<execve_data>(info, &linux_procmon::execve_ret_cb, info->trap->name);
+    auto params = libhook::GetTrapParams<execve_data>(hook->trap_);
+
+    // We save information about the current process before replacement
+    params->setResultCallParams(drakvuf, info);
+    params->bprm = drakvuf_get_function_argument(drakvuf, info, 1);
+    params->process_name = info->proc_data.name;
+    params->thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
+    params->old_creds = get_current_credentials(drakvuf, info);
+
+    uint64_t hookID = make_hook_id(info);
+    this->ret_hooks[hookID] = std::move(hook);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 linux_procmon::linux_procmon(drakvuf_t drakvuf, const procmon_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
     struct process_visitor_ctx ctx = { .format = output };
@@ -705,24 +673,11 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, const procmon_config* config, ou
         return;
     }
 
-    addr_t do_open_execat_addr = 0;
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, "__do_open_execat", &do_open_execat_addr))
-    {
-        if (!drakvuf_get_kernel_symbol_rva(drakvuf, "do_open_execat", &do_open_execat_addr))
-        {
-            PRINT_DEBUG("[PROCMON] Failed to get symbol of do_open_execat.\n");
-            return;
-        }
-        else
-            do_open_execat_name = "do_open_execat";
-    }
-    else
-        do_open_execat_name = "__do_open_execat";
-
-    exec_hook = createSyscallHook("do_execveat_common", &linux_procmon::do_execveat_common_cb);
+    // to maintain backward compatibility
+    exec_hook = createSyscallHook("begin_new_exec", &linux_procmon::execve_cb, "do_execveat_common");
     if (nullptr == exec_hook)
     {
-        PRINT_DEBUG("[PROCMON] Method do_execveat_common not found. You are probably using an older kernel version below 5.9\n");
+        PRINT_DEBUG("[PROCMON] Method begin_new_exec not found.\n");
         return;
     }
 

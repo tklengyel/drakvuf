@@ -105,6 +105,9 @@
 #ifndef PROCMON_LINUX_H
 #define PROCMON_LINUX_H
 
+#include "plugins/output_format.h"
+#include "plugins/output_format/common.h"
+
 #include "private.h"
 #include <unordered_set>
 
@@ -123,10 +126,6 @@ public:
     /* Offsets */
     std::array<size_t, procmon_ns::__LINUX_OFFSET_MAX> offsets;
 
-    /* Traps */
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::SyscallHook>> internal_traps;
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> internal_ret_traps;
-
     /* Hooks */
     std::unique_ptr<libhook::SyscallHook> exec_hook;
     std::unique_ptr<libhook::SyscallHook> exit_hook;
@@ -137,15 +136,13 @@ public:
     std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 
     /* Callbacks */
-    event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    event_response_t do_open_execat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t execve_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* Return callbacks */
-    event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    event_response_t do_open_execat_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t execve_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
@@ -153,9 +150,21 @@ public:
     std::unordered_set<std::string> filter;
 
     /* Helper functions */
-    void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    // dirty hack, but will be fixed in soon PR
+    void print_info(
+        drakvuf_t drakvuf,
+        drakvuf_trap_info_t* info,
+        std::vector<std::pair<std::string, std::variant<fmt::Nval<int>, fmt::Nval<unsigned int>, fmt::Estr<std::string>>>> extra_args
+    );
     void configure_filter(const procmon_config* config);
     bool read_procmon_filter(const char* filter_file);
+
+    // TODO: make more clean
+    bool get_struct_field_pointer(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t struct_addr, int offset_field, addr_t* value);
+    std::string get_string_from_struct(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t struct_base, int offset_field);
+
+    procmon_ns::task_creds get_current_credentials(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    bool get_cred_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t struct_cred, int offset_field, uint32_t* value);
 
     linux_procmon(drakvuf_t drakvuf, const procmon_config* config, output_format_t output);
     linux_procmon(const linux_procmon&) = delete;
