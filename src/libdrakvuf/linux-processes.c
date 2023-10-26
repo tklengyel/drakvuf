@@ -122,6 +122,15 @@
 #define PF_EXITING		0x00000004	/* Getting shut down */
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 
+enum
+{
+    PIDTYPE_PID,
+    PIDTYPE_TGID,
+    PIDTYPE_PGID,
+    PIDTYPE_SID,
+    PIDTYPE_MAX,
+};
+
 static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t* ctx)
 {
     vmi_instance_t vmi = drakvuf->vmi;
@@ -462,6 +471,115 @@ bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid
 
     return ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, tid) );
 }
+
+static bool linux_get_task_pid(drakvuf_t drakvuf, addr_t process_base, addr_t* thread_pid)
+{
+    return get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_THREAD_PID, thread_pid);
+}
+
+static bool linux_get_task_pgrp(drakvuf_t drakvuf, addr_t process_base, addr_t* struct_pid)
+{
+    addr_t signal;
+    if (!get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_SIGNAL, &signal))
+        return false;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd
+    );
+
+    ctx.addr = signal + drakvuf->offsets[SIGNAL_STRUCT_PIDS] + sizeof(addr_t) * PIDTYPE_PGID;
+
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, struct_pid))
+        return false;
+
+    return true;
+}
+
+static bool linux_get_ns_of_pid(drakvuf_t drakvuf, addr_t struct_pid, addr_t* ns)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd
+    );
+
+    uint32_t level;
+    ctx.addr = struct_pid + drakvuf->offsets[PID_LEVEL];
+    if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &level))
+        return false;
+
+    // In the version before 4.15, the "struct upid" has a different size, but this version is not supported
+    // https://elixir.bootlin.com/linux/v6.5.7/source/include/linux/pid.h#L54
+    const uint32_t size_of_upid = 8;
+
+    ctx.addr = struct_pid + drakvuf->offsets[PID_NUMBERS] + level * size_of_upid + drakvuf->offsets[UPID_NS];
+    return ( VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, ns) );
+}
+
+static bool linux_get_pid_ns(drakvuf_t drakvuf, addr_t process_base, addr_t* ns)
+{
+    addr_t thread_pid;
+    if (!linux_get_task_pid(drakvuf, process_base, &thread_pid))
+        return false;
+
+    return linux_get_ns_of_pid(drakvuf, thread_pid, ns);
+}
+
+/*
+ * get process group id
+ * by default return zero: https://elixir.bootlin.com/linux/v6.5.7/source/kernel/pid.c#L475
+ */
+bool linux_get_process_pgid(drakvuf_t drakvuf, addr_t process_base, uint32_t* pgid)
+{
+    *pgid = 0;
+    const kernel_version_t* version = linux_get_kernel_version_from_process(drakvuf, process_base);
+    if (version->major <= 4 && version->minor < 19)
+    {
+        PRINT_DEBUG("Failed to extract PGID (unsupported kernel version)\n");
+        return false;
+    }
+
+    addr_t struct_pid;
+    if (!linux_get_task_pgrp(drakvuf, process_base, &struct_pid))
+        return false;
+
+    addr_t ns;
+    if (!linux_get_pid_ns(drakvuf, process_base, &ns))
+        return false;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd
+    );
+
+    uint32_t ns_level;
+    ctx.addr = ns + drakvuf->offsets[PID_NAMESPACE_LEVEL];
+    if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &ns_level))
+        return false;
+
+    uint32_t pid_level;
+    ctx.addr = struct_pid + drakvuf->offsets[PID_LEVEL];
+    if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &pid_level))
+        return false;
+
+    if (ns_level <= pid_level)
+    {
+        // TODO: maybe ns_level incorrect (usually 0)
+        addr_t upid = struct_pid + drakvuf->offsets[PID_NUMBERS] + ns_level;
+
+        addr_t upid_ns;
+        ctx.addr = upid + drakvuf->offsets[UPID_NS];
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &upid_ns))
+            return false;
+
+        ctx.addr = upid + drakvuf->offsets[UPID_NR];
+        if (upid_ns == ns)
+            return ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, pgid) );
+    }
+
+    return true;
+}
+
 
 char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {

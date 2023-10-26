@@ -511,6 +511,12 @@ bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
     addr_t process_base,
     addr_t* dtb) NOEXCEPT;
 
+
+bool drakvuf_get_process_group_id( drakvuf_t drakvuf,
+    addr_t process_base,
+    uint32_t* pgid) NOEXCEPT;
+
+
 bool drakvuf_get_current_process_environ(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     GHashTable** environ) NOEXCEPT;
