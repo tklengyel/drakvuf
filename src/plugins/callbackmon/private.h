@@ -103,6 +103,66 @@
  ***************************************************************************/
 #pragma once
 
+namespace callbackmon_ns
+{
+struct type_cb_t
+{
+    addr_t base;
+    addr_t callback;
+
+    bool operator==(const type_cb_t& o) const
+    {
+        return base == o.base && callback == o.callback;
+    }
+
+    operator addr_t() const
+    {
+        return callback;
+    }
+};
+
+struct callbackmon_module_t
+{
+    addr_t base;
+    size_t size;
+    std::string name;
+};
+
+struct object_type_t
+{
+    addr_t base;
+    std::string name;
+    std::vector<type_cb_t> callbacks;
+    std::vector<addr_t> initializer;
+};
+
+struct object_t
+{
+    addr_t base;
+    std::string name;
+    std::vector<addr_t> callbacks;
+};
+
+enum
+{
+    OBJECT_TYPE_CALLBACKLIST,
+    OBJECT_TYPE_TYPEINFO,
+    OBJECT_TYPE_INITIALIZER_DUMP_CB,
+    OBJECT_TYPE_INITIALIZER_OPEN_CB,
+    OBJECT_TYPE_INITIALIZER_CLOSE_CB,
+    OBJECT_TYPE_INITIALIZER_DELETE_CB,
+    OBJECT_TYPE_INITIALIZER_PARSE_CB,
+    OBJECT_TYPE_INITIALIZER_SECURITY_CB,
+    OBJECT_TYPE_INITIALIZER_QUERY_CB,
+    OBJECT_TYPE_INITIALIZER_OK2CLOSE_CB,
+    DEVICE_OBJECT_DRIVER_OBJECT,
+    DRIVER_OBJECT_MAJOR_FUNCTION,
+    LDR_TABLE_ENTRY_FULLDLLNAME,
+    LDR_TABLE_ENTRY_DLLBASE,
+    LDR_TABLE_ENTRY_SIZEOFIMAGE,
+    __OFFSET_MAX
+};
+
 enum
 {
     NDIS_PROTOCOL_BLOCK_NAME,
@@ -179,6 +239,25 @@ enum
     NDIS_MINIPORT_BLOCK_SYNCHRONOUSRETURNPACKETHANDLER,
     NDIS_MINIPORT_BLOCK_TOPNDIS5PACKETINDICATEHANDLER,
     __OFFSET_MINIPORT_MAX
+};
+
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [OBJECT_TYPE_CALLBACKLIST]            = { "_OBJECT_TYPE", "CallbackList" },
+    [OBJECT_TYPE_TYPEINFO]                = { "_OBJECT_TYPE", "TypeInfo" },
+    [OBJECT_TYPE_INITIALIZER_DUMP_CB]     = { "_OBJECT_TYPE_INITIALIZER", "DumpProcedure"},
+    [OBJECT_TYPE_INITIALIZER_OPEN_CB]     = { "_OBJECT_TYPE_INITIALIZER", "OpenProcedure"},
+    [OBJECT_TYPE_INITIALIZER_CLOSE_CB]    = { "_OBJECT_TYPE_INITIALIZER", "CloseProcedure"},
+    [OBJECT_TYPE_INITIALIZER_DELETE_CB]   = { "_OBJECT_TYPE_INITIALIZER", "DeleteProcedure"},
+    [OBJECT_TYPE_INITIALIZER_PARSE_CB]    = { "_OBJECT_TYPE_INITIALIZER", "ParseProcedure"},
+    [OBJECT_TYPE_INITIALIZER_SECURITY_CB] = { "_OBJECT_TYPE_INITIALIZER", "SecurityProcedure"},
+    [OBJECT_TYPE_INITIALIZER_QUERY_CB]    = { "_OBJECT_TYPE_INITIALIZER", "QueryNameProcedure"},
+    [OBJECT_TYPE_INITIALIZER_OK2CLOSE_CB] = { "_OBJECT_TYPE_INITIALIZER", "OkayToCloseProcedure"},
+    [DEVICE_OBJECT_DRIVER_OBJECT]         = { "_DEVICE_OBJECT", "DriverObject" },
+    [DRIVER_OBJECT_MAJOR_FUNCTION]        = { "_DRIVER_OBJECT", "MajorFunction" },
+    [LDR_TABLE_ENTRY_FULLDLLNAME]         = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
+    [LDR_TABLE_ENTRY_DLLBASE]             = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
+    [LDR_TABLE_ENTRY_SIZEOFIMAGE]         = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
 };
 
 static const char* offset_generic_names_w7[__OFFSET_GENERIC_MAX][2] =
@@ -295,4 +374,5 @@ static const char* offset_miniport_names[__OFFSET_MINIPORT_MAX][2] =
     [NDIS_MINIPORT_BLOCK_MINIPORTRETURNPACKETHANDLER]              = { "_NDIS_MINIPORT_BLOCK", "MiniportReturnPacketHandler"              },
     [NDIS_MINIPORT_BLOCK_SYNCHRONOUSRETURNPACKETHANDLER]           = { "_NDIS_MINIPORT_BLOCK", "SynchronousReturnPacketHandler"           },
     [NDIS_MINIPORT_BLOCK_TOPNDIS5PACKETINDICATEHANDLER]            = { "_NDIS_MINIPORT_BLOCK", "TopNdis5PacketIndicateHandler"            }
+};
 };

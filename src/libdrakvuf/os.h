@@ -246,6 +246,9 @@ typedef struct os_interface
     bool (*enumerate_process_modules)
     (drakvuf_t drakvuf, addr_t eprocess, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx), void* visitor_ctx);
 
+    bool (*enumerate_object_directory)
+    (drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx);
+
     bool (*is_crashreporter)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
@@ -313,6 +316,12 @@ typedef struct os_interface
 
     bool (*get_kernel_symbol_va)
     (drakvuf_t drakvuf, const char* function, addr_t* va);
+
+    unicode_string_t* (*get_object_name)
+    (drakvuf_t drakvuf, addr_t object);
+
+    unicode_string_t* (*get_object_type_name)
+    (drakvuf_t drakvuf, addr_t object);
 
 } os_interface_t;
 

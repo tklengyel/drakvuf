@@ -225,6 +225,9 @@ struct drakvuf
     xen_pfn_t max_gpfn;
     addr_t kernbase;
     addr_t kpgd;
+    uint8_t ob_header_cookie;
+    addr_t ob_infomask2off;
+    addr_t ob_type_table;
 
     size_t address_width;
 
