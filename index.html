@@ -166,6 +166,8 @@ ldconfig
 echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
 echo "xen-evtchn" >> /etc/modules
 echo "xen-privcmd" >> /etc/modules
+echo "xen-gntdev" >> /etc/modules
+systemctl enable xencommons.service
 systemctl enable xen-qemu-dom0-disk-backend.service
 systemctl enable xen-init-dom0.service
 systemctl enable xenconsoled.service
