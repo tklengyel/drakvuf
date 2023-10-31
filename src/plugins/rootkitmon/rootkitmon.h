@@ -127,7 +127,6 @@ public:
         const char* func_name, hook_cb_t callback);
     std::unique_ptr<libhook::ManualHook> register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access);
 
-    std::set<rootkitmon_ns::driver_t> enumerate_object_directory(vmi_instance_t vmi, const char* name);
     unicode_string_t* get_object_type_name(vmi_instance_t vmi, addr_t object);
     unicode_string_t* get_object_name(vmi_instance_t vmi, addr_t object);
     rootkitmon_ns::device_stack_t enumerate_driver_stacks(vmi_instance_t vmi, addr_t driver_object);
@@ -172,11 +171,8 @@ public:
     bool do_flt_checks;
     // map of volumes and their callbacks
     std::unordered_map<uint64_t, rootkitmon_ns::callback_ctl_t> flt_callbacks;
-    std::unordered_map<rootkitmon_ns::driver_t, rootkitmon_ns::sha256_checksum_t> driver_sections_checksums;
+    std::unordered_map<rootkitmon_ns::driver_t, std::pair<rootkitmon_ns::sha256_checksum_t, std::string>> driver_sections_checksums;
     std::unordered_map<rootkitmon_ns::driver_t, rootkitmon_ns::sha256_checksum_t> driver_object_checksums;
-    std::unordered_map<addr_t, rootkitmon_ns::sha256_checksum_t> ob_type_initiliazer_crc;
-    std::unordered_map<addr_t, std::vector<addr_t>> ob_type_callbacks;
-    std::unordered_map<addr_t, std::vector<addr_t>> ob_callbacks;
     // _DRIVER_OBJECT -> _DEVICE_OBJECT -> [_DEVICE_OBJECT, ...]
     std::unordered_map<rootkitmon_ns::driver_t, rootkitmon_ns::device_stack_t> driver_stacks;
     // VCPU -> Descriptor
