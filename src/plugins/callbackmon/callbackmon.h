@@ -161,6 +161,7 @@ public:
     std::unordered_map<addr_t, protocol_cb_t> ndis_protocol_cb;
 
     std::vector<callbackmon_ns::callbackmon_module_t> drivers;
+    std::unique_ptr<libhook::SyscallHook> driver_hook;
 
     virtual bool stop_impl() override;
 };

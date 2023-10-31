@@ -721,8 +721,7 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         });
         return true;
     }, this);
-
-    createSyscallHook("MiProcessLoaderEntry", &callbackmon::load_unload_cb);
+    this->driver_hook = createSyscallHook("MiProcessLoaderEntry", &callbackmon::load_unload_cb);
 }
 
 bool callbackmon::stop_impl()
