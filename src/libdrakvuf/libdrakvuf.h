@@ -648,6 +648,12 @@ typedef struct _module_info
     bool is_wow_process ;         /* Is WoW64 process?                                          */
 } module_info_t ;
 
+typedef struct _object_info
+{
+    addr_t base_addr;
+    unicode_string_t* name;
+} object_info_t;
+
 bool drakvuf_enumerate_processes(drakvuf_t drakvuf,
     void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx),
     void* visitor_ctx) NOEXCEPT;
@@ -664,6 +670,10 @@ bool drakvuf_enumerate_drivers(drakvuf_t drakvuf,
 bool drakvuf_enumerate_process_modules(drakvuf_t drakvuf,
     addr_t eprocess,
     bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx),
+    void* visitor_ctx) NOEXCEPT;
+
+bool drakvuf_enumerate_object_directory(drakvuf_t drakvuf,
+    void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx),
     void* visitor_ctx) NOEXCEPT;
 
 bool drakvuf_is_crashreporter(drakvuf_t drakvuf,
@@ -701,6 +711,10 @@ unicode_string_t* drakvuf_read_unicode32_common(drakvuf_t drakvuf, const access_
 unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr) NOEXCEPT;
 
 unicode_string_t* drakvuf_read_unicode32_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
+
+unicode_string_t* drakvuf_get_object_type_name(drakvuf_t drakvuf, addr_t object) NOEXCEPT;
+
+unicode_string_t* drakvuf_get_object_name(drakvuf_t drakvuf, addr_t object) NOEXCEPT;
 
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
     addr_t module_list_head,
