@@ -915,6 +915,20 @@ bool drakvuf_enumerate_process_modules(drakvuf_t drakvuf, addr_t eprocess, bool 
     return ret;
 }
 
+bool drakvuf_enumerate_object_directory(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx)
+{
+    bool ret = false;
+
+    if (drakvuf->osi.enumerate_object_directory)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.enumerate_object_directory(drakvuf, visitor_func, visitor_ctx);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
 {
     bool ret = false;
@@ -1186,6 +1200,34 @@ const kernel_version_t* drakvuf_get_kernel_version(drakvuf_t drakvuf, drakvuf_tr
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.get_kernel_version(drakvuf, info);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+unicode_string_t* drakvuf_get_object_name(drakvuf_t drakvuf, addr_t object)
+{
+    unicode_string_t* ret = NULL;
+
+    if (drakvuf->osi.get_object_name)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_object_name(drakvuf, object);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+unicode_string_t* drakvuf_get_object_type_name(drakvuf_t drakvuf, addr_t object)
+{
+    unicode_string_t* ret = NULL;
+
+    if (drakvuf->osi.get_object_type_name)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_object_type_name(drakvuf, object);
         drakvuf_release_vmi(drakvuf);
     }
 
