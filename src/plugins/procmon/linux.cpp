@@ -367,12 +367,11 @@ event_response_t linux_procmon::send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_tr
 event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     /*
-    static int __send_signal(
+    int do_send_sig_info(
         int sig,
         struct kernel_siginfo *info,
-        struct task_struct *t,
-        enum pid_type type,
-        bool force
+        struct task_struct *p,
+        enum pid_type type
     )
     */
     PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
@@ -688,10 +687,10 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, const procmon_config* config, ou
         return;
     }
 
-    signal_hook = createSyscallHook("__send_signal", &linux_procmon::send_signal_cb, "send_signal");
+    signal_hook = createSyscallHook("do_send_sig_info", &linux_procmon::send_signal_cb, "send_signal");
     if (nullptr == signal_hook)
     {
-        PRINT_DEBUG("[PROCMON] Method __send_signal not found.\n");
+        PRINT_DEBUG("[PROCMON] Method do_send_sig_info not found.\n");
         return;
     }
 
