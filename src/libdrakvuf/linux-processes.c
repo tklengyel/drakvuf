@@ -176,7 +176,14 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         gs_base = VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
     }
 
-    addr_t addr = gs_base + drakvuf->offsets[CURRENT_TASK];
+    addr_t current_task_offset = drakvuf->offsets[CURRENT_TASK];
+    // for kernel 6.2+ need use new structure
+    // https://elixir.bootlin.com/linux/v6.2-rc1/source/arch/x86/include/asm/current.h
+    if (!current_task_offset)
+        current_task_offset = drakvuf->offsets[PCPU_HOT] + drakvuf->offsets[PCPU_HOT_CURRENT_TASK];
+
+    addr_t addr = gs_base + current_task_offset;
+
     addr_t process;
     if ( VMI_SUCCESS == vmi_read_addr_va(drakvuf->vmi, addr, 0, &process) && process >= MIN_KERNEL_BOUNDARY )
         return process;

@@ -114,6 +114,8 @@ enum linux_offsets
     _TEXT,
     INIT_TASK,
     CURRENT_TASK,
+    PCPU_HOT,
+    PCPU_HOT_CURRENT_TASK,
     TASK_STRUCT_FLAGS,
     TASK_STRUCT_COMM,
     TASK_STRUCT_CRED,
