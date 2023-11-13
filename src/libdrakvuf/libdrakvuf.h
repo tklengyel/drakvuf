@@ -187,6 +187,7 @@ typedef enum trap_type
     REGISTER,
     DEBUG,
     CPUID,
+    IO,
     CATCHALL_BREAKPOINT
 } trap_type_t;
 
@@ -227,6 +228,7 @@ typedef struct drakvuf_trap_info
         const cpuid_event_t* cpuid; /* For CPUID traps */
         const debug_event_t* debug; /* For DEBUG traps */
         const reg_event_t*   reg;   /* For MSR traps */
+        const io_event_t*    io;    /* For I/O traps */
     };
 } drakvuf_trap_info_t;
 
