@@ -520,6 +520,15 @@ static bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     return 1;
 }
 
+static bool inject_trap_io(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
+    if ( !drakvuf->io && !control_io_trap(drakvuf, 1) )
+        return 0;
+
+    drakvuf->io = g_slist_prepend(drakvuf->io, trap);
+    return 1;
+};
+
 static bool _drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     bool ret;
@@ -554,6 +563,9 @@ static bool _drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
             break;
         case CPUID:
             ret = inject_trap_cpuid(drakvuf, trap);
+            break;
+        case IO:
+            ret = inject_trap_io(drakvuf, trap);
             break;
         case CATCHALL_BREAKPOINT:
             ret = inject_trap_catchall_breakpoint(drakvuf, trap);
