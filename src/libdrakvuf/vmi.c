@@ -1080,6 +1080,41 @@ static event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     return ret;
 }
 
+static event_response_t io_cb(vmi_instance_t vmi, vmi_event_t* event)
+{
+    UNUSED(vmi);
+    event_response_t rsp = 0;
+    drakvuf_t drakvuf = (drakvuf_t)event->data;
+
+    flush_vmi(drakvuf);
+
+    PRINT_DEBUG("I/O event vCPU %u altp2m:%u CR3: 0x%"PRIx64" RIP=0x%"PRIx64". Port: %u\n",
+        event->vcpu_id, event->slat_id, event->x86_regs->cr3,
+        event->x86_regs->rip, event->io_event.port);
+
+    drakvuf_trap_info_t trap_info;
+    proc_data_priv_t proc_data;
+    proc_data_priv_t attached_proc_data;
+    fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
+    trap_info.io = &event->io_event;
+
+    drakvuf->in_callback = 1;
+    GSList* loop = drakvuf->io;
+    while (loop)
+    {
+        trap_info.trap = (drakvuf_trap_t*)loop->data;
+        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+        loop = loop->next;
+    }
+    drakvuf->in_callback = 0;
+
+    free_proc_data_priv_2(&proc_data, &attached_proc_data);
+
+    process_free_requests(drakvuf);
+
+    return rsp;
+}
+
 void remove_trap(drakvuf_t drakvuf,
     const drakvuf_trap_t* trap)
 {
@@ -1266,6 +1301,11 @@ void remove_trap(drakvuf_t drakvuf,
             drakvuf->cpuid = g_slist_remove(drakvuf->cpuid, trap);
             if ( !drakvuf->cpuid )
                 control_cpuid_trap(drakvuf, 0);
+            break;
+        case IO:
+            drakvuf->io = g_slist_remove(drakvuf->io, trap);
+            if ( !drakvuf->io )
+                control_io_trap(drakvuf, 0);
             break;
         case CATCHALL_BREAKPOINT:
             drakvuf->catchall_breakpoint = g_slist_remove(drakvuf->catchall_breakpoint, trap);
@@ -1691,6 +1731,33 @@ bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle)
         if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->cpuid_event, NULL))
         {
             fprintf(stderr, "Failed to clear CPUID event\n");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+bool control_io_trap(drakvuf_t drakvuf, bool toggle)
+{
+    drakvuf->io_event.version = VMI_EVENTS_VERSION;
+    drakvuf->io_event.type = VMI_EVENT_IO;
+    drakvuf->io_event.data = drakvuf;
+    drakvuf->io_event.callback = io_cb;
+
+    if ( toggle )
+    {
+        if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->io_event))
+        {
+            fprintf(stderr, "Failed to register I/O event\n");
+            return 0;
+        }
+    }
+    else
+    {
+        if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->io_event, NULL))
+        {
+            fprintf(stderr, "Failed to clear I/O event\n");
             return 0;
         }
     }
@@ -2128,6 +2195,8 @@ void close_vmi(drakvuf_t drakvuf)
         g_slist_free(drakvuf->debug);
     if (drakvuf->cpuid)
         g_slist_free(drakvuf->cpuid);
+    if (drakvuf->io)
+        g_slist_free(drakvuf->io);
     if (drakvuf->cr3)
         g_slist_free(drakvuf->cr3);
     if (drakvuf->catchall_breakpoint)
@@ -2145,6 +2214,7 @@ void close_vmi(drakvuf_t drakvuf)
 
     drakvuf->debug = NULL;
     drakvuf->cpuid = NULL;
+    drakvuf->io = NULL;
     drakvuf->cr3 = NULL;
     drakvuf->memaccess_lookup_gfn = NULL;
     drakvuf->breakpoint_lookup_trap = NULL;
