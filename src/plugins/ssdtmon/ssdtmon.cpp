@@ -141,7 +141,7 @@ static std::array<uint8_t, 32> ssdtmon_sha256_calc(vmi_instance_t vmi, addr_t ad
         .addr = addr
     );
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, PROT_READ, access_ptrs.data()))
         return out;
 
     auto checksum = g_checksum_new(G_CHECKSUM_SHA256);

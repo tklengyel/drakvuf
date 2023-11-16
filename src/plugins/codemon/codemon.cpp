@@ -333,7 +333,7 @@ bool dump_memory_region(vmi_instance_t vmi, codemon* plugin, access_context_t* c
         goto error;
     }
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, PROT_READ, access_ptrs))
     {
         PRINT_DEBUG("[CODEMON] Failed mmap guest\n");
         goto error;
@@ -460,7 +460,7 @@ void get_sha256_memory(vmi_instance_t vmi, access_context_t* ctx, dump_metadata_
         goto error;
     }
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, PROT_READ, access_ptrs))
     {
         PRINT_DEBUG("[CODEMON] Failed mmap guest\n");
         goto error;

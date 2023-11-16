@@ -101,8 +101,6 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include <glib.h>
-#include <libvmi/libvmi.h>
 #include <unordered_map>
 #include <set>
 #include "plugins/output_format.h"
@@ -213,7 +211,7 @@ static sha256_checksum_t calc_checksum(vmi_instance_t vmi, addr_t address, size_
         .addr = address
     );
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, PROT_READ, access_ptrs.data()))
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to map guest VA 0x%lx\n", ctx.addr);
         return out;
@@ -547,7 +545,7 @@ static bool driver_visitor(drakvuf_t drakvuf, const module_info_t* module_info, 
 
     // Map 1 4KB page with PE header
     void* module = nullptr;
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, &module) || !module )
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &a_ctx, 1, PROT_READ, &module) || !module )
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to map guest VA 0x%lx\n", a_ctx.addr);
         return true;

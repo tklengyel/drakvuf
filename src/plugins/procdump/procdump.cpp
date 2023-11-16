@@ -255,7 +255,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
 
     bool res = true;
     uint8_t zeros[VMI_PS_4KB] = {};
-    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, PROT_READ, access_ptrs))
     {
         for (size_t i = 0; i < num_pages; ++i)
         {

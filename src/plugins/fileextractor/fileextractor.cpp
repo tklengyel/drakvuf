@@ -1933,7 +1933,7 @@ void fileextractor::dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t
     {
         std::vector<void*> access_ptrs(num_pages, nullptr);
 
-        if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
+        if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, PROT_READ, access_ptrs.data()))
             return;
 
         for (size_t i = 0; i < num_pages; i++)
@@ -2032,7 +2032,7 @@ void fileextractor::read_vm(vmi_instance_t vmi,
     auto access_ptrs = new void* [num_pages] { 0 };
 
     uint64_t bytes_read = 0;
-    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &ctx, num_pages, PROT_READ, access_ptrs))
         for (size_t i = 0; i < num_pages; ++i)
             if (access_ptrs[i])
             {
