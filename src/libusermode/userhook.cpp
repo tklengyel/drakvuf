@@ -309,19 +309,21 @@ bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, h
         abort();
     }
 
-    drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
-    trap->type = BREAKPOINT;
-    trap->name = target->target_name.c_str();
-    trap->cb = target->callback;
-    trap->data = target;
-
     // during CoW we need to find all traps placed on the same physical page
     // that's why we'll manually resolve vaddr and store paddr under trap->breakpoint.addr
     addr_t pa;
 
     if (vmi_pagetable_lookup(vmi, info->regs->cr3, exec_func, &pa) != VMI_SUCCESS)
-        goto fail;
+    {
+        PRINT_DEBUG("[USERHOOK] Failed to lookup paddr in make_trap\n");
+        return false;
+    }
 
+    drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
+    trap->type = BREAKPOINT;
+    trap->name = target->target_name.c_str();
+    trap->cb = target->callback;
+    trap->data = target;
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = pa;
@@ -333,7 +335,6 @@ bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, h
         return true;
     }
 
-fail:
     PRINT_DEBUG("[USERHOOK] Failed to add trap :(\n");
     g_slice_free(drakvuf_trap_t, trap);
     return false;
