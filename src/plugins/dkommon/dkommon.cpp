@@ -424,7 +424,7 @@ bool dkommon::find_services_db(vmi_instance_t vmi)
         .addr = srv_module_base
     );
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, access_ptrs.size(), access_ptrs.data()))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, access_ptrs.size(), PROT_READ, access_ptrs.data()))
         return false;
 
     const auto& signature = this->winver == win_7_sp1_ver ? win_7_srv_signature : win_10_srv_signature;

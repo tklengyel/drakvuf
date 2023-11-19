@@ -226,7 +226,7 @@ bool dump_memory_region(
 
     access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, PROT_READ, access_ptrs))
     {
         PRINT_DEBUG("[MEMDUMP] Failed mmap guest\n");
         goto done;
