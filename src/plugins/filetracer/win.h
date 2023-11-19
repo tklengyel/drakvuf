@@ -120,7 +120,7 @@ class win_filetracer : public pluginex
 public:
     std::array<size_t, __OFFSET_MAX> offsets;
 
-    bool has_ole32;
+    bool has_ole32 = false;
     std::array<size_t, __OLE32_OFFSET_MAX> ole32_offsets;
 
     /* Hooks */

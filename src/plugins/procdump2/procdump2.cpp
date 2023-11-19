@@ -1631,7 +1631,7 @@ void procdump2::read_vm(addr_t dtb,
     auto num_pages = size / VMI_PS_4KB;
     auto access_ptrs = new void* [num_pages] { 0 };
 
-    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, PROT_READ, access_ptrs))
     {
         for (size_t i = 0; i < num_pages; ++i)
         {
