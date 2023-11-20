@@ -165,8 +165,7 @@ event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_inf
 
     while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
     {
-        page_info_t pinfo;
-        if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, dll_meta->pf_current_addr, &pinfo) == VMI_SUCCESS)
+        if (is_pagetable_loaded(vmi, info, dll_meta->pf_current_addr))
         {
             PRINT_DEBUG("[USERHOOK] Export info accessible OK %llx\n", (unsigned long long)dll_meta->pf_current_addr);
             dll_meta->pf_current_addr += VMI_PS_4KB;
@@ -188,73 +187,39 @@ event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_inf
     }
 
     // export info should be available, try hooking DLLs
+
+    resolve_dll_targets(vmi, dll_meta, info->regs->cr3);
+
     for (auto& target : dll_meta->targets)
     {
         if (target.state == HOOK_FIRST_TRY || target.state == HOOK_PAGEFAULT_RETRY)
         {
-            addr_t exec_func = 0;
+            addr_t exec_func = target.target_addr;
 
-            if (target.type == HOOK_BY_NAME)
+            if (is_pagetable_loaded(vmi, info, exec_func))
             {
-                ACCESS_CONTEXT(ctx,
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = dll_meta->v.real_dll_base
-                );
-
-                if (vmi_translate_sym2v(vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
-                {
+                target.pid = proc_data.pid;
+                if (make_trap(vmi, drakvuf, info, &target, exec_func))
+                    target.state = HOOK_OK;
+                else
                     target.state = HOOK_FAILED;
-                    PRINT_DEBUG("[USERHOOK] Failed to hook %s: failed to translate symbol to address\n", target.target_name.c_str());
-                    continue;
-                }
-
-                target.offset = exec_func - dll_meta->v.real_dll_base;
             }
-            else // HOOK_BY_OFFSET
+            else if (target.state == HOOK_FIRST_TRY)
             {
-                exec_func = dll_meta->v.real_dll_base + target.offset;
-            }
-
-            if (target.state == HOOK_FIRST_TRY)
-            {
-                target.state = HOOK_FAILED;
-
-                page_info_t pinfo;
-                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) != VMI_SUCCESS)
+                if (vmi_request_page_fault(vmi, info->vcpu, exec_func, 0) == VMI_SUCCESS)
                 {
-                    if (vmi_request_page_fault(vmi, info->vcpu, exec_func, 0) == VMI_SUCCESS)
-                    {
-                        target.state = HOOK_PAGEFAULT_RETRY;
-                        plugin->increment_injection_in_progress_count(proc_data);
-                    }
-                    else
-                    {
-                        PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
-                            (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-                    }
-                    return VMI_EVENT_RESPONSE_NONE;
+                    target.state = HOOK_PAGEFAULT_RETRY;
+                    plugin->increment_injection_in_progress_count(proc_data);
                 }
                 else
                 {
-                    target.pid = proc_data.pid;
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
+                    PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
+                        (unsigned long long)info->regs->cr3, (unsigned long long)exec_func);
+                    target.state = HOOK_FAILED;
                 }
+                return VMI_EVENT_RESPONSE_NONE;
             }
-            else if (target.state == HOOK_PAGEFAULT_RETRY)
-            {
-                target.state = HOOK_FAILED;
-                page_info_t pinfo;
-
-                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) == VMI_SUCCESS)
-                {
-                    target.pid = proc_data.pid;
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
-                }
-            }
-            else
+            else // target.state == HOOK_PAGEFAULT_RETRY
             {
                 target.state = HOOK_FAILED;
             }
