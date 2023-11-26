@@ -171,6 +171,7 @@ struct plugins_options
     uint32_t procdump_timeout;          // PLUGIN_PROCDUMP
     const char* procdump_dir;           // PLUGIN_PROCDUMP
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
+    bool procdump_use_maple_tree = false; // PLUGIN_PROCDUMP_LINUX
     vmi_pid_t procdump_on_finish;       // PLUGIN_PROCDUMP2
     bool procdump_new_processes_on_finish; // PLUGIN_PROCDUMP2
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
@@ -233,6 +234,7 @@ typedef enum drakvuf_plugin
     PLUGIN_APIMON,
     PLUGIN_PROCDUMP,
     PLUGIN_PROCDUMP2,
+    PLUGIN_PROCDUMP_LINUX,
     PLUGIN_RPCMON,
     PLUGIN_TLSMON,
     PLUGIN_CODEMON,
@@ -282,6 +284,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_APIMON] = "apimon",
     [PLUGIN_PROCDUMP] = "procdump",
     [PLUGIN_PROCDUMP2] = "procdump2",
+    [PLUGIN_PROCDUMP_LINUX] = "procdump_linux",
     [PLUGIN_RPCMON] = "rpcmon",
     [PLUGIN_TLSMON] = "tlsmon",
     [PLUGIN_CODEMON] = "codemon",
@@ -330,6 +333,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_APIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_PROCDUMP]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_PROCDUMP2]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_PROCDUMP_LINUX]={ [VMI_OS_WINDOWS] = 0, [VMI_OS_LINUX] = 1 },
     [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CODEMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },

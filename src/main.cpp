@@ -320,7 +320,7 @@ static void print_usage()
         "\t --userhook-injection-mode\n"
         "\t                           Use MmCopyVirtualMemory injection instead of PF injection in userhooks\n"
 #endif
-#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
+#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
         "\t --procdump-timeout <timeout>\n"
         "\t                           Timeout (in seconds) to finish process memory dumps\n"
         "\t --procdump-dir <directory>\n"
@@ -330,17 +330,23 @@ static void print_usage()
         "\t --json-hal <path to json>\n"
         "\t                           The JSON profile for hal.dll\n"
 #endif
+#if defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
+        "\t --procdump-new-processes-on-finish\n"
+        "\t                           Dump memory for all new processes upon completion of monitoring\n"
+        "\t --procdump-exclude-list <file name filter>\n"
+        "\t                           File with list of process name regexes to exclude from dumping\n"
+#endif
 #ifdef ENABLE_PLUGIN_PROCDUMP2
-        "\t --procdump-disable-dump-on-finish\n"
-        "\t                           Disable dumping of injected process memory upon completion of monitoring\n"
         "\t --procdump-new-processes-on-finish\n"
         "\t                           Dump memory for all new processes upon completion of monitoring\n"
         "\t --procdump-disable-kideliverapc-hook\n"
         "\t                           Disables hook on KiDeliverApc\n"
         "\t --procdump-disable-kedelayexecutionthread-hook\n"
         "\t                           Disables hook on KeDelayExecutionThread\n"
-        "\t --procdump-exclude-list <file name filter>\n"
-        "\t                           File with list of process name regexes to exclude from dumping\n"
+#endif
+#ifdef ENABLE_PLUGIN_PROCDUMP_LINUX
+        "\t --procdump-use-maple-tree\n"
+        "\t                           Extract VMAs from maple tree (linux kernel 6.2+) \n"
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON
         "\t --codemon-dump-dir <directory>\n"
@@ -495,6 +501,7 @@ int main(int argc, char** argv)
         opt_procdump_timeout,
         opt_procdump_dir,
         opt_compress_procdumps,
+        opt_procdump_use_maple_tree,
         opt_procdump_disable_dump_on_finish,
         opt_procdump_new_processes_on_finish,
         opt_procdump_disable_kideliverapc_hook,
@@ -580,6 +587,7 @@ int main(int argc, char** argv)
         {"procdump-timeout", required_argument, NULL, opt_procdump_timeout},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
+        {"procdump-use-maple-tree", no_argument, NULL, opt_procdump_use_maple_tree},
         {"procdump-disable-dump-on-finish", no_argument, NULL, opt_procdump_disable_dump_on_finish},
         {"procdump-new-processes-on-finish", no_argument, NULL, opt_procdump_new_processes_on_finish},
         {"procdump-disable-kideliverapc-hook", no_argument, NULL, opt_procdump_disable_kideliverapc_hook},
@@ -908,7 +916,7 @@ int main(int argc, char** argv)
                 options.memdump_disable_shellcode_detect = true;
                 break;
 #endif
-#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
+#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
             case opt_procdump_timeout:
                 options.procdump_timeout = strtoul(optarg, NULL, 0);
                 break;
@@ -922,18 +930,14 @@ int main(int argc, char** argv)
                 options.hal_profile = optarg;
                 break;
 #endif
-#ifdef ENABLE_PLUGIN_PROCDUMP2
-            case opt_procdump_disable_dump_on_finish:
-                procdump_on_finish = false;
+#ifdef ENABLE_PLUGIN_PROCDUMP_LINUX
+            case opt_procdump_use_maple_tree:
+                options.procdump_use_maple_tree = true;
                 break;
+#endif
+#if defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
             case opt_procdump_new_processes_on_finish:
                 options.procdump_new_processes_on_finish = true;
-                break;
-            case opt_procdump_disable_kideliverapc_hook:
-                options.procdump_disable_kideliverapc_hook = true;
-                break;
-            case opt_procdump_disable_kedelayexecutionthread_hook:
-                options.procdump_disable_kedelayexecutionthread_hook = true;
                 break;
             case opt_procdump_exclude_list:
                 if (!std::filesystem::exists(optarg))
@@ -941,6 +945,17 @@ int main(int argc, char** argv)
                     fprintf(stderr, "file %s does not exist!\n", optarg);
                 }
                 options.procdump_exclude_file = optarg;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_PROCDUMP2
+            case opt_procdump_disable_dump_on_finish:
+                procdump_on_finish = false;
+                break;
+            case opt_procdump_disable_kideliverapc_hook:
+                options.procdump_disable_kideliverapc_hook = true;
+                break;
+            case opt_procdump_disable_kedelayexecutionthread_hook:
+                options.procdump_disable_kedelayexecutionthread_hook = true;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON

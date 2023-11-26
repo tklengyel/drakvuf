@@ -288,6 +288,15 @@ sources += procdump2/writer.h
 sources += procdump2/minidump2.h
 endif
 
+if PLUGIN_PROCDUMP_LINUX
+sources += procdump_linux/procdump_linux.cpp
+sources += procdump_linux/procdump_linux.h
+sources += procdump_linux/private.h
+sources += procdump_linux/writer.cpp
+sources += procdump_linux/writer.h
+sources += procdump_linux/coredump.h
+endif
+
 if PLUGIN_RPCMON
 sources += rpcmon/rpcmon.cpp
 sources += rpcmon/rpcmon.h
