@@ -346,7 +346,7 @@ static void print_usage()
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP_LINUX
         "\t --procdump-use-maple-tree\n"
-        "\t                           Extract VMAs from maple tree (linux kernel 6.2+) \n"
+        "\t                           Extract VMAs from maple tree (linux kernel 6.1+) \n"
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON
         "\t --codemon-dump-dir <directory>\n"

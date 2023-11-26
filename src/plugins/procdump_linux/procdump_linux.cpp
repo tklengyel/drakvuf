@@ -686,12 +686,12 @@ std::vector<vm_area_info> procdump_linux::get_vmas_from_list(drakvuf_t drakvuf, 
     return vma_list;
 }
 
-static void calculate_offset(std::vector<vm_area_info> &vma_list, uint64_t* file_offset)
+static void calculate_offset(std::vector<vm_area_info>& vma_list, uint64_t* file_offset)
 {
     uint64_t headers_size = sizeof(struct elf64_header) + sizeof(struct elf64_program_header) * (vma_list.size() + 1);
     *file_offset += headers_size;
 
-    for(uint64_t i = 0; i < vma_list.size(); i++)
+    for (uint64_t i = 0; i < vma_list.size(); i++)
     {
         vma_list[i].file_offset = *file_offset;
         *file_offset += vma_list[i].size;
