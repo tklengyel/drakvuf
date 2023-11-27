@@ -304,6 +304,7 @@ static bool _drakvuf_init_os(drakvuf_t drakvuf)
             break;
         case VMI_OS_UNKNOWN: /* fall-through */
         case VMI_OS_FREEBSD: /* fall-through */
+        case VMI_OS_OSX: /* fall-through */
         default:
             break;
     }
