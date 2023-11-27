@@ -111,7 +111,7 @@
 class win_syscalls : public syscalls_base
 {
 public:
-    GSList* strings_to_free;
+    GSList* strings_to_free = nullptr;
 
     std::array<std::array<addr_t, 2>, 2> sst;
 
@@ -139,6 +139,7 @@ public:
     void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* module, const syscalls_ns::syscall_t* sc, std::vector<uint64_t> args, privilege_mode_t mode, std::optional<std::string> from_dll);
 
     win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+    ~win_syscalls();
 };
 
 namespace syscalls_ns

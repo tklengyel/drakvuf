@@ -786,3 +786,14 @@ void win_syscalls::print_syscall(
         std::move(fmt_args)
     );
 }
+
+win_syscalls::~win_syscalls()
+{
+    GSList* loop = this->strings_to_free;
+    while (loop)
+    {
+        g_free(loop->data);
+        loop = loop->next;
+    }
+    g_slist_free(this->strings_to_free);
+}
