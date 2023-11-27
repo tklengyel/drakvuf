@@ -189,6 +189,13 @@ if get_option('plugin-procmon')
     config_h.set('ENABLE_PLUGIN_PROCMON', 1)
 endif
 
+if get_option('plugin-procdump-linux')
+    plugin_sources += 'procdump_linux/procdump_linux.cpp'
+    plugin_sources += 'procdump_linux/writer.cpp'
+
+    config_h.set('ENABLE_PLUGIN_PROCDUMP_LINUX', 1)
+endif
+
 if get_option('plugin-ptracemon')
     plugin_sources += 'ptracemon/ptracemon.cpp'
 
@@ -269,6 +276,7 @@ summary({
     'rootkitmon': get_option('plugin-rootkitmon'),
     'spraymon': get_option('plugin-spraymon'),
     'procmon': get_option('plugin-procmon'),
+    'procdump-linux': get_option('plugin-procdump-linux'),
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon' : get_option('plugin-ebpfmon'),

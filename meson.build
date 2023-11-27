@@ -25,7 +25,8 @@ endif
 glib = dependency('glib-2.0')
 libvmi = dependency('libvmi')
 jsonc = dependency('json-c')
-deps = [glib, libvmi, jsonc]
+zlib = dependency('zlib')
+deps = [glib, libvmi, jsonc, zlib]
 
 version = meson.project_version()
 if not get_option('release')
