@@ -198,6 +198,13 @@ typedef enum memaccess_type
     POST
 } memaccess_type_t;
 
+typedef enum proc_type
+{
+    PROC_TYPE_UNKNOWN = 0,
+    PROC_TYPE_32      = 32,
+    PROC_TYPE_64      = 64,
+} proc_type_t;
+
 typedef struct process_data
 {
     const char* name;   /* Process name */
@@ -205,7 +212,8 @@ typedef struct process_data
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
     int64_t userid ;    /* Process SessionID/UID */
-    uint32_t tid ;    /* Thread Id for Linux & Windows*/
+    uint32_t tid ;      /* Thread Id for Linux & Windows*/
+    proc_type_t bitness;/* Process bitness 32/64 */
 } proc_data_t ;
 
 typedef struct drakvuf* drakvuf_t;
