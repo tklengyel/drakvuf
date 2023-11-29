@@ -116,6 +116,17 @@
 
 using namespace syscalls_ns;
 
+// This is the list of system libraries that use syscalls.
+//
+static std::string whitelisted_libraries[] =
+{
+    "windows\\system32\\gdi32.dll",
+    "windows\\system32\\imm32.dll",
+    "windows\\system32\\ntdll.dll",
+    "windows\\system32\\user32.dll",
+    "windows\\system32\\wow64win.dll"
+};
+
 static bool enum_modules_cb(drakvuf_t dravkuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
 {
     auto plugin   = static_cast<win_syscalls*>(ctx);
@@ -300,14 +311,27 @@ static addr_t get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     return user_ret_addr;
 }
 
+static std::optional<std::string> resolve_parent_module(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s)
+{
+    vmi_lock_guard vmi(drakvuf);
+    addr_t rsp, top;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, drakvuf_get_rspbase(drakvuf, info) - 0x10, 0, &rsp) ||
+        VMI_SUCCESS != vmi_read_addr_va(vmi, rsp, info->attached_proc_data.pid, &top))
+    {
+        PRINT_DEBUG("[SYSCALLS] Failed to resolve top of the stack\n");
+        return {};
+    }
+    return resolve_module(drakvuf, top, info->attached_proc_data.base_addr, info->attached_proc_data.pid, s);
+}
+
 /// Get module that called Nt (syscall) function and previous mode.
 ///
-static std::pair<privilege_mode_t, std::optional<std::string>>
+static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<std::string>>
     get_syscall_retinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s)
 {
     if (s->is32bit)
     {
-        return { MAXIMUM_MODE, {} };
+        return { MAXIMUM_MODE, {}, {} };
     }
 
     privilege_mode_t mode = MAXIMUM_MODE;
@@ -319,13 +343,30 @@ static std::pair<privilege_mode_t, std::optional<std::string>>
 
     if (mode == KERNEL_MODE)
     {
-        return { mode, resolve_module(drakvuf, ret, info->proc_data.base_addr, 4, s) };
+        return { mode, resolve_module(drakvuf, ret, info->proc_data.base_addr, 4, s), {} };
     }
     else if (mode == USER_MODE)
     {
-        return { mode, resolve_module(drakvuf, ret, info->attached_proc_data.base_addr, info->attached_proc_data.pid, s) };
+        auto module = resolve_module(drakvuf, ret, info->attached_proc_data.base_addr, info->attached_proc_data.pid, s);
+        // Check if module is a dll.
+        //
+        if (module.has_value())
+        {
+            auto resolved_lib = module.value();
+            for (auto& c : resolved_lib)
+                c = std::tolower(c);
+            for (const auto& lib : whitelisted_libraries)
+            {
+                if (resolved_lib.length() >= lib.length() &&
+                    resolved_lib.compare(resolved_lib.length() - lib.length(), lib.length(), lib) == 0)
+                {
+                    return { mode, std::move(resolved_lib), resolve_parent_module(drakvuf, info, s) };
+                }
+            }
+        }
+        return { mode, std::move(module), {} };
     }
-    return { MAXIMUM_MODE, {} };
+    return { MAXIMUM_MODE, {}, {} };
 }
 
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -336,8 +377,8 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     auto num_args = sc ? sc->num_args : 0;
 
     auto args = extract_args(drakvuf, info, s->register_size, num_args);
-    auto [mode, module] = get_syscall_retinfo(drakvuf, info, s);
-    s->print_syscall(drakvuf, info, w->num, w->type, sc, std::move(args), mode, std::move(module));
+    auto [mode, module, parent_module] = get_syscall_retinfo(drakvuf, info, s);
+    s->print_syscall(drakvuf, info, w->num, w->type, sc, std::move(args), mode, std::move(module), std::move(parent_module));
 
     if (s->disable_sysret || s->is_stopping())
         return VMI_EVENT_RESPONSE_NONE;
@@ -743,7 +784,8 @@ void win_syscalls::print_syscall(
     drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     int nr, const char* module, const syscall_t* sc,
     std::vector<uint64_t> args, privilege_mode_t mode,
-    std::optional<std::string> from_dll
+    std::optional<std::string> from_dll,
+    std::optional<std::string> from_parent_dll
 )
 {
     if (sc)
@@ -766,11 +808,14 @@ void win_syscalls::print_syscall(
         }
     }
 
-    std::optional<fmt::Estr<std::string>> from_dll_opt;
+    std::optional<fmt::Estr<std::string>> from_dll_opt, from_parent_dll_opt;
     std::optional<fmt::Rstr<const char*>> priv_mode_opt;
 
     if (from_dll.has_value())
         from_dll_opt = fmt::Estr(std::move(*from_dll));
+
+    if (from_parent_dll.has_value())
+        from_dll_opt = fmt::Estr(std::move(*from_parent_dll));
 
     if (mode != MAXIMUM_MODE)
         priv_mode_opt = fmt::Rstr(mode == USER_MODE ? "User" : "Kernel");
@@ -783,6 +828,7 @@ void win_syscalls::print_syscall(
         keyval("NArgs", fmt::Nval(args.size())),
         keyval("PreviousMode", priv_mode_opt),
         keyval("FromModule", from_dll_opt),
+        keyval("FromParentModule", from_parent_dll_opt),
         std::move(fmt_args)
     );
 }

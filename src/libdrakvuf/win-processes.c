@@ -1413,7 +1413,14 @@ bool win_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t
                 proc_data->name   = win_get_process_name( drakvuf, base_addr, true );
 
                 if ( proc_data->name )
+                {
+                    ACCESS_CONTEXT(ctx,
+                        .translate_mechanism = VMI_TM_PROCESS_PID,
+                        .pid = 0,
+                    );
+                    proc_data->bitness = win_get_wow_peb(drakvuf, &ctx, base_addr) ? PROC_TYPE_32 : PROC_TYPE_64;
                     return true;
+                }
             }
         }
     }

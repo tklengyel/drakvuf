@@ -344,7 +344,8 @@ inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gi
         keyval("Time", TimeVal{UNPACK_TIMEVAL(timestamp)}),
         keyval("PID", fmt::Nval(proc_data.pid)),
         keyval("PPID", fmt::Nval(proc_data.ppid)),
-        keyval("RunningProcess", fmt::Qstr(proc_data.name))
+        keyval("RunningProcess", fmt::Qstr(proc_data.name)),
+        keyval("Bitness", fmt::Nval(static_cast<int>(proc_data.bitness)))
     );
 }
 
