@@ -107,16 +107,12 @@
 
 #include <glib.h>
 #include "plugins/plugins_ex.h"
+#include "private.h"
 
 class win_procmon : public pluginex
 {
 public:
-    addr_t command_line;
-    addr_t image_path_name;
-    addr_t dll_path;
-    addr_t current_directory_handle;
-    addr_t current_directory_dospath;
-    addr_t cid_tid;
+    std::array<size_t, procmon_ns::__WINDOWS_OFFSET_MAX> offsets;
 
     win_procmon(drakvuf_t drakvuf, output_format_t output);
     win_procmon(const win_procmon&) = delete;

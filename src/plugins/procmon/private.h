@@ -480,6 +480,29 @@ static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
     [_PATH_DENTRY] = {"path", "dentry"},
 };
 
+enum
+{
+    USER_PROCESS_PARAMS_COMMANDLINE,
+    USER_PROCESS_PARAMS_IMAGEPATHNAME,
+    USER_PROCESS_PARAMS_DLLPATH,
+    USER_PROCESS_PARAMS_CURRENTDIRECTORY,
+    CURDIR_HANDLE,
+    CURDIR_DOSPATH,
+    CLIENT_ID_UNIQUE_THREAD,
+    __WINDOWS_OFFSET_MAX
+};
+
+static const char* windows_offset_names[__WINDOWS_OFFSET_MAX][2] =
+{
+    [USER_PROCESS_PARAMS_COMMANDLINE]      = { "_RTL_USER_PROCESS_PARAMETERS", "CommandLine" },
+    [USER_PROCESS_PARAMS_IMAGEPATHNAME]    = { "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName" },
+    [USER_PROCESS_PARAMS_DLLPATH]          = { "_RTL_USER_PROCESS_PARAMETERS", "DllPath" },
+    [USER_PROCESS_PARAMS_CURRENTDIRECTORY] = { "_RTL_USER_PROCESS_PARAMETERS", "CurrentDirectory"},
+    [CURDIR_HANDLE]                        = { "_CURDIR", "Handle" },
+    [CURDIR_DOSPATH]                       = { "_CURDIR", "DosPath" },
+    [CLIENT_ID_UNIQUE_THREAD]              = { "_CLIENT_ID", "UniqueThread" },
+};
+
 } // procmon_ns
 
 #define MAX_ARG_STRLEN (4096 * 32)

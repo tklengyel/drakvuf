@@ -774,6 +774,7 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_
     proc_data->base_addr = proc_data_priv.base_addr;
     proc_data->userid = proc_data_priv.userid;
     proc_data->tid = proc_data_priv.tid;
+    proc_data->bitness = proc_data_priv.bitness;
     drakvuf_release_vmi(drakvuf);
     return success;
 }

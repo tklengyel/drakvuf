@@ -113,6 +113,8 @@
 #include "winnt.h"
 #include "privileges.h"
 
+using namespace procmon_ns;
+
 namespace
 {
 
@@ -174,11 +176,11 @@ static void print_process_creation_result(
     addr_t new_thread_handle, uint32_t new_tid,
     addr_t user_process_parameters_addr)
 {
-    addr_t cmdline_addr = user_process_parameters_addr + f->command_line;
-    addr_t imagepath_addr = user_process_parameters_addr + f->image_path_name;
-    addr_t dllpath_addr = user_process_parameters_addr + f->dll_path;
-    addr_t curdir_handle_addr = user_process_parameters_addr + f->current_directory_handle;
-    addr_t curdir_dospath_addr = user_process_parameters_addr + f->current_directory_dospath;
+    addr_t cmdline_addr = user_process_parameters_addr + f->offsets[USER_PROCESS_PARAMS_COMMANDLINE];
+    addr_t imagepath_addr = user_process_parameters_addr + f->offsets[USER_PROCESS_PARAMS_IMAGEPATHNAME];
+    addr_t dllpath_addr = user_process_parameters_addr + f->offsets[USER_PROCESS_PARAMS_DLLPATH];
+    addr_t curdir_handle_addr = user_process_parameters_addr + f->offsets[USER_PROCESS_PARAMS_CURRENTDIRECTORY] + f->offsets[CURDIR_HANDLE];
+    addr_t curdir_dospath_addr = user_process_parameters_addr + f->offsets[USER_PROCESS_PARAMS_CURRENTDIRECTORY] + f->offsets[CURDIR_DOSPATH];
 
     unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_addr);
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
@@ -215,6 +217,13 @@ static void print_process_creation_result(
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
     char const* dllpath = dllpath_us ? reinterpret_cast<char const*>(dllpath_us->contents) : "";
 
+    addr_t process, dtb;
+    proc_data_t proc_data{};
+    if (drakvuf_get_process_by_pid(drakvuf, new_pid, &process, &dtb))
+    {
+        drakvuf_get_process_data(drakvuf, process, &proc_data);
+    }
+
     fmt::print(f->m_output_format, "procmon", drakvuf, info,
         keyval("Status", fmt::Xval(status)),
         keyval("NewProcessHandle", fmt::Xval(new_process_handle)),
@@ -224,7 +233,8 @@ static void print_process_creation_result(
         keyval("CommandLine", fmt::Qstr(cmdline)),
         keyval("ImagePathName", fmt::Qstr(imagepath)),
         keyval("DllPath", fmt::Qstr(dllpath)),
-        keyval("CWD", fmt::Qstr(curdir))
+        keyval("CWD", fmt::Qstr(curdir)),
+        keyval("Bitness", fmt::Nval(static_cast<int>(proc_data.bitness)))
     );
 
     g_free(cmdline);
@@ -237,6 +247,9 @@ static void print_process_creation_result(
 
     if (dllpath_us)
         vmi_free_unicode_str(dllpath_us);
+
+    if (proc_data.name)
+        g_free((gpointer)proc_data.name);
 }
 
 static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -311,6 +324,13 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
     if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &new_pid))
         new_pid = 0;
 
+    addr_t process, dtb;
+    proc_data_t proc_data{};
+    if (drakvuf_get_process_by_pid(drakvuf, new_pid, &process, &dtb))
+    {
+        drakvuf_get_process_data(drakvuf, process, &proc_data);
+    }
+
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
         keyval("Status", fmt::Xval(status)),
         keyval("ProcessHandle", fmt::Xval(process_handle)),
@@ -322,8 +342,12 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
         keyval("DebugPort", fmt::Xval(params->debug_port)),
         keyval("ExceptionPort", fmt::Xval(params->exception_port)),
         keyval("JobMemberLevel", fmt::Nval(params->job_member_level)),
-        keyval("NewPid", fmt::Nval(new_pid))
+        keyval("NewPid", fmt::Nval(new_pid)),
+        keyval("Bitness", fmt::Nval(static_cast<int>(proc_data.bitness)))
     );
+
+    if (proc_data.name)
+        g_free((gpointer)proc_data.name);
 
     plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -616,7 +640,7 @@ static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&params->client_id))
         PRINT_DEBUG("[PROCMON] Failed to read CLIENT_ID\n");
 
-    ctx.addr += plugin->cid_tid;
+    ctx.addr += plugin->offsets[CLIENT_ID_UNIQUE_THREAD];
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&params->unique_thread))
         PRINT_DEBUG("[PROCMON] Failed to read CLIENT_ID.UniqueThread\n");
 
@@ -722,32 +746,8 @@ win_procmon::win_procmon(drakvuf_t drakvuf, output_format_t output) : pluginex(d
     struct process_visitor_ctx ctx = { .format = output };
     drakvuf_enumerate_processes(drakvuf, process_visitor, &ctx);
 
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CommandLine", &this->command_line))
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, windows_offset_names, this->offsets.size(), this->offsets.data()))
         throw -1;
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
-        throw -1;
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "DllPath", &this->dll_path))
-        throw -1;
-
-    addr_t current_directory_offset;
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CurrentDirectory", &current_directory_offset))
-        throw -1;
-
-    addr_t curdir_handle_offset;
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_CURDIR", "Handle", &curdir_handle_offset))
-        throw -1;
-
-    addr_t curdir_dospath_offset;
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_CURDIR", "DosPath", &curdir_dospath_offset))
-        throw -1;
-
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_CLIENT_ID", "UniqueThread", &this->cid_tid))
-        throw -1;
-
-    this->current_directory_handle = current_directory_offset + curdir_handle_offset;
-    this->current_directory_dospath = current_directory_offset + curdir_dospath_offset;
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
