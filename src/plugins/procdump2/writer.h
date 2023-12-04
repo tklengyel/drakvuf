@@ -105,7 +105,7 @@
 #pragma once
 
 #include <memory>
-
+#include <string>
 namespace procdump2_ns
 {
 
@@ -114,8 +114,14 @@ class ProcdumpWriter
 public:
     virtual ~ProcdumpWriter() = default;
 
-    virtual bool append(uint8_t const* data, size_t size) = 0;
+    bool append(uint8_t const* data, size_t size);
+    uint64_t data_size() const;
+
+    virtual bool do_append(uint8_t const* data, size_t size) = 0;
     virtual bool finish() = 0;
+
+private:
+    uint64_t m_data_size{0};
 };
 
 class ProcdumpWriterFactory

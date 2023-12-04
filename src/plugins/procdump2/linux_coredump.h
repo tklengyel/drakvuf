@@ -102,10 +102,10 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCDUMP_LINUX_COREDUMP_H
-#define PROCDUMP_LINUX_COREDUMP_H
+#ifndef LINUX_PROCDUMP_COREDUMP_H
+#define LINUX_PROCDUMP_COREDUMP_H
 
-namespace procdump_linux_ns
+namespace procdump2_ns
 {
 //https://llvm.org/doxygen/BinaryFormat_2ELF_8h_source.html
 
@@ -829,4 +829,4 @@ struct elf64_nt_file_entry
 
 }
 
-#endif // PROCDUMP_LINUX_COREDUMP_H
+#endif // LINUX_PROCDUMP_COREDUMP_H

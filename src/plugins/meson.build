@@ -189,11 +189,13 @@ if get_option('plugin-procmon')
     config_h.set('ENABLE_PLUGIN_PROCMON', 1)
 endif
 
-if get_option('plugin-procdump-linux')
-    plugin_sources += 'procdump_linux/procdump_linux.cpp'
-    plugin_sources += 'procdump_linux/writer.cpp'
+if get_option('plugin-procdump2')
+    plugin_sources += 'procdump2/procdump2.cpp'
+    plugin_sources += 'procdump2/linux.cpp'
+    plugin_sources += 'procdump2/win.cpp'
+    plugin_sources += 'procdump2/writer.cpp'
     deps += dependency('zlib')
-    config_h.set('ENABLE_PLUGIN_PROCDUMP_LINUX', 1)
+    config_h.set('ENABLE_PLUGIN_PROCDUMP2', 1)
 endif
 
 if get_option('plugin-ptracemon')

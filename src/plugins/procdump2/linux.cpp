@@ -105,11 +105,10 @@
 #include "plugins/output_format.h"
 #include <libdrakvuf/libdrakvuf.h>
 
-#include "procdump_linux.h"
-#include "private.h"
+#include "linux.h"
 
 using namespace std::string_literals;
-using namespace procdump_linux_ns;
+using namespace procdump2_ns;
 
 static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
 {
@@ -125,14 +124,14 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
     ctx->push_back(pid);
 }
 
-std::vector<vmi_pid_t> procdump_linux::get_running_processes()
+std::vector<vmi_pid_t> linux_procdump::get_running_processes()
 {
     std::vector<vmi_pid_t> pids;
     drakvuf_enumerate_processes(drakvuf, process_visitor, &pids);
     return pids;
 }
 
-void procdump_linux::save_file_metadata(std::shared_ptr<linux_procdump_task_t> task)
+void linux_procdump::save_file_metadata(std::shared_ptr<linux_procdump_task_t> task)
 {
     FILE* fp = fopen((procdump_dir / (task->data_file_name + ".metadata"s)).c_str(), "w");
     if (!fp)
@@ -159,13 +158,13 @@ void procdump_linux::save_file_metadata(std::shared_ptr<linux_procdump_task_t> t
     json_object_put(jobj);
 }
 
-void procdump_linux::dump_zero_page(std::shared_ptr<linux_procdump_task_t> task)
+void linux_procdump::dump_zero_page(std::shared_ptr<linux_procdump_task_t> task)
 {
     uint8_t zeros[VMI_PS_4KB] = {};
     task->writer->append(zeros, VMI_PS_4KB);
 }
 
-void procdump_linux::read_vm(drakvuf_t drakvuf, vmi_instance_t vmi, vm_area_info vm_area, std::shared_ptr<linux_procdump_task_t> task)
+void linux_procdump::read_vm(drakvuf_t drakvuf, vmi_instance_t vmi, vm_area_info vm_area, std::shared_ptr<linux_procdump_task_t> task)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -205,7 +204,7 @@ void procdump_linux::read_vm(drakvuf_t drakvuf, vmi_instance_t vmi, vm_area_info
     }
 }
 
-void procdump_linux::write_program_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
+void linux_procdump::write_program_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
 {
     //add PT_NOTE program header for notes
     struct elf64_program_header note_program_header(PT_NOTE, 0, task->note_offset, 0, 0, task->note_aligned, 0);
@@ -219,7 +218,7 @@ void procdump_linux::write_program_headers(std::shared_ptr<linux_procdump_task_t
     }
 }
 
-void procdump_linux::write_section_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
+void linux_procdump::write_section_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
 {
     //add STRTAB section into dump file. it contains the names of all sections
     //String Table format: https://refspecs.linuxbase.org/elf/elf.pdf#page=31
@@ -246,7 +245,7 @@ void procdump_linux::write_section_headers(std::shared_ptr<linux_procdump_task_t
     task->writer->append((const uint8_t*)&string_table_section_header, sizeof(struct elf64_section_header));
 }
 
-void procdump_linux::calc_note_size_and_count(std::vector<vm_area_info> vma_list, uint64_t* note_size, uint64_t* note_count)
+void linux_procdump::calc_note_size_and_count(std::vector<vm_area_info> vma_list, uint64_t* note_size, uint64_t* note_count)
 {
     //for now notes contain only NT_FILE with mapped filenames
     *note_size += sizeof(struct elf64_note_header);
@@ -262,7 +261,7 @@ void procdump_linux::calc_note_size_and_count(std::vector<vm_area_info> vma_list
     }
 }
 
-void procdump_linux::write_notes(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
+void linux_procdump::write_notes(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
 {
     //all notes header
     struct elf64_note_header note_header(task->note_size - sizeof(struct elf64_note_header));
@@ -296,7 +295,7 @@ void procdump_linux::write_notes(std::shared_ptr<linux_procdump_task_t> task, st
         task->writer->append((const uint8_t*)&null, sizeof(uint8_t));
 }
 
-void procdump_linux::start_copy_memory(drakvuf_t drakvuf, vmi_instance_t vmi, std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
+void linux_procdump::start_copy_memory(drakvuf_t drakvuf, vmi_instance_t vmi, std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list)
 {
     calc_note_size_and_count(vma_list, &task->note_size, &task->note_count);
 
@@ -325,7 +324,7 @@ void procdump_linux::start_copy_memory(drakvuf_t drakvuf, vmi_instance_t vmi, st
     task->dump_size = task->writer->data_size();
 }
 
-void procdump_linux::print_dump_exclusion(drakvuf_trap_info_t* info)
+void linux_procdump::print_dump_exclusion(drakvuf_trap_info_t* info)
 {
     PRINT_DEBUG("[PROCDUMP] Skip excluded process %d (%s)\n"
         , info->proc_data.pid
@@ -336,7 +335,7 @@ void procdump_linux::print_dump_exclusion(drakvuf_trap_info_t* info)
     );
 }
 
-void procdump_linux::print_dump_failure(addr_t process_base, const std::string& message)
+void linux_procdump::print_dump_failure(addr_t process_base, const std::string& message)
 {
     //fill some data for output message
     drakvuf_trap_info_t info = {};
@@ -370,7 +369,7 @@ void procdump_linux::print_dump_failure(addr_t process_base, const std::string& 
     g_free(const_cast<char*>(info.proc_data.name));
 }
 
-void procdump_linux::print_dump_info(std::shared_ptr<linux_procdump_task_t> task)
+void linux_procdump::print_dump_info(std::shared_ptr<linux_procdump_task_t> task)
 {
     //fill some data for output message
     drakvuf_trap_info_t info = {};
@@ -426,7 +425,7 @@ static void convert_flags(vm_area_info& info, uint32_t flags)
 }
 
 // read vm_area_info from given address
-void procdump_linux::read_vma_info(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t vm_area, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
+void linux_procdump::read_vma_info(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t vm_area, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -497,7 +496,7 @@ void procdump_linux::read_vma_info(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t
 }
 
 // leafes stored in maple_range_64, but slots are pointers to vm_area_struct
-void procdump_linux::read_range_leafes(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
+void linux_procdump::read_range_leafes(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -523,7 +522,7 @@ void procdump_linux::read_range_leafes(drakvuf_t drakvuf, vmi_instance_t vmi, ad
     }
 }
 
-void procdump_linux::read_range_node_impl(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list, int count, uint64_t offset)
+void linux_procdump::read_range_node_impl(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list, int count, uint64_t offset)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -564,13 +563,13 @@ void procdump_linux::read_range_node_impl(drakvuf_t drakvuf, vmi_instance_t vmi,
 }
 
 // Read range node and go deeper into the tree
-void procdump_linux::read_range_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
+void linux_procdump::read_range_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
 {
     read_range_node_impl(drakvuf, vmi, node_addr, process_data, vma_list, MAPLE_RANGE64_SLOTS, this->tree_offsets[MAPLE_RANGE_SLOT]);
 }
 
 // Read arange node and go deeper into the tree
-void procdump_linux::read_arange_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
+void linux_procdump::read_arange_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list)
 {
     read_range_node_impl(drakvuf, vmi, node_addr, process_data, vma_list, MAPLE_ARANGE64_SLOTS, this->tree_offsets[MAPLE_ARANGE_SLOT]);
 }
@@ -582,7 +581,7 @@ void procdump_linux::read_arange_node(drakvuf_t drakvuf, vmi_instance_t vmi, add
     otherwise they will point to incorrect data.
 */
 
-std::vector<vm_area_info> procdump_linux::get_vmas_from_maple_tree(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data)
+std::vector<vm_area_info> linux_procdump::get_vmas_from_maple_tree(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -637,7 +636,7 @@ std::vector<vm_area_info> procdump_linux::get_vmas_from_maple_tree(drakvuf_t dra
 }
 
 //get important information for every memory region from task_struct
-std::vector<vm_area_info> procdump_linux::get_vmas_from_list(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data)
+std::vector<vm_area_info> linux_procdump::get_vmas_from_list(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data)
 {
     uint32_t map_count = 0;
     addr_t active_mm = 0;
@@ -698,7 +697,7 @@ static void calculate_offset(std::vector<vm_area_info>& vma_list, uint64_t* file
     }
 }
 
-void procdump_linux::dump_process(drakvuf_t drakvuf, std::shared_ptr<linux_procdump_task_t> task)
+void linux_procdump::dump_process(drakvuf_t drakvuf, std::shared_ptr<linux_procdump_task_t> task)
 {
     if (!drakvuf_get_process_data(drakvuf, task->process_base, &task->process_data))
     {
@@ -729,7 +728,7 @@ void procdump_linux::dump_process(drakvuf_t drakvuf, std::shared_ptr<linux_procd
     this->finished.insert(task->process_data.pid);
 }
 
-void procdump_linux::start_dump_process(vmi_pid_t pid, bool reason)
+void linux_procdump::start_dump_process(vmi_pid_t pid, bool reason)
 {
     addr_t process_base = 0;
     if (!drakvuf_get_process_by_pid(drakvuf, pid, &process_base, nullptr))
@@ -783,12 +782,12 @@ void procdump_linux::start_dump_process(vmi_pid_t pid, bool reason)
     dump_process(drakvuf, task);
 }
 
-bool procdump_linux::is_process_handled(vmi_pid_t pid)
+bool linux_procdump::is_process_handled(vmi_pid_t pid)
 {
     return this->finished.find(pid) != this->finished.end();
 }
 
-event_response_t procdump_linux::do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+event_response_t linux_procdump::do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     if (!is_process_handled(info->proc_data.pid))
         start_dump_process(info->proc_data.pid, 1);
@@ -796,7 +795,7 @@ event_response_t procdump_linux::do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-procdump_linux::procdump_linux(drakvuf_t drakvuf, const procdump_linux_config* config, output_format_t output)
+linux_procdump::linux_procdump(drakvuf_t drakvuf, const procdump2_config* config, output_format_t output)
     : pluginex(drakvuf, output)
     , timeout{config->timeout}
     , dump_new_processes_on_finish(config->dump_new_processes_on_finish)
@@ -838,7 +837,7 @@ procdump_linux::procdump_linux(drakvuf_t drakvuf, const procdump_linux_config* c
         }
     }
 
-    exit_hook = createSyscallHook("do_exit", &procdump_linux::do_exit_cb);
+    exit_hook = createSyscallHook("do_exit", &linux_procdump::do_exit_cb);
     if (nullptr == exit_hook)
     {
         PRINT_DEBUG("[PROCDUMP] Method do_exit not found.\n");
@@ -846,7 +845,7 @@ procdump_linux::procdump_linux(drakvuf_t drakvuf, const procdump_linux_config* c
     }
 }
 
-bool procdump_linux::stop_impl()
+bool linux_procdump::stop_impl()
 {
     if (procdump_dir.empty())
         return true;

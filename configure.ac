@@ -403,22 +403,12 @@ fi
 
 AC_ARG_ENABLE([plugin_procdump2],
   [AS_HELP_STRING([--enable-plugin-procdump],
-    [Enable the windows experimental process dumping plugin @<:@no@:>@])],
+    [Enable the windows/linux experimental process dumping plugin @<:@yes@:>@])],
   [plugin_procdump2="$enableval"],
-  [plugin_procdump2="no"])
+  [plugin_procdump2="yes"])
 AM_CONDITIONAL([PLUGIN_PROCDUMP2], [test x$plugin_procdump2 = xyes])
 if test x$plugin_procdump2 = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP2, 1, "")
-fi
-
-AC_ARG_ENABLE([plugin_procdump_linux],
-  [AS_HELP_STRING([--disable-plugin-procdump],
-    [Enable the windows process dumping plugin @<:@yes@:>@])],
-  [plugin_procdump_linux="$enableval"],
-  [plugin_procdump_linux="yes"])
-AM_CONDITIONAL([PLUGIN_PROCDUMP_LINUX], [test x$plugin_procdump_linux = xyes])
-if test x$plugin_procdump_linux = xyes; then
-  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP_LINUX, 1, "")
 fi
 
 AC_ARG_ENABLE([plugin_rpcmon],
@@ -829,8 +819,6 @@ AS_IF([test x$plugin_procdump == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
 AS_IF([test x$plugin_procdump2 == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
-AS_IF([test x$plugin_procdump_linux == xyes],
-    [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
 
 
 AC_CHECK_HEADERS([xenctrl.h libxl_utils.h libxl.h xenforeignmemory.h])
@@ -909,7 +897,6 @@ DKOMmon:            $plugin_dkommon
 MEMDump:            $plugin_memdump
 ProcDump:           $plugin_procdump
 ProcDump2:          $plugin_procdump2
-ProcDumpLinux:      $plugin_procdump_linux
 APIMon:             $plugin_apimon
 RPCMon:             $plugin_rpcmon
 TLSMon:             $plugin_tlsmon

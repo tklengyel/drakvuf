@@ -320,7 +320,7 @@ static void print_usage()
         "\t --userhook-injection-mode\n"
         "\t                           Use MmCopyVirtualMemory injection instead of PF injection in userhooks\n"
 #endif
-#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
+#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
         "\t --procdump-timeout <timeout>\n"
         "\t                           Timeout (in seconds) to finish process memory dumps\n"
         "\t --procdump-dir <directory>\n"
@@ -330,7 +330,7 @@ static void print_usage()
         "\t --json-hal <path to json>\n"
         "\t                           The JSON profile for hal.dll\n"
 #endif
-#if defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
+#if defined(ENABLE_PLUGIN_PROCDUMP2)
         "\t --procdump-new-processes-on-finish\n"
         "\t                           Dump memory for all new processes upon completion of monitoring\n"
         "\t --procdump-exclude-list <file name filter>\n"
@@ -343,8 +343,6 @@ static void print_usage()
         "\t                           Disables hook on KiDeliverApc\n"
         "\t --procdump-disable-kedelayexecutionthread-hook\n"
         "\t                           Disables hook on KeDelayExecutionThread\n"
-#endif
-#ifdef ENABLE_PLUGIN_PROCDUMP_LINUX
         "\t --procdump-use-maple-tree\n"
         "\t                           Extract VMAs from maple tree (linux kernel 6.1+) \n"
 #endif
@@ -916,7 +914,7 @@ int main(int argc, char** argv)
                 options.memdump_disable_shellcode_detect = true;
                 break;
 #endif
-#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
+#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
             case opt_procdump_timeout:
                 options.procdump_timeout = strtoul(optarg, NULL, 0);
                 break;
@@ -930,12 +928,10 @@ int main(int argc, char** argv)
                 options.hal_profile = optarg;
                 break;
 #endif
-#ifdef ENABLE_PLUGIN_PROCDUMP_LINUX
+#if defined(ENABLE_PLUGIN_PROCDUMP2)
             case opt_procdump_use_maple_tree:
                 options.procdump_use_maple_tree = true;
                 break;
-#endif
-#if defined(ENABLE_PLUGIN_PROCDUMP2) || defined(ENABLE_PLUGIN_PROCDUMP_LINUX)
             case opt_procdump_new_processes_on_finish:
                 options.procdump_new_processes_on_finish = true;
                 break;

@@ -102,194 +102,73 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCDUMP_LINUX_PRIVATE_H
-#define PROCDUMP_LINUX_PRIVATE_H
+#ifndef LINUX_PROCDUMP_H
+#define LINUX_PROCDUMP_H
 
-#include <string>
-#include <set>
-#include "writer.h"
+#include "plugins/plugins_ex.h"
+#include "helpers/exclude_matcher.h"
+#include "linux_private.h"
+#include "linux_coredump.h"
+#include "private2.h"
 
-using namespace std::string_literals;
+#include <filesystem>
 
-namespace procdump_linux_ns
+using namespace procdump2_ns;
+
+class linux_procdump: public pluginex
 {
+public:
+    linux_procdump(drakvuf_t drakvuf, const procdump2_config* config, output_format_t output);
+    ~linux_procdump() = default;
+    virtual bool stop_impl() override;
 
-//https://elixir.bootlin.com/linux/v4.8/source/include/linux/mm.h
-#define VM_NONE		    0x00000000
+private:
+    std::array<size_t, procdump2_ns::__LINUX_OFFSET_MAX> offsets;
+    std::array<size_t, procdump2_ns::__LIST_OFFSET_MAX> list_offsets;
+    std::array<size_t, procdump2_ns::__TREE_OFFSET_MAX> tree_offsets;
 
-#define VM_READ		    0x00000001	/* currently active flags */
-#define VM_WRITE	    0x00000002
-#define VM_EXEC		    0x00000004
-#define VM_SHARED	    0x00000008
+    std::unique_ptr<libhook::SyscallHook> exit_hook;
 
-/* mprotect() hardcodes VM_MAYREAD >> 4 == VM_READ, and so for r/w/x bits. */
-#define VM_MAYREAD	    0x00000010	/* limits for mprotect() etc */
-#define VM_MAYWRITE	    0x00000020
-#define VM_MAYEXEC	    0x00000040
-#define VM_MAYSHARE	    0x00000080
+    uint64_t procdumps_count{0};
+    std::set<vmi_pid_t> finished;
 
-#define VM_GROWSDOWN	0x00000100	/* general info on the segment */
-#define VM_UFFD_MISSING	0x00000200	/* missing pages tracking */
-#define VM_PFNMAP	    0x00000400	/* Page-ranges managed without "struct page", just pure PFN */
-#define VM_DENYWRITE	0x00000800	/* ETXTBSY on write attempts.. */
-#define VM_UFFD_WP	    0x00001000	/* wrprotect pages tracking */
+    uint32_t timeout{0};
+    bool dump_new_processes_on_finish{0};
+    const std::filesystem::path procdump_dir;
+    bool const use_compression{false};
+    bool const use_maple_tree{false};
+    const exclude_matcher exclude;
+    int address_width = drakvuf_get_address_width(drakvuf) * 8;
+    uint32_t begin_stop_at{0};
 
-#define VM_LOCKED	    0x00002000
-#define VM_IO           0x00004000	/* Memory mapped I/O or similar */
+    void read_vma_info(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t leaf_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    void read_range_node_impl(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list, int count, uint64_t offset);
+    void read_range_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    void read_range_leafes(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    void read_arange_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    std::vector<vm_area_info> get_vmas_from_maple_tree(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data);
+    std::vector<vm_area_info> get_vmas_from_list(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data);
 
-/* Used by sys_madvise() */
-#define VM_SEQ_READ	    0x00008000	/* App will access data sequentially */
-#define VM_RAND_READ	0x00010000	/* App will not benefit from clustered reads */
+    void start_copy_memory(drakvuf_t drakvuf, vmi_instance_t vmi, std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
+    void start_dump_process(vmi_pid_t pid, bool reason);
 
-#define VM_DONTCOPY	    0x00020000      /* Do not copy this vma on fork */
-#define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
-#define VM_LOCKONFAULT	0x00080000	/* Lock the pages covered when they are faulted in */
-#define VM_ACCOUNT	    0x00100000	/* Is a VM accounted object */
-#define VM_NORESERVE	0x00200000	/* should the VM suppress accounting */
-#define VM_HUGETLB	    0x00400000	/* Huge TLB Page VM */
-#define VM_ARCH_1	    0x01000000	/* Architecture-specific flag */
-#define VM_ARCH_2	    0x02000000
-#define VM_DONTDUMP	    0x04000000	/* Do not include in the core dump */
+    bool is_process_handled(vmi_pid_t pid);
+    void dump_zero_page(std::shared_ptr<linux_procdump_task_t> task);
+    void read_vm(drakvuf_t drakvuf, vmi_instance_t vmi, vm_area_info vm_area, std::shared_ptr<linux_procdump_task_t> task);
+    void dump_process(drakvuf_t drakvuf, std::shared_ptr<linux_procdump_task_t> task);
 
-#define NULL_INDEX 0
-#define SHSTRTAB_INDEX 1
-#define NOTE0_INDEX 11
-#define LOAD_INDEX 17
-static const char string_table_section[] = {'\0', '.', 's', 'h', 's', 't', 'r', 't', 'a', 'b', '\0', 'n', 'o', 't', 'e', '0', '\0', 'l', 'o', 'a', 'd', '\0'};
+    void write_program_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
+    void write_section_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
+    void calc_note_size_and_count(std::vector<vm_area_info> vma_list, uint64_t* note_size, uint64_t* note_count);
+    void write_notes(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
 
-struct linux_procdump_task_t
-{
-    std::string data_file_name;
-    addr_t process_base;
-    const uint64_t idx = 0;
-    bool reason = 0;
-    std::unique_ptr<ProcdumpWriter> writer;
+    void print_dump_exclusion(drakvuf_trap_info_t* info);
+    void print_dump_failure(addr_t process_base, const std::string& message);
+    void print_dump_info(std::shared_ptr<linux_procdump_task_t> task);
+    void save_file_metadata(std::shared_ptr<linux_procdump_task_t> task);
+    std::vector<vmi_pid_t> get_running_processes();
 
-    proc_data_t process_data = {};
-    uint64_t dump_size = 0;
-    uint64_t mapped_files_count = 0;
-    uint64_t note_offset = 0;
-    uint64_t note_size = 0;
-    uint64_t note_aligned = 0;
-    uint64_t note_count = 0;
-
-    linux_procdump_task_t(addr_t process_base,
-        std::string procdump_dir,
-        uint64_t idx,
-        bool use_compression,
-        bool reason)
-        : process_base(process_base)
-        , idx(idx)
-        , reason(reason)
-    {
-        data_file_name = "procdump."s + std::to_string(idx);
-        writer = ProcdumpWriterFactory::build(
-                procdump_dir + "/"s + data_file_name,
-                use_compression);
-    }
+    event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 };
 
-struct vm_area_info
-{
-    uint32_t segment_flags;
-    uint32_t section_flags;
-    addr_t vm_start;
-    addr_t vm_end;
-    uint32_t vm_pgoff;
-
-    uint64_t size;
-    std::string filename;
-    uint64_t file_offset;
-};
-
-struct dump_offsets
-{
-    uint64_t curr_program_offset;
-    uint64_t curr_section_offset;
-    uint64_t curr_write_offset;
-};
-
-
-//https://elixir.bootlin.com/linux/v6.6.1/source/include/linux/maple_tree.h#L41
-#define MAPLE_NODE_MASK	255UL
-
-#define MAPLE_NODE_TYPE_MASK	0x0F
-#define MAPLE_NODE_TYPE_SHIFT	0x03
-
-enum maple_type
-{
-    MAPLE_DENSE,
-    MAPLE_LEAF_64,
-    MAPLE_RANGE_64,
-    MAPLE_ARANGE_64,
-};
-
-// may differ from version to version
-#define MAPLE_RANGE64_SLOTS	16
-#define MAPLE_ARANGE64_SLOTS 10
-
-enum
-{
-    TASK_STRUCT_MM,
-    TASK_STRUCT_ACTIVE_MM,
-    MM_STRUCT_MAP_COUNT,
-    VM_AREA_STRUCT_VM_START,
-    VM_AREA_STRUCT_VM_END,
-    VM_AREA_STRUCT_VM_FLAGS,
-    VM_AREA_STRUCT_VM_FILE,
-    VM_AREA_STRUCT_VM_PGOFF,
-    _FILE_F_PATH,
-    _PATH_DENTRY,
-    __LINUX_OFFSET_MAX,
-};
-
-// Linux Offsets
-static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
-{
-    [TASK_STRUCT_MM] = {"task_struct", "mm"},
-    [TASK_STRUCT_ACTIVE_MM] = {"task_struct", "active_mm"},
-    [MM_STRUCT_MAP_COUNT] = {"mm_struct", "map_count"},
-    [VM_AREA_STRUCT_VM_START] = {"vm_area_struct", "vm_start"},
-    [VM_AREA_STRUCT_VM_END] = {"vm_area_struct", "vm_end"},
-    [VM_AREA_STRUCT_VM_FLAGS] = {"vm_area_struct", "vm_flags"},
-    [VM_AREA_STRUCT_VM_FILE] = {"vm_area_struct", "vm_file"},
-    [VM_AREA_STRUCT_VM_PGOFF] = {"vm_area_struct", "vm_pgoff"},
-    [_FILE_F_PATH] = {"file", "f_path"},
-    [_PATH_DENTRY] = {"path", "dentry"},
-};
-
-enum
-{
-    MM_STRUCT_MMAP,
-    VM_AREA_STRUCT_VM_NEXT,
-    __LIST_OFFSET_MAX,
-};
-
-// VMA list Offsets
-static const char* list_offset_names[__LIST_OFFSET_MAX][2] =
-{
-    [MM_STRUCT_MMAP] = {"mm_struct", "mmap"},
-    [VM_AREA_STRUCT_VM_NEXT] = {"vm_area_struct", "vm_next"},
-};
-
-// Kernel version 6.2+
-enum
-{
-    MM_STRUCT_MM_MT,
-    MAPLE_TREE_MA_ROOT,
-    MAPLE_ARANGE_SLOT,
-    MAPLE_RANGE_SLOT,
-    __TREE_OFFSET_MAX,
-};
-
-// Maple tree Offsets
-static const char* tree_offset_names[__TREE_OFFSET_MAX][2] =
-{
-    [MM_STRUCT_MM_MT] = {"mm_struct", "mm_mt"},
-    [MAPLE_TREE_MA_ROOT] = {"maple_tree", "ma_root"},
-    [MAPLE_ARANGE_SLOT] = {"maple_arange_64", "slot"},
-    [MAPLE_RANGE_SLOT] = {"maple_range_64", "slot"},
-};
-
-}
 #endif
