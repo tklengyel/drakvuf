@@ -102,9 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-//#include <inttypes.h>
-//#include <assert.h>
-
 #include "procdump2.h"
 #include "private2.h"
 #include "linux.h"
