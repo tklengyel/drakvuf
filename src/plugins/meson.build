@@ -192,7 +192,7 @@ endif
 if get_option('plugin-procdump-linux')
     plugin_sources += 'procdump_linux/procdump_linux.cpp'
     plugin_sources += 'procdump_linux/writer.cpp'
-
+    deps += dependency('zlib')
     config_h.set('ENABLE_PLUGIN_PROCDUMP_LINUX', 1)
 endif
 
