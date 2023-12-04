@@ -278,7 +278,6 @@ summary({
     'rootkitmon': get_option('plugin-rootkitmon'),
     'spraymon': get_option('plugin-spraymon'),
     'procmon': get_option('plugin-procmon'),
-    'procdump-linux': get_option('plugin-procdump-linux'),
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon' : get_option('plugin-ebpfmon'),
