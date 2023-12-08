@@ -737,7 +737,8 @@ void win_procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<w
             else if (size == ctx->current_dump_size)
             {
                 // The region have been fully dumped so go to next one
-                auto [base, size] = get_memory_region(info, ctx);
+                addr_t base = 0;
+                std::tie(base, size) = get_memory_region(info, ctx);
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
                     "Copy memory region [%#lx;%#lx]\n"
                     , info->event_uid
