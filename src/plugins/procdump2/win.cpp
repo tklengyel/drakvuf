@@ -1663,6 +1663,7 @@ void win_procdump2::restore(drakvuf_trap_info_t* info, return_ctx& ctx)
 
 void win_procdump2::save_file_metadata(std::shared_ptr<win_procdump2_ctx> ctx, proc_data_t* proc_data)
 {
+    umask(S_IWGRP | S_IWOTH);
     FILE* fp = fopen((procdump_dir + "/"s + ctx->data_file_name + ".metadata"s).data(), "w");
     if (!fp)
     {

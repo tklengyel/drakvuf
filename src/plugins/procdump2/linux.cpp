@@ -104,6 +104,8 @@
 
 #include "plugins/output_format.h"
 #include <libdrakvuf/libdrakvuf.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "linux.h"
 
@@ -133,6 +135,7 @@ std::vector<vmi_pid_t> linux_procdump::get_running_processes()
 
 void linux_procdump::save_file_metadata(std::shared_ptr<linux_procdump_task_t> task)
 {
+    umask(S_IWGRP | S_IWOTH);
     FILE* fp = fopen((procdump_dir / (task->data_file_name + ".metadata"s)).c_str(), "w");
     if (!fp)
     {
