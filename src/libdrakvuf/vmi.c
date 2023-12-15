@@ -2008,10 +2008,10 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
         return 0;
     }
 
-bool altp2m = xen_set_altp2m_params(drakvuf->xen, drakvuf->domID, drakvuf->skip_altp2m_check);
-PRINT_DEBUG("Altp2m params set: %i\n", altp2m);
-if (!altp2m)
-    return 0;
+    bool altp2m = xen_set_altp2m_params(drakvuf->xen, drakvuf->domID, drakvuf->skip_altp2m_check);
+    PRINT_DEBUG("Altp2m params set: %i\n", altp2m);
+    if (!altp2m)
+        return 0;
 
     altp2m = vmi_slat_set_domain_state(drakvuf->vmi, 1) == VMI_SUCCESS;
     PRINT_DEBUG("Altp2m enabled: %i\n", altp2m);
