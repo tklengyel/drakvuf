@@ -203,6 +203,7 @@ static void print_usage()
         "\t -j, --injection-timeout <seconds>\n"
         "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
         "\t -C                        Enable context based views\n"
+	"\t -A, --skip-altp2m-check   Skip the altp2m check (Required on Qubes 4.x\n"
         "\t --context-process         Process to be monitored in context based views (requires -C)\n"
         "\t                           (e.g.: Name, :PID, Name:PID)\n"
         "\t --terminate               Terminate injected process\n"
@@ -587,6 +588,7 @@ int main(int argc, char** argv)
         {"procdump-exclude-list", required_argument, NULL, opt_procdump_exclude_list},
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
+	{"skip-altp2m-check", no_argument, NULL, 'A'},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
         {"procmon-envs-list", required_argument, NULL, 'q'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
@@ -631,7 +633,7 @@ int main(int argc, char** argv)
         {"rebootmon-abort-on-power-off", no_argument, NULL, opt_rebootmon_abort_on_power_off},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:q:Mc:nblgj:k:w:W:hFC";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:q:Mc:nblgj:k:w:W:hFCA";
 
     int long_index = 0;
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
@@ -744,6 +746,9 @@ int main(int argc, char** argv)
                 break;
             case 'p':
                 leave_paused = true;
+                break;
+            case 'A':
+                options.skip_altp2m_check = true;
                 break;
             case 'T':
                 options.tcpip_profile = optarg;

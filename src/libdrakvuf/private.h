@@ -211,6 +211,8 @@ struct drakvuf
     // Cache for extracted linux kernel version
     kernel_version_t kernel_ver;
     bool kernel_ver_initialized;
+    // Skip altp2m check
+    bool skip_altp2m_check;
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests

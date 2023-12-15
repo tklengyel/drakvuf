@@ -349,7 +349,7 @@ int xen_send_qemu_monitor_command(xen_interface_t* xen, domid_t domID, const cha
     return xen->xlw.libxl_qemu_monitor_command(xen->xl_ctx, (uint32_t) domID, command_line, output, NULL);
 }
 
-bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID)
+bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID, bool skip_altp2m_check)
 {
     uint64_t param_altp2m;
 
@@ -357,7 +357,7 @@ bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID)
     if (rc < 0)
     {
         fprintf(stderr, "Failed to get HVM_PARAM_ALTP2M, RC: %i\n", rc);
-        return 0;
+        return skip_altp2m_check ? 1 : 0;
     }
 
     if (param_altp2m != XEN_ALTP2M_external)
@@ -366,7 +366,7 @@ bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID)
         if (rc < 0)
         {
             fprintf(stderr, "Failed to set HVM_PARAM_ALTP2M, RC: %i\n", rc);
-            return 0;
+            return skip_altp2m_check ? 1 : 0;
         }
     }
 

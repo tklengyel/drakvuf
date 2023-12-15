@@ -2008,7 +2008,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
         return 0;
     }
 
-    bool altp2m = xen_set_altp2m_params(drakvuf->xen, drakvuf->domID);
+    bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID, bool skip_altp2m_check);
     PRINT_DEBUG("Altp2m params set: %i\n", altp2m);
     if (!altp2m)
         return 0;
