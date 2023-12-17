@@ -129,10 +129,10 @@ static event_response_t wait_for_thread_exit_cb(drakvuf_t drakvuf, drakvuf_trap_
 {
     injector_t injector = info->trap->data;
     if (drakvuf_get_thread(drakvuf,
-            info->attached_proc_data.base_addr, injector->target_tid))
+                           info->attached_proc_data.base_addr, injector->target_tid))
     {
         PRINT_DEBUG("Target thread with PID %u and TID %u terminated\n",
-            injector->target_pid, injector->target_tid);
+                    injector->target_pid, injector->target_tid);
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
     }

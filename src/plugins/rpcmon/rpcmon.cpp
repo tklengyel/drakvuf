@@ -143,9 +143,9 @@ struct _GUID
         const int sz = 64;
         char stream[sz] = {0};
         snprintf(stream, sz, "\"%08X-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX\"",
-            Data1, Data2, Data3, Data4[0], Data4[1],
-            Data4[2], Data4[3], Data4[4],
-            Data4[5], Data4[6], Data4[7]);
+                 Data1, Data2, Data3, Data4[0], Data4[1],
+                 Data4[2], Data4[3], Data4[4],
+                 Data4[5], Data4[6], Data4[7]);
 
         return std::string(stream);
     }
@@ -260,10 +260,10 @@ static std::optional<rpc_info_t> parse_MIDL_STUB_DESC(drakvuf_t drakvuf, drakvuf
         return {};
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = rpc_interface_information_addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = rpc_interface_information_addr
+                  );
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -288,9 +288,9 @@ static std::optional<uint64_t> parse_FORMAT_STRING(drakvuf_t drakvuf, drakvuf_tr
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     uint8_t oi_flags;
     ctx.addr = arg + Oi_FLAGS_FIELD_OFFSET;
@@ -298,8 +298,8 @@ static std::optional<uint64_t> parse_FORMAT_STRING(drakvuf_t drakvuf, drakvuf_tr
         return {};
 
     int proc_num_field_offset = (oi_flags & Oi_HAS_RPCFLAGS)
-        ? Oi_PROCNUM_FIELD_OFFSET_WITH_RPCFLAGS
-        : Oi_PROCNUM_FIELD_OFFSET_WITHOUT_RPCFLAGS;
+                                ? Oi_PROCNUM_FIELD_OFFSET_WITH_RPCFLAGS
+                                : Oi_PROCNUM_FIELD_OFFSET_WITHOUT_RPCFLAGS;
 
     uint16_t proc_num;
     ctx.addr = arg + proc_num_field_offset;
@@ -324,7 +324,7 @@ static std::optional<rpc_message_t> parse_RPC_MESSAGE(drakvuf_t drakvuf, drakvuf
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx, .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3);
+                   .dtb = info->regs->cr3);
 
     uint32_t proc_num;
     if (is32bit)
@@ -361,8 +361,8 @@ event_response_t rpcmon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
         const auto& args = params->arguments;
         const auto& printers = params->target->argument_printers;
         for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
-            arg != std::cend(args) && printer != std::cend(printers);
-            ++arg, ++printer)
+                arg != std::cend(args) && printer != std::cend(printers);
+                ++arg, ++printer)
         {
             fmt_args.push_back(fmt::Rstr((*printer)->print(drakvuf, info, *arg)));
 
@@ -401,13 +401,13 @@ event_response_t rpcmon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
     }
 
     fmt::print(m_output_format, "rpcmon", drakvuf, info,
-        keyval("Event", fmt::Qstr("api_called")),
-        keyval("CalledFrom", fmt::Xval(info->regs->rip)),
-        keyval("ReturnValue", fmt::Xval(info->regs->rax)),
-        keyval("Arguments", fmt_args),
-        keyval("Extra", fmt_extra),
-        keyval("ExtraNum", fmt_extra_num)
-    );
+               keyval("Event", fmt::Qstr("api_called")),
+               keyval("CalledFrom", fmt::Xval(info->regs->rip)),
+               keyval("ReturnValue", fmt::Xval(info->regs->rax)),
+               keyval("Arguments", fmt_args),
+               keyval("Extra", fmt_extra),
+               keyval("ExtraNum", fmt_extra_num)
+              );
 
     uint64_t hookID = make_hook_id(info);
     ret_hooks.erase(hookID);
@@ -453,7 +453,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
     uint64_t hookID = make_hook_id(info);
     auto hook = plugin->createReturnHook<RpcmonReturnHookData>(info,
-            &rpcmon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
+                &rpcmon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
     auto params = libhook::GetTrapParams<RpcmonReturnHookData>(hook->trap_);
 
     params->arguments = std::move(arguments);

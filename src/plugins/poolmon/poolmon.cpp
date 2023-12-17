@@ -130,7 +130,7 @@ static GTree* pooltag_build_tree()
     for (; i < TAG_COUNT; i++)
     {
         g_tree_insert(pooltags, (gpointer) tags[i].tag,
-            (gpointer) &tags[i]);
+                      (gpointer) &tags[i]);
     }
 
     return pooltags;
@@ -196,14 +196,14 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     fmt::print(p->format, "poolmon", drakvuf, info,
-        keyval("VCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Nval(info->regs->cr3)),
-        keyval("Tag", fmt::Qstr(tag)),
-        keyval("Type", fmt::Qstr(pool_type_str)),
-        keyval("Size", fmt::Nval(size)),
-        keyval("Source", source),
-        keyval("Description", description)
-    );
+               keyval("VCPU", fmt::Nval(info->vcpu)),
+               keyval("CR3", fmt::Nval(info->regs->cr3)),
+               keyval("Tag", fmt::Qstr(tag)),
+               keyval("Type", fmt::Qstr(pool_type_str)),
+               keyval("Size", fmt::Nval(size)),
+               keyval("Source", source),
+               keyval("Description", description)
+              );
 
     return 0;
 }

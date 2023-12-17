@@ -156,77 +156,77 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     switch (base_injector->step)
     {
-        case STEP1: // Finds vdso and sets up mmap
-        {
-            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+    case STEP1: // Finds vdso and sets up mmap
+    {
+        memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-            if (!init_syscalls(drakvuf, info))
-                return cleanup(drakvuf, info, false);
+        if (!init_syscalls(drakvuf, info))
+            return cleanup(drakvuf, info, false);
 
-            // don't remove the initial trap
-            // it is used for cleanup after restoring registers
+        // don't remove the initial trap
+        // it is used for cleanup after restoring registers
 
-            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
-                return cleanup(drakvuf, info, false);
+        if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
+            return cleanup(drakvuf, info, false);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+        event = VMI_EVENT_RESPONSE_SET_REGISTERS;
 
-            break;
-        }
-        case STEP2: // setup shellcode
-        {
-            if (!call_mmap_syscall_cb(injector, info->regs, FILE_BUF_SIZE))
-                return cleanup(drakvuf, info, true);
+        break;
+    }
+    case STEP2: // setup shellcode
+    {
+        if (!call_mmap_syscall_cb(injector, info->regs, FILE_BUF_SIZE))
+            return cleanup(drakvuf, info, true);
 
-            if (!write_shellcode_to_mmap_location(drakvuf, info))
-                return cleanup(drakvuf, info, true);
+        if (!write_shellcode_to_mmap_location(drakvuf, info))
+            return cleanup(drakvuf, info, true);
 
-            setup_mmap_trap(drakvuf, info);
-            info->regs->rip = injector->virtual_memory_addr;
+        setup_mmap_trap(drakvuf, info);
+        info->regs->rip = injector->virtual_memory_addr;
 
-            free_bp_trap(drakvuf, injector, info->trap);
+        free_bp_trap(drakvuf, injector, info->trap);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP3: //since mmap starting location is trapped, the first one will be this
-        {
-            PRINT_DEBUG("Shellcode begin\n");
+        event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+        break;
+    }
+    case STEP3: //since mmap starting location is trapped, the first one will be this
+    {
+        PRINT_DEBUG("Shellcode begin\n");
 
-            if (!save_rip_for_ret(drakvuf, info->regs))
-                return cleanup(drakvuf, info, true);
+        if (!save_rip_for_ret(drakvuf, info->regs))
+            return cleanup(drakvuf, info, true);
 
-            // rsp is being updated
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP4: // shellcode should've executed and we will be returned to the same trap as ret is appended in the end
-        {
-            PRINT_DEBUG("Shellcode end\n");
-            free_bp_trap(drakvuf, injector, info->trap);
+        // rsp is being updated
+        event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+        break;
+    }
+    case STEP4: // shellcode should've executed and we will be returned to the same trap as ret is appended in the end
+    {
+        PRINT_DEBUG("Shellcode end\n");
+        free_bp_trap(drakvuf, injector, info->trap);
 
-            // restore regs
-            copy_gprs(info->regs, &injector->saved_regs);
+        // restore regs
+        copy_gprs(info->regs, &injector->saved_regs);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP5: // cleanup
-        {
-            PRINT_DEBUG("Removing traps and exiting\n");
+        event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+        break;
+    }
+    case STEP5: // cleanup
+    {
+        PRINT_DEBUG("Removing traps and exiting\n");
 
-            // remove the initial trap here
-            free_bp_trap(drakvuf, injector, info->trap);
-            drakvuf_interrupt(drakvuf, SIGINT);
+        // remove the initial trap here
+        free_bp_trap(drakvuf, injector, info->trap);
+        drakvuf_interrupt(drakvuf, SIGINT);
 
-            event = VMI_EVENT_RESPONSE_NONE;
-            break;
-        }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+        event = VMI_EVENT_RESPONSE_NONE;
+        break;
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
 
     return event;
@@ -283,10 +283,10 @@ static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_inf
     linux_injector_t injector = info->trap->data;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = injector->virtual_memory_addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = injector->virtual_memory_addr
+                  );
 
     size_t bytes_write = 0;
 

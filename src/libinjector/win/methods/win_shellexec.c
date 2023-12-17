@@ -115,43 +115,43 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     switch (base_injector->step)
     {
-        case STEP1:
+    case STEP1:
+    {
+        // save registers
+        PRINT_DEBUG("Saving registers\n");
+        memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+
+        if (!setup_shell_execute_stack(injector, info->regs))
         {
-            // save registers
-            PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
-
-            if (!setup_shell_execute_stack(injector, info->regs))
-            {
-                fprintf(stderr, "Failed to setup shellexec stack\n");
-                return cleanup(drakvuf, info);
-            }
-
-            info->regs->rip = injector->exec_func;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            fprintf(stderr, "Failed to setup shellexec stack\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP2:
-        {
-            // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND(6) while
-            // successfully opening file.
-            if (info->regs->rax != 6 && is_fun_error(drakvuf, info, "ShellExecute failed"))
-                return cleanup(drakvuf, info);
 
-            PRINT_DEBUG("ShellExecute successful\n");
+        info->regs->rip = injector->exec_func;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP2:
+    {
+        // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND(6) while
+        // successfully opening file.
+        if (info->regs->rax != 6 && is_fun_error(drakvuf, info, "ShellExecute failed"))
+            return cleanup(drakvuf, info);
 
-            injector->rc = INJECTOR_SUCCEEDED;
+        PRINT_DEBUG("ShellExecute successful\n");
 
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGINT);
+        injector->rc = INJECTOR_SUCCEEDED;
 
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGINT);
+
+        memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
 
     return VMI_EVENT_RESPONSE_NONE;

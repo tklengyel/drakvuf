@@ -127,7 +127,7 @@ using namespace procdump2_ns;
  *                             Public interface                              *
  *****************************************************************************/
 procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
-    output_format_t output)
+                     output_format_t output)
     : pluginex(drakvuf, output)
     , timeout{config->timeout}
     , procdump_dir{config->procdump_dir ?: ""}
@@ -141,7 +141,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
         return;
 
     if (config->disable_kideliverapc_hook &&
-        config->disable_kedelayexecutionthread_hook)
+            config->disable_kedelayexecutionthread_hook)
     {
         PRINT_DEBUG("[PROCDUMP] WARNING Hooks are disabled: check arguments\n");
         return;
@@ -163,10 +163,10 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
         drakvuf_kernel_symbol_to_va(drakvuf, "KeDelayExecutionThread");
 
     if (!this->malloc_va ||
-        !this->suspend_process_va ||
-        !this->resume_process_va ||
-        !this->copy_virt_mem_va ||
-        !this->delay_execution_va)
+            !this->suspend_process_va ||
+            !this->resume_process_va ||
+            !this->copy_virt_mem_va ||
+            !this->delay_execution_va)
     {
         PRINT_DEBUG("[PROCDUMP] Failed to get function address\n");
         throw -1;
@@ -291,8 +291,8 @@ bool procdump2::stop_impl()
         {
             auto ctx = task.second;
             PRINT_DEBUG("[PROCDUMP] Pending task on stop: PID=%d, stage %s\n"
-                , ctx->target_process_pid, to_str(ctx->stage()).data()
-            );
+                        , ctx->target_process_pid, to_str(ctx->stage()).data()
+                       );
         }
     return false;
 }
@@ -327,14 +327,14 @@ void procdump2::start_dump_process(vmi_pid_t pid)
     }
 
     auto ctx = std::make_shared<procdump2_ctx>(
-            false,
-            process_base,
-            std::string(proc_name ?: ""),
-            pid,
-            procdumps_count++,
-            procdump_dir,
-            use_compression,
-            "FinishAnalysis");
+                   false,
+                   process_base,
+                   std::string(proc_name ?: ""),
+                   pid,
+                   procdumps_count++,
+                   procdump_dir,
+                   use_compression,
+                   "FinishAnalysis");
     g_free(proc_name);
     ctx->stage(procdump_stage::need_suspend);
     ctx->wait_awaken = false;
@@ -350,7 +350,7 @@ void procdump2::start_dump_process(vmi_pid_t pid)
  *****************************************************************************/
 
 event_response_t procdump2::delay_execution_cb(drakvuf_t,
-    drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     // TODO It is possible that all threads in System process at PASSIVE_LEVEL
     if (4 == info->attached_proc_data.pid)
@@ -371,14 +371,14 @@ event_response_t procdump2::deliver_apc_cb(drakvuf_t, drakvuf_trap_info_t* info)
 {
     std::string proc_name{info->attached_proc_data.name};
     if (proc_name.find("lsass")    != std::string::npos ||
-        proc_name.find("csrss")    != std::string::npos ||
-        proc_name.find("conhost")  != std::string::npos ||
-        proc_name.find("services") != std::string::npos ||
-        proc_name.find("explorer") != std::string::npos ||
-        proc_name.find("spoolsv")  != std::string::npos ||
-        proc_name.find("lsm")      != std::string::npos ||
-        proc_name.find("taskhost") != std::string::npos ||
-        proc_name.find("svchost")  != std::string::npos)
+            proc_name.find("csrss")    != std::string::npos ||
+            proc_name.find("conhost")  != std::string::npos ||
+            proc_name.find("services") != std::string::npos ||
+            proc_name.find("explorer") != std::string::npos ||
+            proc_name.find("spoolsv")  != std::string::npos ||
+            proc_name.find("lsm")      != std::string::npos ||
+            proc_name.find("taskhost") != std::string::npos ||
+            proc_name.find("svchost")  != std::string::npos)
     {
         return dispatcher(info);
     }
@@ -395,14 +395,14 @@ event_response_t procdump2::deliver_apc_cb(drakvuf_t, drakvuf_trap_info_t* info)
  * We should add such processes to queue of processes to terminate.
  */
 event_response_t procdump2::terminate_process_cb(drakvuf_t,
-    drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-        "NtTerminateProcess(%#lx)\n"
-        , info->event_uid
-        , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , drakvuf_get_function_argument(drakvuf, info, 1)
-    );
+                "NtTerminateProcess(%#lx)\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , drakvuf_get_function_argument(drakvuf, info, 1)
+               );
 
     if (drakvuf_lookup_injection(drakvuf, info))
         drakvuf_remove_injection(drakvuf, info);
@@ -413,13 +413,13 @@ event_response_t procdump2::terminate_process_cb(drakvuf_t,
         ++next_it;
         auto ctx = it->second;
         bool is_target = drakvuf_check_return_context(drakvuf, info,
-                ctx->target.ret_pid,
-                ctx->target.ret_tid,
-                ctx->target.ret_rsp);
+                         ctx->target.ret_pid,
+                         ctx->target.ret_tid,
+                         ctx->target.ret_rsp);
         bool is_host = drakvuf_check_return_context(drakvuf, info,
-                ctx->host.ret_pid,
-                ctx->host.ret_tid,
-                ctx->host.ret_rsp);
+                       ctx->host.ret_pid,
+                       ctx->host.ret_tid,
+                       ctx->host.ret_rsp);
         if (is_target && dispatch_target_wakeup(info, ctx))
             return VMI_EVENT_RESPONSE_NONE;
         else if (is_host && dispatch_host_wakeup(info, ctx))
@@ -451,7 +451,7 @@ event_response_t procdump2::terminate_process_cb(drakvuf_t,
  * finish.
  */
 event_response_t procdump2::clean_process_memory_cb(drakvuf_t,
-    drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     /* Check if current thread is a active one. */
     for (auto& [pid, ctx]: this->active)
@@ -460,36 +460,36 @@ event_response_t procdump2::clean_process_memory_cb(drakvuf_t,
         {
             // The working thread is active - keep alive
             PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Target process destroyed.\n"
-                , info->event_uid
-                , info->attached_proc_data.pid
-                , info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
-            // TODO Move working thread check into function
-            if (this->working_threads.find(ctx->working.ret_tid) !=
-                this->working_threads.end())
-            {
-                if (ctx->stage() == procdump_stage::copy_memory)
-                    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d]\t> "
-                        "Working thread still active. "
-                        "BSOD on locked pages could occur\n"
+                        "Target process destroyed.\n"
                         , info->event_uid
                         , info->attached_proc_data.pid
                         , info->attached_proc_data.tid
                         , ctx->target_process_pid, to_int(ctx->stage())
-                    );
+                       );
+            // TODO Move working thread check into function
+            if (this->working_threads.find(ctx->working.ret_tid) !=
+                    this->working_threads.end())
+            {
+                if (ctx->stage() == procdump_stage::copy_memory)
+                    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d]\t> "
+                                "Working thread still active. "
+                                "BSOD on locked pages could occur\n"
+                                , info->event_uid
+                                , info->attached_proc_data.pid
+                                , info->attached_proc_data.tid
+                                , ctx->target_process_pid, to_int(ctx->stage())
+                               );
             }
             else
             {
                 // The working thread is not active - finish task
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d]\t> "
-                    "Working thread finished.\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid
-                    , info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
+                            "Working thread finished.\n"
+                            , info->event_uid
+                            , info->attached_proc_data.pid
+                            , info->attached_proc_data.tid
+                            , ctx->target_process_pid, to_int(ctx->stage())
+                           );
             }
         }
     }
@@ -516,10 +516,10 @@ event_response_t procdump2::dispatcher(drakvuf_trap_info_t* info)
     if (!is_plugin_active())
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-            "Nothing to dispatch\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-        );
+                    "Nothing to dispatch\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                   );
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -535,10 +535,10 @@ event_response_t procdump2::dispatcher(drakvuf_trap_info_t* info)
     if (info->proc_data.pid != info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-            "Skip thread attached to other process\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-        );
+                    "Skip thread attached to other process\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                   );
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -559,16 +559,16 @@ event_response_t procdump2::dispatcher(drakvuf_trap_info_t* info)
 void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx> ctx)
 {
     PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-        "Dispatch active process\n"
-        , info->event_uid
-        , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , ctx->target_process_pid, to_int(ctx->stage())
-    );
+                "Dispatch active process\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , ctx->target_process_pid, to_int(ctx->stage())
+               );
 
     if (is_stopping() &&
-        timeout &&
-        g_get_real_time() / G_USEC_PER_SEC - begin_stop_at > timeout &&
-        !ctx->is_timed_out())
+            timeout &&
+            g_get_real_time() / G_USEC_PER_SEC - begin_stop_at > timeout &&
+            !ctx->is_timed_out())
     {
         ctx->stage(procdump_stage::timeout);
     }
@@ -577,261 +577,261 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
 
     switch (ctx->stage())
     {
-        case procdump_stage::need_suspend:
-        case procdump_stage::pending:
-        case procdump_stage::prepare_minidump:
-        case procdump_stage::finished:
-        {
-            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "WARNING! Working thread don't handle this stage\n"
-                , info->event_uid
-                , info->attached_proc_data.pid
-                , info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
-        }
-        break;
+    case procdump_stage::need_suspend:
+    case procdump_stage::pending:
+    case procdump_stage::prepare_minidump:
+    case procdump_stage::finished:
+    {
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "WARNING! Working thread don't handle this stage\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid
+                    , info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
+    }
+    break;
 
-        case procdump_stage::suspend:
+    case procdump_stage::suspend:
+    {
+        /* Don't check PsSuspendProcess return code.
+         *
+         * PsSuspendProcess will only return STATUS_SUCCESS or
+         * STATUS_PROCESS_IS_TERMINATING.
+         * I believe that both values are acceptible here.
+         *
+         * After PsSuspendProcess invokation we have to wait until
+         * target process would be really suspended. So move the
+         * context into pending state.
+         */
+        restore(info, ctx->working);
+        ctx->stage(procdump_stage::pending);
+        /* This trick prevents to fetching the task from active list
+         * while handline KiDeliverApc hook.
+         * TODO Move to function
+         */
+        ctx->working.ret_pid = 0;
+        this->working_threads.erase(info->attached_proc_data.tid);
+    }
+    break;
+
+    case procdump_stage::get_irql:
+    {
+        uint8_t irql = info->regs->rax;
+        if (irql >= IRQL_DISPATCH_LEVEL)
         {
-            /* Don't check PsSuspendProcess return code.
-             *
-             * PsSuspendProcess will only return STATUS_SUCCESS or
-             * STATUS_PROCESS_IS_TERMINATING.
-             * I believe that both values are acceptible here.
-             *
-             * After PsSuspendProcess invokation we have to wait until
-             * target process would be really suspended. So move the
-             * context into pending state.
-             */
+            /* The current thread's IRQL is high. Search other one. */
             restore(info, ctx->working);
             ctx->stage(procdump_stage::pending);
             /* This trick prevents to fetching the task from active list
-             * while handline KiDeliverApc hook.
-             * TODO Move to function
-             */
+            * while handline KiDeliverApc hook.
+            * TODO Move to function
+            */
             ctx->working.ret_pid = 0;
             this->working_threads.erase(info->attached_proc_data.tid);
         }
-        break;
-
-        case procdump_stage::get_irql:
+        else
         {
-            uint8_t irql = info->regs->rax;
-            if (irql >= IRQL_DISPATCH_LEVEL)
+            if ( (ctx->pool = this->pools->get()) != 0 )
             {
-                /* The current thread's IRQL is high. Search other one. */
-                restore(info, ctx->working);
-                ctx->stage(procdump_stage::pending);
-                /* This trick prevents to fetching the task from active list
-                * while handline KiDeliverApc hook.
-                * TODO Move to function
-                */
-                ctx->working.ret_pid = 0;
-                this->working_threads.erase(info->attached_proc_data.tid);
+                if (!start_copy_memory(info, ctx))
+                {
+                    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                                "Resume target process on dump start fail\n"
+                                , info->event_uid
+                                , info->attached_proc_data.pid
+                                , info->attached_proc_data.tid
+                                , ctx->target_process_pid, to_int(ctx->stage())
+                               );
+                    resume(info, ctx);
+                }
             }
             else
+                allocate_pool(info, ctx);
+        }
+    }
+    break;
+
+    case procdump_stage::allocate_pool:
+    {
+        addr_t pool = info->regs->rax;
+        if (pool)
+        {
+            pools->add(pool);
+            ctx->pool = pools->get();
+            if (!start_copy_memory(info, ctx))
             {
-                if ( (ctx->pool = this->pools->get()) != 0 )
-                {
-                    if (!start_copy_memory(info, ctx))
-                    {
-                        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
                             "Resume target process on dump start fail\n"
                             , info->event_uid
                             , info->attached_proc_data.pid
                             , info->attached_proc_data.tid
                             , ctx->target_process_pid, to_int(ctx->stage())
-                        );
-                        resume(info, ctx);
-                    }
-                }
-                else
-                    allocate_pool(info, ctx);
+                           );
+                resume(info, ctx);
             }
         }
-        break;
-
-        case procdump_stage::allocate_pool:
+        else
         {
-            addr_t pool = info->regs->rax;
-            if (pool)
-            {
-                pools->add(pool);
-                ctx->pool = pools->get();
-                if (!start_copy_memory(info, ctx))
-                {
-                    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                        "Resume target process on dump start fail\n"
+            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                        "Resume target process on pool allocation fail\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid, info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                       );
+            resume(info, ctx);
+        }
+    }
+    break;
+
+    case procdump_stage::copy_memory:
+    {
+        uint32_t read_bytes = 0;
+        {
+            ACCESS_CONTEXT(vmi_ctx);
+            vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+            vmi_ctx.dtb = info->regs->cr3;
+            vmi_ctx.addr = ctx->current_read_bytes_va;
+
+            vmi_lock_guard vmi(drakvuf);
+            vmi_read_32(vmi, &vmi_ctx, &read_bytes);
+        }
+
+        size_t size = 0;
+        if (read_bytes == ctx->current_dump_size)
+        {
+            read_vm(info->regs->cr3, ctx, read_bytes);
+            size = read_bytes;
+        }
+        else if (read_bytes == 0)
+        {
+            dump_zero_page(ctx);
+            size = VMI_PS_4KB;
+        }
+        else
+        {
+            read_vm(info->regs->cr3, ctx, read_bytes);
+            dump_zero_page(ctx);
+            size = read_bytes + VMI_PS_4KB;
+        }
+
+        // Dump data region (not memory-mapped file) with zeroes
+        if (size < ctx->current_dump_size &&
+                !ctx->is_current_memory_mapped_file)
+        {
+            for (; size < ctx->current_dump_size; size += VMI_PS_4KB)
+                dump_zero_page(ctx);
+        }
+
+        if (size == ctx->current_dump_size && ctx->vads.empty())
+        {
+            // The last region have been fully dumped so finish task
+            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                        "Resume target process on dump finish\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid, info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                       );
+            resume(info, ctx);
+        }
+        else if (size == ctx->current_dump_size)
+        {
+            // The region have been fully dumped so go to next one
+            auto [base, size] = get_memory_region(info, ctx);
+            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                        "Copy memory region [%#lx;%#lx]\n"
                         , info->event_uid
                         , info->attached_proc_data.pid
                         , info->attached_proc_data.tid
                         , ctx->target_process_pid, to_int(ctx->stage())
-                    );
-                    resume(info, ctx);
-                }
-            }
-            else
-            {
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Resume target process on pool allocation fail\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
-                resume(info, ctx);
-            }
+                        , base, size
+                       );
+            copy_memory(info, ctx, base, size);
         }
-        break;
-
-        case procdump_stage::copy_memory:
+        else
         {
-            uint32_t read_bytes = 0;
-            {
-                ACCESS_CONTEXT(vmi_ctx);
-                vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-                vmi_ctx.dtb = info->regs->cr3;
-                vmi_ctx.addr = ctx->current_read_bytes_va;
-
-                vmi_lock_guard vmi(drakvuf);
-                vmi_read_32(vmi, &vmi_ctx, &read_bytes);
-            }
-
-            size_t size = 0;
-            if (read_bytes == ctx->current_dump_size)
-            {
-                read_vm(info->regs->cr3, ctx, read_bytes);
-                size = read_bytes;
-            }
-            else if (read_bytes == 0)
-            {
-                dump_zero_page(ctx);
-                size = VMI_PS_4KB;
-            }
-            else
-            {
-                read_vm(info->regs->cr3, ctx, read_bytes);
-                dump_zero_page(ctx);
-                size = read_bytes + VMI_PS_4KB;
-            }
-
-            // Dump data region (not memory-mapped file) with zeroes
-            if (size < ctx->current_dump_size &&
-                !ctx->is_current_memory_mapped_file)
-            {
-                for (; size < ctx->current_dump_size; size += VMI_PS_4KB)
-                    dump_zero_page(ctx);
-            }
-
-            if (size == ctx->current_dump_size && ctx->vads.empty())
-            {
-                // The last region have been fully dumped so finish task
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Resume target process on dump finish\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
-                resume(info, ctx);
-            }
-            else if (size == ctx->current_dump_size)
-            {
-                // The region have been fully dumped so go to next one
-                auto [base, size] = get_memory_region(info, ctx);
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Copy memory region [%#lx;%#lx]\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid
-                    , info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                    , base, size
-                );
-                copy_memory(info, ctx, base, size);
-            }
-            else
-            {
-                /* If we have read more any data (assume 4KB at least) then
-                 * after the last read byte the non-accessible page occur.
-                 * So skip this page.
-                 * If zero bytes have been read then the first page is
-                 * non-accessible. So skip this page.
-                 */
-                auto base = ctx->current_dump_base + size;
-                size = ctx->current_dump_size - size;
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "copy_memory: bytes copied %#x before "
-                    "NO_ACCESS page. Continue with [%#lx;%#lx]\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid
-                    , info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                    , read_bytes, base, size
-                );
-                copy_memory(info, ctx, base, size);
-            }
-        }
-        break;
-
-        case procdump_stage::target_awaken:
-        case procdump_stage::resume:
-        {
+            /* If we have read more any data (assume 4KB at least) then
+             * after the last read byte the non-accessible page occur.
+             * So skip this page.
+             * If zero bytes have been read then the first page is
+             * non-accessible. So skip this page.
+             */
+            auto base = ctx->current_dump_base + size;
+            size = ctx->current_dump_size - size;
             PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "After resuming target process\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
-            /* Assume self-terminating target here. Such a target would
-             * remove task after return from PsSuspendProcess.
-             *
-             * For not self-terminating target this is not the case. The
-             * task should be removed here.
-             */
-            restore(info, ctx->working);
-            if (ctx->is_restored())
-            {
-                ctx->stage(procdump_stage::finished);
-                finish_task(info, ctx);
-            }
-            /* This trick prevents to fetching the task from active list
-             * while handline KiDeliverApc hook.
-             * TODO Move to function
-             */
-            ctx->working.ret_pid = 0;
-            this->working_threads.erase(info->attached_proc_data.tid);
+                        "copy_memory: bytes copied %#x before "
+                        "NO_ACCESS page. Continue with [%#lx;%#lx]\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid
+                        , info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                        , read_bytes, base, size
+                       );
+            copy_memory(info, ctx, base, size);
         }
+    }
+    break;
+
+    case procdump_stage::target_awaken:
+    case procdump_stage::resume:
+    {
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "After resuming target process\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
+        /* Assume self-terminating target here. Such a target would
+         * remove task after return from PsSuspendProcess.
+         *
+         * For not self-terminating target this is not the case. The
+         * task should be removed here.
+         */
+        restore(info, ctx->working);
+        if (ctx->is_restored())
+        {
+            ctx->stage(procdump_stage::finished);
+            finish_task(info, ctx);
+        }
+        /* This trick prevents to fetching the task from active list
+         * while handline KiDeliverApc hook.
+         * TODO Move to function
+         */
+        ctx->working.ret_pid = 0;
+        this->working_threads.erase(info->attached_proc_data.tid);
+    }
+    break;
+    case procdump_stage::timeout:
+        resume(info, ctx);
         break;
-        case procdump_stage::timeout:
-            resume(info, ctx);
-            break;
-        case procdump_stage::target_wakeup:
-            restore(info, ctx->working);
-            /* This trick prevents to fetching the task from active list
-             * while handline KiDeliverApc hook.
-             * TODO Move to function
-             */
-            ctx->working.ret_pid = 0;
-            this->working_threads.erase(info->attached_proc_data.tid);
+    case procdump_stage::target_wakeup:
+        restore(info, ctx->working);
+        /* This trick prevents to fetching the task from active list
+         * while handline KiDeliverApc hook.
+         * TODO Move to function
+         */
+        ctx->working.ret_pid = 0;
+        this->working_threads.erase(info->attached_proc_data.tid);
     }
 }
 
 bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx> ctx)
 {
     PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-        "Dispatch pending process\n"
-        , info->event_uid
-        , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , ctx->target_process_pid, to_int(ctx->stage())
-    );
+                "Dispatch pending process\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , ctx->target_process_pid, to_int(ctx->stage())
+               );
 
     if (ctx->stage() == procdump_stage::need_suspend)
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Suspend target process\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Suspend target process\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         ctx->stage(procdump_stage::suspend);
         // TODO Move to function ... START
         memcpy(&ctx->working.regs, info->regs, sizeof(x86_registers_t));
@@ -846,20 +846,20 @@ bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<proc
         if (ctx->old_stage() == procdump_stage::need_suspend)
             check_stack_marker(info, ctx, ctx->working);
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Check if target process suspended\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Check if target process suspended\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         bool is_suspended = false;
         if ( !drakvuf_is_process_suspended(drakvuf, ctx->target_process_base, &is_suspended) )
         {
             PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Failed to check if process suspended\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
+                        "Failed to check if process suspended\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid, info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                       );
             // TODO Move to function ... START
             memcpy(&ctx->working.regs, info->regs, sizeof(x86_registers_t));
             ctx->working.restored = false;
@@ -882,11 +882,11 @@ bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<proc
     else
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Wait pending stage here\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Wait pending stage here\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         return false;
     }
 }
@@ -948,14 +948,14 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
     // TODO Check that target process would be suspended.
     // TODO Hook process creation and remove from finished list reused PIDs.
     if (is_active_process(target_process_pid) ||
-        is_process_handled(target_process_pid))
+            is_process_handled(target_process_pid))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-            "Skip active or finished process %d (%s)\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , target_process_pid, target_process_name.data()
-        );
+                    "Skip active or finished process %d (%s)\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , target_process_pid, target_process_name.data()
+                   );
         return false;
     }
 
@@ -966,24 +966,24 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
     }
 
     auto ctx = std::make_shared<procdump2_ctx>(
-            is_hosted,
-            target_process_base,
-            target_process_name,
-            target_process_pid,
-            procdumps_count++,
-            procdump_dir,
-            use_compression,
-            "TerminateProcess");
+                   is_hosted,
+                   target_process_base,
+                   target_process_name,
+                   target_process_pid,
+                   procdumps_count++,
+                   procdump_dir,
+                   use_compression,
+                   "TerminateProcess");
 
     this->active[target_process_pid] = ctx;
 
     PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-        "Dispatch new process: %s\n"
-        , info->event_uid
-        , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , ctx->target_process_pid, to_int(ctx->stage())
-        , target_process_name.data()
-    );
+                "Dispatch new process: %s\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , ctx->target_process_pid, to_int(ctx->stage())
+                , target_process_name.data()
+               );
 
     /* Suspend target and/or host processes.
      *
@@ -996,11 +996,11 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
     if (is_hosted)
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Delay target suspend\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Delay target suspend\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         ctx->stage(procdump_stage::need_suspend);
         ctx->host_process_base = info->attached_proc_data.base_addr;
         memcpy(&ctx->host.regs, info->regs, sizeof(x86_registers_t));
@@ -1009,11 +1009,11 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
     else
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Suspend self-terminating\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Suspend self-terminating\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         memcpy(&ctx->target.regs, info->regs, sizeof(x86_registers_t));
         suspend(info, ctx->target_process_base, ctx->target);
     }
@@ -1028,39 +1028,39 @@ bool procdump2::dispatch_host_wakeup(
     check_stack_marker(info, ctx, ctx->host);
     switch (ctx->stage())
     {
-        case procdump_stage::resume:
-        case procdump_stage::target_awaken:
-        case procdump_stage::finished:
-        case procdump_stage::target_wakeup:
-        case procdump_stage::timeout:
-            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Delayed host process wake up - restore it\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
-            restore(info, ctx->host);
-            if (ctx->is_restored())
-            {
-                ctx->stage(procdump_stage::finished);
-                finish_task(info, ctx);
-            }
-            return true;
-        case procdump_stage::need_suspend:
-        case procdump_stage::prepare_minidump:
-        case procdump_stage::suspend:
-        case procdump_stage::pending:
-        case procdump_stage::get_irql:
-        case procdump_stage::allocate_pool:
-        case procdump_stage::copy_memory:
-            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Delayed host process wake up - delay it\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
-            delay_execution(info, ctx->host, 500);
-            return true;
+    case procdump_stage::resume:
+    case procdump_stage::target_awaken:
+    case procdump_stage::finished:
+    case procdump_stage::target_wakeup:
+    case procdump_stage::timeout:
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "Delayed host process wake up - restore it\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
+        restore(info, ctx->host);
+        if (ctx->is_restored())
+        {
+            ctx->stage(procdump_stage::finished);
+            finish_task(info, ctx);
+        }
+        return true;
+    case procdump_stage::need_suspend:
+    case procdump_stage::prepare_minidump:
+    case procdump_stage::suspend:
+    case procdump_stage::pending:
+    case procdump_stage::get_irql:
+    case procdump_stage::allocate_pool:
+    case procdump_stage::copy_memory:
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "Delayed host process wake up - delay it\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
+        delay_execution(info, ctx->host, 500);
+        return true;
     }
     return true;
 }
@@ -1071,97 +1071,97 @@ bool procdump2::dispatch_target_wakeup(
 {
     check_stack_marker(info, ctx, ctx->target);
     PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-        "Suspended target process wake up\n"
-        , info->event_uid
-        , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , ctx->target_process_pid, to_int(ctx->stage())
-    );
+                "Suspended target process wake up\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , ctx->target_process_pid, to_int(ctx->stage())
+               );
     switch (ctx->stage())
     {
-        case procdump_stage::target_awaken:
-            if (ctx->is_restored())
-            {
-                ctx->stage(procdump_stage::finished);
-                finish_task(info, ctx);
-            }
-            return false;
-        case procdump_stage::finished:
-        case procdump_stage::resume:
-            restore(info, ctx->target);
-            if (ctx->stage() == procdump_stage::resume)
-                ctx->stage(procdump_stage::target_awaken);
+    case procdump_stage::target_awaken:
+        if (ctx->is_restored())
+        {
+            ctx->stage(procdump_stage::finished);
+            finish_task(info, ctx);
+        }
+        return false;
+    case procdump_stage::finished:
+    case procdump_stage::resume:
+        restore(info, ctx->target);
+        if (ctx->stage() == procdump_stage::resume)
+            ctx->stage(procdump_stage::target_awaken);
 
-            if (ctx->is_restored())
-            {
-                ctx->stage(procdump_stage::finished);
-                finish_task(info, ctx);
-            }
-            return true;
-        case procdump_stage::target_wakeup:
-            // TODO Move working thread check into function
-            if (this->working_threads.find(ctx->working.ret_tid) !=
+        if (ctx->is_restored())
+        {
+            ctx->stage(procdump_stage::finished);
+            finish_task(info, ctx);
+        }
+        return true;
+    case procdump_stage::target_wakeup:
+        // TODO Move working thread check into function
+        if (this->working_threads.find(ctx->working.ret_tid) !=
                 this->working_threads.end())
-            {
-                // The working thread is active - keep alive
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Suspended target process wake up while not finished but "
-                    "working thread still active - keep alive\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid
-                    , info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
-                delay_execution(info, ctx->target, 100);
-            }
-            else
-            {
-                // The working thread is not active - finish task
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Suspended target process wake up while not finished and "
-                    "working thread finished - finish the task\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid
-                    , info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
-                restore(info, ctx->target);
-                finish_task(info, ctx);
-            }
-            return true;
-        case procdump_stage::need_suspend:
-        case procdump_stage::prepare_minidump:
-        case procdump_stage::timeout:
+        {
+            // The working thread is active - keep alive
             PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "WARNING! Taraget wakeup don't handle this stage\n"
-                , info->event_uid
-                , info->attached_proc_data.pid
-                , info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
-        case procdump_stage::suspend:
-        case procdump_stage::pending:
-        case procdump_stage::get_irql:
-        case procdump_stage::allocate_pool:
-        case procdump_stage::copy_memory:
-            if (ctx->on_target_resuspend())
-            {
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Suspended target process wake up while not finished "
-                    "(retries %d)\n"
+                        "Suspended target process wake up while not finished but "
+                        "working thread still active - keep alive\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid
+                        , info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                       );
+            delay_execution(info, ctx->target, 100);
+        }
+        else
+        {
+            // The working thread is not active - finish task
+            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                        "Suspended target process wake up while not finished and "
+                        "working thread finished - finish the task\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid
+                        , info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                       );
+            restore(info, ctx->target);
+            finish_task(info, ctx);
+        }
+        return true;
+    case procdump_stage::need_suspend:
+    case procdump_stage::prepare_minidump:
+    case procdump_stage::timeout:
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "WARNING! Taraget wakeup don't handle this stage\n"
                     , info->event_uid
                     , info->attached_proc_data.pid
                     , info->attached_proc_data.tid
                     , ctx->target_process_pid, to_int(ctx->stage())
-                    , ctx->target_resuspend_count
-                );
-                suspend(info, ctx->target_process_base, ctx->target);
-            }
-            else
-            {
-                ctx->stage(procdump_stage::target_wakeup);
-                dispatch_target_wakeup(info, ctx);
-            }
-            return true;
+                   );
+    case procdump_stage::suspend:
+    case procdump_stage::pending:
+    case procdump_stage::get_irql:
+    case procdump_stage::allocate_pool:
+    case procdump_stage::copy_memory:
+        if (ctx->on_target_resuspend())
+        {
+            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                        "Suspended target process wake up while not finished "
+                        "(retries %d)\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid
+                        , info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                        , ctx->target_resuspend_count
+                       );
+            suspend(info, ctx->target_process_base, ctx->target);
+        }
+        else
+        {
+            ctx->stage(procdump_stage::target_wakeup);
+            dispatch_target_wakeup(info, ctx);
+        }
+        return true;
     }
     return true;
 }
@@ -1185,11 +1185,11 @@ void procdump2::allocate_pool(
     if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), malloc_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Failed to inject ExAllocatePoolWithTag\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Failed to inject ExAllocatePoolWithTag\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         throw -1;
     }
 
@@ -1200,7 +1200,7 @@ void procdump2::allocate_pool(
 }
 
 void procdump2::copy_memory(drakvuf_trap_info_t* info,
-    std::shared_ptr<procdump2_ctx> ctx, addr_t addr, size_t size)
+                            std::shared_ptr<procdump2_ctx> ctx, addr_t addr, size_t size)
 {
     x86_registers_t regs;
     memcpy(&regs, info->regs, sizeof(x86_registers_t));
@@ -1218,11 +1218,11 @@ void procdump2::copy_memory(drakvuf_trap_info_t* info,
     if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), copy_virt_mem_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Failed to inject MmCopyVirtualMemory\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Failed to inject MmCopyVirtualMemory\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         throw -1;
     }
 
@@ -1244,11 +1244,11 @@ void procdump2::get_irql(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ct
     if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, nullptr, 0, current_irql_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Failed to inject KeGetCurrentIrql\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Failed to inject KeGetCurrentIrql\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         throw -1;
     }
 
@@ -1269,11 +1269,11 @@ void procdump2::resume(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx>
     if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), resume_process_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Failed to inject PsResumeProcess\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Failed to inject PsResumeProcess\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         throw -1;
     }
 
@@ -1301,10 +1301,10 @@ void procdump2::suspend(drakvuf_trap_info_t* info, addr_t target_process_base, r
     if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), suspend_process_va, ctx.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-            "Failed to inject PsSuspendProcess\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-        );
+                    "Failed to inject PsSuspendProcess\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                   );
         throw -1;
     }
 
@@ -1314,8 +1314,8 @@ void procdump2::suspend(drakvuf_trap_info_t* info, addr_t target_process_base, r
 }
 
 void procdump2::delay_execution(drakvuf_trap_info_t* info,
-    return_ctx& ctx,
-    uint16_t msec)
+                                return_ctx& ctx,
+                                uint16_t msec)
 {
     x86_registers_t regs;
     memcpy(&regs, info->regs, sizeof(x86_registers_t));
@@ -1330,10 +1330,10 @@ void procdump2::delay_execution(drakvuf_trap_info_t* info,
     if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), delay_execution_va, ctx.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-            "Failed to inject KeDelayExecutionThread\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-        );
+                    "Failed to inject KeDelayExecutionThread\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                   );
         throw -1;
     }
 
@@ -1350,43 +1350,43 @@ std::shared_ptr<procdump2_ctx> procdump2::continues_task(drakvuf_trap_info_t* in
 {
     /* If current thread is working one then search for task to continue. */
     if (this->working_threads.find(info->attached_proc_data.tid) !=
-        this->working_threads.end())
+            this->working_threads.end())
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-            "Search task to continue\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-        );
+                    "Search task to continue\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                   );
 
         for (auto& [pid, ctx]: this->active)
         {
             PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Check task if to continue\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-            );
+                        "Check task if to continue\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid, info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                       );
             if (ctx->stage() == procdump_stage::finished)
             {
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "The task is finished\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
+                            "The task is finished\n"
+                            , info->event_uid
+                            , info->attached_proc_data.pid, info->attached_proc_data.tid
+                            , ctx->target_process_pid, to_int(ctx->stage())
+                           );
                 continue;
             }
             else if (drakvuf_check_return_context(drakvuf, info,
-                    ctx->working.ret_pid,
-                    ctx->working.ret_tid,
-                    ctx->working.ret_rsp))
+                                                  ctx->working.ret_pid,
+                                                  ctx->working.ret_tid,
+                                                  ctx->working.ret_rsp))
             {
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Found task to continue\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
+                            "Found task to continue\n"
+                            , info->event_uid
+                            , info->attached_proc_data.pid, info->attached_proc_data.tid
+                            , ctx->target_process_pid, to_int(ctx->stage())
+                           );
                 ctx->working.ret_rsp = 0;
                 /* Restore stack pointer after injection.
                  *
@@ -1399,27 +1399,27 @@ std::shared_ptr<procdump2_ctx> procdump2::continues_task(drakvuf_trap_info_t* in
         }
 
         PRINT_DEBUG("[PROCDUMP] [%d:%d] "
-            "Working thread failed to get task to continue.\n"
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-        );
+                    "Working thread failed to get task to continue.\n"
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                   );
     }
 
     return nullptr;
 }
 
 void procdump2::finish_task(drakvuf_trap_info_t* info,
-    std::shared_ptr<procdump2_ctx> ctx)
+                            std::shared_ptr<procdump2_ctx> ctx)
 {
     ctx->writer->finish();
     save_file_metadata(ctx, &info->attached_proc_data);
     fmt::print(m_output_format, "procdump", drakvuf, info,
-        keyval("TargetPID", fmt::Nval(ctx->target_process_pid)),
-        keyval("TargetName", fmt::Qstr(ctx->target_process_name)),
-        keyval("DumpReason", fmt::Qstr(ctx->dump_reason)),
-        keyval("DumpSize", fmt::Nval(ctx->size)),
-        keyval("SN", fmt::Nval(ctx->idx)),
-        keyval("Status", fmt::Qstr(ctx->status()))
-    );
+               keyval("TargetPID", fmt::Nval(ctx->target_process_pid)),
+               keyval("TargetName", fmt::Qstr(ctx->target_process_name)),
+               keyval("DumpReason", fmt::Qstr(ctx->dump_reason)),
+               keyval("DumpSize", fmt::Nval(ctx->size)),
+               keyval("SN", fmt::Nval(ctx->idx)),
+               keyval("Status", fmt::Qstr(ctx->status()))
+              );
 
     this->finished.insert(ctx->target_process_pid);
     if (ctx->pool)
@@ -1430,24 +1430,24 @@ void procdump2::finish_task(drakvuf_trap_info_t* info,
 void procdump2::print_dump_exclusion(drakvuf_trap_info_t* info)
 {
     PRINT_DEBUG("[PROCDUMP] Skip excluded proces %d (%s)\n"
-        , info->attached_proc_data.pid
-        , info->attached_proc_data.name
-    );
+                , info->attached_proc_data.pid
+                , info->attached_proc_data.name
+               );
     fmt::print(m_output_format, "procdump_skip", drakvuf, info,
-        keyval("Message", fmt::Rstr("Excluded by filter"))
-    );
+               keyval("Message", fmt::Rstr("Excluded by filter"))
+              );
 }
 
 std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info,
-    std::shared_ptr<procdump2_ctx> ctx)
+        std::shared_ptr<procdump2_ctx> ctx)
 {
     if (ctx->vads.empty())
     {
         PRINT_DEBUG("[PROCDUMP] [%d:%d] [%d:%d] "
-            "No VADs left\n"
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "No VADs left\n"
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         return std::make_pair(0, 0);
     }
 
@@ -1455,37 +1455,37 @@ std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info
     auto vad_start = it->first;
     auto& vad = it->second;
     PRINT_DEBUG("[PROCDUMP] [%d:%d] [%d:%d] "
-        "VAD: start %#lx, type %#x, ptes %zu, idx %#x\n"
-        , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , ctx->target_process_pid, to_int(ctx->stage())
-        , vad_start, vad.type, vad.total_number_of_ptes, vad.idx
-    );
+                "VAD: start %#lx, type %#x, ptes %zu, idx %#x\n"
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , ctx->target_process_pid, to_int(ctx->stage())
+                , vad_start, vad.type, vad.total_number_of_ptes, vad.idx
+               );
 
     auto total_number_of_ptes = vad.total_number_of_ptes;
     // Dump first page of memory-mapped files with signle page request.
     auto max_size = (vad.is_memory_mapped_file && vad.idx == 0)
-        ? 1
-        : ctx->POOL_SIZE_IN_PAGES;
+                    ? 1
+                    : ctx->POOL_SIZE_IN_PAGES;
 
     uint32_t ptes_to_dump = std::min(total_number_of_ptes - vad.idx, max_size);
 
     if (!ptes_to_dump)
     {
         PRINT_DEBUG("[PROCDUMP] [%d:%d] [%d:%d] "
-            "No PTEs left\n"
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "No PTEs left\n"
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         return std::make_pair(0, 0);
     }
     if (vad.idx + ptes_to_dump > total_number_of_ptes)
     {
         PRINT_DEBUG("[PROCDUMP] [%d:%d] [%d:%d] "
-            "PTEs overflow: %#x + %#x > %#lx\n"
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-            , vad.idx, ptes_to_dump, total_number_of_ptes
-        );
+                    "PTEs overflow: %#x + %#x > %#lx\n"
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                    , vad.idx, ptes_to_dump, total_number_of_ptes
+                   );
         return std::make_pair(0, 0);
     }
 
@@ -1520,7 +1520,7 @@ bool procdump2::is_process_handled(vmi_pid_t pid)
 }
 
 static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
-    void* callback_data)
+                       void* callback_data)
 {
     uint32_t vad_type = drakvuf_mmvad_type(drakvuf, mmvad);
     auto ctx = static_cast<procdump2_ctx*>(callback_data);
@@ -1533,13 +1533,13 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
         // TODO Usually this regions contains several committed pages.
         // Save it with MiniDump
         PRINT_DEBUG("[PROCDUMP] [%d:%d] "
-            "Warning: VAD (0x%lx; 0x%lx; 0x%lx; 0x%lx) "
-            "skipped on size 0x%lx, CommitCharge 0x%lx\n"
-            , ctx->target_process_pid, to_int(ctx->stage())
-            , mmvad->starting_vpn, mmvad->ending_vpn
-            , mmvad->flags, mmvad->flags1, len_bytes
-            , drakvuf_mmvad_commit_charge(drakvuf, mmvad, nullptr)
-        );
+                    "Warning: VAD (0x%lx; 0x%lx; 0x%lx; 0x%lx) "
+                    "skipped on size 0x%lx, CommitCharge 0x%lx\n"
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                    , mmvad->starting_vpn, mmvad->ending_vpn
+                    , mmvad->flags, mmvad->flags1, len_bytes
+                    , drakvuf_mmvad_commit_charge(drakvuf, mmvad, nullptr)
+                   );
         return false;
     }
 
@@ -1570,7 +1570,7 @@ bool procdump2::prepare_minidump(drakvuf_trap_info_t* info, std::shared_ptr<proc
     for (auto vad: ctx->vads)
     {
         struct mdmp_memory_descriptor64 range(vad.first,
-            vad.second.total_number_of_ptes * VMI_PS_4KB);
+                                              vad.second.total_number_of_ptes * VMI_PS_4KB);
         memory_ranges.push_back(range);
     }
 
@@ -1586,27 +1586,27 @@ bool procdump2::prepare_minidump(drakvuf_trap_info_t* info, std::shared_ptr<proc
     thread_ctx.set(is32bit, info->regs);
 
     auto mdmp = minidump(time_stamp,
-            is32bit,
-            num_cpus,
-            win_major,
-            win_minor,
-            win_build_number,
-            vendor,
-            version_information,
-            feature_information,
-            amd_extended_cpu_features,
-            csdversion,
-            memory_ranges,
+                         is32bit,
+                         num_cpus,
+                         win_major,
+                         win_minor,
+                         win_build_number,
+                         vendor,
+                         version_information,
+                         feature_information,
+                         amd_extended_cpu_features,
+                         csdversion,
+                         memory_ranges,
     {thread},
     {thread_ctx});
 
     if (!ctx->writer->append((const uint8_t*)&mdmp, sizeof(mdmp)))
     {
         PRINT_DEBUG("[PROCDUMP] [%d:%d] [%d:%d] "
-            "Failed to prepare MiniDump file\n"
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Failed to prepare MiniDump file\n"
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         return false;
     }
     return true;
@@ -1619,8 +1619,8 @@ void procdump2::dump_zero_page(std::shared_ptr<procdump2_ctx> ctx)
 }
 
 void procdump2::read_vm(addr_t dtb,
-    std::shared_ptr<procdump2_ctx> ctx,
-    size_t size)
+                        std::shared_ptr<procdump2_ctx> ctx,
+                        size_t size)
 {
     vmi_lock_guard vmi(drakvuf);
 
@@ -1666,10 +1666,10 @@ void procdump2::save_file_metadata(std::shared_ptr<procdump2_ctx> ctx, proc_data
     if (!fp)
     {
         PRINT_DEBUG("[PROCDUMP] [%d:%d] [%d:%d] "
-            "Failed to open metadata file\n"
-            , proc_data->pid, proc_data->tid
-            , ctx->target_process_pid, to_int(ctx->stage())
-        );
+                    "Failed to open metadata file\n"
+                    , proc_data->pid, proc_data->tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                   );
         return;
     }
 
@@ -1699,12 +1699,12 @@ bool procdump2::start_copy_memory(drakvuf_trap_info_t* info, std::shared_ptr<pro
         if (base && size)
         {
             PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Copy memory region [%#lx;%#lx]\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-                , base, size
-            );
+                        "Copy memory region [%#lx;%#lx]\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid, info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                        , base, size
+                       );
             copy_memory(info, ctx, base, size);
             return true;
         }
@@ -1727,17 +1727,17 @@ void procdump2::check_stack_marker(
     uint64_t stack_marker;
 
     if ( VMI_SUCCESS == vmi_read_64(vmi, &ctx, &stack_marker) &&
-        stack_marker != stack_holder.stack_marker())
+            stack_marker != stack_holder.stack_marker())
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Stack marker check failed at %#lx: "
-            "expected %#lx, result %#lx\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , task->target_process_pid, to_int(task->stage())
-            , stack_holder.stack_marker_va(), stack_holder.stack_marker()
-            , stack_marker
-        );
+                    "Stack marker check failed at %#lx: "
+                    "expected %#lx, result %#lx\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , task->target_process_pid, to_int(task->stage())
+                    , stack_holder.stack_marker_va(), stack_holder.stack_marker()
+                    , stack_marker
+                   );
     }
 }
 

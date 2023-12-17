@@ -119,13 +119,13 @@ using namespace syscalls_ns;
 void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info)
 {
     fmt::print(this->m_output_format, "sysret", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("Ret", fmt::Xval(info->regs->rax)),
-        keyval("Info", fmt::Rstr(extra_info ?: ""))
-    );
+               keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
+               keyval("vCPU", fmt::Nval(info->vcpu)),
+               keyval("CR3", fmt::Xval(info->regs->cr3)),
+               keyval("Syscall", fmt::Nval(nr)),
+               keyval("Ret", fmt::Xval(info->regs->rax)),
+               keyval("Info", fmt::Rstr(extra_info ?: ""))
+              );
 }
 
 std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
@@ -136,31 +136,31 @@ std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         switch (arg.type)
         {
-            case PUNICODE_STRING:
+        case PUNICODE_STRING:
+        {
+            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
+            if ( us )
             {
-                unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-                if ( us )
-                {
-                    cstr = (char*)us->contents;
-                    us->contents = nullptr;
-                    vmi_free_unicode_str(us);
-                }
-                break;
+                cstr = (char*)us->contents;
+                us->contents = nullptr;
+                vmi_free_unicode_str(us);
             }
-            case PCHAR:
-                cstr = drakvuf_read_ascii_str(drakvuf, info, val);
-                break;
-            case MMAP_PROT:
-                // PROT_NONE == 0, so incorrect for parsing flags
-                return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
-            case PRCTL_OPTION:
-                return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
-            case ARCH_PRCTL_CODE:
-                return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
-            default:
-                if (this->os == VMI_OS_WINDOWS)
-                    cstr = win_extract_string(drakvuf, info, arg, val);
-                break;
+            break;
+        }
+        case PCHAR:
+            cstr = drakvuf_read_ascii_str(drakvuf, info, val);
+            break;
+        case MMAP_PROT:
+            // PROT_NONE == 0, so incorrect for parsing flags
+            return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
+        case PRCTL_OPTION:
+            return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
+        case ARCH_PRCTL_CODE:
+            return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
+        default:
+            if (this->os == VMI_OS_WINDOWS)
+                cstr = win_extract_string(drakvuf, info, arg, val);
+            break;
         }
     }
 
@@ -177,22 +177,22 @@ uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
 {
     switch (arg.type)
     {
-        case BYTE:
-        case BOOLEAN:
-            return val & 0xff;
-        case SHORT:
-        case USHORT:
-        case WORD:
-            return val & 0xffff;
-        case DWORD:
-        case INT:
-        case UINT:
-        case LONG:
-        case ULONG:
-        case WIN32_PROTECTION_MASK:
-            return val & 0xffffffff;
-        default:
-            return val;
+    case BYTE:
+    case BOOLEAN:
+        return val & 0xff;
+    case SHORT:
+    case USHORT:
+    case WORD:
+        return val & 0xffff;
+    case DWORD:
+    case INT:
+    case UINT:
+    case LONG:
+    case ULONG:
+    case WIN32_PROTECTION_MASK:
+        return val & 0xffffffff;
+    default:
+        return val;
     }
 }
 
@@ -202,10 +202,10 @@ uint64_t syscalls_base::transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     {
         auto vmi = vmi_lock_guard(drakvuf);
         ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = val
-        );
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = val
+                      );
 
         uint64_t _val;
 

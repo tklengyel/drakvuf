@@ -158,10 +158,10 @@ bool linux_procmon::get_struct_field_pointer(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = struct_addr + this->offsets[offset_field]
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = struct_addr + this->offsets[offset_field]
+                  );
 
     return (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, value));
 }
@@ -170,10 +170,10 @@ bool linux_procmon::get_cred_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 {
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = struct_cred + this->offsets[offset_field]
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = struct_cred + this->offsets[offset_field]
+                  );
     return ( VMI_SUCCESS == vmi_read_32(vmi, &ctx, value) );
 }
 
@@ -205,10 +205,10 @@ std::string linux_procmon::get_string_from_struct(drakvuf_t drakvuf, drakvuf_tra
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = struct_string_ptr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = struct_string_ptr
+                  );
 
     auto tmp = vmi_read_str(vmi, &ctx);
     std::string result = tmp ?: "";
@@ -472,9 +472,9 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     uint64_t flags;
     ctx.addr = args + this->offsets[_KERNEL_CLONE_ARGS_FLAGS];
@@ -552,8 +552,8 @@ event_response_t linux_procmon::execve_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3);
 
     uint32_t argc;
     ctx.addr = params->bprm + offsets[_LINUX_BINPRM_ARGC];

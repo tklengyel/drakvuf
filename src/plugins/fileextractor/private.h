@@ -340,9 +340,9 @@ public:
     addr_t pool{0};
 
     task_t(handle_t handle_,
-        std::string filename_,
-        task_reason reason_,
-        addr_t file_obj_)
+           std::string filename_,
+           task_reason reason_,
+           addr_t file_obj_)
         : handle(handle_)
         , filename(filename_)
         , reason(reason_)

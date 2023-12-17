@@ -226,29 +226,29 @@ private:
 
     /* Routines */
     bool get_file_object_handle_count(drakvuf_trap_info_t*,
-        handle_t,
-        uint64_t* handle_count);
+                                      handle_t,
+                                      uint64_t* handle_count);
 
     bool get_file_object_flags(drakvuf_trap_info_t*,
-        vmi_instance_t,
-        handle_t,
-        uint64_t* flags);
+                               vmi_instance_t,
+                               handle_t,
+                               uint64_t* flags);
     std::string get_file_name(vmi_instance_t,
-        drakvuf_trap_info_t*,
-        addr_t handle,
-        addr_t* out_file,
-        addr_t* out_filetype);
+                              drakvuf_trap_info_t*,
+                              addr_t handle,
+                              addr_t* out_file,
+                              addr_t* out_filetype);
     bool get_file_object_currentbyteoffset(vmi_instance_t, drakvuf_trap_info_t*, handle_t, uint64_t*);
     bool get_write_offset(vmi_instance_t, drakvuf_trap_info_t*, addr_t, uint64_t*);
     void calc_checksum(task_t&);
     void save_file_metadata(drakvuf_trap_info_t*, addr_t control_area, task_t&);
     void update_file_metadata(drakvuf_trap_info_t*, task_t&);
     bool save_file_chunk(int file_sequence_number,
-        void* buffer,
-        size_t size);
+                         void* buffer,
+                         size_t size);
     bool save_file_chunk_rb(int file_sequence_number, uint64_t currentoffset,
-        void* buffer,
-        size_t size);
+                            void* buffer,
+                            size_t size);
     void dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t offset, size_t size);
     uint64_t make_hook_id(drakvuf_trap_info_t*);
     uint64_t make_task_id(vmi_pid_t pid, handle_t handle);

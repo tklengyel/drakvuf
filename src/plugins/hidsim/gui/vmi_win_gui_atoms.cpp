@@ -135,7 +135,7 @@ void free_atom_entry(struct atom_entry* a)
 void print_atom(gpointer key, gpointer value, gpointer user_data)
 {
     PRINT_DEBUG("Atom: %" PRIx16 " %ls\n", GPOINTER_TO_UINT(key),
-        ((struct atom_entry*)value)->name);
+                ((struct atom_entry*)value)->name);
 }
 
 /*
@@ -155,48 +155,48 @@ struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
     }
 
     if (VMI_FAILURE == vmi_read_addr_va(vmi, atom_addr +
-            symbol_offsets.atom_entry_hashlink_offset, 0, &entry->hashlink))
+                                        symbol_offsets.atom_entry_hashlink_offset, 0, &entry->hashlink))
     {
         printf("Error reading HashLink at %" PRIx64 "\n", atom_addr +
-            symbol_offsets.atom_entry_hashlink_offset);
+               symbol_offsets.atom_entry_hashlink_offset);
         free(entry);
         return NULL;
     }
 
     if (VMI_FAILURE == vmi_read_16_va(vmi, atom_addr +
-            symbol_offsets.atom_entry_atom_offset, 0, &entry->atom))
+                                      symbol_offsets.atom_entry_atom_offset, 0, &entry->atom))
     {
         printf("Error reading Atom at %" PRIx64 "\n", atom_addr +
-            symbol_offsets.atom_entry_atom_offset);
+               symbol_offsets.atom_entry_atom_offset);
         free(entry);
         return NULL;
     }
 
     if (VMI_FAILURE == vmi_read_16_va(vmi, atom_addr +
-            symbol_offsets.atom_entry_ref_count_offset, 0, &entry->ref_count))
+                                      symbol_offsets.atom_entry_ref_count_offset, 0, &entry->ref_count))
     {
         printf("Error reading ReferenceCount at %" PRIx64 "\n", atom_addr +
-            symbol_offsets.atom_entry_ref_count_offset);
+               symbol_offsets.atom_entry_ref_count_offset);
         free(entry);
         return NULL;
     }
 
     if (VMI_FAILURE == vmi_read_8_va(vmi, atom_addr +
-            symbol_offsets.atom_entry_name_len_offset, 0, &entry->name_len))
+                                     symbol_offsets.atom_entry_name_len_offset, 0, &entry->name_len))
     {
         printf("Error reading NameLength at %" PRIx64 "\n", atom_addr +
-            symbol_offsets.atom_entry_name_len_offset);
+               symbol_offsets.atom_entry_name_len_offset);
         free(entry);
         return NULL;
     }
 
     entry->name = read_wchar_str(vmi, atom_addr +
-            symbol_offsets.atom_entry_name_offset, (size_t)entry->name_len);
+                                 symbol_offsets.atom_entry_name_offset, (size_t)entry->name_len);
 
     if (!entry->name)
     {
         printf("Error reading wchar-string Name at %" PRIx64 "\n", atom_addr +
-            symbol_offsets.atom_entry_name_offset);
+               symbol_offsets.atom_entry_name_offset);
     }
 
     return entry;
@@ -204,7 +204,7 @@ struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
 
 /* Creates a single atom-entry struct */
 struct atom_entry* create_atom_entry(uint16_t atom, const wchar_t* name,
-    uint8_t len, addr_t hashlink, uint16_t refcount)
+                                     uint8_t len, addr_t hashlink, uint16_t refcount)
 {
     struct atom_entry* entry;
 
@@ -219,7 +219,7 @@ struct atom_entry* create_atom_entry(uint16_t atom, const wchar_t* name,
     entry->name = wcsdup(name);
     if (!entry->name)
         printf("[HIDSIM][MONITOR] Memory allocation for atom's name failed."
-            " Continuing anyway\n");
+               " Continuing anyway\n");
 
     entry->name_len = len;
     entry->hashlink = hashlink;
@@ -277,15 +277,15 @@ GHashTable* build_atom_table(vmi_instance_t vmi, addr_t table_addr)
     uint32_t num_buckets = 0;
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, table_addr +
-            symbol_offsets.atom_table_num_buckets_off, 0, &num_buckets))
+                                      symbol_offsets.atom_table_num_buckets_off, 0, &num_buckets))
     {
         printf("Failed to read num buckets-value of _RTL_ATOM_TABLE at %" PRIx64
-            "\n", table_addr + symbol_offsets.atom_table_num_buckets_off);
+               "\n", table_addr + symbol_offsets.atom_table_num_buckets_off);
         return NULL;
     }
 
     GHashTable* ht = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL,
-            (GDestroyNotify) free_atom_entry);
+                                           (GDestroyNotify) free_atom_entry);
     add_default_atoms(ht);
 
     /* Iterate the array of pointers to _RTL_ATOM_TABLE_ENTRY-structs at buckets */
@@ -294,10 +294,10 @@ GHashTable* build_atom_table(vmi_instance_t vmi, addr_t table_addr)
         addr_t cur = 0;
 
         if (VMI_FAILURE == vmi_read_addr_va(vmi, table_addr +
-                symbol_offsets.atom_table_buckets_off + i * 4, 0, &cur))
+                                            symbol_offsets.atom_table_buckets_off + i * 4, 0, &cur))
         {
             printf("Failed to read pointer to buckets entry of _RTL_ATOM_TABLE at %"
-                PRIx64 "\n", table_addr + symbol_offsets.atom_table_buckets_off + i * 4);
+                   PRIx64 "\n", table_addr + symbol_offsets.atom_table_buckets_off + i * 4);
             g_hash_table_destroy(ht);
             return NULL;
         }

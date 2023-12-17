@@ -153,7 +153,7 @@ private:
     std::atomic<uint32_t> coords;
 
     bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
+                                    const char* win32k_profile);
     bool check_platform_support(drakvuf_t dv);
 };
 

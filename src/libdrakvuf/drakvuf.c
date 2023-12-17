@@ -292,21 +292,21 @@ static bool _drakvuf_init_os(drakvuf_t drakvuf)
 
     switch (drakvuf->os)
     {
-        case VMI_OS_WINDOWS:
-            if ( !set_os_windows(drakvuf) )
-                drakvuf->os = VMI_OS_UNKNOWN;
-            else
-                drakvuf->pm = vmi_init_paging(drakvuf->vmi, VMI_PM_INITFLAG_TRANSITION_PAGES);
-            break;
-        case VMI_OS_LINUX:
-            if ( !set_os_linux(drakvuf) )
-                drakvuf->os = VMI_OS_UNKNOWN;
-            break;
-        case VMI_OS_UNKNOWN: /* fall-through */
-        case VMI_OS_FREEBSD: /* fall-through */
-        case VMI_OS_OSX: /* fall-through */
-        default:
-            break;
+    case VMI_OS_WINDOWS:
+        if ( !set_os_windows(drakvuf) )
+            drakvuf->os = VMI_OS_UNKNOWN;
+        else
+            drakvuf->pm = vmi_init_paging(drakvuf->vmi, VMI_PM_INITFLAG_TRANSITION_PAGES);
+        break;
+    case VMI_OS_LINUX:
+        if ( !set_os_linux(drakvuf) )
+            drakvuf->os = VMI_OS_UNKNOWN;
+        break;
+    case VMI_OS_UNKNOWN: /* fall-through */
+    case VMI_OS_FREEBSD: /* fall-through */
+    case VMI_OS_OSX: /* fall-through */
+    default:
+        break;
     }
 
     return drakvuf->os != VMI_OS_UNKNOWN;
@@ -550,31 +550,31 @@ static bool _drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
     switch (trap->type)
     {
-        case BREAKPOINT:
-            ret = inject_trap_breakpoint(drakvuf, trap);
-            break;
-        case MEMACCESS:
-            ret = inject_trap_mem(drakvuf, trap, 0);
-            break;
-        case REGISTER:
-            ret = inject_trap_reg(drakvuf, trap);
-            break;
-        case DEBUG:
-            ret = inject_trap_debug(drakvuf, trap);
-            break;
-        case CPUID:
-            ret = inject_trap_cpuid(drakvuf, trap);
-            break;
-        case IO:
-            ret = inject_trap_io(drakvuf, trap);
-            break;
-        case CATCHALL_BREAKPOINT:
-            ret = inject_trap_catchall_breakpoint(drakvuf, trap);
-            break;
-        case __INVALID_TRAP_TYPE: /* fall-through */
-        default:
-            ret = 0;
-            break;
+    case BREAKPOINT:
+        ret = inject_trap_breakpoint(drakvuf, trap);
+        break;
+    case MEMACCESS:
+        ret = inject_trap_mem(drakvuf, trap, 0);
+        break;
+    case REGISTER:
+        ret = inject_trap_reg(drakvuf, trap);
+        break;
+    case DEBUG:
+        ret = inject_trap_debug(drakvuf, trap);
+        break;
+    case CPUID:
+        ret = inject_trap_cpuid(drakvuf, trap);
+        break;
+    case IO:
+        ret = inject_trap_io(drakvuf, trap);
+        break;
+    case CATCHALL_BREAKPOINT:
+        ret = inject_trap_catchall_breakpoint(drakvuf, trap);
+        break;
+    case __INVALID_TRAP_TYPE: /* fall-through */
+    default:
+        ret = 0;
+        break;
     }
 
     drakvuf_resume(drakvuf);
@@ -670,12 +670,12 @@ bool json_get_struct_members_array_rva(
     addr_t* rva)
 {
     return json_lookup_array(
-            drakvuf,
-            json,
-            struct_name_symbol_array,
-            array_size,
-            rva,
-            NULL);
+               drakvuf,
+               json,
+               struct_name_symbol_array,
+               array_size,
+               rva,
+               NULL);
 }
 
 const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf)
@@ -784,10 +784,10 @@ char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
     drakvuf_lock_and_get_vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = addr
+                  );
 
     char* ret = vmi_read_str(drakvuf->vmi, &ctx);
 
@@ -836,10 +836,10 @@ unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return NULL;
 
     ACCESS_CONTEXT(ctx,
-        .addr = addr,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+                   .addr = addr,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     return drakvuf_read_unicode_common(drakvuf, &ctx);
 }
@@ -847,10 +847,10 @@ unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 unicode_string_t* drakvuf_read_unicode_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = vaddr,
-        .pid = pid
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .addr = vaddr,
+                   .pid = pid
+                  );
 
     return drakvuf_read_unicode_common(drakvuf, &ctx);
 }
@@ -895,10 +895,10 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
         return NULL;
 
     ACCESS_CONTEXT(ctx,
-        .addr = addr,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+                   .addr = addr,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     return drakvuf_read_unicode32_common(drakvuf, &ctx);
 }
@@ -906,10 +906,10 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
 unicode_string_t* drakvuf_read_unicode32_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = vaddr,
-        .pid = pid
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .addr = vaddr,
+                   .pid = pid
+                  );
 
     return drakvuf_read_unicode32_common(drakvuf, &ctx);
 }
@@ -1056,10 +1056,10 @@ static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
 
     /* allocate and populate new pollfd array and new fd_info_lookup array */
     drakvuf->event_fds = (struct pollfd*) g_try_malloc0(sizeof(struct pollfd) * \
-            (g_slist_length(drakvuf->event_fd_info)));
+                         (g_slist_length(drakvuf->event_fd_info)));
 
     drakvuf->fd_info_lookup = (fd_info_t) g_try_malloc0(sizeof(struct fd_info) * \
-            (g_slist_length(drakvuf->event_fd_info)));
+                              (g_slist_length(drakvuf->event_fd_info)));
 
     int i = 0;
     GSList* loop = drakvuf->event_fd_info;
@@ -1223,7 +1223,7 @@ bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_lock_and_get_vmi(drakvuf);
     void* injection_cb = drakvuf_lookup_injection(drakvuf, info);
     bool res = !drakvuf->enable_active_callback_check
-        || !injection_cb || injection_cb == info->trap->cb;
+               || !injection_cb || injection_cb == info->trap->cb;
     drakvuf_release_vmi(drakvuf);
     return res;
 }
@@ -1240,8 +1240,8 @@ void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 }
 
 void drakvuf_insert_injection(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*))
+                              drakvuf_trap_info_t* info,
+                              event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*))
 {
     drakvuf_lock_and_get_vmi(drakvuf);
     uint64_t pid = info->attached_proc_data.pid;

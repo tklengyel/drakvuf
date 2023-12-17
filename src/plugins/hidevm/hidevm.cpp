@@ -164,10 +164,10 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
                 if (info->regs->rax == STATUS_WMI_GUID_NOT_FOUND)
                 {
                     ACCESS_CONTEXT(ctx,
-                        .translate_mechanism = VMI_TM_PROCESS_DTB,
-                        .dtb = info->regs->cr3,
-                        .addr = this->addr_WmiKmRequestOpenBlock_Handle
-                    );
+                                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                                   .dtb = info->regs->cr3,
+                                   .addr = this->addr_WmiKmRequestOpenBlock_Handle
+                                  );
                     // Set fake handle value of WmiGuid
                     if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &this->FakeWmiGuidHandle))
                     {
@@ -192,10 +192,10 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
             else if (this->stage == STAGE_WMI_QUERY_GUID_INFORMATION)
             {
                 ACCESS_CONTEXT(ctx,
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = this->addr_InputBuffer_Status
-                );
+                               .translate_mechanism = VMI_TM_PROCESS_DTB,
+                               .dtb = info->regs->cr3,
+                               .addr = this->addr_InputBuffer_Status
+                              );
 
                 uint64_t InputBuffer_Status = 0;
                 if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &InputBuffer_Status))
@@ -240,10 +240,10 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
                 if (this->query_stage == 1)
                 {
                     ACCESS_CONTEXT(ctx,
-                        .translate_mechanism = VMI_TM_PROCESS_DTB,
-                        .dtb = info->regs->cr3,
-                        .addr = this->addr_InputBuffer + WmiKmQueryData_Length
-                    );
+                                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                                   .dtb = info->regs->cr3,
+                                   .addr = this->addr_InputBuffer + WmiKmQueryData_Length
+                                  );
                     // Prepare data on first return from NtDeviceIoControlFile with IOCTL_WMI_QUERY_ALL_DATA
                     out_WmiKmQueryData_Length = 0x38;
                     if (VMI_SUCCESS == vmi_write_32(vmi, &ctx, &out_WmiKmQueryData_Length))
@@ -308,10 +308,10 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
                 else if (this->query_stage == 2)
                 {
                     ACCESS_CONTEXT(ctx,
-                        .translate_mechanism = VMI_TM_PROCESS_DTB,
-                        .dtb = info->regs->cr3,
-                        .addr = this->addr_InputBuffer
-                    );
+                                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                                   .dtb = info->regs->cr3,
+                                   .addr = this->addr_InputBuffer
+                                  );
 
                     // Set fake data to OutputBuffer, that should be returned
                     if (VMI_SUCCESS == vmi_write(vmi, &ctx, sizeof(WMI_data), (void*)WMI_data, nullptr))
@@ -326,8 +326,8 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
                                 this->addr_IoStatusBlock_Information = 0;
                                 this->NtClose_hook[hook_ID] = this->createSyscallHook("NtClose", &hidevm::NtClose_cb);
                                 fmt::print(this->format, "hidevm", drakvuf, info,
-                                    keyval("Reason", fmt::Qstr("MSAcpi_ThermalZoneTemperature query spoofed"))
-                                );
+                                           keyval("Reason", fmt::Qstr("MSAcpi_ThermalZoneTemperature query spoofed"))
+                                          );
                             }
                             else
                             {
@@ -397,10 +397,10 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
             unicode_string_t guid_object_name_utf8;
 
             ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = InputBuffer + WmiKmRequestOpenBlock_ObjectAttributes
-            );
+                           .translate_mechanism = VMI_TM_PROCESS_DTB,
+                           .dtb = info->regs->cr3,
+                           .addr = InputBuffer + WmiKmRequestOpenBlock_ObjectAttributes
+                          );
             // We need to check that (*WMI_KM_REQUEST_OPEN_BLOCK)InputBuffer->GuidObjectAttributes->ObjectName contains thermal zone GUID
             if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &InputBuffer_GuidObjectAttributes))
             {
@@ -489,10 +489,10 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                 }
 
                 ACCESS_CONTEXT(ctx,
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = InputBuffer + WmiKmRequestQueryGuidInfo_Handle
-                );
+                               .translate_mechanism = VMI_TM_PROCESS_DTB,
+                               .dtb = info->regs->cr3,
+                               .addr = InputBuffer + WmiKmRequestQueryGuidInfo_Handle
+                              );
                 if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &InputBuffer_Handle))
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_GUID_INFORMATION): Failed to read InputBuffer.Handle\n");
@@ -539,10 +539,10 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                 }
 
                 ACCESS_CONTEXT(ctx,
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = InputBuffer + WmiKmQueryData_Handle
-                );
+                               .translate_mechanism = VMI_TM_PROCESS_DTB,
+                               .dtb = info->regs->cr3,
+                               .addr = InputBuffer + WmiKmQueryData_Handle
+                              );
                 if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &InputBuffer_Handle))
                 {
                     PRINT_DEBUG("[HIDEVM] Breakpoint in WmiPrvSE.exe NtDeviceIoControlFile(IOCTL_WMI_QUERY_ALL_DATA): Failed to read InputBuffer.Handle\n");
@@ -617,10 +617,10 @@ static bool replace_object_name(vmi_instance_t vmi, uint64_t cr3, addr_t addr_st
         if (VMI_SUCCESS == vmi_convert_str_encoding(&replacement_utf8, &replacement_utf16, "UTF-16LE"))
         {
             ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = cr3,
-                .addr = addr_strQuery + object_name_pos * 2
-            );
+                           .translate_mechanism = VMI_TM_PROCESS_DTB,
+                           .dtb = cr3,
+                           .addr = addr_strQuery + object_name_pos * 2
+                          );
             if (VMI_SUCCESS == vmi_write(vmi, &ctx, replacement_utf16.length, replacement_utf16.contents, nullptr))
             {
                 result = true;
@@ -652,10 +652,10 @@ static void check_and_replace_query_string(drakvuf_t drakvuf, drakvuf_trap_info_
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr_strQuery
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = addr_strQuery
+                  );
     unicode_string_t* strQuery = drakvuf_read_wchar_string(drakvuf, &ctx);
 
     if (strQuery)
@@ -674,9 +674,9 @@ static void check_and_replace_query_string(drakvuf_t drakvuf, drakvuf_trap_info_
             if (replace_object_name(vmi, info->regs->cr3, addr_strQuery, object_name_pos))
             {
                 fmt::print(plugin->format, "hidevm", drakvuf, info,
-                    keyval("Reason", fmt::Qstr("WMI query spoofed")),
-                    keyval("strQuery", fmt::Qstr(query.c_str()))
-                );
+                           keyval("Reason", fmt::Qstr("WMI query spoofed")),
+                           keyval("strQuery", fmt::Qstr(query.c_str()))
+                          );
             }
         }
         vmi_free_unicode_str(strQuery);
@@ -732,7 +732,7 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
             // Get TickCountMultiplier
             uint32_t multiplier = 0, ticks = 0;
             if (VMI_SUCCESS != vmi_read_32_pa(vmi, pkuser + 0x04,  &multiplier) ||
-                VMI_SUCCESS != vmi_read_32_pa(vmi, pkuser + 0x320, &ticks))
+                    VMI_SUCCESS != vmi_read_32_pa(vmi, pkuser + 0x320, &ticks))
             {
                 PRINT_DEBUG("[HIDEVM] Failed to read KUSER_SHARED_DATA\n");
             }
@@ -788,16 +788,16 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
 
         switch (win_ver)
         {
-            case VMI_OS_WINDOWS_7:
-                wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win7_x64, log, IWbemServices__ExecQuery_args());
-                wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win7_x32, log, IWbemServices__ExecQuery_args());
-                break;
-            case VMI_OS_WINDOWS_10:
-                wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win10_x64, log, IWbemServices__ExecQuery_args());
-                wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win10_x32, log, IWbemServices__ExecQuery_args());
-                break;
-            default:
-                break;
+        case VMI_OS_WINDOWS_7:
+            wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win7_x64, log, IWbemServices__ExecQuery_args());
+            wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win7_x32, log, IWbemServices__ExecQuery_args());
+            break;
+        case VMI_OS_WINDOWS_10:
+            wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win10_x64, log, IWbemServices__ExecQuery_args());
+            wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win10_x32, log, IWbemServices__ExecQuery_args());
+            break;
+        default:
+            break;
         }
 
         if (win_ver == VMI_OS_WINDOWS_7 || win_ver == VMI_OS_WINDOWS_10)

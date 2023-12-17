@@ -134,10 +134,10 @@ event_response_t linux_rebootmon::reboot_cb(drakvuf_t drakvuf, drakvuf_trap_info
     }
 
     fmt::print(this->m_output_format, "rebootmon", drakvuf, info,
-        keyval("Magic1", fmt::Rstr(parse_enum(magic1, reboot_magics))),
-        keyval("Magic2", fmt::Rstr(parse_enum(magic2, reboot_magics))),
-        keyval("Cmd", fmt::Rstr(parse_enum(cmd, reboot_commands))),
-        keyval("Arg", opt_arg));
+               keyval("Magic1", fmt::Rstr(parse_enum(magic1, reboot_magics))),
+               keyval("Magic2", fmt::Rstr(parse_enum(magic2, reboot_magics))),
+               keyval("Cmd", fmt::Rstr(parse_enum(cmd, reboot_commands))),
+               keyval("Arg", opt_arg));
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -151,7 +151,7 @@ event_response_t linux_rebootmon::machine_restart_cb(drakvuf_t drakvuf, drakvuf_
     char* cmd = drakvuf_read_ascii_str(drakvuf, info, cmd_ptr);
 
     fmt::print(this->m_output_format, "rebootmon", drakvuf, info,
-        keyval("Cmd", fmt::Estr(cmd ?: "")));
+               keyval("Cmd", fmt::Estr(cmd ?: "")));
 
     g_free(cmd);
 

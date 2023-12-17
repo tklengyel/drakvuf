@@ -270,7 +270,7 @@ static bool consume_ndis_protocols(drakvuf_t drakvuf, vmi_instance_t vmi, callba
     if (winver == VMI_OS_WINDOWS_10)
     {
         if (!json_get_struct_members_array_rva(drakvuf, profile_json, offset_generic_names_w10, plugin->generic_offsets.size(), plugin->generic_offsets.data()) ||
-            !json_get_struct_members_array_rva(drakvuf, profile_json, offset_open_names_w10,    plugin->open_offsets.size(),    plugin->open_offsets.data()))
+                !json_get_struct_members_array_rva(drakvuf, profile_json, offset_open_names_w10,    plugin->open_offsets.size(),    plugin->open_offsets.data()))
         {
             json_object_put(profile_json);
             return false;
@@ -279,7 +279,7 @@ static bool consume_ndis_protocols(drakvuf_t drakvuf, vmi_instance_t vmi, callba
     else
     {
         if (!json_get_struct_members_array_rva(drakvuf, profile_json, offset_generic_names_w7, plugin->generic_offsets.size(), plugin->generic_offsets.data()) ||
-            !json_get_struct_members_array_rva(drakvuf, profile_json, offset_open_names_w7,    plugin->open_offsets.size(),    plugin->open_offsets.data()))
+                !json_get_struct_members_array_rva(drakvuf, profile_json, offset_open_names_w7,    plugin->open_offsets.size(),    plugin->open_offsets.data()))
         {
             json_object_put(profile_json);
             return false;
@@ -287,7 +287,7 @@ static bool consume_ndis_protocols(drakvuf_t drakvuf, vmi_instance_t vmi, callba
     }
 
     if (!json_get_struct_members_array_rva(drakvuf, profile_json, offset_miniport_names, plugin->miniport_offsets.size(), plugin->miniport_offsets.data()) ||
-        !json_get_symbol_rva(drakvuf, profile_json, protocol_symname, &ndis_protocol_list_rva))
+            !json_get_symbol_rva(drakvuf, profile_json, protocol_symname, &ndis_protocol_list_rva))
     {
         json_object_put(profile_json);
         return false;
@@ -297,8 +297,8 @@ static bool consume_ndis_protocols(drakvuf_t drakvuf, vmi_instance_t vmi, callba
     //
     addr_t list_head, ndis_base, protocol_head;
     if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head)  ||
-        !drakvuf_get_module_base_addr(drakvuf, list_head, "NDIS.SYS", &ndis_base) ||
-        VMI_SUCCESS != vmi_read_addr_va(vmi, ndis_base + ndis_protocol_list_rva, 0, &protocol_head))
+            !drakvuf_get_module_base_addr(drakvuf, list_head, "NDIS.SYS", &ndis_base) ||
+            VMI_SUCCESS != vmi_read_addr_va(vmi, ndis_base + ndis_protocol_list_rva, 0, &protocol_head))
     {
         return false;
     }
@@ -354,7 +354,7 @@ static std::vector<addr_t> get_callback_object_callbacks(drakvuf_t drakvuf, call
     {
         addr_t callback{};
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry + callback_fn_off, 0, &callback) ||
-            VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
+                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
             return out;
         if (callback)
         {
@@ -438,9 +438,9 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
             //     QWORD unk1; // 0x38
             // } CALLBACK_ENTRY_ITEM, *PCALLBACK_ENTRY_ITEM; // size: 0x40
             if (VMI_SUCCESS != vmi_read_32_va  (vmi, entry + 0x14, 0, &active)  ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x28, 0, &pre_cb)  ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x30, 0, &post_cb) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
+                    VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x28, 0, &pre_cb)  ||
+                    VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x30, 0, &post_cb) ||
+                    VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
             {
                 return false;
             }
@@ -479,7 +479,7 @@ event_response_t callbackmon::load_unload_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     {
         callbackmon_module_t module_info{};
         if (VMI_SUCCESS == vmi_read_addr_va(vmi, entry + offsets[LDR_TABLE_ENTRY_DLLBASE],     info->proc_data.pid, &module_info.base) &&
-            VMI_SUCCESS == vmi_read_addr_va(vmi, entry + offsets[LDR_TABLE_ENTRY_SIZEOFIMAGE], info->proc_data.pid, &module_info.size))
+                VMI_SUCCESS == vmi_read_addr_va(vmi, entry + offsets[LDR_TABLE_ENTRY_SIZEOFIMAGE], info->proc_data.pid, &module_info.size))
         {
             if (auto name = vmi_read_unicode_str_va(vmi, entry + offsets[LDR_TABLE_ENTRY_FULLDLLNAME], info->proc_data.pid))
             {
@@ -508,12 +508,12 @@ void callbackmon::report(drakvuf_t drakvuf, const char* list_name, addr_t addr, 
 
     const auto& module = get_module_by_addr();
     fmt::print(format, "callbackmon", drakvuf, nullptr,
-        keyval("Type", fmt::Rstr("Callback")),
-        keyval("ListName", fmt::Estr(list_name)),
-        keyval("Module", fmt::Estr(module.name)),
-        keyval("RVA", fmt::Xval(module.base ? addr - module.base : 0)),
-        keyval("Action", fmt::Estr(action))
-    );
+               keyval("Type", fmt::Rstr("Callback")),
+               keyval("ListName", fmt::Estr(list_name)),
+               keyval("Module", fmt::Estr(module.name)),
+               keyval("RVA", fmt::Xval(module.base ? addr - module.base : 0)),
+               keyval("Action", fmt::Estr(action))
+              );
 }
 
 callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output)
@@ -557,7 +557,7 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         {
             addr_t callback = 0;
             if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry + cb_off, 4, &callback) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 4, &entry))
+                    VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 4, &entry))
                 throw -1;
             if (callback) out.push_back(callback);
         }
@@ -594,7 +594,7 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         {
             addr_t driver{};
             if (VMI_SUCCESS != vmi_read_addr_va(vmi, device + offsets[DEVICE_OBJECT_DRIVER_OBJECT], 0, &driver) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, device + offsets[DRIVER_OBJECT_MAJOR_FUNCTION] + irp_mj_shutdown * ptrsize, 0, &device))
+                    VMI_SUCCESS != vmi_read_addr_va(vmi, device + offsets[DRIVER_OBJECT_MAJOR_FUNCTION] + irp_mj_shutdown * ptrsize, 0, &device))
                 throw -1;
         }
         return devices;
@@ -658,14 +658,14 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         addr_t callout_base, callout_count;
         // Read callout count and callout base address
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, gwfp + size_off, 4, &callout_count) ||
-            VMI_SUCCESS != vmi_read_addr_va(vmi, gwfp + callout_off, 4, &callout_base))
+                VMI_SUCCESS != vmi_read_addr_va(vmi, gwfp + callout_off, 4, &callout_base))
             throw -1;
 
         for (addr_t callout = callout_base; callout < callout_base + callout_count* callout_size; callout += callout_size)
         {
             addr_t cb1 = 0, cb2 = 0;
             if (VMI_SUCCESS != vmi_read_addr_va(vmi, callout + 2 * ptrsize, 4, &cb1) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, callout + 2 * ptrsize + ptrsize, 4, &cb2))
+                    VMI_SUCCESS != vmi_read_addr_va(vmi, callout + 2 * ptrsize + ptrsize, 4, &cb2))
                 throw -1;
 
             if (cb1) out.push_back(cb1);
@@ -821,7 +821,7 @@ bool callbackmon::stop_impl()
     for (const auto& past_object : this->object_cb)
     {
         const auto& new_object = std::find_if(snapshot->object_cb.begin(), snapshot->object_cb.end(),
-                [&past_object](const auto& object)
+                                              [&past_object](const auto& object)
         {
             return object.base == past_object.base;
         });
@@ -835,7 +835,7 @@ bool callbackmon::stop_impl()
     for (const auto& past_object : this->object_type)
     {
         const auto& new_object = std::find_if(snapshot->object_type.begin(), snapshot->object_type.end(),
-                [&past_object](const auto& object)
+                                              [&past_object](const auto& object)
         {
             return object.base == past_object.base;
         });

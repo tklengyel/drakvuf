@@ -134,7 +134,7 @@ void print_atom(gpointer key, gpointer value, gpointer user_data);
 struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr);
 
 struct atom_entry* create_atom_entry(uint16_t atom, const wchar_t* name,
-    uint8_t len, addr_t hashlink, uint16_t refcount);
+                                     uint8_t len, addr_t hashlink, uint16_t refcount);
 
 /* Adds the default _RTL_ATOM_ENTRY-structs to the atom-table */
 void add_default_atoms(GHashTable* atom_table);

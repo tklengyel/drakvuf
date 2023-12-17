@@ -147,10 +147,10 @@ event_response_t ptracemon::ptrace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     }
 
     fmt::print(this->m_output_format, "ptracemon", drakvuf, info,
-        keyval("Type", fmt::Rstr(request_str)),
-        keyval("TargetPID", fmt::Nval(target_process_data.pid)),
-        keyval("TargetProcessName", fmt::Estr(target_process_data.name))
-    );
+               keyval("Type", fmt::Rstr(request_str)),
+               keyval("TargetPID", fmt::Nval(target_process_data.pid)),
+               keyval("TargetProcessName", fmt::Estr(target_process_data.name))
+              );
 
     g_free(const_cast<char*>(target_process_data.name));
 

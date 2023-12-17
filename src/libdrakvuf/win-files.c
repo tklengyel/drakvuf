@@ -131,9 +131,9 @@ char* win_get_filename_from_object_attributes(drakvuf_t drakvuf, drakvuf_trap_in
     vmi_instance_t vmi = drakvuf->vmi;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     addr_t file_root_handle = 0;
     ctx.addr = attrs + drakvuf->offsets[OBJECT_ATTRIBUTES_ROOTDIRECTORY];
@@ -155,9 +155,9 @@ char* win_get_filename_from_object_attributes(drakvuf_t drakvuf, drakvuf_trap_in
     }
 
     char* file_path = g_strdup_printf("%s%s%s",
-            file_root ?: "",
-            file_root ? "\\" : "",
-            file_name_us->contents);
+                                      file_root ?: "",
+                                      file_root ? "\\" : "",
+                                      file_name_us->contents);
 
     vmi_free_unicode_str(file_name_us);
     g_free(file_root);

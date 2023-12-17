@@ -218,7 +218,7 @@ static int get_display_dimensions(qmp_connection* qc, dimensions* dims)
     if (!f)
     {
         fprintf(stderr, "[HIDSIM] [INJECTOR] Error extracting display size from"
-            " %s\n", tmp_path);
+                " %s\n", tmp_path);
         return -1;
     }
 
@@ -254,7 +254,7 @@ static int get_display_dimensions(qmp_connection* qc, dimensions* dims)
      * and checking for utopian big screen sizes.
      */
     if (width == 0 || height == 0 ||
-        width > SCREEN_MAX_8K || height > SCREEN_MAX_8K)
+            width > SCREEN_MAX_8K || height > SCREEN_MAX_8K)
     {
         fprintf(stderr, "[HIDSIM] [INJECTOR] Unsupported screensize\n");
         return -1;
@@ -272,7 +272,7 @@ static int get_display_dimensions(qmp_connection* qc, dimensions* dims)
     dims->dy = calculate_pixel_unit(dims->height);
 
     PRINT_DEBUG("[HIDSIM] [INJECTOR] Screen dimension: %d x %d\n",
-        dims->width, dims->height);
+                dims->width, dims->height);
 
     return 0;
 }
@@ -311,9 +311,9 @@ static void move_mouse(qmp_connection* qc, int x, int y, bool is_abs)
 
     /* Constructs events for x- and y-axis */
     json_object_array_add(events,
-        construct_mouse_move_event(ax_x, is_abs, x));
+                          construct_mouse_move_event(ax_x, is_abs, x));
     json_object_array_add(events,
-        construct_mouse_move_event(ax_y, is_abs, y));
+                          construct_mouse_move_event(ax_y, is_abs, y));
 
     /* Wraps it */
     cmd = construct_input_event_cmd(events);
@@ -334,7 +334,7 @@ static void center_cursor(qmp_connection* qc)
 
 /* Resets file stream, timer and cursor position */
 static int reset_hid_injection(qmp_connection* qc, FILE* f, struct timeval* tv,
-    int* nx, int* ny)
+                               int* nx, int* ny)
 {
     /* Jumps to the beginning of the HID data */
     int ret = fseek(f, HEADER_LEN, SEEK_SET);
@@ -499,7 +499,7 @@ void click(qmp_connection* qc, BTN_ENUM b)
     /* Sends command */
     qmp_communicate_json(qc, cmd, NULL);
     PRINT_DEBUG("[HIDSIM] [INJECTOR] %s\n", json_object_to_json_string_ext(cmd,
-            JSON_C_TO_STRING_SPACED));
+                JSON_C_TO_STRING_SPACED));
 
     /* Keep the button down a litte */
     usleep(500);
@@ -516,7 +516,7 @@ void click(qmp_connection* qc, BTN_ENUM b)
     cmd = construct_input_event_cmd(events);
     qmp_communicate_json(qc, cmd, NULL);
     PRINT_DEBUG("[HIDSIM] [INJECTOR] %s\n", json_object_to_json_string_ext(cmd,
-            JSON_C_TO_STRING_SPACED));
+                JSON_C_TO_STRING_SPACED));
 
     /* Resets event buffer */
     json_object_put(cmd);
@@ -525,7 +525,7 @@ void click(qmp_connection* qc, BTN_ENUM b)
 
 /* Smoothly moves the cursor to new coordinates in a given time frame */
 void translate(qmp_connection* qc, dimensions* dim, int time_frame,
-    int ox, int oy, int dx, int dy, int* newx, int* newy)
+               int ox, int oy, int dx, int dy, int* newx, int* newy)
 {
     const float DISP_RES = dim->dx < dim->dy ? dim->dy : dim->dx;
     assert(DISP_RES > 0);
@@ -604,7 +604,7 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
 
 /* Injects random mouse movements */
 static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
-    std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
+                                std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [INJECTOR] Injecting random mouse movements\n");
     dimensions dim;
@@ -661,7 +661,7 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
 
                 /* Inject clicks, if CLICK_THRESHOLD moves, since last click */
                 if (moves_next_click <= 0
-                    && (oy + dy) < BOTTOM_THRES && (ox + dx) > LEFT_THRES)
+                        && (oy + dy) < BOTTOM_THRES && (ox + dx) > LEFT_THRES)
                     is_click = true;
 
             }
@@ -718,7 +718,7 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
  * given by a binary file
  */
 static int run_template_injection(qmp_connection* qc, FILE* f,
-    std::atomic<bool>* has_to_stop)
+                                  std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [INJECTOR] Running template injection\n");
 
@@ -809,7 +809,7 @@ static int run_template_injection(qmp_connection* qc, FILE* f,
             /* Sends command */
             qmp_communicate_json(qc, cmd, NULL);
             PRINT_DEBUG("[HIDSIM] %s\n", json_object_to_json_string_ext(cmd,
-                    JSON_C_TO_STRING_SPACED));
+                        JSON_C_TO_STRING_SPACED));
 
             /* Resets event buffer */
             json_object_put(cmd);
@@ -838,7 +838,7 @@ static int hid_cleanup(qmp_connection* qc, int fd, FILE* f)
     if (qc)
         if ((ret = qmp_close_conn(qc)) != 0)
             fprintf(stderr, "[HIDSIM] [INJECTOR] Error closing QMP socket %s\n",
-                qc->sa.sun_path);
+                    qc->sa.sun_path);
     if (f)
         if ((ret = fclose(f)) != 0)
             fprintf(stderr, "[HIDSIM] [INJECTOR] Error closing stream\n");
@@ -851,7 +851,7 @@ static int hid_cleanup(qmp_connection* qc, int fd, FILE* f)
 
 /* Worker thread function */
 int hid_inject(const char* sock_path, const char* template_path, bool is_rand_clicks,
-    std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
+               std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
 {
     /* Initializes qmp connection */
     qmp_connection qc;
@@ -862,7 +862,7 @@ int hid_inject(const char* sock_path, const char* template_path, bool is_rand_cl
     if (qmp_init_conn(&qc, sock_path) < 0)
     {
         fprintf(stderr, "[HIDSIM] [INJECTOR] Could not connect to Unix Domain Socket %s.\n",
-            sock_path);
+                sock_path);
         return 1;
     }
 

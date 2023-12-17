@@ -188,7 +188,7 @@ struct rect* get_visible_rect_from_bitmask(
 }
 
 void update_visibility_bitmask(char* map, size_t n, int scanline,
-    struct rect* r)
+                               struct rect* r)
 {
     size_t byte;
     int bit_idx;
@@ -240,7 +240,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->r.x0))
+                                      symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->r.x0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -248,7 +248,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_right_offset, pid, (uint32_t*)&wc->r.x1))
+                                      symbol_offsets.rc_right_offset, pid, (uint32_t*)&wc->r.x1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -258,14 +258,14 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     wc->r.w = wc->r.x1 - wc->r.x0;
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_top_offset, pid, (uint32_t*)&wc->r.y0))
+                                      symbol_offsets.rc_top_offset, pid, (uint32_t*)&wc->r.y0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&wc->r.y1))
+                                      symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&wc->r.y1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -276,7 +276,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
 
     /* Determine, if windows is visible */
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.wnd_style, pid,
-            &wc->style))
+                                      &wc->style))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -285,7 +285,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
 
     /* Determine extended style attributes */
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.wnd_exstyle, pid,
-            &wc->exstyle))
+                                      &wc->exstyle))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -295,7 +295,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     /* Retrieves pointer to atom class */
     addr_t pcls = 0;
     if (VMI_FAILURE == vmi_read_addr_va(vmi, win + symbol_offsets.pcls_offset,
-            pid, &pcls))
+                                        pid, &pcls))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -303,7 +303,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
     /* Reads atom value */
     if (VMI_FAILURE == vmi_read_16_va(vmi, pcls + symbol_offsets.cls_atom_offset,
-            pid, &wc->atom))
+                                      pid, &wc->atom))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -311,14 +311,14 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->rclient.x0))
+                                      + symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->rclient.x0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_right_offset, pid, (uint32_t*)&wc->rclient.x1))
+                                      + symbol_offsets.rc_right_offset, pid, (uint32_t*)&wc->rclient.x1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -326,14 +326,14 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_top_offset, pid, (uint32_t*)&wc->rclient.y0))
+                                      + symbol_offsets.rc_top_offset, pid, (uint32_t*)&wc->rclient.y0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&wc->rclient.y1))
+                                      + symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&wc->rclient.y1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         free(wc);
@@ -344,7 +344,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
 
     /* Retrieves window name */
     if (VMI_FAILURE != vmi_read_addr_va(vmi, win + symbol_offsets.wnd_strname_offset +
-            symbol_offsets.large_unicode_buf_offset, pid, &str_name_off))
+                                        symbol_offsets.large_unicode_buf_offset, pid, &str_name_off))
     {
         /* Length is always 0, therefore always read 255 chars */
         wc->text = read_wchar_str_pid(vmi, str_name_off, (size_t)255, pid);
@@ -371,7 +371,7 @@ bool filter_wnd_text(wchar_t* text)
 
             /* Calculates maximum possible displacement */
             max_disp = tlen - llen < MAX_DISPLACEMENT ?
-                tlen - llen : MAX_DISPLACEMENT;
+                       tlen - llen : MAX_DISPLACEMENT;
 
             for (size_t j = 0; j < max_disp + 1; j++)
             {
@@ -386,7 +386,7 @@ bool filter_wnd_text(wchar_t* text)
 }
 
 int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
-    GArray* wins, struct wnd* btn)
+                         GArray* wins, struct wnd* btn)
 {
     int res = 0;
     /* Current window address */
@@ -457,7 +457,7 @@ int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
         if (cand && cand->atom)
         {
             struct atom_entry* a = (struct atom_entry*) g_hash_table_lookup(
-                    desk->atom_table, GUINT_TO_POINTER(wnd->atom));
+                                       desk->atom_table, GUINT_TO_POINTER(wnd->atom));
 
             if (a && a->name)
                 for (size_t j = 0; j < ARRAY_SIZE(IRRELEVANT_ATOM_CLASSES); j++)
@@ -512,7 +512,7 @@ int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
 
 
 status_t traverse_windows_pid(vmi_instance_t vmi, addr_t win,
-    vmi_pid_t pid, GHashTable* seen_windows, GArray* result_windows, int level)
+                              vmi_pid_t pid, GHashTable* seen_windows, GArray* result_windows, int level)
 {
     addr_t* cur = (addr_t*) malloc(sizeof(addr_t));
     if (!cur)
@@ -608,7 +608,7 @@ status_t traverse_windows_pid(vmi_instance_t vmi, addr_t win,
              * and so on.
              */
             traverse_windows_pid(vmi, *child, pid, seen_windows, result_windows,
-                level + 1);
+                                 level + 1);
 
             free(child);
         }
@@ -626,7 +626,7 @@ void free_data(gpointer data)
 }
 
 status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
-    GArray** result_windows)
+                                   GArray** result_windows)
 {
     uint32_t desk_id = 0;
 
@@ -639,7 +639,7 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
     if (VMI_FAILURE == vmi_read_32_va(vmi, addr, pid, &desk_id))
     {
         fprintf(stderr, "Failed to read desktop ID at %" PRIx64 "\n", desktop +
-            symbol_offsets.desk_desktopid_off);
+                symbol_offsets.desk_desktopid_off);
         return VMI_FAILURE;
     }
 
@@ -649,7 +649,7 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
     if (VMI_FAILURE == vmi_read_addr_va(vmi, addr, pid, &desktop_info))
     {
         fprintf(stderr, "Failed to read pointer to _DESKTOPINFO at %" PRIx64 "\n",
-            desktop + symbol_offsets.desk_pdeskinfo_off);
+                desktop + symbol_offsets.desk_pdeskinfo_off);
         return VMI_FAILURE;
     }
 
@@ -661,7 +661,7 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
     if (VMI_FAILURE == vmi_read_addr_va(vmi, addr, pid, &spwnd))
     {
         fprintf(stderr, "Failed to read pointer to _WINDOW at %" PRIx64 "\n",
-            desktop_info + symbol_offsets.deskinfo_spwnd_offset);
+                desktop_info + symbol_offsets.deskinfo_spwnd_offset);
         return VMI_FAILURE;
     }
 
@@ -676,7 +676,7 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
 
     /* No value destroy function, since the hash table is used as a set  */
     GHashTable* seen_windows = g_hash_table_new_full(g_int64_hash, g_int64_equal,
-            free_data, NULL);
+                               free_data, NULL);
 
     status_t ret = traverse_windows_pid(vmi, spwnd, pid, seen_windows, *result_windows, 0);
 
@@ -687,7 +687,7 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
 
 /* Traverses this singly-linked list of desktops belonging to one WinSta */
 status_t traverse_desktops(vmi_instance_t vmi, addr_t* desktops,
-    size_t* max_len, addr_t list_head)
+                           size_t* max_len, addr_t list_head)
 {
     addr_t cur = list_head;
     addr_t next = 0;
@@ -704,7 +704,7 @@ status_t traverse_desktops(vmi_instance_t vmi, addr_t* desktops,
         if (VMI_FAILURE == vmi_read_addr_va(vmi, cur + symbol_offsets.desk_rpdesk_next_off, 0, &next))
         {
             fprintf(stderr, "Failed to read pointer to next desktop at %" PRIx64 "\n",
-                cur + symbol_offsets.desk_rpdesk_next_off);
+                    cur + symbol_offsets.desk_rpdesk_next_off);
             *max_len = i;
             return VMI_FAILURE;
         }
@@ -723,7 +723,7 @@ status_t traverse_desktops(vmi_instance_t vmi, addr_t* desktops,
  * type tagDESKTOP
  */
 status_t populate_winsta(vmi_instance_t vmi, struct winsta* winsta, addr_t addr,
-    vmi_pid_t providing_pid)
+                         vmi_pid_t providing_pid)
 {
     winsta->addr = addr;
 
@@ -737,7 +737,7 @@ status_t populate_winsta(vmi_instance_t vmi, struct winsta* winsta, addr_t addr,
     if (VMI_FAILURE == vmi_read_addr_va(vmi, addr + symbol_offsets.winsta_pglobal_atom_table_offset, 0, &winsta->atom_table))
     {
         fprintf(stderr, "Failed to read pointer to atom table at %" PRIx64 "\n", addr +
-            symbol_offsets.winsta_pglobal_atom_table_offset);
+                symbol_offsets.winsta_pglobal_atom_table_offset);
         return VMI_FAILURE;
     }
 
@@ -762,7 +762,7 @@ status_t populate_winsta(vmi_instance_t vmi, struct winsta* winsta, addr_t addr,
     if (VMI_FAILURE == vmi_read_addr_va(vmi, addr + symbol_offsets.winsta_rpdesk_list_offset, 0, &desk))
     {
         fprintf(stderr, "Failed to read pointer to rpdesklist at %" PRIx64 "\n", addr +
-            symbol_offsets.winsta_rpdesk_list_offset);
+                symbol_offsets.winsta_rpdesk_list_offset);
         return VMI_FAILURE;
     }
 
@@ -814,7 +814,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
         if (VMI_FAILURE == vmi_read_32_va(vmi, current_process + symbol_offsets.pid_offset, 0, (uint32_t*)&pid))
         {
             fprintf(stderr, "Failed to read PID at %" PRIx64 "\n",
-                current_process + symbol_offsets.pid_offset);
+                    current_process + symbol_offsets.pid_offset);
             continue;
         }
 
@@ -822,10 +822,10 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
 
         /* Retrieves pointer of ThreadListHead-member == associated thread */
         if (VMI_FAILURE == vmi_read_addr_va(vmi, current_process +
-                symbol_offsets.thread_list_head_offset, 0, &thrd_list_head))
+                                            symbol_offsets.thread_list_head_offset, 0, &thrd_list_head))
         {
             fprintf(stderr, "Failed to read ThreadListHead-pointer at %" PRIx64 "\n",
-                current_process + symbol_offsets.thread_list_head_offset);
+                    current_process + symbol_offsets.thread_list_head_offset);
             g_array_free(winstas, true);
             return VMI_FAILURE;
         }
@@ -842,10 +842,10 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
             {
                 /* Retrieves pointer of ThreadListHead-member == associated thread */
                 if (VMI_FAILURE == vmi_read_addr_va(vmi, cur_thrd_list_entry, 0,
-                        &next_thread_entry))
+                                                    &next_thread_entry))
                 {
                     fprintf(stderr, "Failed to read ThreadListHead-pointer at %" PRIx64 "\n",
-                        current_process + symbol_offsets.thread_list_head_offset);
+                            current_process + symbol_offsets.thread_list_head_offset);
                     g_array_free(winstas, true);
                     return VMI_FAILURE;
                 }
@@ -874,7 +874,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
             if (VMI_FAILURE == vmi_read_addr_va(vmi, cur_kthread + symbol_offsets.teb_offset, 0, &teb))
             {
                 fprintf(stderr, "Failed to read Teb-pointer at %" PRIx64 "\n",
-                    cur_kthread + symbol_offsets.teb_offset);
+                        cur_kthread + symbol_offsets.teb_offset);
                 return VMI_FAILURE;
             }
 
@@ -887,7 +887,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
 
             /* Retrieves pointer to Win32ThreadInfo-struct */
             if (VMI_FAILURE == vmi_read_addr_va(vmi, teb +
-                    symbol_offsets.teb_win32threadinfo_offset, pid, &w32thrd_info))
+                                                symbol_offsets.teb_win32threadinfo_offset, pid, &w32thrd_info))
             {
                 continue;
             }
@@ -904,7 +904,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
              * whether winsta is present
              */
             if (VMI_FAILURE == vmi_read_addr_va(vmi, w32thrd_info +
-                    symbol_offsets.w32t_deskinfo_offset, pid, &desktop_info))
+                                                symbol_offsets.w32t_deskinfo_offset, pid, &desktop_info))
             {
                 continue;
             }
@@ -913,10 +913,10 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
 
             /* Retrieves pointer to winsta struct */
             if (VMI_FAILURE == vmi_read_addr_va(vmi, w32thrd_info +
-                    symbol_offsets.w32t_pwinsta_offset, pid, &cur_pwinsta))
+                                                symbol_offsets.w32t_pwinsta_offset, pid, &cur_pwinsta))
             {
                 fprintf(stderr, "Failed to read pointer to tagWINDOWSTATION at %" PRIx64
-                    "\n", w32thrd_info + symbol_offsets.w32t_pwinsta_offset);
+                        "\n", w32thrd_info + symbol_offsets.w32t_pwinsta_offset);
                 continue;
             }
 
@@ -1030,7 +1030,7 @@ status_t find_first_active_desktop(vmi_instance_t vmi, struct desktop* d)
 }
 
 int scan_for_clickable_button(vmi_instance_t vmi, struct desktop* d,
-    struct wnd* btn)
+                              struct wnd* btn)
 {
     int res;
 

@@ -125,21 +125,21 @@ void close_vmi(drakvuf_t drakvuf);
 void drakvuf_vmi_event_callback (int fd, void* data);
 
 bool inject_trap(drakvuf_t drakvuf,
-    drakvuf_trap_t* trap,
-    addr_t vaddr,
-    vmi_pid_t pid);
+                 drakvuf_trap_t* trap,
+                 addr_t vaddr,
+                 vmi_pid_t pid);
 bool inject_trap_mem(drakvuf_t drakvuf,
-    drakvuf_trap_t* trap,
-    bool guard2);
+                     drakvuf_trap_t* trap,
+                     bool guard2);
 bool inject_trap_pa(drakvuf_t drakvuf,
-    drakvuf_trap_t* trap,
-    addr_t pa);
+                    drakvuf_trap_t* trap,
+                    addr_t pa);
 bool inject_traps_modules(drakvuf_t drakvuf,
-    drakvuf_trap_t* trap,
-    addr_t list_head,
-    vmi_pid_t pid);
+                          drakvuf_trap_t* trap,
+                          addr_t list_head,
+                          vmi_pid_t pid);
 void remove_trap(drakvuf_t drakvuf,
-    const drakvuf_trap_t* trap);
+                 const drakvuf_trap_t* trap);
 
 bool control_cr3_trap(drakvuf_t drakvuf, bool toggle);
 bool control_cr4_trap(drakvuf_t drakvuf, bool toggle);

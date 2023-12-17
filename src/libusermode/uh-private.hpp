@@ -157,7 +157,7 @@ struct rh_data_t
     userhook* userhook_plugin;
 
     rh_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
-        std::string dll_name, std::string func_name, callback_t cb, void* extra):
+              std::string dll_name, std::string func_name, callback_t cb, void* extra):
         target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
         extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
         target_process_dtb(), func_addr(), userhook_plugin(userhook_plugin) {}
@@ -300,11 +300,11 @@ event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_inf
 event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
 
 bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
-    uint64_t* stack_marker,
-    addr_t addr,
-    addr_t* stack_pointer);
+                        drakvuf_trap_info_t* info,
+                        event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+                        uint64_t* stack_marker,
+                        addr_t addr,
+                        addr_t* stack_pointer);
 
 event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 

@@ -113,18 +113,18 @@ void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, c
 {
     switch (format)
     {
-        case OUTPUT_CSV:
-            csvfmt::print(plugin_name, drakvuf, info, args...);
-            break;
-        case OUTPUT_KV:
-            kvfmt::print(plugin_name, drakvuf, info, args...);
-            break;
-        case OUTPUT_JSON:
-            jsonfmt::print(plugin_name, drakvuf, info, args...);
-            break;
-        case OUTPUT_DEFAULT:
-            deffmt::print(plugin_name, drakvuf, info, args...);
-            break;
+    case OUTPUT_CSV:
+        csvfmt::print(plugin_name, drakvuf, info, args...);
+        break;
+    case OUTPUT_KV:
+        kvfmt::print(plugin_name, drakvuf, info, args...);
+        break;
+    case OUTPUT_JSON:
+        jsonfmt::print(plugin_name, drakvuf, info, args...);
+        break;
+    case OUTPUT_DEFAULT:
+        deffmt::print(plugin_name, drakvuf, info, args...);
+        break;
     }
 }
 
@@ -150,18 +150,18 @@ inline void print_running_process(output_format_t format, const char* plugin_nam
 {
     switch (format)
     {
-        case OUTPUT_CSV:
-            csvfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
-            break;
-        case OUTPUT_KV:
-            kvfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
-            break;
-        case OUTPUT_JSON:
-            jsonfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
-            break;
-        case OUTPUT_DEFAULT:
-            deffmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
-            break;
+    case OUTPUT_CSV:
+        csvfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+        break;
+    case OUTPUT_KV:
+        kvfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+        break;
+    case OUTPUT_JSON:
+        jsonfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+        break;
+    case OUTPUT_DEFAULT:
+        deffmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+        break;
     }
 }
 

@@ -151,7 +151,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
     if ((strlen(path) + 1) > sizeof(qc->sa.sun_path))
     {
         fprintf(stderr, "Path to domain socket exceeds %ld characters\n",
-            sizeof(qc->sa.sun_path));
+                sizeof(qc->sa.sun_path));
         return -1;
     }
 
@@ -164,7 +164,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
     if (ret == -1)
     {
         fprintf(stderr, "Connecting to %s failed - %s\n", qc->sa.sun_path,
-            strerror(errno));
+                strerror(errno));
         return -1;
     }
 
@@ -186,7 +186,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
     if (ret == -1)
     {
         fprintf(stderr, "Write to %s failed - %s\n", qc->sa.sun_path,
-            strerror(errno));
+                strerror(errno));
         return -1;
     }
     /* Check return value */
@@ -195,7 +195,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
     if (ret == -1)
     {
         fprintf(stderr, "Read from %s failed - %s\n", qc->sa.sun_path,
-            strerror(errno));
+                strerror(errno));
         return -1;
     }
 
@@ -213,10 +213,10 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 
 /* Sends the given data to the QMPConnection and reads the response */
 int qmp_communicate_json(qmp_connection* qc, struct json_object* in,
-    struct json_object** out)
+                         struct json_object** out)
 {
     const char* in_str = json_object_to_json_string_ext(in,
-            JSON_C_TO_STRING_SPACED);
+                         JSON_C_TO_STRING_SPACED);
 
     char* out_str = NULL;
 
@@ -242,7 +242,7 @@ int qmp_communicate(qmp_connection* qc, const char* in, char** out)
     if (ret == -1)
     {
         fprintf(stderr, "Write to %s failed - %s\n", qc->sa.sun_path,
-            strerror(errno));
+                strerror(errno));
         return ret;
     }
 
@@ -252,7 +252,7 @@ int qmp_communicate(qmp_connection* qc, const char* in, char** out)
     if (ret == -1)
     {
         fprintf(stderr, "Read from %s failed - %s\n", qc->sa.sun_path,
-            strerror(errno));
+                strerror(errno));
         return ret;
     }
     if (out)

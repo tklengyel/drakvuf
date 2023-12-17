@@ -151,10 +151,10 @@ static char* ipv4_to_str(uint8_t ipv4[4])
 static char* ipv6_to_str(uint8_t ipv6[16])
 {
     return g_strdup_printf("%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
-            ipv6[0], ipv6[1], ipv6[2], ipv6[3],
-            ipv6[4], ipv6[5], ipv6[6], ipv6[7],
-            ipv6[8], ipv6[9], ipv6[10], ipv6[11],
-            ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+                           ipv6[0], ipv6[1], ipv6[2], ipv6[3],
+                           ipv6[4], ipv6[5], ipv6[6], ipv6[7],
+                           ipv6[8], ipv6[9], ipv6[10], ipv6[11],
+                           ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
 }
 
 static char* read_ipv4_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr)
@@ -209,30 +209,30 @@ static char const* tcp_addressfamily_string(int family)
 static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
 {
     fmt::print(s->format, "socketmon", drakvuf, info,
-        keyval("Owner", fmt::Qstr(owner_proc_data.name)),
-        keyval("OwnerId", fmt::Nval(owner_proc_data.userid)),
-        keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
-        keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
-        keyval("Protocol", fmt::Rstr(udp_addressfamily_string(addressfamily))),
-        keyval("LocalIp", fmt::Rstr(lip ?: "")),
-        keyval("LocalPort", fmt::Nval(port))
-    );
+               keyval("Owner", fmt::Qstr(owner_proc_data.name)),
+               keyval("OwnerId", fmt::Nval(owner_proc_data.userid)),
+               keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
+               keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
+               keyval("Protocol", fmt::Rstr(udp_addressfamily_string(addressfamily))),
+               keyval("LocalIp", fmt::Rstr(lip ?: "")),
+               keyval("LocalPort", fmt::Nval(port))
+              );
 }
 
 static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data,
-    int addressfamily, char const* lip, int localport, char const* rip, int remoteport)
+                       int addressfamily, char const* lip, int localport, char const* rip, int remoteport)
 {
     fmt::print(s->format, "socketmon", drakvuf, info,
-        keyval("Owner", fmt::Qstr(owner_proc_data.name)),
-        keyval("OwnerId", fmt::Nval(owner_proc_data.userid)),
-        keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
-        keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
-        keyval("Protocol", fmt::Rstr(tcp_addressfamily_string(addressfamily))),
-        keyval("LocalIp", fmt::Rstr(lip ?: "")),
-        keyval("LocalPort", fmt::Nval(localport)),
-        keyval("RemoteIp", fmt::Rstr(rip ?: "")),
-        keyval("RemotePort", fmt::Nval(remoteport))
-    );
+               keyval("Owner", fmt::Qstr(owner_proc_data.name)),
+               keyval("OwnerId", fmt::Nval(owner_proc_data.userid)),
+               keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
+               keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
+               keyval("Protocol", fmt::Rstr(tcp_addressfamily_string(addressfamily))),
+               keyval("LocalIp", fmt::Rstr(lip ?: "")),
+               keyval("LocalPort", fmt::Nval(localport)),
+               keyval("RemoteIp", fmt::Rstr(rip ?: "")),
+               keyval("RemotePort", fmt::Nval(remoteport))
+              );
 }
 
 template<typename tcp_endpoint_struct, typename inetaf_struct, typename addr_info_struct>
@@ -316,14 +316,14 @@ static uint16_t tcp_get_family(vmi_instance_t vmi, addr_t rcx, addr_t build)
 
     switch (build)
     {
-        case win_7_sp1_ver:
-            offsets = win7_sp1_tcp_offsets;
-            break;
-        case win_10_1803_ver:
-            offsets = win10_1803_tcp_offsets;
-            break;
-        default:
-            return 0;
+    case win_7_sp1_ver:
+        offsets = win7_sp1_tcp_offsets;
+        break;
+    case win_10_1803_ver:
+        offsets = win10_1803_tcp_offsets;
+        break;
+    default:
+        return 0;
     };
 
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + offsets[IP_FAMILY_OFF0], 0, &ptr))
@@ -341,14 +341,14 @@ static std::pair<uint16_t, uint16_t> tcp_get_port(vmi_instance_t vmi, addr_t rcx
 
     switch (build)
     {
-        case win_7_sp1_ver:
-            offsets = win7_sp1_tcp_offsets;
-            break;
-        case win_10_1803_ver:
-            offsets = win10_1803_tcp_offsets;
-            break;
-        default:
-            return std::make_pair(0, 0);
+    case win_7_sp1_ver:
+        offsets = win7_sp1_tcp_offsets;
+        break;
+    case win_10_1803_ver:
+        offsets = win10_1803_tcp_offsets;
+        break;
+    default:
+        return std::make_pair(0, 0);
     };
 
     vmi_read_16_va(vmi, rcx + offsets[LOCAL_PORT],  0, &lport);
@@ -363,22 +363,22 @@ static char* tcp_get_addr(vmi_instance_t vmi, addr_t rcx, addr_t build, uint16_t
     addr_t ptr = 0;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid                 = 4
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid                 = 4
+                  );
 
     const uint16_t* offsets = nullptr;
 
     switch (build)
     {
-        case win_7_sp1_ver:
-            offsets = win7_sp1_tcp_offsets;
-            break;
-        case win_10_1803_ver:
-            offsets = win10_1803_tcp_offsets;
-            break;
-        default:
-            return nullptr;
+    case win_7_sp1_ver:
+        offsets = win7_sp1_tcp_offsets;
+        break;
+    case win_10_1803_ver:
+        offsets = win10_1803_tcp_offsets;
+        break;
+    default:
+        return nullptr;
     };
 
 
@@ -435,10 +435,10 @@ static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     addr_t message = drakvuf_get_function_argument(drakvuf, info, 2);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = message + 0x20 // struct sockaddr_in*, tested on Win7 sp1 x64 and Win10 21H1 x64
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = message + 0x20 // struct sockaddr_in*, tested on Win7 sp1 x64 and Win10 21H1 x64
+                  );
 
     sockaddr_in6 sockaddr = {};
     vmi_lock_guard vmi(drakvuf);
@@ -511,8 +511,8 @@ static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* sm, const char* dns_name)
 {
     fmt::print(sm->format, "socketmon", drakvuf, info,
-        keyval("DnsName", fmt::Qstr(dns_name ?: ""))
-    );
+               keyval("DnsName", fmt::Qstr(dns_name ?: ""))
+              );
 }
 
 static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -672,8 +672,8 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 }
 
 static void register_tcpip_trap( drakvuf_t drakvuf, json_object* tcpip_profile_json, const char* function_name,
-    drakvuf_trap_t* trap,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+                                 drakvuf_trap_t* trap,
+                                 event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     if ( !json_get_symbol_rva(drakvuf, tcpip_profile_json, function_name, &trap->breakpoint.rva) ) throw -1;
 
@@ -705,13 +705,13 @@ static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_i
     vmi_instance_t vmi;
     addr_t exec_func ;
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb                 = module_info->dtb,
-        .addr                = module_info->base_addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb                 = module_info->dtb,
+                   .addr                = module_info->base_addr
+                  );
 
     PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X %d] is_wow_process[%d]  is_wow_module[%d] base_name[%s] load_address[0x%lX] full_name[%s]\n",
-        module_info->dtb, module_info->pid, module_info->pid, module_info->is_wow_process, module_info->is_wow, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents );
+                module_info->dtb, module_info->pid, module_info->pid, module_info->is_wow_process, module_info->is_wow, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents );
 
     if (data->is_wow && !module_info->is_wow)
         return false;
@@ -741,9 +741,9 @@ static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_i
 }
 
 static void register_module_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
-    const char* module_name, const char* function_name,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ),
-    event_response_t(*wow_hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr )
+                                  const char* module_name, const char* function_name,
+                                  event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ),
+                                  event_response_t(*wow_hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr )
 {
     struct module_trap_context_t visitor_ctx = {};
     visitor_ctx.is_wow = false;
@@ -772,9 +772,9 @@ static void register_module_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
 }
 
 static void register_dnsapi_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
-    const char* function_name,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ),
-    event_response_t(*wow_hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr )
+                                  const char* function_name,
+                                  event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ),
+                                  event_response_t(*wow_hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr )
 {
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     register_module_trap(drakvuf, trap, "dnsapi.dll", function_name, hook_cb, wow_hook_cb);
@@ -834,21 +834,21 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
     {
         switch (this->build.version)
         {
-            case VMI_OS_WINDOWS_8:
-                // Tested on Windows 8.1 update 1 x64
-                tcpe_cb = tcpe_win81_x64_cb;
-                break;
-            case VMI_OS_WINDOWS_10:
-                if (this->build.buildnumber < 17134)
-                    // Tested on Windows 10 x64 before 1803
-                    tcpe_cb = tcpe_win10_x64_cb;
-                break;
-            case VMI_OS_WINDOWS_7:
-                break;
-            default:
-                PRINT_DEBUG("Socketmon plugin is not supported on %d %d", this->build.version, this->build.buildnumber);
-                throw -1;
-                break;
+        case VMI_OS_WINDOWS_8:
+            // Tested on Windows 8.1 update 1 x64
+            tcpe_cb = tcpe_win81_x64_cb;
+            break;
+        case VMI_OS_WINDOWS_10:
+            if (this->build.buildnumber < 17134)
+                // Tested on Windows 10 x64 before 1803
+                tcpe_cb = tcpe_win10_x64_cb;
+            break;
+        case VMI_OS_WINDOWS_7:
+            break;
+        default:
+            PRINT_DEBUG("Socketmon plugin is not supported on %d %d", this->build.version, this->build.buildnumber);
+            throw -1;
+            break;
         }
     }
     else

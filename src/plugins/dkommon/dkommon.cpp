@@ -145,17 +145,17 @@ static const std::map<uint64_t, std::pair<uint64_t, uint64_t>> srv_offsets =
 static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, dkommon* plugin, vmi_pid_t pid)
 {
     fmt::print(plugin->format, "dkommon", drakvuf, info,
-        keyval("Message", fmt::Qstr("Hidden Process")),
-        keyval("HiddenPID", fmt::Nval(pid))
-    );
+               keyval("Message", fmt::Qstr("Hidden Process")),
+               keyval("HiddenPID", fmt::Nval(pid))
+              );
 }
 
 static void print_driver_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_format_t format, const char* message, const char* name)
 {
     fmt::print(format, "dkommon", drakvuf, info,
-        keyval("Message", fmt::Qstr(message)),
-        keyval("DriverName", fmt::Qstr(name))
-    );
+               keyval("Message", fmt::Qstr(message)),
+               keyval("DriverName", fmt::Qstr(name))
+              );
 }
 
 static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvuf)
@@ -164,9 +164,9 @@ static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvu
     vmi_lock_guard vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4
+                  );
 
     addr_t list_head = 0;
     if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head))
@@ -220,9 +220,9 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* pass_ctx)
             addr_t module_list{ 0 };
             drakvuf_get_module_list(drakvuf, process, &module_list);
             ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_PID,
-                .pid = pid
-            );
+                           .translate_mechanism = VMI_TM_PROCESS_PID,
+                           .pid = pid
+                          );
             drakvuf_get_module_base_addr_ctx(drakvuf, module_list, &ctx, "services.exe", &plugin->srv_module_base);
             PRINT_DEBUG("[DKOMMON] Found services.exe: 0x%lx\n", plugin->srv_module_base);
         }
@@ -238,10 +238,10 @@ static event_response_t load_unload_driver_cb(drakvuf_t drakvuf, drakvuf_trap_in
     bool i_insert = drakvuf_get_function_argument(drakvuf, info, 2);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
-        .addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME]
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4,
+                   .addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME]
+                  );
 
     vmi_lock_guard vmi(drakvuf);
     unicode_string_t* drvname = drakvuf_read_unicode_common(drakvuf, &ctx);
@@ -286,9 +286,9 @@ static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     vmi_lock_guard vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4
+                  );
 
     ctx.addr = list_entry_va + plugin->offsets[LIST_ENTRY_FLINK];
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &flink))
@@ -419,10 +419,10 @@ bool dkommon::find_services_db(vmi_instance_t vmi)
     // Locate pattern within first 3 pages.
     std::vector<void*> access_ptrs(3, nullptr);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = srv_pid,
-        .addr = srv_module_base
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = srv_pid,
+                   .addr = srv_module_base
+                  );
 
     if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, access_ptrs.size(), PROT_READ, access_ptrs.data()))
         return false;
@@ -493,8 +493,8 @@ dkommon::dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete")) ||
-        !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")) ||
-        !register_trap(nullptr, load_unload_driver_cb, bp.for_syscall_name("MiProcessLoaderEntry")))
+            !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")) ||
+            !register_trap(nullptr, load_unload_driver_cb, bp.for_syscall_name("MiProcessLoaderEntry")))
     {
         PRINT_DEBUG("[DKOMMON] Failed to setup critical traps\n");
         throw -1;
@@ -528,7 +528,7 @@ dkommon::dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_
                 if (this->winver == win_7_sp1_ver)
                 {
                     if (!json_get_symbol_rva(drakvuf, profile_json, "?ScCreateServiceRecord@@YAKPEAGHPEAPEAU_SERVICE_RECORD@@@Z", &fn_srv_add) ||
-                        !json_get_symbol_rva(drakvuf, profile_json, "?Add@DEFER_LIST@@QEAAXPEAU_SERVICE_RECORD@@@Z", &fn_srv_del))
+                            !json_get_symbol_rva(drakvuf, profile_json, "?Add@DEFER_LIST@@QEAAXPEAU_SERVICE_RECORD@@@Z", &fn_srv_del))
                     {
                         PRINT_DEBUG("[DKOMMON] Failed to resolve symbols\n");
                         throw -1;
@@ -537,7 +537,7 @@ dkommon::dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_
                 else
                 {
                     if (!json_get_symbol_rva(drakvuf, profile_json, "?Add@CServiceDatabase@@QEAAKPEAVCServiceRecord@@@Z", &fn_srv_add) ||
-                        !json_get_symbol_rva(drakvuf, profile_json, "?Remove@CServiceDatabase@@QEAAKPEAVCServiceRecord@@@Z", &fn_srv_del))
+                            !json_get_symbol_rva(drakvuf, profile_json, "?Remove@CServiceDatabase@@QEAAKPEAVCServiceRecord@@@Z", &fn_srv_del))
                     {
                         PRINT_DEBUG("[DKOMMON] Failed to resolve symbols\n");
                         throw -1;
@@ -606,9 +606,9 @@ bool dkommon::stop_impl()
                     if (VMI_SUCCESS != vmi_read_addr_va(vmi, srv + name_off, srv_pid, &name_va))
                         continue;
                     ACCESS_CONTEXT(ctx,
-                        .translate_mechanism = VMI_TM_PROCESS_PID,
-                        .pid = srv_pid,
-                        .addr = name_va);
+                                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                                   .pid = srv_pid,
+                                   .addr = name_va);
                     auto name = drakvuf_read_wchar_string(drakvuf, &ctx);
                     if (name)
                     {

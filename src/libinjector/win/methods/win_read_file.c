@@ -116,153 +116,153 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     switch (base_injector->step)
     {
-        case STEP1: // allocate virtual memory
+    case STEP1: // allocate virtual memory
+    {
+        // save registers
+        PRINT_DEBUG("Saving registers\n");
+        memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+
+        if (!setup_virtual_alloc_stack(injector, info->regs))
         {
-            // save registers
-            PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
-
-            if (!setup_virtual_alloc_stack(injector, info->regs))
-            {
-                PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
-                return cleanup(drakvuf, info);
-            }
-
-            info->regs->rip = injector->exec_func;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP2: // write payload to virtual memory
+
+        info->regs->rip = injector->exec_func;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP2: // write payload to virtual memory
+    {
+        // any error checks?
+        PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
+        injector->payload_addr = info->regs->rax;
+        PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
+
+        if (!setup_memset_stack(injector, info->regs))
         {
-            // any error checks?
-            PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
-            injector->payload_addr = info->regs->rax;
-            PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
-
-            if (!setup_memset_stack(injector, info->regs))
-            {
-                PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
-                return cleanup(drakvuf, info);
-            }
-
-            info->regs->rip = injector->memset;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP3: // expand env in memory
-        {
-            PRINT_DEBUG("Expanding shell...\n");
-            if (!setup_expand_env_stack(injector, info->regs))
-            {
-                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                return cleanup(drakvuf, info);
-            }
 
-            info->regs->rip = injector->expand_env;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        info->regs->rip = injector->memset;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP3: // expand env in memory
+    {
+        PRINT_DEBUG("Expanding shell...\n");
+        if (!setup_expand_env_stack(injector, info->regs))
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP4: // open file handle
+
+        info->regs->rip = injector->expand_env;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP4: // open file handle
+    {
+        if (!info->regs->rax)
         {
-            if (!info->regs->rax)
-            {
-                PRINT_DEBUG("Failed to expand environment variables!\n");
-                return cleanup(drakvuf, info);
-            }
-            PRINT_DEBUG("Env expand status: %lx\n", info->regs->rax);
-
-            if (info->regs->rax * 2 > FILE_BUF_SIZE)
-            {
-                PRINT_DEBUG("Env expand reported more than the buffer can carry.\n");
-                return cleanup(drakvuf, info);
-            }
-
-            if (!setup_create_file(drakvuf, info))
-                return cleanup(drakvuf, info);
-
-            info->regs->rip = injector->create_file;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            PRINT_DEBUG("Failed to expand environment variables!\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP5: // verify file handle and open host file
+        PRINT_DEBUG("Env expand status: %lx\n", info->regs->rax);
+
+        if (info->regs->rax * 2 > FILE_BUF_SIZE)
         {
-            PRINT_DEBUG("File create result %lx\n", info->regs->rax);
+            PRINT_DEBUG("Env expand reported more than the buffer can carry.\n");
+            return cleanup(drakvuf, info);
+        }
 
-            if (is_fun_error(drakvuf, info, "Couldn't open guest file"))
-                return cleanup(drakvuf, info);
+        if (!setup_create_file(drakvuf, info))
+            return cleanup(drakvuf, info);
 
-            injector->file_handle = info->regs->rax;
+        info->regs->rip = injector->create_file;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP5: // verify file handle and open host file
+    {
+        PRINT_DEBUG("File create result %lx\n", info->regs->rax);
 
-            if (!open_host_file(injector, "wb"))
-                return cleanup(drakvuf, info);
+        if (is_fun_error(drakvuf, info, "Couldn't open guest file"))
+            return cleanup(drakvuf, info);
 
-            PRINT_DEBUG("Reading file...\n");
+        injector->file_handle = info->regs->rax;
 
+        if (!open_host_file(injector, "wb"))
+            return cleanup(drakvuf, info);
+
+        PRINT_DEBUG("Reading file...\n");
+
+        if (!setup_read_file_stack(injector, info->regs))
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        info->regs->rip = injector->read_file;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP6: // read chunk from guest and write to host
+    {
+        PRINT_DEBUG("File read result: %lx\n", info->regs->rax);
+
+        if (is_fun_error(drakvuf, info, "Failed to read guest file"))
+            return cleanup(drakvuf, info);
+
+        uint32_t num_bytes;
+
+        if (!process_read_file(drakvuf, info, &num_bytes))
+            return cleanup(drakvuf, info);
+
+        if (num_bytes != 0)
+        {
+            PRINT_DEBUG("Reading next chunk\n");
             if (!setup_read_file_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                return 0;
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->read_file;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            return override_step(base_injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
         }
-        case STEP6: // read chunk from guest and write to host
+        else
         {
-            PRINT_DEBUG("File read result: %lx\n", info->regs->rax);
+            PRINT_DEBUG("Finishing\n");
 
-            if (is_fun_error(drakvuf, info, "Failed to read guest file"))
-                return cleanup(drakvuf, info);
-
-            uint32_t num_bytes;
-
-            if (!process_read_file(drakvuf, info, &num_bytes))
-                return cleanup(drakvuf, info);
-
-            if (num_bytes != 0)
+            if (!setup_close_handle_stack(injector, info->regs))
             {
-                PRINT_DEBUG("Reading next chunk\n");
-                if (!setup_read_file_stack(injector, info->regs))
-                {
-                    PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                    return cleanup(drakvuf, info);
-                }
-
-                info->regs->rip = injector->read_file;
-                return override_step(base_injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
-            }
-            else
-            {
-                PRINT_DEBUG("Finishing\n");
-
-                if (!setup_close_handle_stack(injector, info->regs))
-                {
-                    PRINT_DEBUG("Failed to setup stack for closing handle\n");
-                    return cleanup(drakvuf, info);
-                }
-                info->regs->rip = injector->close_handle;
-            }
-
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        case STEP7: // close file handle
-        {
-            PRINT_DEBUG("Close handle RAX: 0x%lx\n", info->regs->rax);
-            fclose(injector->host_file);
-
-            if (is_fun_error(drakvuf, info, "Could not close File handle"))
+                PRINT_DEBUG("Failed to setup stack for closing handle\n");
                 return cleanup(drakvuf, info);
-
-            PRINT_DEBUG("File operation executed OK\n");
-            injector->rc = INJECTOR_SUCCEEDED;
-
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGINT);
-
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            }
+            info->regs->rip = injector->close_handle;
         }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP7: // close file handle
+    {
+        PRINT_DEBUG("Close handle RAX: 0x%lx\n", info->regs->rax);
+        fclose(injector->host_file);
+
+        if (is_fun_error(drakvuf, info, "Could not close File handle"))
+            return cleanup(drakvuf, info);
+
+        PRINT_DEBUG("File operation executed OK\n");
+        injector->rc = INJECTOR_SUCCEEDED;
+
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGINT);
+
+        memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -287,10 +287,10 @@ static bool process_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint
     uint8_t buf[FILE_BUF_SIZE];
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = injector->payload_addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = injector->payload_addr
+                  );
 
     PRINT_DEBUG("Reading Payload chunk\n");
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);

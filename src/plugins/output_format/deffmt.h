@@ -143,7 +143,7 @@ struct DataPrinter
     {
         auto restore_flags = fmt::RestoreFlags(os);
         os << t.tv_sec << '.' << std::setfill('0')
-            << std::setw(6) << t.tv_usec;
+           << std::setw(6) << t.tv_usec;
         return true;
     }
 
@@ -311,11 +311,11 @@ inline const char* userid_field_name(drakvuf_t drakvuf)
 {
     switch (drakvuf_get_os_type(drakvuf))
     {
-        case VMI_OS_WINDOWS:
-            return "SessionID";
-        case VMI_OS_LINUX:
-        default:
-            return "UID";
+    case VMI_OS_WINDOWS:
+        return "SessionID";
+    case VMI_OS_LINUX:
+    default:
+        return "UID";
     }
 }
 
@@ -330,14 +330,14 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf
         procname += "\"";
 
         print_data(os,
-            keyval("TIME", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-            keyval("VCPU", fmt::Nval(info->vcpu)),
-            keyval("CR3", fmt::Xval(info->regs->cr3)),
-            keyval(procname.c_str(), fmt::Rstr(method)),
-            keyval(userid_field_name(drakvuf), fmt::Nval(proc_data->userid)),
-            keyval("PID", fmt::Nval(proc_data->pid)),
-            keyval("PPID", fmt::Nval(proc_data->ppid))
-        );
+                   keyval("TIME", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+                   keyval("VCPU", fmt::Nval(info->vcpu)),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval(procname.c_str(), fmt::Rstr(method)),
+                   keyval(userid_field_name(drakvuf), fmt::Nval(proc_data->userid)),
+                   keyval("PID", fmt::Nval(proc_data->pid)),
+                   keyval("PPID", fmt::Nval(proc_data->ppid))
+                  );
     }
 }
 
@@ -346,7 +346,7 @@ void print(const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t
 {
     std::string up_name(plugin_name);
     std::transform(up_name.begin(), up_name.end(), up_name.begin(),
-        [](uint8_t c)
+                   [](uint8_t c)
     {
         return std::toupper(c);
     });
@@ -375,11 +375,11 @@ void print(const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t
 inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)
 {
     print(plugin_name, drakvuf, nullptr,
-        keyval("TIME", TimeVal{UNPACK_TIMEVAL(timestamp)}),
-        keyval("PID", fmt::Nval(proc_data.pid)),
-        keyval("PPID", fmt::Nval(proc_data.ppid)),
-        keyval("RunningProcess", fmt::Qstr(proc_data.name))
-    );
+          keyval("TIME", TimeVal{UNPACK_TIMEVAL(timestamp)}),
+          keyval("PID", fmt::Nval(proc_data.pid)),
+          keyval("PPID", fmt::Nval(proc_data.ppid)),
+          keyval("RunningProcess", fmt::Qstr(proc_data.name))
+         );
 }
 
 } // namespace deffmt

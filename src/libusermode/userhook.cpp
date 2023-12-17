@@ -167,10 +167,10 @@ static std::string drakvuf_read_unicode(drakvuf_t drakvuf, addr_t addr)
 static status_t read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr, addr_t* base_address)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = base_address_ptr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = base_address_ptr
+                  );
 
     auto vmi = vmi_lock_guard(drakvuf);
     return vmi_read_addr(vmi, &ctx, base_address);
@@ -254,10 +254,10 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     size_t vad_length = (mmvad->ending_vpn - mmvad->starting_vpn + 1) << 12;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = vad_start
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = vad_start
+                  );
 
     addr_t export_header_rva = 0;
     size_t export_header_size = 0;
@@ -266,7 +266,7 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     uint8_t image[MAX_HEADER_BYTES];
 
     if (auto vmi = vmi_lock_guard(drakvuf);
-        VMI_SUCCESS != peparse_get_image(vmi, &ctx, MAX_HEADER_BYTES, image))
+            VMI_SUCCESS != peparse_get_image(vmi, &ctx, MAX_HEADER_BYTES, image))
         return nullptr;
 
     void* optional_header = NULL;
@@ -525,10 +525,10 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
      * function from other injections.
      */
     auto trap = plugin->register_trap<protect_virtual_memory_result_t>(
-            info,
-            protect_virtual_memory_hook_ret_cb,
-            breakpoint_by_pid_searcher(),
-            "NtProtectVirtualMemory ret");
+                    info,
+                    protect_virtual_memory_hook_ret_cb,
+                    breakpoint_by_pid_searcher(),
+                    "NtProtectVirtualMemory ret");
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -593,10 +593,10 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
     addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
 
     auto trap = plugin->register_trap<map_view_of_section_result_t>(
-            info,
-            map_view_of_section_ret_cb,
-            breakpoint_by_pid_searcher(),
-            "NtMapViewOfSection ret");
+                    info,
+                    map_view_of_section_ret_cb,
+                    breakpoint_by_pid_searcher(),
+                    "NtMapViewOfSection ret");
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -638,7 +638,7 @@ static event_response_t clean_process_address_space_hook_cb(drakvuf_t drakvuf, d
             if (target.state == HOOK_OK)
             {
                 PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", exit_pid,
-                    target.target_name.c_str());
+                            target.target_name.c_str());
                 drakvuf_remove_trap(drakvuf, target.trap, wrap_delete);
             }
         }
@@ -746,9 +746,9 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
         PRINT_DEBUG("USERHOOK] Found %zu hooks on CoW page, registering return trap\n", hooks.size());
 
         auto trap = plugin->register_trap<copy_on_write_result_t>(
-                info,
-                copy_on_write_ret_cb,
-                breakpoint_by_pid_searcher());
+                        info,
+                        copy_on_write_ret_cb,
+                        breakpoint_by_pid_searcher());
         if (!trap)
             return VMI_EVENT_RESPONSE_NONE;
 
@@ -788,8 +788,8 @@ bool userhook::is_supported(drakvuf_t drakvuf)
         auto vmi = vmi_lock_guard(drakvuf);
         win_build_info_t build;
         if (vmi_get_windows_build_info(vmi, &build) &&
-            VMI_OS_WINDOWS_10 == build.version &&
-            15063 >= build.buildnumber)
+                VMI_OS_WINDOWS_10 == build.version &&
+                15063 >= build.buildnumber)
         {
             PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this operating system.\n");
             return false;
@@ -823,9 +823,9 @@ userhook::userhook(drakvuf_t drakvuf, bool injection_mode_enabled): pluginex(dra
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<call_result_t>(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
-        !register_trap<call_result_t>(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
-        !register_trap(nullptr, clean_process_address_space_hook_cb, bp.for_syscall_name("MmCleanProcessAddressSpace"), nullptr, UNLIMITED_TTL) ||
-        !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite"), nullptr, UNLIMITED_TTL))
+            !register_trap<call_result_t>(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
+            !register_trap(nullptr, clean_process_address_space_hook_cb, bp.for_syscall_name("MmCleanProcessAddressSpace"), nullptr, UNLIMITED_TTL) ||
+            !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite"), nullptr, UNLIMITED_TTL))
         throw -1;
 
     if (!this->injection_mode)
@@ -1007,8 +1007,8 @@ std::unique_ptr<ArgumentPrinter> make_arg_printer(
 
 
 std::vector<std::unique_ptr<ArgumentPrinter>> parse_arguments(
-        const PrinterConfig& config,
-        std::stringstream& ss)
+            const PrinterConfig& config,
+            std::stringstream& ss)
 {
     std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers;
 

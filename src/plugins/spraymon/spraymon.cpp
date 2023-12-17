@@ -155,9 +155,9 @@ void spraymon::log(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_c
     if (gdi_max_count > this->gdi_threshold || usr_max_count > this->usr_threshold)
     {
         fmt::print(this->format, "spraymon", drakvuf, nullptr,
-            keyval("PID", fmt::Nval(pid)),
-            keyval("ProcessName", fmt::Qstr(process_name)),
-            keyval("Reason", fmt::Qstr("High graphic objects count")));
+                   keyval("PID", fmt::Nval(pid)),
+                   keyval("ProcessName", fmt::Qstr(process_name)),
+                   keyval("Reason", fmt::Qstr("High graphic objects count")));
     }
 }
 
@@ -198,14 +198,14 @@ event_response_t spraymon::hook_setwin32process_cb(drakvuf_t drakvuf, drakvuf_tr
     log(drakvuf, gdi_max_count, usr_max_count, process_name, pid);
 
     PRINT_DEBUG("[SPRAYMON] (success) Process name -> %s\nGDI count -> %du\nUSER count -> %du\n",
-        process_name, gdi_max_count, usr_max_count);
+                process_name, gdi_max_count, usr_max_count);
 
     g_free(const_cast<char*>(process_name));
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 spraymon::spraymon(drakvuf_t drakvuf, const spraymon_config* config,
-    output_format_t output)
+                   output_format_t output)
     : pluginex(drakvuf, output)
     , format(output)
     , do_final_analysis(true)
@@ -249,8 +249,8 @@ spraymon::spraymon(drakvuf_t drakvuf, const spraymon_config* config,
 
     // Collect win32k offsets
     if (!json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "GDIHandleCountPeak", &this->gdihandlecountpeak) ||
-        !json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "UserHandleCountPeak", &this->userhandlecountpeak)
-    )
+            !json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "UserHandleCountPeak", &this->userhandlecountpeak)
+       )
     {
         PRINT_DEBUG("[SPRAYMON] Failed to win32k members offsets.\n");
         throw -1;
@@ -307,7 +307,7 @@ bool spraymon::stop_impl()
             log(drakvuf, gdi_max_count, usr_max_count, const_cast<char*>(data.name), data.pid);
 
             PRINT_DEBUG("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n",
-                data.name, gdi_max_count, usr_max_count);
+                        data.name, gdi_max_count, usr_max_count);
 
             g_free(const_cast<char*>(data.name));
 

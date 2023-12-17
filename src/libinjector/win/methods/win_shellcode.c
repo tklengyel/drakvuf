@@ -116,60 +116,60 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 
     switch (base_injector->step)
     {
-        case STEP1: // allocate virtual memory
+    case STEP1: // allocate virtual memory
+    {
+        // save registers
+        PRINT_DEBUG("Saving registers\n");
+        memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+
+        if (!setup_virtual_alloc_stack(injector, info->regs))
         {
-            // save registers
-            PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
-
-            if (!setup_virtual_alloc_stack(injector, info->regs))
-            {
-                PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
-                return cleanup(drakvuf, info);
-            }
-
-            info->regs->rip = injector->exec_func;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP2: // write payload to virtual memory
+
+        info->regs->rip = injector->exec_func;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP2: // write payload to virtual memory
+    {
+        // any error checks?
+        PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
+        injector->payload_addr = info->regs->rax;
+        PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
+
+        if (!setup_memset_stack(injector, info->regs))
         {
-            // any error checks?
-            PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
-            injector->payload_addr = info->regs->rax;
-            PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
-
-            if (!setup_memset_stack(injector, info->regs))
-            {
-                PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
-                return cleanup(drakvuf, info);
-            }
-
-            info->regs->rip = injector->memset;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP3: // inject payload
-        {
-            if (!inject_payload(drakvuf, info))
-                return cleanup(drakvuf, info);
 
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        case STEP4:
-        {
-            PRINT_DEBUG("Shellcode executed\n");
-            injector->rc = INJECTOR_SUCCEEDED;
+        info->regs->rip = injector->memset;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP3: // inject payload
+    {
+        if (!inject_payload(drakvuf, info))
+            return cleanup(drakvuf, info);
 
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGINT);
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP4:
+    {
+        PRINT_DEBUG("Shellcode executed\n");
+        injector->rc = INJECTOR_SUCCEEDED;
 
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGINT);
+
+        memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
 
     return VMI_EVENT_RESPONSE_NONE;

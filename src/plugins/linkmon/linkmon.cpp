@@ -129,7 +129,7 @@ static char* get_parent_folder(char const* file_name)
 }
 
 event_response_t linkmon::setinformation_cb(drakvuf_t,
-    drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     uint32_t file_information_class = drakvuf_get_function_argument(drakvuf, info, 5);
 
@@ -150,10 +150,10 @@ event_response_t linkmon::setinformation_cb(drakvuf_t,
 
     vmi_lock_guard vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = file_information + this->offsets[FILE_LINK_INFORMATION_ROOTDIRECTORY],
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = file_information + this->offsets[FILE_LINK_INFORMATION_ROOTDIRECTORY],
+                  );
 
     addr_t root_dir_handle = 0;
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &root_dir_handle))
@@ -199,9 +199,9 @@ event_response_t linkmon::setinformation_cb(drakvuf_t,
     vmi_free_unicode_str(file_name);
 
     fmt::print(this->m_output_format, "linkmon", drakvuf, info,
-        keyval("FileName", fmt::Qstr(file_name_full)),
-        keyval("LinkType", fmt::Qstr("hardlink")),
-        keyval("LinkTarget", fmt::Qstr(target_file_name_str)));
+               keyval("FileName", fmt::Qstr(file_name_full)),
+               keyval("LinkType", fmt::Qstr("hardlink")),
+               keyval("LinkTarget", fmt::Qstr(target_file_name_str)));
 
     g_free(file_name_full);
 
@@ -209,8 +209,8 @@ event_response_t linkmon::setinformation_cb(drakvuf_t,
 }
 
 event_response_t linkmon::print_junction(drakvuf_t,
-    drakvuf_trap_info_t* info,
-    addr_t input_buffer)
+        drakvuf_trap_info_t* info,
+        addr_t input_buffer)
 {
     addr_t file_handle = drakvuf_get_function_argument(drakvuf, info, 1);
     char* file_name = drakvuf_get_filename_from_handle(drakvuf, info, file_handle);
@@ -225,10 +225,10 @@ event_response_t linkmon::print_junction(drakvuf_t,
     addr_t struct_offset = input_buffer + this->offsets[REPARSE_DATA_BUFFER_MOUNTPOINTREPARSEBUFFER];
     vmi_lock_guard vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = struct_offset + this->offsets[REPARSE_DATA_BUFFER_SUBSTITUTENAMEOFFSET]
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = struct_offset + this->offsets[REPARSE_DATA_BUFFER_SUBSTITUTENAMEOFFSET]
+                  );
 
     uint16_t substitute_name_offset = 0;
     if (VMI_FAILURE == vmi_read_16(vmi, &ctx, &substitute_name_offset))
@@ -258,16 +258,16 @@ event_response_t linkmon::print_junction(drakvuf_t,
     vmi_free_unicode_str(substitute_name);
 
     fmt::print(this->m_output_format, "linkmon", drakvuf, info,
-        keyval("FileName", fmt::Qstr(file_name_str)),
-        keyval("LinkType", fmt::Qstr("junction")),
-        keyval("LinkTarget", fmt::Qstr(target_file_name_str)));
+               keyval("FileName", fmt::Qstr(file_name_str)),
+               keyval("LinkType", fmt::Qstr("junction")),
+               keyval("LinkTarget", fmt::Qstr(target_file_name_str)));
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 event_response_t linkmon::print_symlink(drakvuf_t,
-    drakvuf_trap_info_t* info,
-    addr_t input_buffer)
+                                        drakvuf_trap_info_t* info,
+                                        addr_t input_buffer)
 {
     addr_t file_handle = drakvuf_get_function_argument(drakvuf, info, 1);
     char* file_name = drakvuf_get_filename_from_handle(drakvuf, info, file_handle);
@@ -282,10 +282,10 @@ event_response_t linkmon::print_symlink(drakvuf_t,
     addr_t struct_offset = input_buffer + this->offsets[REPARSE_DATA_BUFFER_SYMBOLICLINKREPARSEBUFFER];
     vmi_lock_guard vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = struct_offset + this->offsets[REPARSE_DATA_BUFFER_SUBSTITUTENAMEOFFSET_SYMLINK]
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = struct_offset + this->offsets[REPARSE_DATA_BUFFER_SUBSTITUTENAMEOFFSET_SYMLINK]
+                  );
 
     uint16_t substitute_name_offset = 0;
     if (VMI_FAILURE == vmi_read_16(vmi, &ctx, &substitute_name_offset))
@@ -322,16 +322,16 @@ event_response_t linkmon::print_symlink(drakvuf_t,
     vmi_free_unicode_str(substitute_name);
 
     fmt::print(this->m_output_format, "linkmon", drakvuf, info,
-        keyval("FileName", fmt::Qstr(file_name_str)),
-        keyval("LinkType", fmt::Qstr("symlink")),
-        keyval("Flags", fmt::Xval(flags)),
-        keyval("LinkTarget", fmt::Qstr(target_file_name_str)));
+               keyval("FileName", fmt::Qstr(file_name_str)),
+               keyval("LinkType", fmt::Qstr("symlink")),
+               keyval("Flags", fmt::Xval(flags)),
+               keyval("LinkTarget", fmt::Qstr(target_file_name_str)));
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 event_response_t linkmon::ntfscontrolfile_cb(drakvuf_t,
-    drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     uint32_t fs_control_code = drakvuf_get_function_argument(drakvuf, info, 6);
     if (fs_control_code != FSCTL_SET_REPARSE_POINT)
@@ -340,10 +340,10 @@ event_response_t linkmon::ntfscontrolfile_cb(drakvuf_t,
     addr_t input_buffer = drakvuf_get_function_argument(drakvuf, info, 7);
     vmi_lock_guard vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = input_buffer + this->offsets[REPARSE_DATA_BUFFER_REPARSETAG]
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = input_buffer + this->offsets[REPARSE_DATA_BUFFER_REPARSETAG]
+                  );
 
     uint32_t reparse_tag = 0;
     if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &reparse_tag))
@@ -354,23 +354,23 @@ event_response_t linkmon::ntfscontrolfile_cb(drakvuf_t,
 
     switch (reparse_tag)
     {
-        case IO_REPARSE_TAG_SYMLINK:
-            print_symlink(drakvuf, info, input_buffer);
-            break;
-        case IO_REPARSE_TAG_MOUNT_POINT:
-            print_junction(drakvuf, info, input_buffer);
-            break;
-        default:
-            PRINT_DEBUG("[LINKMON] Unsupported ReparseTag\n");
-            break;
+    case IO_REPARSE_TAG_SYMLINK:
+        print_symlink(drakvuf, info, input_buffer);
+        break;
+    case IO_REPARSE_TAG_MOUNT_POINT:
+        print_junction(drakvuf, info, input_buffer);
+        break;
+    default:
+        PRINT_DEBUG("[LINKMON] Unsupported ReparseTag\n");
+        break;
     }
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 linkmon::linkmon(drakvuf_t drakvuf,
-    const linkmon_config* c,
-    output_format_t output)
+                 const linkmon_config* c,
+                 output_format_t output)
     : pluginex(drakvuf, output)
 {
     if (!c->ole32_profile)
@@ -381,11 +381,11 @@ linkmon::linkmon(drakvuf_t drakvuf,
 
     auto ole32_profile_json = profile_guard(c->ole32_profile);
     if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json,
-            offset_names_1, this->offsets.size(), this->offsets.data()))
+                                           offset_names_1, this->offsets.size(), this->offsets.data()))
     {
         PRINT_DEBUG("[LINKMON] Second attempt to get offsets\n");
         if (!json_get_struct_members_array_rva(drakvuf, ole32_profile_json,
-                offset_names_2, this->offsets.size(), this->offsets.data()))
+                                               offset_names_2, this->offsets.size(), this->offsets.data()))
             throw -1;
     }
 

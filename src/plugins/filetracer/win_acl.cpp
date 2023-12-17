@@ -503,7 +503,7 @@ std::string read_sid(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets)
     ctx->addr = psid;
     size_t bytes_read = 0;
     if ( VMI_SUCCESS != vmi_read(vmi, ctx, sid_size, buffer.get(), &bytes_read) ||
-        sid_size != bytes_read)
+            sid_size != bytes_read)
         return string();
 
     return parse_sid(buffer.get(), sid_size);
@@ -532,29 +532,29 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
     ctx->addr = pacl + ACL_SIZE;
     size_t bytes_read = 0;
     if ( VMI_SUCCESS != vmi_read(vmi, ctx, aces_size, ace_ptr, &bytes_read) ||
-        aces_size != bytes_read)
+            aces_size != bytes_read)
         return string();
 
     // manual work done, may arise issues
     switch (format)
     {
-        case OUTPUT_CSV:
-            fmt << '"';
-            break;
+    case OUTPUT_CSV:
+        fmt << '"';
+        break;
 
-        case OUTPUT_KV:
-            fmt << base_name << '=' << ace_count;
-            break;
+    case OUTPUT_KV:
+        fmt << base_name << '=' << ace_count;
+        break;
 
-        case OUTPUT_JSON:
-            fmt << '"' << base_name << "\": [";
-            break;
+    case OUTPUT_JSON:
+        fmt << '"' << base_name << "\": [";
+        break;
 
-        default:
-        case OUTPUT_DEFAULT:
-            for (auto& c: base_name) c = std::toupper(c);
-            fmt << base_name << "_COUNT:" << ace_count;
-            break;
+    default:
+    case OUTPUT_DEFAULT:
+        for (auto& c: base_name) c = std::toupper(c);
+        fmt << base_name << "_COUNT:" << ace_count;
+        break;
     }
 
     size_t aces_read = 0;
@@ -568,58 +568,58 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
 
         switch (header->type)
         {
-                REGISTER_ACE_PARSER(ACCESS_ALLOWED_ACE)
-                REGISTER_ACE_PARSER(ACCESS_DENIED_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_AUDIT_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_ALARM_ACE)
-                REGISTER_ACE_PARSER(ACCESS_ALLOWED_OBJECT_ACE)
-                REGISTER_ACE_PARSER(ACCESS_DENIED_OBJECT_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_AUDIT_OBJECT_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_ALARM_OBJECT_ACE)
-                REGISTER_ACE_PARSER(ACCESS_ALLOWED_CALLBACK_ACE)
-                REGISTER_ACE_PARSER(ACCESS_DENIED_CALLBACK_ACE)
-                REGISTER_ACE_PARSER(ACCESS_ALLOWED_CALLBACK_OBJECT_ACE)
-                REGISTER_ACE_PARSER(ACCESS_DENIED_CALLBACK_OBJECT_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_AUDIT_CALLBACK_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_ALARM_CALLBACK_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_AUDIT_CALLBACK_OBJECT_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_ALARM_CALLBACK_OBJECT_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_MANDATORY_LABEL_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_RESOURCE_ATTRIBUTE_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_SCOPED_POLICY_ID_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_PROCESS_TRUST_LABEL_ACE)
-                REGISTER_ACE_PARSER(SYSTEM_ACCESS_FILTER_ACE)
+            REGISTER_ACE_PARSER(ACCESS_ALLOWED_ACE)
+            REGISTER_ACE_PARSER(ACCESS_DENIED_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_AUDIT_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_ALARM_ACE)
+            REGISTER_ACE_PARSER(ACCESS_ALLOWED_OBJECT_ACE)
+            REGISTER_ACE_PARSER(ACCESS_DENIED_OBJECT_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_AUDIT_OBJECT_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_ALARM_OBJECT_ACE)
+            REGISTER_ACE_PARSER(ACCESS_ALLOWED_CALLBACK_ACE)
+            REGISTER_ACE_PARSER(ACCESS_DENIED_CALLBACK_ACE)
+            REGISTER_ACE_PARSER(ACCESS_ALLOWED_CALLBACK_OBJECT_ACE)
+            REGISTER_ACE_PARSER(ACCESS_DENIED_CALLBACK_OBJECT_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_AUDIT_CALLBACK_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_ALARM_CALLBACK_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_AUDIT_CALLBACK_OBJECT_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_ALARM_CALLBACK_OBJECT_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_MANDATORY_LABEL_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_RESOURCE_ATTRIBUTE_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_SCOPED_POLICY_ID_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_PROCESS_TRUST_LABEL_ACE)
+            REGISTER_ACE_PARSER(SYSTEM_ACCESS_FILTER_ACE)
 
-            default:
-                break;
+        default:
+            break;
         }
 
         // manual work done, may arise issues
         switch (format)
         {
-            case OUTPUT_CSV:
-                if (ace_ptr != aces.get())
-                    fmt << ',';
-                fmt << type << ',' << hex << showbase << mask << ',' << sid;
-                break;
+        case OUTPUT_CSV:
+            if (ace_ptr != aces.get())
+                fmt << ',';
+            fmt << type << ',' << hex << showbase << mask << ',' << sid;
+            break;
 
-            case OUTPUT_KV:
-                fmt << ",Type=\"" << type << "\"";
-                if (!mask.empty())
-                    fmt << "," << hex << showbase << mask;
-                fmt << ",SID=\"" << sid << '"';
-                break;
+        case OUTPUT_KV:
+            fmt << ",Type=\"" << type << "\"";
+            if (!mask.empty())
+                fmt << "," << hex << showbase << mask;
+            fmt << ",SID=\"" << sid << '"';
+            break;
 
-            case OUTPUT_JSON:
-                if (ace_ptr != aces.get())
-                    fmt << ',';
-                fmt << "{\"Type\" : \"" << type << "\",\"AccessMask\" : \"" << hex << showbase << mask << "\",\"SID\" : \"" << sid << "\"}";
-                break;
+        case OUTPUT_JSON:
+            if (ace_ptr != aces.get())
+                fmt << ',';
+            fmt << "{\"Type\" : \"" << type << "\",\"AccessMask\" : \"" << hex << showbase << mask << "\",\"SID\" : \"" << sid << "\"}";
+            break;
 
-            default:
-            case OUTPUT_DEFAULT:
-                fmt << ",TYPE:" << type << ",ACCESS_MASK:\"" << hex << showbase << mask << "\",SID:" << sid;;
-                break;
+        default:
+        case OUTPUT_DEFAULT:
+            fmt << ",TYPE:" << type << ",ACCESS_MASK:\"" << hex << showbase << mask << "\",SID:" << sid;;
+            break;
         }
 
         if (0 == ace_size || ace_ptr + ace_size < ace_ptr)
@@ -635,18 +635,18 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
     // manual work done, may arise issues
     switch (format)
     {
-        case OUTPUT_CSV:
-            fmt << '"';
-            break;
+    case OUTPUT_CSV:
+        fmt << '"';
+        break;
 
-        case OUTPUT_JSON:
-            fmt << ']';
-            break;
+    case OUTPUT_JSON:
+        fmt << ']';
+        break;
 
-        default:
-        case OUTPUT_KV:
-        case OUTPUT_DEFAULT:
-            break;
+    default:
+    case OUTPUT_KV:
+    case OUTPUT_DEFAULT:
+        break;
     }
 
     return fmt.str();

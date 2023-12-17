@@ -118,7 +118,7 @@ public:
     void add(addr_t base)
     {
         if (unused.find(base) != unused.end() ||
-            used.find(base) != used.end())
+                used.find(base) != used.end())
         {
             PRINT_DEBUG("[PROCDUMP] Re-add pool %#lx\n", base);
             throw -1;
@@ -189,32 +189,32 @@ std::string to_str(procdump_stage stage)
 {
     switch (stage)
     {
-        case procdump_stage::need_suspend:
-            return "need_suspend";
-        case procdump_stage::suspend:
-            return "suspend";
-        case procdump_stage::pending:
-            return "pending";
-        case procdump_stage::get_irql:
-            return "get_irql";
-        case procdump_stage::allocate_pool:
-            return "allocate_pool";
-        case procdump_stage::prepare_minidump:
-            return "prepare_minidump";
-        case procdump_stage::copy_memory:
-            return "copy_memory";
-        case procdump_stage::resume:
-            return "resume";
-        case procdump_stage::target_awaken:
-            return "target_awaken";
-        case procdump_stage::finished:
-            return "finished";
-        case procdump_stage::target_wakeup:
-            return "target_wakeup";
-        case procdump_stage::timeout:
-            return "timeout";
-        default:
-            return "invalid";
+    case procdump_stage::need_suspend:
+        return "need_suspend";
+    case procdump_stage::suspend:
+        return "suspend";
+    case procdump_stage::pending:
+        return "pending";
+    case procdump_stage::get_irql:
+        return "get_irql";
+    case procdump_stage::allocate_pool:
+        return "allocate_pool";
+    case procdump_stage::prepare_minidump:
+        return "prepare_minidump";
+    case procdump_stage::copy_memory:
+        return "copy_memory";
+    case procdump_stage::resume:
+        return "resume";
+    case procdump_stage::target_awaken:
+        return "target_awaken";
+    case procdump_stage::finished:
+        return "finished";
+    case procdump_stage::target_wakeup:
+        return "target_wakeup";
+    case procdump_stage::timeout:
+        return "timeout";
+    default:
+        return "invalid";
     }
 }
 
@@ -322,13 +322,13 @@ public:
     std::unique_ptr<ProcdumpWriter> writer;
 
     procdump2_ctx(bool is_hosted,
-        addr_t base,
-        std::string name,
-        vmi_pid_t pid,
-        uint64_t idx_,
-        std::string procdump_dir,
-        bool use_compression,
-        const char* dump_reason)
+                  addr_t base,
+                  std::string name,
+                  vmi_pid_t pid,
+                  uint64_t idx_,
+                  std::string procdump_dir,
+                  bool use_compression,
+                  const char* dump_reason)
         : is_hosted(is_hosted)
         , target_process_base(base)
         , target_process_name(name)
@@ -338,8 +338,8 @@ public:
     {
         data_file_name = "procdump."s + std::to_string(idx);
         writer = ProcdumpWriterFactory::build(
-                procdump_dir + "/"s + data_file_name,
-                use_compression);
+                     procdump_dir + "/"s + data_file_name,
+                     use_compression);
 
         if (is_hosted)
             /* The hosted target is suspended from it's host... */
@@ -352,7 +352,7 @@ public:
     ~procdump2_ctx()
     {
         PRINT_DEBUG("[PROCDUMP] [%d:%d] [%srestored] Destroy task context\n"
-            , target_process_pid, stage(), is_restored() ? "" : "not ");
+                    , target_process_pid, stage(), is_restored() ? "" : "not ");
     }
 
     bool on_target_resuspend()
@@ -370,19 +370,19 @@ public:
 
         switch (m_stage)
         {
-            case procdump_stage::finished:
-                if (size == 0)
-                    return "Empty";
-                else
-                    return "Success";
-            case procdump_stage::target_wakeup:
-                return "WakeUp";
-            case procdump_stage::prepare_minidump:
-                return "PrepareMinidump";
-            case procdump_stage::allocate_pool:
-                return "AllocatePool";
-            default:
-                return "Fail";
+        case procdump_stage::finished:
+            if (size == 0)
+                return "Empty";
+            else
+                return "Success";
+        case procdump_stage::target_wakeup:
+            return "WakeUp";
+        case procdump_stage::prepare_minidump:
+            return "PrepareMinidump";
+        case procdump_stage::allocate_pool:
+            return "AllocatePool";
+        default:
+            return "Fail";
         }
     }
 
@@ -405,11 +405,11 @@ public:
             m_old_stage = m_stage;
             m_stage = new_stage;
             PRINT_DEBUG("[PROCDUMP] [%d] Stage switch: %s -> %s%s\n"
-                , target_process_pid
-                , to_str(m_old_stage).data()
-                , to_str(m_stage).data()
-                , m_timeout ? "(timeout)" : ""
-            );
+                        , target_process_pid
+                        , to_str(m_old_stage).data()
+                        , to_str(m_stage).data()
+                        , m_timeout ? "(timeout)" : ""
+                       );
         }
     }
 

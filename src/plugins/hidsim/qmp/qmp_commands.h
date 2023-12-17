@@ -175,7 +175,7 @@ struct json_object* construct_input_event_cmd(struct json_object* events)
     jobj = json_object_new_object();
 
     json_object_object_add(jobj, QMP_KEY_EXECUTE,
-        json_object_new_string(QMP_VAL_INPUT_SEND_EVENT));
+                           json_object_new_string(QMP_VAL_INPUT_SEND_EVENT));
     json_object_object_add(jobj, QMP_KEY_ARGUMENTS, arg_obj);
 
     return jobj;
@@ -198,11 +198,11 @@ struct json_object* construct_screendump_cmd(const char* filename)
 
     jobj = json_object_new_object();
     json_object_object_add(jobj, QMP_KEY_EXECUTE,
-        json_object_new_string(QMP_VAL_SCREENDUMP));
+                           json_object_new_string(QMP_VAL_SCREENDUMP));
 
     fn_obj = json_object_new_object();
     json_object_object_add(fn_obj, QMP_VAL_FILENAME,
-        json_object_new_string(filename));
+                           json_object_new_string(filename));
     json_object_object_add(jobj, QMP_KEY_ARGUMENTS, fn_obj);
 
     return jobj;
@@ -228,7 +228,7 @@ void add_type(struct json_object* type_obj, const char* type)
  * {\"type\": \"%s\", \"data\": { \"axis\": \"y\", \"value\": %d } }"
  */
 struct json_object* construct_mouse_move_event(enum AXIS_ENUM ax, bool is_abs,
-    int z)
+        int z)
 {
     struct json_object* evt_obj, *data_obj;
 
@@ -245,7 +245,7 @@ struct json_object* construct_mouse_move_event(enum AXIS_ENUM ax, bool is_abs,
      */
     data_obj = json_object_new_object();
     json_object_object_add(data_obj, QMP_KEY_AXIS,
-        json_object_new_string(AXIS_VALUES[ax]));
+                           json_object_new_string(AXIS_VALUES[ax]));
     json_object_object_add(data_obj, QMP_KEY_VALUE, json_object_new_int(z));
     json_object_object_add(evt_obj, QMP_KEY_DATA, data_obj);
 
@@ -269,9 +269,9 @@ struct json_object* construct_mouse_button_event(enum BTN_ENUM b, bool is_down)
     /* Constructs "data":  { \"down\": \"%s\", \"button\": %s } */
     data_obj = json_object_new_object();
     json_object_object_add(data_obj, QMP_KEY_DOWN,
-        json_object_new_boolean(is_down));
+                           json_object_new_boolean(is_down));
     json_object_object_add(data_obj, QMP_KEY_BTN,
-        json_object_new_string(BTN_VALUES[b]));
+                           json_object_new_string(BTN_VALUES[b]));
     json_object_object_add(evt_obj, QMP_KEY_DATA, data_obj);
 
     return evt_obj;
@@ -296,7 +296,7 @@ struct json_object* construct_qapi_keypress_event(int key, bool is_down)
     /* Constructs \"data\" : { \"down\": %s, \"key\": { */
     data_obj = json_object_new_object();
     json_object_object_add(data_obj, QMP_KEY_DOWN,
-        json_object_new_boolean(is_down));
+                           json_object_new_boolean(is_down));
 
     /* Constructs {\"type\": \"qcode\", \"data\": \"%s\" } */
     key_obj = json_object_new_object();
@@ -305,7 +305,7 @@ struct json_object* construct_qapi_keypress_event(int key, bool is_down)
     {
         add_type(key_obj, QMP_VAL_QCODE);
         json_object_object_add(key_obj, QMP_KEY_DATA,
-            json_object_new_string(name_map_linux_to_qcode[key]));
+                               json_object_new_string(name_map_linux_to_qcode[key]));
     }
     else
     {

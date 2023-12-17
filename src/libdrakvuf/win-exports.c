@@ -123,7 +123,7 @@
 // search for the given module+symbol in the given module list
 static status_t
 modlist_sym2va(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx,
-    const char* module_name, const char* symbol, addr_t* va)
+               const char* module_name, const char* symbol, addr_t* va)
 {
     addr_t dllbase;
     if (win_get_module_base_addr_ctx(drakvuf, module_list_head, ctx, module_name, &dllbase))
@@ -165,8 +165,8 @@ addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const ch
     }
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = pid);
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = pid);
 
     addr_t dllbase;
     if (win_get_module_base_addr_ctx(drakvuf, module_list, &ctx, module_name, &dllbase))
@@ -182,8 +182,8 @@ addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char* mod
     addr_t inloadorder;
     addr_t ret = 0;
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB
+                  );
 
     if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return 0;
@@ -199,7 +199,7 @@ addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char* mod
         return 0;
 
     PRINT_DEBUG("Found PEB @ 0x%lx. LDR @ 0x%lx. INLOADORDER @ 0x%lx.\n",
-        peb, ldr, inloadorder);
+                peb, ldr, inloadorder);
 
     modlist_sym2va(drakvuf, inloadorder, &ctx, mod_name, symbol, &ret);
     return ret;

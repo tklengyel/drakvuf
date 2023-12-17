@@ -211,6 +211,8 @@ struct drakvuf
     // Cache for extracted linux kernel version
     kernel_version_t kernel_ver;
     bool kernel_ver_initialized;
+    // Skip altp2m check
+    bool skip_altp2m_check;
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests
@@ -355,19 +357,19 @@ typedef struct intercept_process
 void drakvuf_force_resume (drakvuf_t drakvuf);
 
 bool drakvuf_get_current_process_data(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    proc_data_priv_t* proc_data);
+                                      drakvuf_trap_info_t* info,
+                                      proc_data_priv_t* proc_data);
 
 bool drakvuf_get_process_data_priv(drakvuf_t drakvuf,
-    addr_t process_base,
-    proc_data_priv_t* proc_data);
+                                   addr_t process_base,
+                                   proc_data_priv_t* proc_data);
 
 char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    bool fullpath);
+                                       drakvuf_trap_info_t* info,
+                                       bool fullpath);
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info);
+        drakvuf_trap_info_t* info);
 
 bool drakvuf_is_ignored_process(drakvuf_t drakvuf, vmi_pid_t pid);
 

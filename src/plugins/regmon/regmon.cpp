@@ -167,17 +167,17 @@ void regmon::print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* in
         flags = parse_flags(reg_opts, reg_options, this->m_output_format);
 
     fmt::print(this->m_output_format, "regmon", drakvuf, info,
-        keyval("Key", fmt::Qstr(key_name)),
-        keyval("ValueName", value_name_opt),
-        keyval("Value", value_opt),
-        flagsval("RegOptions", flags)
-    );
+               keyval("Key", fmt::Qstr(key_name)),
+               keyval("ValueName", value_name_opt),
+               keyval("Value", value_opt),
+               flagsval("RegOptions", flags)
+              );
 }
 
 event_response_t regmon::log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    uint64_t key_handle,
-    char const* value_name,
-    char const* data )
+                                       uint64_t key_handle,
+                                       char const* value_name,
+                                       char const* data )
 {
     if (!key_handle) return 0;
 
@@ -197,9 +197,9 @@ static char const* get_value_name(unicode_string_t* us)
 }
 
 event_response_t regmon::log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    uint64_t key_handle,
-    addr_t value_name_addr, bool with_value_name,
-    char const* data )
+                                       uint64_t key_handle,
+                                       addr_t value_name_addr, bool with_value_name,
+                                       char const* data )
 {
     unicode_string_t* value_name_us = nullptr;
     char const* value_name = nullptr;
@@ -217,13 +217,13 @@ event_response_t regmon::log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* i
 }
 
 event_response_t regmon::log_reg_key( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    uint64_t key_handle)
+                                      uint64_t key_handle)
 {
     return log_reg_impl(drakvuf, info, key_handle, 0L, false, nullptr);
 }
 
 event_response_t regmon::log_reg_key_value( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    uint64_t key_handle, addr_t value_name_addr )
+        uint64_t key_handle, addr_t value_name_addr )
 {
     return log_reg_impl(drakvuf, info, key_handle, value_name_addr, true, nullptr);
 }
@@ -235,9 +235,9 @@ char* regmon::get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     addr_t key_handle;
     ctx.addr = attr + this->objattr_root;
@@ -258,9 +258,9 @@ char* regmon::get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     }
 
     char* key_path = g_strdup_printf("%s%s%s",
-            key_root_p ?: "",
-            key_root_p ? "\\" : "",
-            (const char*)us->contents ?: "");
+                                     key_root_p ?: "",
+                                     key_root_p ? "\\" : "",
+                                     (const char*)us->contents ?: "");
     g_free(key_root_p);
     vmi_free_unicode_str(us);
 
@@ -280,13 +280,13 @@ event_response_t regmon::log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t*
 }
 
 unicode_string_t* regmon::get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    uint32_t type, addr_t data_addr, size_t data_size )
+        uint32_t type, addr_t data_addr, size_t data_size )
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = data_addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = data_addr
+                  );
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -353,8 +353,8 @@ unicode_string_t* regmon::get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_in
 }
 
 event_response_t regmon::log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    uint64_t key_handle, addr_t value_name_addr,
-    uint32_t type, addr_t data_addr, size_t data_size )
+        uint64_t key_handle, addr_t value_name_addr,
+        uint32_t type, addr_t data_addr, size_t data_size )
 {
     unicode_string_t* data_us = get_data_as_string(drakvuf, info, type, data_addr, data_size);
 
@@ -371,7 +371,7 @@ event_response_t regmon::log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap
 }
 
 event_response_t regmon::log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-    uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count )
+        uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count )
 {
     /*
     typedef struct _KEY_VALUE_ENTRY {
@@ -391,10 +391,10 @@ event_response_t regmon::log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_t
         auto vmi = vmi_lock_guard(drakvuf);
 
         ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof
-        );
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof
+                      );
 
         addr_t value_name_addr;
         if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &value_name_addr) )

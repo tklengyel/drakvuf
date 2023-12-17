@@ -176,15 +176,15 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
 
     switch (drakvuf_get_os_type(drakvuf))
     {
-        case VMI_OS_WINDOWS:
-            trap = createWindowsTrap(drakvuf, syscall_name, ttl);
-            break;
-        case VMI_OS_LINUX:
-            trap = createLinuxTrap(drakvuf, syscall_name, ttl);
-            break;
-        default:
-            PRINT_DEBUG("[LIBHOOK] Failed to create syscall hook for unsupported OS \n");
-            break;
+    case VMI_OS_WINDOWS:
+        trap = createWindowsTrap(drakvuf, syscall_name, ttl);
+        break;
+    case VMI_OS_LINUX:
+        trap = createLinuxTrap(drakvuf, syscall_name, ttl);
+        break;
+    default:
+        PRINT_DEBUG("[LIBHOOK] Failed to create syscall hook for unsupported OS \n");
+        break;
     }
 
     if (!trap)

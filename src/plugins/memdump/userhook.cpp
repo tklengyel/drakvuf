@@ -176,7 +176,7 @@ void memdump::userhook_init(const memdump_config* c, output_format_t output)
     catch (const std::runtime_error& exc)
     {
         std::cerr << "Loading DLL hook configuration for MEMDUMP plugin failed\n"
-            << "Reason: " << exc.what() << "\n";
+                  << "Reason: " << exc.what() << "\n";
         throw -1;
     }
 

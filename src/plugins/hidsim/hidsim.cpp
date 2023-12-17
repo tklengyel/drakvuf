@@ -126,12 +126,12 @@ bool hidsim::check_platform_support(drakvuf_t drakvuf)
     if (bi.version == VMI_OS_WINDOWS_7)
     {
         PRINT_DEBUG("[HIDSIM] GUI reconstruction supported"
-            "on Windows 7\n");
+                    "on Windows 7\n");
         return true;
     }
 
     PRINT_DEBUG("[HIDSIM] GUI reconstruction is NOT supported "
-        "on this guest system\n");
+                "on this guest system\n");
     return false;
 }
 
@@ -154,7 +154,7 @@ bool hidsim::prepare_gui_reconstruction(drakvuf_t drakvuf, const char* win32k_pr
     {
         /* Initializes reconstruction  */
         return gui_init_reconstruction(drakvuf, this->win32k_json_path.c_str(),
-                is_x86) == 0;
+                                       is_x86) == 0;
     }
     return false;
 }
@@ -179,7 +179,7 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config) :
     {
         this->template_path = config->template_fp;
         PRINT_DEBUG("[HIDSIM] Using template file: %s\n",
-            this->template_path.c_str());
+                    this->template_path.c_str());
     }
 
     this->is_rand_clicks = config->is_rand_clicks;
@@ -196,12 +196,12 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config) :
 
     /* Starts injection thread */
     this->thread_inject = std::thread(hid_inject, sock_path.c_str(),
-            template_path.c_str(), is_rand_clicks, &coords, &has_to_stop);
+                                      template_path.c_str(), is_rand_clicks, &coords, &has_to_stop);
 
     /* GUI Reconstruction thread */
     if (this->is_monitor && this->is_gui_support)
         this->thread_reconstruct = std::thread(gui_monitor, drakvuf, &coords,
-                &has_to_stop);
+                                               &has_to_stop);
 
     PRINT_DEBUG("[HIDSIM] HID injection started\n");
 }

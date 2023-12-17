@@ -144,9 +144,9 @@ struct guid_t
         const int sz = 64;
         char stream[sz] = { 0 };
         snprintf(stream, sz, "{%08X-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}",
-            data1, data2, data3,
-            data4[0], data4[1], data4[2], data4[3],
-            data4[4], data4[5], data4[6], data4[7]);
+                 data1, data2, data3,
+                 data4[0], data4[1], data4[2], data4[3],
+                 data4[4], data4[5], data4[6], data4[7]);
         return std::string(stream);
     }
 } __attribute__((packed, aligned(4)));

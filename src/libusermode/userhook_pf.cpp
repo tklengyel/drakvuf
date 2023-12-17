@@ -197,10 +197,10 @@ event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_inf
             if (target.type == HOOK_BY_NAME)
             {
                 ACCESS_CONTEXT(ctx,
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = dll_meta->v.real_dll_base
-                );
+                               .translate_mechanism = VMI_TM_PROCESS_DTB,
+                               .dtb = info->regs->cr3,
+                               .addr = dll_meta->v.real_dll_base
+                              );
 
                 if (vmi_translate_sym2v(vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
                 {
@@ -231,7 +231,7 @@ event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_inf
                     else
                     {
                         PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
-                            (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
+                                    (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
                     }
                     return VMI_EVENT_RESPONSE_NONE;
                 }
@@ -260,10 +260,10 @@ event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_inf
             }
 
             PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
-                target.target_name.c_str(),
-                (unsigned long long)exec_func,
-                (unsigned long long)dll_meta->v.real_dll_base,
-                target.state == HOOK_OK ? "OK" : "FAIL");
+                        target.target_name.c_str(),
+                        (unsigned long long)exec_func,
+                        (unsigned long long)dll_meta->v.real_dll_base,
+                        target.state == HOOK_OK ? "OK" : "FAIL");
         }
     }
 

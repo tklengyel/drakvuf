@@ -179,9 +179,9 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
             // The syscall args are passed via a struct pt_regs *, which is in %rdi upon entry
             size_t pt_regs[__PT_REGS_MAX] = {0};
             ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3
-            );
+                           .translate_mechanism = VMI_TM_PROCESS_DTB,
+                           .dtb = info->regs->cr3
+                          );
 
             for ( int i = 0; i < __PT_REGS_MAX; i++)
             {
@@ -270,15 +270,15 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     g_free(tmp);
 
     fmt::print(this->m_output_format, "syscall", drakvuf, info,
-        keyval("ThreadName", fmt::Estr(thread_name)),
-        keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval((uint64_t)(params->num))),
-        keyval("NArgs", fmt::Nval(params->sc->num_args)),
-        keyval("Type", fmt::Estr(params->type)),
-        this->fmt_args
-    );
+               keyval("ThreadName", fmt::Estr(thread_name)),
+               keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
+               keyval("vCPU", fmt::Nval(info->vcpu)),
+               keyval("CR3", fmt::Xval(info->regs->cr3)),
+               keyval("Syscall", fmt::Nval((uint64_t)(params->num))),
+               keyval("NArgs", fmt::Nval(params->sc->num_args)),
+               keyval("Type", fmt::Estr(params->type)),
+               this->fmt_args
+              );
 }
 
 event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

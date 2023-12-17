@@ -111,7 +111,7 @@
 bool is_dll_name_matched(const std::string& dll_name, const std::string& pattern)
 {
     auto it = std::find_end(dll_name.begin(), dll_name.end(), pattern.begin(), pattern.end(),
-            [](char x, char y)
+                            [](char x, char y)
     {
         return std::toupper(x) == std::toupper(y);
     });
