@@ -310,8 +310,8 @@ static bool find_module_visitor(drakvuf_t drakvuf, module_info_t* module_info, b
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = pid);
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = pid);
 
     struct find_module_visitor_ctx visitor_ctx = { .module_name = trap->breakpoint.module, .ret = NULL };
     if (!win_enumerate_module_info_ctx(drakvuf, list_head, &ctx, find_module_visitor, &visitor_ctx))
@@ -367,9 +367,9 @@ bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, ac
 bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4
+                  );
 
     return win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, base_addr_out);
 }
@@ -545,22 +545,22 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     {
         switch (narg)
         {
-            case 1:
-                return info->regs->rcx;
-            case 2:
-                return info->regs->rdx;
-            case 3:
-                return info->regs->r8;
-            case 4:
-                return info->regs->r9;
+        case 1:
+            return info->regs->rcx;
+        case 2:
+            return info->regs->rdx;
+        case 3:
+            return info->regs->r8;
+        case 4:
+            return info->regs->r9;
         }
     }
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * (is32 ? 4 : 8)
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = info->regs->rsp + narg * (is32 ? 4 : 8)
+                  );
 
     addr_t ret;
     if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret))
@@ -571,10 +571,10 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = info->regs->rsp
+                  );
 
     addr_t ret_addr;
     if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret_addr))
@@ -611,8 +611,8 @@ void win_set_return_context(drakvuf_t drakvuf __attribute__((unused)), drakvuf_t
 bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     return (info->attached_proc_data.pid == pid)
-        && (info->attached_proc_data.tid == tid)
-        && (!rsp || info->regs->rsp >= rsp);
+           && (info->attached_proc_data.tid == tid)
+           && (!rsp || info->regs->rsp >= rsp);
 }
 
 bool win_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
@@ -656,13 +656,13 @@ bool set_os_windows(drakvuf_t drakvuf)
     }
 
     if (VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY] ) ||
-        VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_OBJECT_HEADER",      &drakvuf->sizes[OBJECT_HEADER]))
+            VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_OBJECT_HEADER",      &drakvuf->sizes[OBJECT_HEADER]))
     {
         return 0;
     }
 
     if (VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObpInfoMaskToOffset", &drakvuf->ob_infomask2off) ||
-        VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObTypeIndexTable",    &drakvuf->ob_type_table))
+            VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObTypeIndexTable",    &drakvuf->ob_type_table))
     {
         return 0;
     }

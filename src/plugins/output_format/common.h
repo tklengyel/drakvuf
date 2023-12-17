@@ -330,15 +330,15 @@ struct BinaryString<T,
 
 /* Any argument type */
 using Aarg = std::variant<
-    fmt::Nval<unsigned long>,
-    fmt::Xval<unsigned long>,
-    fmt::Fval<long double>,
-    fmt::Rstr<const char*>,
-    fmt::Rstr<std::string>,
-    fmt::Qstr<const char*>,
-    fmt::Qstr<std::string>,
-    fmt::Estr<const char*>,
-    fmt::Estr<std::string>>;
+             fmt::Nval<unsigned long>,
+             fmt::Xval<unsigned long>,
+             fmt::Fval<long double>,
+             fmt::Rstr<const char*>,
+             fmt::Rstr<std::string>,
+             fmt::Qstr<const char*>,
+             fmt::Qstr<std::string>,
+             fmt::Estr<const char*>,
+             fmt::Estr<std::string>>;
 
 } // namespace fmt
 

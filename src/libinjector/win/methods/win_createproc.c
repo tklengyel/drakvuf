@@ -119,89 +119,89 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     switch (base_injector->step)
     {
-        case STEP1:
+    case STEP1:
+    {
+        // save registers
+        PRINT_DEBUG("Saving registers\n");
+        memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+
+        if (!setup_create_process_stack(injector, info->regs))
         {
-            // save registers
-            PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
-
-            if (!setup_create_process_stack(injector, info->regs))
-            {
-                fprintf(stderr, "Failed to setup create process stack\n");
-                return cleanup(drakvuf, info);
-            }
-
-            injector->target_rsp = info->regs->rsp;
-            info->regs->rip = injector->exec_func;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            fprintf(stderr, "Failed to setup create process stack\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP2:
+
+        injector->target_rsp = info->regs->rsp;
+        info->regs->rip = injector->exec_func;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP2:
+    {
+        // We are now in the return path from CreateProcessW
+        if (is_fun_error(drakvuf, info, "CreateProcessW Failed"))
+            return cleanup(drakvuf, info);
+
+        if (!fill_created_process_info(injector, info))
+            return cleanup(drakvuf, info);
+
+        if (!injector->pid || !injector->tid)
         {
-            // We are now in the return path from CreateProcessW
-            if (is_fun_error(drakvuf, info, "CreateProcessW Failed"))
-                return cleanup(drakvuf, info);
-
-            if (!fill_created_process_info(injector, info))
-                return cleanup(drakvuf, info);
-
-            if (!injector->pid || !injector->tid)
-            {
-                fprintf(stderr, "Failed to inject\n");
-                return cleanup(drakvuf, info);
-            }
-
-            PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
-
-            if (!setup_resume_thread_stack(injector, info->regs))
-            {
-                fprintf(stderr, "Failed to setup stack for passing inputs!\n");
-                return cleanup(drakvuf, info);
-            }
-
-            injector->target_rsp = info->regs->rsp;
-
-            if (!setup_wait_for_injected_process_trap(injector))
-                return cleanup(drakvuf, info);
-
-            info->regs->rip = injector->resume_thread;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            fprintf(stderr, "Failed to inject\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP3: // We are now in the return path from ResumeThread
+
+        PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
+
+        if (!setup_resume_thread_stack(injector, info->regs))
         {
-            PRINT_DEBUG("Resume RAX: 0x%lx\n", info->regs->rax);
-
-            injector->rc = (info->regs->rax == 1) ? INJECTOR_SUCCEEDED : INJECTOR_FAILED;
-
-            if (injector->rc == INJECTOR_FAILED)
-            {
-                fprintf(stderr, "Failed to resume\n");
-                return cleanup(drakvuf, info);
-            }
-            PRINT_DEBUG("Resume successful\n");
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-
-            injector->resumed = true;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            fprintf(stderr, "Failed to setup stack for passing inputs!\n");
+            return cleanup(drakvuf, info);
         }
-        case STEP4: // exit loop
+
+        injector->target_rsp = info->regs->rsp;
+
+        if (!setup_wait_for_injected_process_trap(injector))
+            return cleanup(drakvuf, info);
+
+        info->regs->rip = injector->resume_thread;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP3: // We are now in the return path from ResumeThread
+    {
+        PRINT_DEBUG("Resume RAX: 0x%lx\n", info->regs->rax);
+
+        injector->rc = (info->regs->rax == 1) ? INJECTOR_SUCCEEDED : INJECTOR_FAILED;
+
+        if (injector->rc == INJECTOR_FAILED)
         {
-            PRINT_DEBUG("Detected: %d\n", injector->detected);
-            PRINT_DEBUG("Break on detection: %d\n", injector->break_loop_on_detection);
-            // It will keep running until the injected process is detected
-            // It ensures that we don't get in the main drakvuf loop somehow
-            if (injector->detected)
-            {
-                PRINT_DEBUG("Removing traps and exiting injector\n");
-                drakvuf_remove_trap(drakvuf, info->trap, NULL);
-                drakvuf_interrupt(drakvuf, SIGINT);
-            }
-            return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+            fprintf(stderr, "Failed to resume\n");
+            return cleanup(drakvuf, info);
         }
-        default:
+        PRINT_DEBUG("Resume successful\n");
+        memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+
+        injector->resumed = true;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP4: // exit loop
+    {
+        PRINT_DEBUG("Detected: %d\n", injector->detected);
+        PRINT_DEBUG("Break on detection: %d\n", injector->break_loop_on_detection);
+        // It will keep running until the injected process is detected
+        // It ensures that we don't get in the main drakvuf loop somehow
+        if (injector->detected)
         {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
+            PRINT_DEBUG("Removing traps and exiting injector\n");
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGINT);
         }
+        return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
 
     return VMI_EVENT_RESPONSE_NONE;

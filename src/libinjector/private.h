@@ -132,39 +132,39 @@ typedef struct
 } injection_error_t;
 
 injector_status_t injector_start_app_on_linux(drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
-    const char* app,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid);
+        vmi_pid_t pid,
+        uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
+        const char* app,
+        injection_method_t method,
+        output_format_t format,
+        const char* binary_path,
+        int args_count,
+        const char* args[],
+        vmi_pid_t* injected_pid);
 
 injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid,
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,
-    const char* target_process,
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search,
-    bool wait_for_exit,
-    vmi_pid_t* injected_pid);
+        vmi_pid_t pid,
+        uint32_t tid,
+        const char* app,
+        const char* cwd,
+        injection_method_t method,
+        output_format_t format,
+        const char* binary_path,
+        const char* target_process,
+        bool break_loop_on_detection,
+        injector_t* injector_to_be_freed,
+        bool global_search,
+        bool wait_for_exit,
+        vmi_pid_t* injected_pid);
 
 void injector_terminate_on_win(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid);
+                               vmi_pid_t injection_pid,
+                               uint32_t injection_tid,
+                               vmi_pid_t pid);
 
 void injector_exitthread_on_win(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid);
+                                vmi_pid_t injection_pid,
+                                uint32_t injection_tid);
 
 void print_injection_info(
     output_format_t format,

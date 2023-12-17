@@ -157,10 +157,10 @@ static addr_t place_string_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
     addr -= len + string_align - (len % string_align);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) str, NULL))
     {
@@ -192,10 +192,10 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     memcpy(buf, str, str_len);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     if (VMI_FAILURE == vmi_write(vmi, &ctx, buf_len, buf, NULL))
     {
@@ -216,10 +216,10 @@ static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
     addr -= addr % stack_align;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     if (VMI_FAILURE == vmi_write(vmi, &ctx, size, (void*)data, NULL))
     {
@@ -240,10 +240,10 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     addr &= ~0xf; // Align stack
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     if (VMI_FAILURE == vmi_write(vmi, &ctx, size, (void*)data, NULL))
     {
@@ -258,41 +258,41 @@ static addr_t place_argument_on_addr_32(vmi_instance_t vmi, x86_registers_t* reg
 {
     switch (arg->type)
     {
-        case ARGUMENT_STRING:
-        {
-            addr = place_string_on_stack_32(vmi, regs, addr, arg->data, arg->size);
-            if ( !addr ) goto err;
-            arg->data_on_stack = addr;
-            break;
-        }
-        case ARGUMENT_STRUCT:
-        {
-            addr = place_struct_on_stack_32(vmi, regs, addr, arg->data, arg->size);
-            if ( !addr ) goto err;
-            arg->data_on_stack = addr;
-            break;
-        }
-        case ARGUMENT_INT:
-        {
-            arg->data_on_stack = (uint64_t)arg->data;
-            addr -= 0x4;
+    case ARGUMENT_STRING:
+    {
+        addr = place_string_on_stack_32(vmi, regs, addr, arg->data, arg->size);
+        if ( !addr ) goto err;
+        arg->data_on_stack = addr;
+        break;
+    }
+    case ARGUMENT_STRUCT:
+    {
+        addr = place_struct_on_stack_32(vmi, regs, addr, arg->data, arg->size);
+        if ( !addr ) goto err;
+        arg->data_on_stack = addr;
+        break;
+    }
+    case ARGUMENT_INT:
+    {
+        arg->data_on_stack = (uint64_t)arg->data;
+        addr -= 0x4;
 
-            ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = regs->cr3,
-                .addr = addr
-            );
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = regs->cr3,
+                       .addr = addr
+                      );
 
-            if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*)&arg->data_on_stack))
-            {
-                PRINT_DEBUG("Could not write int(%d) at address(%lx)\n", (uint32_t)arg->data_on_stack, addr);
-                goto err;
-            }
-
-            break;
-        }
-        default:
+        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*)&arg->data_on_stack))
+        {
+            PRINT_DEBUG("Could not write int(%d) at address(%lx)\n", (uint32_t)arg->data_on_stack, addr);
             goto err;
+        }
+
+        break;
+    }
+    default:
+        goto err;
     }
     return addr;
 err:
@@ -304,41 +304,41 @@ static addr_t place_argument_on_addr_64(vmi_instance_t vmi, x86_registers_t* reg
 {
     switch (arg->type)
     {
-        case ARGUMENT_STRING:
-        {
-            addr = place_string_on_stack_64(vmi, regs, addr, arg->data, arg->size);
-            if ( !addr ) goto err;
-            arg->data_on_stack = addr;
-            break;
-        }
-        case ARGUMENT_STRUCT:
-        {
-            addr = place_struct_on_stack_64(vmi, regs, addr, arg->data, arg->size);
-            if ( !addr ) goto err;
-            arg->data_on_stack = addr;
-            break;
-        }
-        case ARGUMENT_INT:
-        {
-            arg->data_on_stack = (uint64_t)arg->data;
-            addr -= 0x8;
+    case ARGUMENT_STRING:
+    {
+        addr = place_string_on_stack_64(vmi, regs, addr, arg->data, arg->size);
+        if ( !addr ) goto err;
+        arg->data_on_stack = addr;
+        break;
+    }
+    case ARGUMENT_STRUCT:
+    {
+        addr = place_struct_on_stack_64(vmi, regs, addr, arg->data, arg->size);
+        if ( !addr ) goto err;
+        arg->data_on_stack = addr;
+        break;
+    }
+    case ARGUMENT_INT:
+    {
+        arg->data_on_stack = (uint64_t)arg->data;
+        addr -= 0x8;
 
-            ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = regs->cr3,
-                .addr = addr
-            );
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = regs->cr3,
+                       .addr = addr
+                      );
 
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(arg->data_on_stack)) )
-            {
-                PRINT_DEBUG("Could not write int(%ld) at address(%lx)\n", arg->data_on_stack, addr);
-                goto err;
-            }
-
-            break;
-        }
-        default:
+        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(arg->data_on_stack)) )
+        {
+            PRINT_DEBUG("Could not write int(%ld) at address(%lx)\n", arg->data_on_stack, addr);
             goto err;
+        }
+
+        break;
+    }
+    default:
+        goto err;
     }
     return addr;
 err:
@@ -352,26 +352,26 @@ static addr_t place_array_data_on_addr_64(vmi_instance_t vmi, x86_registers_t* r
     {
         switch (args[i].type)
         {
-            case ARGUMENT_STRING:
-                addr = place_string_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
-                if (!addr) return 0;
-                args[i].data_on_stack = addr;
-                break;
-            case ARGUMENT_STRUCT:
-                addr = place_struct_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
-                if (!addr) return 0;
-                args[i].data_on_stack = addr;
-                break;
-            case ARGUMENT_INT:
-                args[i].data_on_stack = (uint64_t)args[i].data;
-                break;
-            case ARGUMENT_ARRAY:
-                // should be placed manually using place_array_on_addr_64
-                // which will set data_on_stack
-                break;
-            default:
-                PRINT_DEBUG("Undefined argument type\n");
-                return 0;
+        case ARGUMENT_STRING:
+            addr = place_string_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
+            if (!addr) return 0;
+            args[i].data_on_stack = addr;
+            break;
+        case ARGUMENT_STRUCT:
+            addr = place_struct_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
+            if (!addr) return 0;
+            args[i].data_on_stack = addr;
+            break;
+        case ARGUMENT_INT:
+            args[i].data_on_stack = (uint64_t)args[i].data;
+            break;
+        case ARGUMENT_ARRAY:
+            // should be placed manually using place_array_on_addr_64
+            // which will set data_on_stack
+            break;
+        default:
+            PRINT_DEBUG("Undefined argument type\n");
+            return 0;
         }
     }
     return addr;
@@ -460,33 +460,33 @@ static bool setup_stack_32(
     {
         switch (args[i].type)
         {
-            case ARGUMENT_STRING:
-                addr = place_string_on_stack_32(vmi, regs, addr, args[i].data, args[i].size);
-                if ( !addr ) goto err;
-                args[i].data_on_stack = addr;
-                break;
-            case ARGUMENT_STRUCT:
-                addr = place_struct_on_stack_32(vmi, regs, addr, args[i].data, args[i].size);
-                if ( !addr ) goto err;
-                args[i].data_on_stack = addr;
-                break;
-            case ARGUMENT_INT:
-                args[i].data_on_stack = (uint64_t)args[i].data;
-                break;
-            case ARGUMENT_ARRAY:
-                // should be placed manually using place_array_on_addr_32
-                // which will set data_on_stack
-                break;
-            default:
-                PRINT_DEBUG("Undefined argument type\n");
-                goto err;
+        case ARGUMENT_STRING:
+            addr = place_string_on_stack_32(vmi, regs, addr, args[i].data, args[i].size);
+            if ( !addr ) goto err;
+            args[i].data_on_stack = addr;
+            break;
+        case ARGUMENT_STRUCT:
+            addr = place_struct_on_stack_32(vmi, regs, addr, args[i].data, args[i].size);
+            if ( !addr ) goto err;
+            args[i].data_on_stack = addr;
+            break;
+        case ARGUMENT_INT:
+            args[i].data_on_stack = (uint64_t)args[i].data;
+            break;
+        case ARGUMENT_ARRAY:
+            // should be placed manually using place_array_on_addr_32
+            // which will set data_on_stack
+            break;
+        default:
+            PRINT_DEBUG("Undefined argument type\n");
+            goto err;
         }
     }
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3
+                  );
 
     // write parameters into guest's stack
     for (i = nb_args-1; i >= 0; i--)
@@ -526,9 +526,9 @@ static bool setup_stack_64(
     uint64_t nul64 = 0;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3
+                  );
 
     addr_t addr = regs->rsp;
 
@@ -574,24 +574,24 @@ static bool setup_stack_64(
 
         switch (nb_args)
         {
-            default:
-                // p4
-                regs->r9 = args[3].data_on_stack;
-            // fall through
-            case 3:
-                // p3
-                regs->r8 = args[2].data_on_stack;
-            // fall through
-            case 2:
-                // p2
-                regs->rdx = args[1].data_on_stack;
-            // fall through
-            case 1:
-                // p1
-                regs->rcx = args[0].data_on_stack;
-            // fall through
-            case 0:
-                break;
+        default:
+            // p4
+            regs->r9 = args[3].data_on_stack;
+        // fall through
+        case 3:
+            // p3
+            regs->r8 = args[2].data_on_stack;
+        // fall through
+        case 2:
+            // p2
+            regs->rdx = args[1].data_on_stack;
+        // fall through
+        case 1:
+            // p1
+            regs->rcx = args[0].data_on_stack;
+        // fall through
+        case 0:
+            break;
         }
     }
 
@@ -651,26 +651,26 @@ static bool setup_linux_syscall(
 
         switch (nb_args)
         {
-            default:
-                regs->r9 = args[5].data_on_stack;
-            // fall through
-            case 5:
-                regs->r8 = args[4].data_on_stack;
-            // fall through
-            case 4:
-                regs->r10 = args[3].data_on_stack;
-            // fall through
-            case 3:
-                regs->rdx = args[2].data_on_stack;
-            // fall through
-            case 2:
-                regs->rsi = args[1].data_on_stack;
-            // fall through
-            case 1:
-                regs->rdi = args[0].data_on_stack;
-            // fall through
-            case 0:
-                break;
+        default:
+            regs->r9 = args[5].data_on_stack;
+        // fall through
+        case 5:
+            regs->r8 = args[4].data_on_stack;
+        // fall through
+        case 4:
+            regs->r10 = args[3].data_on_stack;
+        // fall through
+        case 3:
+            regs->rdx = args[2].data_on_stack;
+        // fall through
+        case 2:
+            regs->rsi = args[1].data_on_stack;
+        // fall through
+        case 1:
+            regs->rdi = args[0].data_on_stack;
+        // fall through
+        case 0:
+            break;
         }
     }
 
@@ -686,10 +686,10 @@ static void setup_stack_marker(
     uint64_t* stack_marker)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = regs->rsp - 0x8
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = regs->rsp - 0x8
+                  );
 
     if (VMI_FAILURE == vmi_write_64(vmi, &ctx, stack_marker))
     {
@@ -717,8 +717,8 @@ static bool setup_stack_marked_locked(
     {
         bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
         return is32bit
-            ? setup_stack_32(vmi, regs, args, nb_args)
-            : setup_stack_64(vmi, regs, args, nb_args);
+               ? setup_stack_32(vmi, regs, args, nb_args)
+               : setup_stack_64(vmi, regs, args, nb_args);
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {

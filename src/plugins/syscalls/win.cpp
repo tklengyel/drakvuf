@@ -268,7 +268,7 @@ static std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t addr,
                 {
                     .name = std::move(name),
                     .base = mmvad.starting_vpn << 12,
-                        .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
+                                               .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
                 });
                 vmi_free_unicode_str(u_name);
                 return mods.back().name;
@@ -316,7 +316,7 @@ static std::optional<std::string> resolve_parent_module(drakvuf_t drakvuf, drakv
     vmi_lock_guard vmi(drakvuf);
     addr_t rsp, top;
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, drakvuf_get_rspbase(drakvuf, info) - 0x10, 0, &rsp) ||
-        VMI_SUCCESS != vmi_read_addr_va(vmi, rsp, info->attached_proc_data.pid, &top))
+            VMI_SUCCESS != vmi_read_addr_va(vmi, rsp, info->attached_proc_data.pid, &top))
     {
         PRINT_DEBUG("[SYSCALLS] Failed to resolve top of the stack\n");
         return {};
@@ -327,7 +327,7 @@ static std::optional<std::string> resolve_parent_module(drakvuf_t drakvuf, drakv
 /// Get module that called Nt (syscall) function and previous mode.
 ///
 static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<std::string>>
-    get_syscall_retinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s)
+        get_syscall_retinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s)
 {
     if (s->is32bit)
     {
@@ -358,7 +358,7 @@ static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<st
             for (const auto& lib : whitelisted_libraries)
             {
                 if (resolved_lib.length() >= lib.length() &&
-                    resolved_lib.compare(resolved_lib.length() - lib.length(), lib.length(), lib) == 0)
+                        resolved_lib.compare(resolved_lib.length() - lib.length(), lib.length(), lib) == 0)
                 {
                     return { mode, std::move(resolved_lib), resolve_parent_module(drakvuf, info, s) };
                 }
@@ -494,7 +494,7 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
             this->strings_to_free = g_slist_prepend(this->strings_to_free, tmp);
             symbol_name = (const char*)tmp;
             PRINT_DEBUG("\t Syscall %s:%s has no internal definition. New syscall?\n",
-                ntos ? "nt" : "wink32k", symbol_name);
+                        ntos ? "nt" : "wink32k", symbol_name);
         }
         else
             symbol_name = definition->name;
@@ -507,10 +507,10 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
 
         breakpoint_by_dtb_searcher bp;
         auto trap = this->register_trap<wrapper_t>(
-                nullptr,
-                syscall_cb,
-                bp.for_virt_addr(syscall_va).for_dtb(cr3),
-                symbol_name);
+                        nullptr,
+                        syscall_cb,
+                        bp.for_virt_addr(syscall_va).for_dtb(cr3),
+                        symbol_name);
 
         if (!trap)
         {
@@ -821,16 +821,16 @@ void win_syscalls::print_syscall(
         priv_mode_opt = fmt::Rstr(mode == USER_MODE ? "User" : "Kernel");
 
     fmt::print(this->m_output_format, "syscall", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("NArgs", fmt::Nval(args.size())),
-        keyval("PreviousMode", priv_mode_opt),
-        keyval("FromModule", from_dll_opt),
-        keyval("FromParentModule", from_parent_dll_opt),
-        std::move(fmt_args)
-    );
+               keyval("Module", fmt::Qstr(std::move(module))),
+               keyval("vCPU", fmt::Nval(info->vcpu)),
+               keyval("CR3", fmt::Xval(info->regs->cr3)),
+               keyval("Syscall", fmt::Nval(nr)),
+               keyval("NArgs", fmt::Nval(args.size())),
+               keyval("PreviousMode", priv_mode_opt),
+               keyval("FromModule", from_dll_opt),
+               keyval("FromParentModule", from_parent_dll_opt),
+               std::move(fmt_args)
+              );
 }
 
 win_syscalls::~win_syscalls()

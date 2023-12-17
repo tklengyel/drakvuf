@@ -213,5 +213,5 @@ extern Offsets symbol_offsets;
  * Kicks off the initializion of the globally accessible symbol_offsets_struct
  */
 status_t initialize_offsets(vmi_instance_t vmi, json_object* kernel_json,
-    json_object* win32k_json, bool is_x86);
+                            json_object* win32k_json, bool is_x86);
 #endif // VMI_WIN_GUI_OFFSETS_H

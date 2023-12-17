@@ -113,60 +113,60 @@ static const char* bpf_attr_get_type(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = attr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = attr
+                  );
 
     const char* type = nullptr;
 
     switch (cmd)
     {
-        case BPF_MAP_CREATE:
-            uint32_t map_type;
-            if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &map_type))
-            {
-                PRINT_DEBUG("[EBPFMON] Failed to read map_type\n");
-                break;
-            }
-            type = bpf_map_type_to_str((bpf_map_type_t)map_type);
-            break;
-        case BPF_PROG_LOAD:
-            uint32_t prog_type;
-            if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &prog_type))
-            {
-                PRINT_DEBUG("[EBPFMON] Failed to read prog_type\n");
-                break;
-            }
-            type = bpf_prog_type_to_str((bpf_prog_type_t) prog_type);
-            break;
-        case BPF_PROG_ATTACH:
-        case BPF_PROG_DETACH:
-        case BPF_LINK_CREATE:
+    case BPF_MAP_CREATE:
+        uint32_t map_type;
+        if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &map_type))
         {
-            uint32_t attach_type;
-            ctx.addr = attr + 8;
-            if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &attach_type))
-            {
-                PRINT_DEBUG("[EBPFMON] Failed to read attach type\n");
-                break;
-            }
-            type = bpf_attach_type_to_str((bpf_attach_type_t) attach_type);
+            PRINT_DEBUG("[EBPFMON] Failed to read map_type\n");
             break;
         }
-        case BPF_PROG_QUERY:
+        type = bpf_map_type_to_str((bpf_map_type_t)map_type);
+        break;
+    case BPF_PROG_LOAD:
+        uint32_t prog_type;
+        if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &prog_type))
         {
-            uint32_t attach_type;
-            if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &attach_type))
-            {
-                PRINT_DEBUG("[EBPFMON] Failed to read attach type\n");
-                break;
-            }
-            type = bpf_attach_type_to_str((bpf_attach_type_t) attach_type);
+            PRINT_DEBUG("[EBPFMON] Failed to read prog_type\n");
             break;
         }
-        default:
+        type = bpf_prog_type_to_str((bpf_prog_type_t) prog_type);
+        break;
+    case BPF_PROG_ATTACH:
+    case BPF_PROG_DETACH:
+    case BPF_LINK_CREATE:
+    {
+        uint32_t attach_type;
+        ctx.addr = attr + 8;
+        if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &attach_type))
+        {
+            PRINT_DEBUG("[EBPFMON] Failed to read attach type\n");
             break;
+        }
+        type = bpf_attach_type_to_str((bpf_attach_type_t) attach_type);
+        break;
+    }
+    case BPF_PROG_QUERY:
+    {
+        uint32_t attach_type;
+        if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &attach_type))
+        {
+            PRINT_DEBUG("[EBPFMON] Failed to read attach type\n");
+            break;
+        }
+        type = bpf_attach_type_to_str((bpf_attach_type_t) attach_type);
+        break;
+    }
+    default:
+        break;
     }
 
     return type;
@@ -188,8 +188,8 @@ event_response_t ebpfmon::sys_bpf_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         arguments.emplace_back("Type", fmt::Rstr(type));
 
     fmt::print(this->m_output_format, "ebpfmon", drakvuf, info,
-        arguments
-    );
+               arguments
+              );
 
     return VMI_EVENT_RESPONSE_NONE;
 }

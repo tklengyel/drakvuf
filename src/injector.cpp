@@ -161,41 +161,41 @@ static void cleanup_timer(void)
 static inline void print_help(void)
 {
     fprintf(stderr, "Required input:\n"
-        "\t -r <path to json>         The OS kernel's JSON\n"
-        "\t -d <domain ID or name>    The domain's ID or name\n"
-        "\t -i <injection pid>        The PID(WIN) | TGID(LINUX) of the process to hijack for injection\n"
-        "\t -e <inject_file>          File to be injected:\n"
-        "\t                             for -m createproc/shellexec/shellcode/doppelganging: the executable to start with injection\n"
-        "\t                             for -m readfile/writefile: the guest path of the file to be read/written\n"
-        "Optional inputs:\n"
-        "\t -l                        Use libvmi.conf\n"
-        "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
-        "\t -m <inject_method>        The injection method\n"
-        "\t                           [WIN]\n"
-        "\t                             createproc (32 and 64-bit) - Spawn a windows process using CreateProcessW ( use -e for specifying the program )\n"
-        "\t                             shellexec (32 and 64-bit) - Spawn a process using ShellExecute ( use -e for specifying the program )\n"
-        "\t                             shellcode (Win10) (64bit)\n"
-        "\t                           [LINUX] (64 bit support only)\n"
-        "\t                             shellcode  - Execute shellcode binary ( use -e for specifying the shellcode binary )\n"
-        "\t                             execproc - Run any process using vfork and execve ( -e for specifying the program, -f for args )\n"
-        "\t                           [BOTH] (WIN - 32-bit untested and 64-bit, LINUX - 64-bit only)\n"
-        "\t                             readfile - pull a file (specified by guest path -e) from the VM and store it on host path specified by -B\n"
-        "\t                             writefile - push a file (specified by host path -B) to the VM and store it on guest path specified by -e\n"
-        "\t -f <args for execproc>    [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
-        "\t                           [LINUX] (execproc -> execve(const char *file, const char *argv[], const char* envp[]); 64bit only)\n"
-        "\t [-B] <path>               The host path of the binary:\n"
-        "\t                             for -m readfile: where to store the file read out from VM\n"
-        "\t                             for -m writefile: to write into the guest VM\n"
-        "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
-        "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
-        "\t -c <current_working_dir>  The current working directory for injected executable\n"
-        "\t -w                        Inject process and wait until it terminates (requires -m createproc)\n"
-        "\t --timeout <seconds>\n"
-        "\t                           Injection timeout (in seconds, default: 0 == no timeout)\n"
+            "\t -r <path to json>         The OS kernel's JSON\n"
+            "\t -d <domain ID or name>    The domain's ID or name\n"
+            "\t -i <injection pid>        The PID(WIN) | TGID(LINUX) of the process to hijack for injection\n"
+            "\t -e <inject_file>          File to be injected:\n"
+            "\t                             for -m createproc/shellexec/shellcode/doppelganging: the executable to start with injection\n"
+            "\t                             for -m readfile/writefile: the guest path of the file to be read/written\n"
+            "Optional inputs:\n"
+            "\t -l                        Use libvmi.conf\n"
+            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
+            "\t -m <inject_method>        The injection method\n"
+            "\t                           [WIN]\n"
+            "\t                             createproc (32 and 64-bit) - Spawn a windows process using CreateProcessW ( use -e for specifying the program )\n"
+            "\t                             shellexec (32 and 64-bit) - Spawn a process using ShellExecute ( use -e for specifying the program )\n"
+            "\t                             shellcode (Win10) (64bit)\n"
+            "\t                           [LINUX] (64 bit support only)\n"
+            "\t                             shellcode  - Execute shellcode binary ( use -e for specifying the shellcode binary )\n"
+            "\t                             execproc - Run any process using vfork and execve ( -e for specifying the program, -f for args )\n"
+            "\t                           [BOTH] (WIN - 32-bit untested and 64-bit, LINUX - 64-bit only)\n"
+            "\t                             readfile - pull a file (specified by guest path -e) from the VM and store it on host path specified by -B\n"
+            "\t                             writefile - push a file (specified by host path -B) to the VM and store it on guest path specified by -e\n"
+            "\t -f <args for execproc>    [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
+            "\t                           [LINUX] (execproc -> execve(const char *file, const char *argv[], const char* envp[]); 64bit only)\n"
+            "\t [-B] <path>               The host path of the binary:\n"
+            "\t                             for -m readfile: where to store the file read out from VM\n"
+            "\t                             for -m writefile: to write into the guest VM\n"
+            "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+            "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
+            "\t -c <current_working_dir>  The current working directory for injected executable\n"
+            "\t -w                        Inject process and wait until it terminates (requires -m createproc)\n"
+            "\t --timeout <seconds>\n"
+            "\t                           Injection timeout (in seconds, default: 0 == no timeout)\n"
 #ifdef DRAKVUF_DEBUG
-        "\t -v                        Turn on verbose (debug) output\n"
+            "\t -v                        Turn on verbose (debug) output\n"
 #endif
-    );
+           );
 }
 
 int main(int argc, char** argv)
@@ -221,7 +221,7 @@ int main(int argc, char** argv)
     int timeout = 0;
 
     fprintf(stderr, "%s %s v%s Copyright (C) 2014-2023 Tamas K Lengyel\n",
-        PACKAGE_NAME, argv[0], PACKAGE_VERSION);
+            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc < 4)
     {
@@ -245,83 +245,83 @@ int main(int argc, char** argv)
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
         {
-            case 'r':
-                json_kernel_path = optarg;
-                break;
-            case 'd':
-                domain = optarg;
-                break;
-            case 'i':
-                injection_pid = atoi(optarg);
-                break;
-            case 'I':
-                injection_thread = atoi(optarg);
-                break;
-            case 'e':
-                inject_file = optarg;
-                break;
-            case 'c':
-                inject_cwd = optarg;
-                break;
-            case 'm':
-                if (!strncmp(optarg, "shellexec", 9))
-                    injection_method = INJECT_METHOD_SHELLEXEC;
-                else if (!strncmp(optarg, "createproc", 10))
-                    injection_method = INJECT_METHOD_CREATEPROC;
-                else if (!strncmp(optarg, "shellcode", 9))
-                    injection_method = INJECT_METHOD_SHELLCODE;
-                else if (!strncmp(optarg, "execproc", 8))
-                    injection_method = INJECT_METHOD_EXECPROC;
-                else if (!strncmp(optarg, "readfile", 8))
-                    injection_method = INJECT_METHOD_READ_FILE;
-                else if (!strncmp(optarg, "writefile", 9))
-                    injection_method = INJECT_METHOD_WRITE_FILE;
-                else
-                {
-                    fprintf(stderr, "Unrecognized injection method\n");
-                    return rc;
-                }
-                break;
-            case 'f':
-                args.push_back(optarg);
-                break;
-            case 'g':
-                injection_global_search = true;
-                break;
-            case 'B':
-                binary_path = optarg;
-                break;
-            case 'P':
-                target_process = optarg;
-                break;
-#ifdef DRAKVUF_DEBUG
-            case 'v':
-                verbose = 1;
-                break;
-#endif
-            case 'l':
-                libvmi_conf = true;
-                break;
-            case 'k':
-                kpgd = strtoull(optarg, NULL, 0);
-                break;
-            case 'o':
-                if (!strncmp(optarg, "csv", 3))
-                    output = OUTPUT_CSV;
-                if (!strncmp(optarg, "kv", 2))
-                    output = OUTPUT_KV;
-                if (!strncmp(optarg, "json", 4))
-                    output = OUTPUT_JSON;
-                break;
-            case 'w':
-                wait_for_exit = true;
-                break;
-            case opt_timeout:
-                timeout = atoi(optarg);
-                break;
-            default:
-                fprintf(stderr, "Unrecognized option: %c\n", c);
+        case 'r':
+            json_kernel_path = optarg;
+            break;
+        case 'd':
+            domain = optarg;
+            break;
+        case 'i':
+            injection_pid = atoi(optarg);
+            break;
+        case 'I':
+            injection_thread = atoi(optarg);
+            break;
+        case 'e':
+            inject_file = optarg;
+            break;
+        case 'c':
+            inject_cwd = optarg;
+            break;
+        case 'm':
+            if (!strncmp(optarg, "shellexec", 9))
+                injection_method = INJECT_METHOD_SHELLEXEC;
+            else if (!strncmp(optarg, "createproc", 10))
+                injection_method = INJECT_METHOD_CREATEPROC;
+            else if (!strncmp(optarg, "shellcode", 9))
+                injection_method = INJECT_METHOD_SHELLCODE;
+            else if (!strncmp(optarg, "execproc", 8))
+                injection_method = INJECT_METHOD_EXECPROC;
+            else if (!strncmp(optarg, "readfile", 8))
+                injection_method = INJECT_METHOD_READ_FILE;
+            else if (!strncmp(optarg, "writefile", 9))
+                injection_method = INJECT_METHOD_WRITE_FILE;
+            else
+            {
+                fprintf(stderr, "Unrecognized injection method\n");
                 return rc;
+            }
+            break;
+        case 'f':
+            args.push_back(optarg);
+            break;
+        case 'g':
+            injection_global_search = true;
+            break;
+        case 'B':
+            binary_path = optarg;
+            break;
+        case 'P':
+            target_process = optarg;
+            break;
+#ifdef DRAKVUF_DEBUG
+        case 'v':
+            verbose = 1;
+            break;
+#endif
+        case 'l':
+            libvmi_conf = true;
+            break;
+        case 'k':
+            kpgd = strtoull(optarg, NULL, 0);
+            break;
+        case 'o':
+            if (!strncmp(optarg, "csv", 3))
+                output = OUTPUT_CSV;
+            if (!strncmp(optarg, "kv", 2))
+                output = OUTPUT_KV;
+            if (!strncmp(optarg, "json", 4))
+                output = OUTPUT_JSON;
+            break;
+        case 'w':
+            wait_for_exit = true;
+            break;
+        case opt_timeout:
+            timeout = atoi(optarg);
+            break;
+        default:
+            fprintf(stderr, "Unrecognized option: %c\n", c);
+            return rc;
         }
 
     if ( !json_kernel_path || !domain || !injection_pid || !inject_file )
@@ -394,17 +394,17 @@ int main(int argc, char** argv)
 
     switch (injection_result)
     {
-        case INJECTOR_SUCCEEDED:
-            if (output == OUTPUT_DEFAULT)
-                printf("Process startup success\n");
-            return drakvuf_exit_code_t::SUCCESS;
-        case INJECTOR_TIMEOUTED:
-            if (output == OUTPUT_DEFAULT)
-                printf("Process startup timeouted\n");
-            return drakvuf_exit_code_t::INJECTION_TIMEOUT;
-        default:
-            if (output == OUTPUT_DEFAULT)
-                printf("Process startup failed\n");
-            return drakvuf_exit_code_t::FAIL;
+    case INJECTOR_SUCCEEDED:
+        if (output == OUTPUT_DEFAULT)
+            printf("Process startup success\n");
+        return drakvuf_exit_code_t::SUCCESS;
+    case INJECTOR_TIMEOUTED:
+        if (output == OUTPUT_DEFAULT)
+            printf("Process startup timeouted\n");
+        return drakvuf_exit_code_t::INJECTION_TIMEOUT;
+    default:
+        if (output == OUTPUT_DEFAULT)
+            printf("Process startup failed\n");
+        return drakvuf_exit_code_t::FAIL;
     }
 }

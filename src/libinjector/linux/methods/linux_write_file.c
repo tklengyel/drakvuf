@@ -182,111 +182,111 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     switch (base_injector->step)
     {
-        case STEP1: // Finds vdso and sets up mmap
+    case STEP1: // Finds vdso and sets up mmap
+    {
+        memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+
+        if (!init_syscalls(drakvuf, info))
+            return cleanup(drakvuf, info, false);
+
+        // don't remove the initial trap
+        // it is used for cleanup after restoring registers
+
+        if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
+            return cleanup(drakvuf, info, false);
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP2: // open file handle
+    {
+        if (!call_mmap_syscall_cb(injector, info->regs, FILE_BUF_SIZE))
+            return cleanup(drakvuf, info, true);
+
+        PRINT_DEBUG("Opening file descriptor\n");
+
+        if (!setup_open_syscall(injector, info->regs, injector->target_file,
+                                O_WRONLY | O_CREAT | O_TRUNC,
+                                S_IRWXU | S_IRWXG | S_IRWXO))
+            return cleanup(drakvuf, info, true);
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP3: // verify fd and write the first chunk
+    {
+        if (!call_open_syscall_cb(injector, info->regs))
+            return cleanup(drakvuf, info, true);
+
+        if (!read_chunk(injector))
+            return cleanup(drakvuf, info, true);
+
+        if (!write_buffer_to_mmap_location(drakvuf, info))
+            return cleanup(drakvuf, info, true);
+
+        if (!setup_write_syscall(injector, info->regs, injector->fd,
+                                 injector->virtual_memory_addr, injector->buffer.len))
+            return cleanup(drakvuf, info, true);
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP4: // loop till all chunks are written and then close the fd
+    {
+        if (!call_write_syscall_cb(injector, info->regs))
+            return cleanup(drakvuf, info, true);
+
+        if (!read_chunk(injector))
+            return cleanup(drakvuf, info, true);
+
+        if (!injector->buffer.len)
         {
-            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
-
-            if (!init_syscalls(drakvuf, info))
-                return cleanup(drakvuf, info, false);
-
-            // don't remove the initial trap
-            // it is used for cleanup after restoring registers
-
-            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
-                return cleanup(drakvuf, info, false);
-
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            PRINT_DEBUG("Write file successful\n");
+            if (!setup_close_syscall(injector, info->regs, injector->fd))
+                return cleanup(drakvuf, info, true);
         }
-        case STEP2: // open file handle
+        else
         {
-            if (!call_mmap_syscall_cb(injector, info->regs, FILE_BUF_SIZE))
-                return cleanup(drakvuf, info, true);
-
-            PRINT_DEBUG("Opening file descriptor\n");
-
-            if (!setup_open_syscall(injector, info->regs, injector->target_file,
-                    O_WRONLY | O_CREAT | O_TRUNC,
-                    S_IRWXU | S_IRWXG | S_IRWXO))
-                return cleanup(drakvuf, info, true);
-
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        case STEP3: // verify fd and write the first chunk
-        {
-            if (!call_open_syscall_cb(injector, info->regs))
-                return cleanup(drakvuf, info, true);
-
-            if (!read_chunk(injector))
-                return cleanup(drakvuf, info, true);
-
             if (!write_buffer_to_mmap_location(drakvuf, info))
                 return cleanup(drakvuf, info, true);
 
             if (!setup_write_syscall(injector, info->regs, injector->fd,
-                    injector->virtual_memory_addr, injector->buffer.len))
+                                     injector->virtual_memory_addr, injector->buffer.len))
                 return cleanup(drakvuf, info, true);
 
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
         }
-        case STEP4: // loop till all chunks are written and then close the fd
-        {
-            if (!call_write_syscall_cb(injector, info->regs))
-                return cleanup(drakvuf, info, true);
 
-            if (!read_chunk(injector))
-                return cleanup(drakvuf, info, true);
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP5: // restore the registers
+    {
+        // We are not handling close syscall error codes yet as it won't break the injector
+        // or the target application working whatever the result comes
 
-            if (!injector->buffer.len)
-            {
-                PRINT_DEBUG("Write file successful\n");
-                if (!setup_close_syscall(injector, info->regs, injector->fd))
-                    return cleanup(drakvuf, info, true);
-            }
-            else
-            {
-                if (!write_buffer_to_mmap_location(drakvuf, info))
-                    return cleanup(drakvuf, info, true);
+        PRINT_DEBUG("Closed File descriptor\n");
+        PRINT_DEBUG("Restoring state\n");
+        free_bp_trap(drakvuf, injector, info->trap);
 
-                if (!setup_write_syscall(injector, info->regs, injector->fd,
-                        injector->virtual_memory_addr, injector->buffer.len))
-                    return cleanup(drakvuf, info, true);
+        // restore regs
+        copy_gprs(info->regs, &injector->saved_regs);
 
-                return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
-            }
+        injector->rc = INJECTOR_SUCCEEDED;
 
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        case STEP5: // restore the registers
-        {
-            // We are not handling close syscall error codes yet as it won't break the injector
-            // or the target application working whatever the result comes
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP6: // cleanup
+    {
+        PRINT_DEBUG("Removing traps and exiting\n");
 
-            PRINT_DEBUG("Closed File descriptor\n");
-            PRINT_DEBUG("Restoring state\n");
-            free_bp_trap(drakvuf, injector, info->trap);
+        // remove the initial trap here
+        free_bp_trap(drakvuf, injector, info->trap);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-            // restore regs
-            copy_gprs(info->regs, &injector->saved_regs);
-
-            injector->rc = INJECTOR_SUCCEEDED;
-
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        case STEP6: // cleanup
-        {
-            PRINT_DEBUG("Removing traps and exiting\n");
-
-            // remove the initial trap here
-            free_bp_trap(drakvuf, injector, info->trap);
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -335,10 +335,10 @@ static bool write_buffer_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t
     linux_injector_t injector = (linux_injector_t)info->trap->data;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = injector->virtual_memory_addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = injector->virtual_memory_addr
+                  );
 
     size_t bytes_write = 0;
 

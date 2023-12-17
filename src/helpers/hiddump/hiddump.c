@@ -222,7 +222,7 @@ int get_dimensions(unsigned int* w, unsigned int* h)
 
     /* Get the root window size */
     int ret = XGetGeometry(display, XDefaultRootWindow(display),
-            &wjunk, &junk, &junk, w, h, &ujunk, &ujunk);
+                           &wjunk, &junk, &junk, w, h, &ujunk, &ujunk);
 
     XCloseDisplay(display);
 
@@ -350,25 +350,25 @@ int poll_events(struct pollfd* fds, size_t n, FILE* fout, int seconds, double x_
                 {
                     switch (ie.code)
                     {
-                        /* Remap for screen size independence */
-                        case REL_X:
-                            val = normalize(ie.value, x_factor);
-                            fprintf(stderr, "%ld.%06ld: REL_X %d\n", rel_t.tv_sec, rel_t.tv_usec, val);
-                            break;
+                    /* Remap for screen size independence */
+                    case REL_X:
+                        val = normalize(ie.value, x_factor);
+                        fprintf(stderr, "%ld.%06ld: REL_X %d\n", rel_t.tv_sec, rel_t.tv_usec, val);
+                        break;
 
-                        case REL_Y:
-                            val = normalize(ie.value, y_factor);
-                            fprintf(stderr, "%ld.%06ld: REL_Y %d\n", rel_t.tv_sec, rel_t.tv_usec, val);
-                            break;
+                    case REL_Y:
+                        val = normalize(ie.value, y_factor);
+                        fprintf(stderr, "%ld.%06ld: REL_Y %d\n", rel_t.tv_sec, rel_t.tv_usec, val);
+                        break;
 
-                        case REL_WHEEL:
-                            val = ie.value;
-                            fprintf(stderr, "%ld.%ld: REL_WHEEL %d\n", rel_t.tv_sec, rel_t.tv_usec, val);
-                            break;
+                    case REL_WHEEL:
+                        val = ie.value;
+                        fprintf(stderr, "%ld.%ld: REL_WHEEL %d\n", rel_t.tv_sec, rel_t.tv_usec, val);
+                        break;
 
-                        /* Continue, if the event code is not of interest */
-                        default:
-                            continue;
+                    /* Continue, if the event code is not of interest */
+                    default:
+                        continue;
                     }
                     if (store_event(&rel_t, &(ie.type), &(ie.code), &val, fout) < 4)
                         fprintf(stderr, "Error storing event!\n");;
@@ -379,23 +379,23 @@ int poll_events(struct pollfd* fds, size_t n, FILE* fout, int seconds, double x_
                 {
                     switch (ie.code)
                     {
-                        case BTN_LEFT:
-                            val = ie.value;
-                            fprintf(stderr, "%ld.%ld: BTN_LEFT %d\n", rel_t.tv_sec, rel_t.tv_usec, (int)val);
-                            break;
-                        case BTN_MIDDLE:
-                            val = ie.value;
-                            fprintf(stderr, "%ld.%ld: BTN_MIDDLE %d\n", rel_t.tv_sec, rel_t.tv_usec, (int)val);
-                            break;
-                        case BTN_RIGHT:
-                            val = ie.value;
-                            fprintf(stderr, "%ld.%ld: BTN_RIGHT %d\n", rel_t.tv_sec, rel_t.tv_usec, (int)val);
-                            break;
-                        default:
-                            /* Key presses, no need to normalize */
-                            fprintf(stderr, "%ld.%ld: Key press %d %d\n", rel_t.tv_sec, rel_t.tv_usec, ie.code, ie.value);
-                            val = ie.value;
-                            break;
+                    case BTN_LEFT:
+                        val = ie.value;
+                        fprintf(stderr, "%ld.%ld: BTN_LEFT %d\n", rel_t.tv_sec, rel_t.tv_usec, (int)val);
+                        break;
+                    case BTN_MIDDLE:
+                        val = ie.value;
+                        fprintf(stderr, "%ld.%ld: BTN_MIDDLE %d\n", rel_t.tv_sec, rel_t.tv_usec, (int)val);
+                        break;
+                    case BTN_RIGHT:
+                        val = ie.value;
+                        fprintf(stderr, "%ld.%ld: BTN_RIGHT %d\n", rel_t.tv_sec, rel_t.tv_usec, (int)val);
+                        break;
+                    default:
+                        /* Key presses, no need to normalize */
+                        fprintf(stderr, "%ld.%ld: Key press %d %d\n", rel_t.tv_sec, rel_t.tv_usec, ie.code, ie.value);
+                        val = ie.value;
+                        break;
                     }
                     if (store_event(&rel_t, &(ie.type), &(ie.code), &val, fout) < 4)
                         fprintf(stderr, "Error storing event!\n");;
@@ -485,7 +485,7 @@ int record(char** event_files, size_t n, const char* output_file, int seconds)
     if (fout == NULL)
     {
         fprintf(stderr, "Could not open file %s\n",
-            output_file && strlen(output_file) > 0 ? output_file : "stdout");
+                output_file && strlen(output_file) > 0 ? output_file : "stdout");
         return 1;
     }
 
@@ -546,7 +546,7 @@ int main(int argc, char** argv)
 
     /* Installs signal handler to ensure clean shut down */
     if (install_signal_handler(SIGINT) || install_signal_handler(SIGTERM) ||
-        install_signal_handler(SIGHUP))
+            install_signal_handler(SIGHUP))
     {
         fprintf(stderr, "Error setting up signal handlers\n");
         return EXIT_FAILURE;
@@ -557,25 +557,25 @@ int main(int argc, char** argv)
     {
         switch (opt)
         {
-            case 'e':
-                fprintf(stderr, "Using event file %s\n", optarg);
-                char* evt = strdup(optarg);
-                event_files[eidx] = evt;
-                eidx++;
-                break;
-            case 'd':
-                duration = atoi(optarg);
-                fprintf(stderr, "Setting duration %d secs\n", duration);
-                break;
-            case ':':
-                fprintf(stderr, "Error: Option needs a value\n");
-                print_help(argv[0]);
-                break;
-            case 'h':
-            /* Fall through */
-            default:
-                print_help(argv[0]);
-                return EXIT_SUCCESS;
+        case 'e':
+            fprintf(stderr, "Using event file %s\n", optarg);
+            char* evt = strdup(optarg);
+            event_files[eidx] = evt;
+            eidx++;
+            break;
+        case 'd':
+            duration = atoi(optarg);
+            fprintf(stderr, "Setting duration %d secs\n", duration);
+            break;
+        case ':':
+            fprintf(stderr, "Error: Option needs a value\n");
+            print_help(argv[0]);
+            break;
+        case 'h':
+        /* Fall through */
+        default:
+            print_help(argv[0]);
+            return EXIT_SUCCESS;
         }
     }
 

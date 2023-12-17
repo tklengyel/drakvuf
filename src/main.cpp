@@ -181,234 +181,234 @@ static inline bool enable_plugin(char* _optarg, bool* plugin_list, bool* disable
 static void print_usage()
 {
     fprintf(stderr, "Required input:\n"
-        "\t -r, --json-kernel <path to json>\n"
-        "\t                           The OS kernel's json profile\n"
-        "\t -d <domain ID or name>    The domain's ID or name\n"
-        "Optional inputs:\n"
-        "\t -l                        Use libvmi.conf\n"
-        "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
-        "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-        "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
-        "\t -e <injection_cmd>        The executable to start with injection\n"
-        "\t -c <current_working_dir>  The current working directory for injected executable\n"
-        "\t --exit-injection-thread   Exit injection thread after process injection complete\n"
-        "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
-        "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
-        "\t --write-file <src> <dst>  Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
-        "\t                           Can be used multiple times to copy multiple files\n"
-        "\t --write-file-timeout <seconds>\n"
-        "\t                           write-file timeout (in seconds, default: 0 == no timeout, requires --write-file)\n"
-        "\t -f <args for exec>        Additional args for exec() (requires -m execproc)\n"
-        "\t -g                        Search required for injection functions in all processes\n"
-        "\t -j, --injection-timeout <seconds>\n"
-        "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
-        "\t -C                        Enable context based views\n"
-	"\t -A, --skip-altp2m-check   Skip the altp2m check (Required on Qubes 4.x\n"
-        "\t --context-process         Process to be monitored in context based views (requires -C)\n"
-        "\t                           (e.g.: Name, :PID, Name:PID)\n"
-        "\t --terminate               Terminate injected process\n"
-        "\t --termination-timeout     Timeout to wait for process termination (in seconds)\n"
-        "\t -t <timeout>              Timeout (in seconds)\n"
-        "\t -o <format>               Output format (default, csv, kv, or json)\n"
-        "\t -x <plugin>               Don't activate the specified plugin\n"
-        "\t --wait-stop-plugins <timeout>\n"
-        "\t                           Wait for plugins to stop before termination loop\n"
-        "\t -a <plugin>               Activate the specified plugin\n"
-        "\t -p                        Leave domain paused after DRAKVUF exits\n"
-        "\t -F, --fast-singlestep     Enable fast singlestepping (requires Xen 4.14+)\n"
-        "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
-        "\t --ignore-pid <PID>        Ignore events from process with PID (can be repeated multiple times).\n"
-        "\t --enable-active-callback-check\n"
-        "\t                           The check prevents events processing until function call injection finish.\n"
+            "\t -r, --json-kernel <path to json>\n"
+            "\t                           The OS kernel's json profile\n"
+            "\t -d <domain ID or name>    The domain's ID or name\n"
+            "Optional inputs:\n"
+            "\t -l                        Use libvmi.conf\n"
+            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
+            "\t -i <injection pid>        The PID of the process to hijack for injection\n"
+            "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
+            "\t -e <injection_cmd>        The executable to start with injection\n"
+            "\t -c <current_working_dir>  The current working directory for injected executable\n"
+            "\t --exit-injection-thread   Exit injection thread after process injection complete\n"
+            "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
+            "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
+            "\t --write-file <src> <dst>  Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
+            "\t                           Can be used multiple times to copy multiple files\n"
+            "\t --write-file-timeout <seconds>\n"
+            "\t                           write-file timeout (in seconds, default: 0 == no timeout, requires --write-file)\n"
+            "\t -f <args for exec>        Additional args for exec() (requires -m execproc)\n"
+            "\t -g                        Search required for injection functions in all processes\n"
+            "\t -j, --injection-timeout <seconds>\n"
+            "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
+            "\t -C                        Enable context based views\n"
+            "\t -A, --skip-altp2m-check   Skip the altp2m check (Required on Qubes 4.x\n"
+            "\t --context-process         Process to be monitored in context based views (requires -C)\n"
+            "\t                           (e.g.: Name, :PID, Name:PID)\n"
+            "\t --terminate               Terminate injected process\n"
+            "\t --termination-timeout     Timeout to wait for process termination (in seconds)\n"
+            "\t -t <timeout>              Timeout (in seconds)\n"
+            "\t -o <format>               Output format (default, csv, kv, or json)\n"
+            "\t -x <plugin>               Don't activate the specified plugin\n"
+            "\t --wait-stop-plugins <timeout>\n"
+            "\t                           Wait for plugins to stop before termination loop\n"
+            "\t -a <plugin>               Activate the specified plugin\n"
+            "\t -p                        Leave domain paused after DRAKVUF exits\n"
+            "\t -F, --fast-singlestep     Enable fast singlestepping (requires Xen 4.14+)\n"
+            "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
+            "\t --ignore-pid <PID>        Ignore events from process with PID (can be repeated multiple times).\n"
+            "\t --enable-active-callback-check\n"
+            "\t                           The check prevents events processing until function call injection finish.\n"
 #if defined(ENABLE_PLUGIN_FILEDELETE) || defined(ENABLE_PLUGIN_FILEEXTRACTOR)
-        "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+            "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
-        "\t -M                        Dump new or modified files also (requires -D)\n"
-        "\t -n                        Use extraction method based on function injection (requires -D)\n"
+            "\t -M                        Dump new or modified files also (requires -D)\n"
+            "\t -n                        Use extraction method based on function injection (requires -D)\n"
 #endif
 #ifdef ENABLE_PLUGIN_FILEEXTRACTOR
-        "\t --fileextractor-timeout <timeout>\n"
-        "\t                           Timeout (in seconds) to finish file extractions\n"
-        "\t --fileextractor-max-size-hash <size>\n"
-        "\t                           Max file size (in MB) to calculate hash\n"
-        "\t --fileextractor-max-size-extract <size>\n"
-        "\t                           Max file size (in MB) to extract\n"
-        "\t --fileextractor-exclude-list <file name filter>\n"
-        "\t                           File with list of file name regexps to exclude from extracting\n"
+            "\t --fileextractor-timeout <timeout>\n"
+            "\t                           Timeout (in seconds) to finish file extractions\n"
+            "\t --fileextractor-max-size-hash <size>\n"
+            "\t                           Max file size (in MB) to calculate hash\n"
+            "\t --fileextractor-max-size-extract <size>\n"
+            "\t                           Max file size (in MB) to extract\n"
+            "\t --fileextractor-exclude-list <file name filter>\n"
+            "\t                           File with list of file name regexps to exclude from extracting\n"
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
-        "\t -T, --json-tcpip <path to json>\n"
-        "\t                           The JSON profile for tcpip.sys\n"
+            "\t -T, --json-tcpip <path to json>\n"
+            "\t                           The JSON profile for tcpip.sys\n"
 #endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
-        "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
+            "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
 #endif
 #ifdef DRAKVUF_DEBUG
-        "\t -v, --verbose             Turn on verbose (debug) output\n"
+            "\t -v, --verbose             Turn on verbose (debug) output\n"
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
-        "\t -S, --syscall-hooks-list <syscalls filter>\n"
-        "\t                           File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
-        "\t --disable-sysret          Do not monitor syscall results\n"
+            "\t -S, --syscall-hooks-list <syscalls filter>\n"
+            "\t                           File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
+            "\t --disable-sysret          Do not monitor syscall results\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCMON
-        "\t -q, --procmon-envs-list <procmon filter>\n"
-        "\t                           File with list of environment variables for printing in procmon\n"
+            "\t -q, --procmon-envs-list <procmon filter>\n"
+            "\t                           File with list of environment variables for printing in procmon\n"
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
-        "\t -b                        Exit from execution as soon as a BSoD is detected\n"
-        "\t --bsodmon-ignore-stop\n"
-        "\t                           Prevent bsodmon from stopping with other plugins\n"
-        "\t --crashdump-dir <directory>\n"
-        "\t                           Where to store OS crash dumps\n"
+            "\t -b                        Exit from execution as soon as a BSoD is detected\n"
+            "\t --bsodmon-ignore-stop\n"
+            "\t                           Prevent bsodmon from stopping with other plugins\n"
+            "\t --crashdump-dir <directory>\n"
+            "\t                           Where to store OS crash dumps\n"
 #endif
-        "\t -w, --json-wow <path to json>\n"
-        "\t                           The JSON profile for WoW64 NTDLL\n"
+            "\t -w, --json-wow <path to json>\n"
+            "\t                           The JSON profile for WoW64 NTDLL\n"
 #if defined(ENABLE_PLUGIN_CLIPBOARDMON) || defined(ENABLE_PLUGIN_SSDTMON)
-        "\t -W, --json-win32k <path to json>\n"
-        "\t                           The JSON profile for win32k.sys\n"
+            "\t -W, --json-win32k <path to json>\n"
+            "\t                           The JSON profile for win32k.sys\n"
 #endif
-        "\t --json-sspicli <path to json>\n"
-        "\t                           The JSON profile for sspicli.dll\n"
-        "\t --json-kernel32 <path to json>\n"
-        "\t                           The JSON profile for kernel32.dll\n"
-        "\t --json-kernelbase <path to json>\n"
-        "\t                           The JSON profile for KernelBase.dll\n"
-        "\t --json-wow-kernel32 <path to json>\n"
-        "\t                           The JSON profile for SysWOW64/kernel32.dll\n"
-        "\t --json-ntdll <path to json>\n"
-        "\t                           The JSON profile for ntdll.dll\n"
-        "\t --json-iphlpapi <path to json>\n"
-        "\t                           The JSON profile for iphlpapi.dll\n"
+            "\t --json-sspicli <path to json>\n"
+            "\t                           The JSON profile for sspicli.dll\n"
+            "\t --json-kernel32 <path to json>\n"
+            "\t                           The JSON profile for kernel32.dll\n"
+            "\t --json-kernelbase <path to json>\n"
+            "\t                           The JSON profile for KernelBase.dll\n"
+            "\t --json-wow-kernel32 <path to json>\n"
+            "\t                           The JSON profile for SysWOW64/kernel32.dll\n"
+            "\t --json-ntdll <path to json>\n"
+            "\t                           The JSON profile for ntdll.dll\n"
+            "\t --json-iphlpapi <path to json>\n"
+            "\t                           The JSON profile for iphlpapi.dll\n"
 #if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON) || defined(ENABLE_PLUGIN_FILETRACER)
-        "\t --json-ole32 <path to json>\n"
-        "\t                           The JSON profile for ole32.dll\n"
+            "\t --json-ole32 <path to json>\n"
+            "\t                           The JSON profile for ole32.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_WMIMON
-        "\t --json-mpr <path to json>\n"
-        "\t                           The JSON profile for mpr.dll\n"
-        "\t --json-wow-ole32 <path to json>\n"
-        "\t                           The JSON profile for SysWOW64/ole32.dll\n"
-        "\t --json-combase <path to json>\n"
-        "\t                           The JSON profile for combase.dll\n"
+            "\t --json-mpr <path to json>\n"
+            "\t                           The JSON profile for mpr.dll\n"
+            "\t --json-wow-ole32 <path to json>\n"
+            "\t                           The JSON profile for SysWOW64/ole32.dll\n"
+            "\t --json-combase <path to json>\n"
+            "\t                           The JSON profile for combase.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_MEMDUMP
-        "\t --memdump-dir <directory>\n"
-        "\t                           Where to store memory dumps\n"
-        "\t --json-clr <path to json>\n"
-        "\t                           The JSON profile for clr.dll\n"
-        "\t --json-mscorwks <path to json>\n"
-        "\t                           The JSON profile for mscorewks.dll\n"
-        "\t --memdump-disable-free-vm\n"
-        "\t                           Disable hook on NtFreeVirtualMemory\n"
-        "\t --memdump-disable-protect-vm\n"
-        "\t                           Disable hook on NtProtectVirtualMemory\n"
-        "\t --memdump-disable-write-vm\n"
-        "\t                           Disable hook on NtWriteVirtualMemory\n"
-        "\t --memdump-disable-terminate-proc\n"
-        "\t                           Disable hook on NtTerminateProcess\n"
-        "\t --memdump-disable-create-thread\n"
-        "\t                           Disable hook on NtCreateThreadEx\n"
-        "\t --memdump-disable-set-thread\n"
-        "\t                           Disable hook on NtSetInformationThread\n"
+            "\t --memdump-dir <directory>\n"
+            "\t                           Where to store memory dumps\n"
+            "\t --json-clr <path to json>\n"
+            "\t                           The JSON profile for clr.dll\n"
+            "\t --json-mscorwks <path to json>\n"
+            "\t                           The JSON profile for mscorewks.dll\n"
+            "\t --memdump-disable-free-vm\n"
+            "\t                           Disable hook on NtFreeVirtualMemory\n"
+            "\t --memdump-disable-protect-vm\n"
+            "\t                           Disable hook on NtProtectVirtualMemory\n"
+            "\t --memdump-disable-write-vm\n"
+            "\t                           Disable hook on NtWriteVirtualMemory\n"
+            "\t --memdump-disable-terminate-proc\n"
+            "\t                           Disable hook on NtTerminateProcess\n"
+            "\t --memdump-disable-create-thread\n"
+            "\t                           Disable hook on NtCreateThreadEx\n"
+            "\t --memdump-disable-set-thread\n"
+            "\t                           Disable hook on NtSetInformationThread\n"
 #endif
 #if defined(ENABLE_PLUGIN_MEMDUMP) || defined(ENABLE_PLUGIN_APIMON) || defined(ENABLE_PLUGIN_RPCMON)
-        "\t --dll-hooks-list <file>\n"
-        "\t                           List of DLL functions to be hooked (see wiki)\n"
-        "\t --userhook-no-addr\n"
-        "\t                           Stop printing addresses of string arguments in apimon and memdump\n"
-        "\t --userhook-injection-mode\n"
-        "\t                           Use MmCopyVirtualMemory injection instead of PF injection in userhooks\n"
+            "\t --dll-hooks-list <file>\n"
+            "\t                           List of DLL functions to be hooked (see wiki)\n"
+            "\t --userhook-no-addr\n"
+            "\t                           Stop printing addresses of string arguments in apimon and memdump\n"
+            "\t --userhook-injection-mode\n"
+            "\t                           Use MmCopyVirtualMemory injection instead of PF injection in userhooks\n"
 #endif
 #if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
-        "\t --procdump-timeout <timeout>\n"
-        "\t                           Timeout (in seconds) to finish process memory dumps\n"
-        "\t --procdump-dir <directory>\n"
-        "\t                           Where to store processes dumps\n"
-        "\t --compress-procdumps\n"
-        "\t                           Controls compression of processes dumps on disk\n"
-        "\t --json-hal <path to json>\n"
-        "\t                           The JSON profile for hal.dll\n"
+            "\t --procdump-timeout <timeout>\n"
+            "\t                           Timeout (in seconds) to finish process memory dumps\n"
+            "\t --procdump-dir <directory>\n"
+            "\t                           Where to store processes dumps\n"
+            "\t --compress-procdumps\n"
+            "\t                           Controls compression of processes dumps on disk\n"
+            "\t --json-hal <path to json>\n"
+            "\t                           The JSON profile for hal.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP2
-        "\t --procdump-disable-dump-on-finish\n"
-        "\t                           Disable dumping of injected process memory upon completion of monitoring\n"
-        "\t --procdump-new-processes-on-finish\n"
-        "\t                           Dump memory for all new processes upon completion of monitoring\n"
-        "\t --procdump-disable-kideliverapc-hook\n"
-        "\t                           Disables hook on KiDeliverApc\n"
-        "\t --procdump-disable-kedelayexecutionthread-hook\n"
-        "\t                           Disables hook on KeDelayExecutionThread\n"
-        "\t --procdump-exclude-list <file name filter>\n"
-        "\t                           File with list of process name regexes to exclude from dumping\n"
+            "\t --procdump-disable-dump-on-finish\n"
+            "\t                           Disable dumping of injected process memory upon completion of monitoring\n"
+            "\t --procdump-new-processes-on-finish\n"
+            "\t                           Dump memory for all new processes upon completion of monitoring\n"
+            "\t --procdump-disable-kideliverapc-hook\n"
+            "\t                           Disables hook on KiDeliverApc\n"
+            "\t --procdump-disable-kedelayexecutionthread-hook\n"
+            "\t                           Disables hook on KeDelayExecutionThread\n"
+            "\t --procdump-exclude-list <file name filter>\n"
+            "\t                           File with list of process name regexes to exclude from dumping\n"
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON
-        "\t --codemon-dump-dir <directory>\n"
-        "\t                           Folder where to store page/vad dumps (path)\n"
-        "\t --codemon-filter-executable <filename>\n"
-        "\t                           Limit the output to events regarding this file\n"
+            "\t --codemon-dump-dir <directory>\n"
+            "\t                           Folder where to store page/vad dumps (path)\n"
+            "\t --codemon-filter-executable <filename>\n"
+            "\t                           Limit the output to events regarding this file\n"
 
-        "\t --codemon-log-everything\n"
-        "\t                           Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not\n"
-        "\t --codemon-dump-vad\n"
-        "\t                           By default only page sized memory areas are dumped. By setting this flag whole VAD nodes can be dumped instead\n"
-        "\t --codemon-analyse-system-dll-vad\n"
-        "\t                           Enforces the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64\n"
-        "\t --codemon-default-benign\n"
-        "\t                           By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated\n"
+            "\t --codemon-log-everything\n"
+            "\t                           Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not\n"
+            "\t --codemon-dump-vad\n"
+            "\t                           By default only page sized memory areas are dumped. By setting this flag whole VAD nodes can be dumped instead\n"
+            "\t --codemon-analyse-system-dll-vad\n"
+            "\t                           Enforces the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64\n"
+            "\t --codemon-default-benign\n"
+            "\t                           By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated\n"
 #endif
 #ifdef ENABLE_PLUGIN_EXPLOITMON
-        "\t --exploitmon-kernel2user-detect\n"
-        "\t                           Detect kernel thread execution in user mode. This degrades performance.\n"
+            "\t --exploitmon-kernel2user-detect\n"
+            "\t                           Detect kernel thread execution in user mode. This degrades performance.\n"
 #endif
 #ifdef ENABLE_PLUGIN_IPT
-        "\t --ipt-dir <directory>\n"
-        "\t                           Where to store data recorded with Intel Processor Trace\n"
-        "\t --ipt-trace-os\n"
-        "\t                           Enable IPT tracing in ring 0\n"
-        "\t --ipt-trace-user\n"
-        "\t                           Enable IPT tracing in ring > 0\n"
+            "\t --ipt-dir <directory>\n"
+            "\t                           Where to store data recorded with Intel Processor Trace\n"
+            "\t --ipt-trace-os\n"
+            "\t                           Enable IPT tracing in ring 0\n"
+            "\t --ipt-trace-user\n"
+            "\t                           Enable IPT tracing in ring > 0\n"
 #endif
 #ifdef ENABLE_PLUGIN_HIDSIM
-        "\t --hid-template <path to template>\n"
-        "\t                           The template specifying the HID events to simulate. If not specified, the mouse will move randomly\n"
-        "\t                           The HID events in the template will be replayed in a loop.\n"
-        "\t --hid-monitor-gui\n"
-        "\t                           Monitor the GUI to try to detect clickable buttons. This requires the presence of a win32k-profile, which has to be specified via -W\n"
-        "\t --hid-random-clicks\n"
-        "\t                           Inject random clicks and double clicks, if no template is specified. Spares the bottom-left 20 percent of the screen\n"
+            "\t --hid-template <path to template>\n"
+            "\t                           The template specifying the HID events to simulate. If not specified, the mouse will move randomly\n"
+            "\t                           The HID events in the template will be replayed in a loop.\n"
+            "\t --hid-monitor-gui\n"
+            "\t                           Monitor the GUI to try to detect clickable buttons. This requires the presence of a win32k-profile, which has to be specified via -W\n"
+            "\t --hid-random-clicks\n"
+            "\t                           Inject random clicks and double clicks, if no template is specified. Spares the bottom-left 20 percent of the screen\n"
 #endif
 #ifdef ENABLE_PLUGIN_ROOTKITMON
-        "\t --json-fwpkclnt <path to json>\n"
-        "\t                           The JSON profile for fwpkclnt.sys\n"
-        "\t --json-fltmgr <path to json>\n"
-        "\t                           The JSON profile for fltmgr.sys\n"
-        "\t --json-ci <path to json>\n"
-        "\t                           The JSON profile for ci.dll\n"
+            "\t --json-fwpkclnt <path to json>\n"
+            "\t                           The JSON profile for fwpkclnt.sys\n"
+            "\t --json-fltmgr <path to json>\n"
+            "\t                           The JSON profile for fltmgr.sys\n"
+            "\t --json-ci <path to json>\n"
+            "\t                           The JSON profile for ci.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_CALLBACKMON
-        "\t --json-netio <path to json>\n"
-        "\t                           The JSON profile for netio.sys\n"
-        "\t --json-ndis <path to json>\n"
-        "\t                           The JSON profile for ndis.sys\n"
+            "\t --json-netio <path to json>\n"
+            "\t                           The JSON profile for netio.sys\n"
+            "\t --json-ndis <path to json>\n"
+            "\t                           The JSON profile for ndis.sys\n"
 #endif
 #ifdef ENABLE_PLUGIN_DKOMMON
-        "\t --json-services <path to json>\n"
-        "\t                           The JSON profile for services.exe\n"
+            "\t --json-services <path to json>\n"
+            "\t                           The JSON profile for services.exe\n"
 #endif
 #ifdef ENABLE_PLUGIN_UNIXSOCKETMON
-        "\t --unixsocketmon-max-size-print <size>\n"
-        "\t                           Max message size (in bytes) to print\n"
+            "\t --unixsocketmon-max-size-print <size>\n"
+            "\t                           Max message size (in bytes) to print\n"
 #endif
 #ifdef ENABLE_PLUGIN_REBOOTMON
-        "\t --rebootmon-abort-on-power-off\n"
-        "\t                           Exit from execution as soon as we detect power off\n"
+            "\t --rebootmon-abort-on-power-off\n"
+            "\t                           Exit from execution as soon as we detect power off\n"
 #endif
-        "\t --libdrakvuf-not-get-userid\n"
-        "\t                           Don't collect user id in get process data\n"
-        "\t -h, --help                Show this help\n"
-    );
+            "\t --libdrakvuf-not-get-userid\n"
+            "\t                           Don't collect user id in get process data\n"
+            "\t -h, --help                Show this help\n"
+           );
 }
 
 int main(int argc, char** argv)
@@ -459,7 +459,7 @@ int main(int argc, char** argv)
     eprint_current_time();
 
     fprintf(stderr, "%s v%s Copyright (C) 2014-2023 Tamas K Lengyel\n",
-        PACKAGE_NAME, PACKAGE_VERSION);
+            PACKAGE_NAME, PACKAGE_VERSION);
 
     if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
     {
@@ -588,7 +588,7 @@ int main(int argc, char** argv)
         {"procdump-exclude-list", required_argument, NULL, opt_procdump_exclude_list},
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
-	{"skip-altp2m-check", no_argument, NULL, 'A'},
+        {"skip-altp2m-check", no_argument, NULL, 'A'},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
         {"procmon-envs-list", required_argument, NULL, 'q'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
@@ -639,419 +639,419 @@ int main(int argc, char** argv)
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
         {
-            case 'r':
-                json_kernel_path = optarg;
-                break;
-            case 'd':
-                domain = optarg;
-                break;
-            case 'i':
-                injection_pid = atoi(optarg);
-                break;
-            case 'I':
-                injection_thread = atoi(optarg);
-                break;
-            case 'e':
-                injection_cmd = optarg;
-                break;
-            case 'c':
-                injection_cwd = optarg;
-                break;
-            case opt_exit_injection_thread:
-                exit_injection_thread = true;
-                break;
-            case 'g':
-                injection_global_search = true;
-                break;
-            case 'j':
-                injection_timeout = atoi(optarg);
-                break;
-            case opt_terminate:
-                terminate = true;
-                break;
-            case 'C':
-                context_based_interception = true;
-                break;
-            case opt_context_interception_processes:
-                context_processes = g_slist_prepend(context_processes, optarg);
-                break;
-            case opt_termination_timeout:
-                termination_timeout = atoi(optarg);
-                break;
-            case 'm':
-                if (!strncmp(optarg, "shellexec", 9))
-                    injection_method = INJECT_METHOD_SHELLEXEC;
-                if (!strncmp(optarg, "createproc", 10))
-                    injection_method = INJECT_METHOD_CREATEPROC;
-                if (!strncmp(optarg, "shellcode", 9))
-                    injection_method = INJECT_METHOD_SHELLCODE;
-                if (!strncmp(optarg, "execproc", 8))
-                    injection_method = INJECT_METHOD_EXECPROC;
-                break;
-            case opt_write_file:
-                if (optind >= argc || *argv[optind] == '-')
-                {
-                    fprintf(stderr, "--write-file <dst> parameter is missing!\n");
-                    return drakvuf_exit_code_t::FAIL;
-                }
+        case 'r':
+            json_kernel_path = optarg;
+            break;
+        case 'd':
+            domain = optarg;
+            break;
+        case 'i':
+            injection_pid = atoi(optarg);
+            break;
+        case 'I':
+            injection_thread = atoi(optarg);
+            break;
+        case 'e':
+            injection_cmd = optarg;
+            break;
+        case 'c':
+            injection_cwd = optarg;
+            break;
+        case opt_exit_injection_thread:
+            exit_injection_thread = true;
+            break;
+        case 'g':
+            injection_global_search = true;
+            break;
+        case 'j':
+            injection_timeout = atoi(optarg);
+            break;
+        case opt_terminate:
+            terminate = true;
+            break;
+        case 'C':
+            context_based_interception = true;
+            break;
+        case opt_context_interception_processes:
+            context_processes = g_slist_prepend(context_processes, optarg);
+            break;
+        case opt_termination_timeout:
+            termination_timeout = atoi(optarg);
+            break;
+        case 'm':
+            if (!strncmp(optarg, "shellexec", 9))
+                injection_method = INJECT_METHOD_SHELLEXEC;
+            if (!strncmp(optarg, "createproc", 10))
+                injection_method = INJECT_METHOD_CREATEPROC;
+            if (!strncmp(optarg, "shellcode", 9))
+                injection_method = INJECT_METHOD_SHELLCODE;
+            if (!strncmp(optarg, "execproc", 8))
+                injection_method = INJECT_METHOD_EXECPROC;
+            break;
+        case opt_write_file:
+            if (optind >= argc || *argv[optind] == '-')
+            {
+                fprintf(stderr, "--write-file <dst> parameter is missing!\n");
+                return drakvuf_exit_code_t::FAIL;
+            }
 
-                if (!std::filesystem::exists(optarg))
-                {
-                    fprintf(stderr, "--write-file <src> file (%s) not found!\n", optarg);
-                    return drakvuf_exit_code_t::FAIL;
-                }
+            if (!std::filesystem::exists(optarg))
+            {
+                fprintf(stderr, "--write-file <src> file (%s) not found!\n", optarg);
+                return drakvuf_exit_code_t::FAIL;
+            }
 
-                write_files[optarg] = argv[optind++];
-                break;
-            case opt_write_file_timeout:
-                write_file_timeout = atoi(optarg);
-                break;
-            case 't':
-                timeout = atoi(optarg);
-                break;
-            case 'D':
-                options.dump_folder = optarg;
-                break;
-            case 'o':
-                if (!strncmp(optarg, "csv", 3))
-                    output = OUTPUT_CSV;
-                if (!strncmp(optarg, "kv", 2))
-                    output = OUTPUT_KV;
-                if (!strncmp(optarg, "json", 4))
-                    output = OUTPUT_JSON;
-                break;
-            case 'x':
-                if (!disable_plugin(optarg, plugin_list))
-                {
-                    fprintf(stderr, "Unknown plugin: %s\n", optarg);
-                    return drakvuf_exit_code_t::FAIL;
-                }
-                break;
-            case opt_wait_stop_plugins:
-                wait_stop_plugins = true;
-                wait_stop_plugins_timeout = atoi(optarg);
-                break;
-            case 'a':
-                if (!enable_plugin(optarg, plugin_list, &disabled_all))
-                {
-                    fprintf(stderr, "Unknown plugin: %s\n", optarg);
-                    return drakvuf_exit_code_t::FAIL;
-                }
-                break;
-            case 'f':
-                args.push_back(optarg);
-                break;
-            case 's':
-                options.cpuid_stealth = true;
-                break;
-            case 'p':
-                leave_paused = true;
-                break;
-            case 'A':
-                options.skip_altp2m_check = true;
-                break;
-            case 'T':
-                options.tcpip_profile = optarg;
-                break;
-            case 'W':
-                options.win32k_profile = optarg;
-                break;
+            write_files[optarg] = argv[optind++];
+            break;
+        case opt_write_file_timeout:
+            write_file_timeout = atoi(optarg);
+            break;
+        case 't':
+            timeout = atoi(optarg);
+            break;
+        case 'D':
+            options.dump_folder = optarg;
+            break;
+        case 'o':
+            if (!strncmp(optarg, "csv", 3))
+                output = OUTPUT_CSV;
+            if (!strncmp(optarg, "kv", 2))
+                output = OUTPUT_KV;
+            if (!strncmp(optarg, "json", 4))
+                output = OUTPUT_JSON;
+            break;
+        case 'x':
+            if (!disable_plugin(optarg, plugin_list))
+            {
+                fprintf(stderr, "Unknown plugin: %s\n", optarg);
+                return drakvuf_exit_code_t::FAIL;
+            }
+            break;
+        case opt_wait_stop_plugins:
+            wait_stop_plugins = true;
+            wait_stop_plugins_timeout = atoi(optarg);
+            break;
+        case 'a':
+            if (!enable_plugin(optarg, plugin_list, &disabled_all))
+            {
+                fprintf(stderr, "Unknown plugin: %s\n", optarg);
+                return drakvuf_exit_code_t::FAIL;
+            }
+            break;
+        case 'f':
+            args.push_back(optarg);
+            break;
+        case 's':
+            options.cpuid_stealth = true;
+            break;
+        case 'p':
+            leave_paused = true;
+            break;
+        case 'A':
+            options.skip_altp2m_check = true;
+            break;
+        case 'T':
+            options.tcpip_profile = optarg;
+            break;
+        case 'W':
+            options.win32k_profile = optarg;
+            break;
 #ifdef DRAKVUF_DEBUG
-            case 'v':
-                verbose = true;
-                break;
+        case 'v':
+            verbose = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
-            case 'S':
-                options.syscalls_filter_file = optarg;
-                break;
-            case opt_disable_sysret:
-                options.disable_sysret = true;
-                break;
+        case 'S':
+            options.syscalls_filter_file = optarg;
+            break;
+        case opt_disable_sysret:
+            options.disable_sysret = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCMON
-            case 'q':
-                if (!std::filesystem::exists(optarg))
-                {
-                    fprintf(stderr, "file %s does not exist!\n", optarg);
-                    return drakvuf_exit_code_t::FAIL;
-                }
-                options.procmon_filter_file = optarg;
-                break;
+        case 'q':
+            if (!std::filesystem::exists(optarg))
+            {
+                fprintf(stderr, "file %s does not exist!\n", optarg);
+                return drakvuf_exit_code_t::FAIL;
+            }
+            options.procmon_filter_file = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
-            case 'M':
-                options.dump_modified_files = true;
-                break;
-            case 'n':
-                options.filedelete_use_injector = true;
-                break;
+        case 'M':
+            options.dump_modified_files = true;
+            break;
+        case 'n':
+            options.filedelete_use_injector = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_FILEEXTRACTOR
-            case opt_fileextractor_timeout:
-                options.fileextractor_timeout = strtoul(optarg, NULL, 0);
-                break;
-            case opt_fileextractor_hash:
-                options.fileextractor_hash = strtoul(optarg, NULL, 0);
-                break;
-            case opt_fileextractor_extract:
-                options.fileextractor_extract = strtoul(optarg, NULL, 0);
-                break;
-            case opt_fileextractor_exclude_list:
-                if (!std::filesystem::exists(optarg))
-                {
-                    fprintf(stderr, "file %s does not exist!\n", optarg);
-                    return drakvuf_exit_code_t::FAIL;
-                }
-                options.fileextractor_exclude_file = optarg;
-                break;
+        case opt_fileextractor_timeout:
+            options.fileextractor_timeout = strtoul(optarg, NULL, 0);
+            break;
+        case opt_fileextractor_hash:
+            options.fileextractor_hash = strtoul(optarg, NULL, 0);
+            break;
+        case opt_fileextractor_extract:
+            options.fileextractor_extract = strtoul(optarg, NULL, 0);
+            break;
+        case opt_fileextractor_exclude_list:
+            if (!std::filesystem::exists(optarg))
+            {
+                fprintf(stderr, "file %s does not exist!\n", optarg);
+                return drakvuf_exit_code_t::FAIL;
+            }
+            options.fileextractor_exclude_file = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
-            case 'b':
-                options.abort_on_bsod = true;
-                break;
-            case opt_bsodmon_ignore_stop:
-                bsodmon_ignore_stop = true;
-                break;
-            case opt_crashdump_dir:
-                options.crashdump_dir = optarg;
-                break;
+        case 'b':
+            options.abort_on_bsod = true;
+            break;
+        case opt_bsodmon_ignore_stop:
+            bsodmon_ignore_stop = true;
+            break;
+        case opt_crashdump_dir:
+            options.crashdump_dir = optarg;
+            break;
 #endif
-            case 'l':
-                libvmi_conf = true;
-                break;
-            case 'F':
-                fast_singlestep = true;
-                break;
-            case opt_traps_ttl:
-                limited_traps_ttl = strtoull(optarg, NULL, 0);
-                break;
-            case 'k':
-                kpgd = strtoull(optarg, NULL, 0);
-                break;
-            case 'w':
-                json_wow_path = optarg;
-                break;
-            case opt_json_sspicli:
-                options.sspicli_profile = optarg;
-                break;
-            case opt_json_kernel32:
-                options.kernel32_profile = optarg;
-                break;
-            case opt_json_kernelbase:
-                options.kernelbase_profile = optarg;
-                break;
-            case opt_json_wow_kernel32:
-                options.wow_kernel32_profile = optarg;
-                break;
-            case opt_json_ntdll:
-                options.ntdll_profile = optarg;
-                break;
-            case opt_json_iphlpapi:
-                options.iphlpapi_profile = optarg;
-                break;
-            case opt_json_mpr:
-                options.mpr_profile = optarg;
-                break;
-            case opt_userhook_no_addr:
-                options.userhook_no_addr = true;
-                break;
-            case opt_userhook_injection_mode:
-                options.userhook_injection_mode = true;
-                break;
-            case opt_ignore_pid:
-            {
-                auto pid = strtoull(optarg, NULL, 0);
-                ignored_processes.insert(pid);
-                break;
-            }
+        case 'l':
+            libvmi_conf = true;
+            break;
+        case 'F':
+            fast_singlestep = true;
+            break;
+        case opt_traps_ttl:
+            limited_traps_ttl = strtoull(optarg, NULL, 0);
+            break;
+        case 'k':
+            kpgd = strtoull(optarg, NULL, 0);
+            break;
+        case 'w':
+            json_wow_path = optarg;
+            break;
+        case opt_json_sspicli:
+            options.sspicli_profile = optarg;
+            break;
+        case opt_json_kernel32:
+            options.kernel32_profile = optarg;
+            break;
+        case opt_json_kernelbase:
+            options.kernelbase_profile = optarg;
+            break;
+        case opt_json_wow_kernel32:
+            options.wow_kernel32_profile = optarg;
+            break;
+        case opt_json_ntdll:
+            options.ntdll_profile = optarg;
+            break;
+        case opt_json_iphlpapi:
+            options.iphlpapi_profile = optarg;
+            break;
+        case opt_json_mpr:
+            options.mpr_profile = optarg;
+            break;
+        case opt_userhook_no_addr:
+            options.userhook_no_addr = true;
+            break;
+        case opt_userhook_injection_mode:
+            options.userhook_injection_mode = true;
+            break;
+        case opt_ignore_pid:
+        {
+            auto pid = strtoull(optarg, NULL, 0);
+            ignored_processes.insert(pid);
+            break;
+        }
 #if defined(ENABLE_PLUGIN_WMIMON) || defined(ENABLE_PLUGIN_LINKMON) || defined(ENABLE_PLUGIN_FILETRACER)
-            case opt_json_ole32:
-                options.ole32_profile = optarg;
-                break;
+        case opt_json_ole32:
+            options.ole32_profile = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_WMIMON
-            case opt_json_wow_ole32:
-                options.wow_ole32_profile = optarg;
-                break;
-            case opt_json_combase:
-                options.combase_profile = optarg;
-                break;
+        case opt_json_wow_ole32:
+            options.wow_ole32_profile = optarg;
+            break;
+        case opt_json_combase:
+            options.combase_profile = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_MEMDUMP
-            case opt_memdump_dir:
-                options.memdump_dir = optarg;
-                break;
-            case opt_dll_hooks_list:
-                options.dll_hooks_list = optarg;
-                break;
-            case opt_json_clr:
-                options.clr_profile = optarg;
-                break;
-            case opt_json_mscorwks:
-                options.mscorwks_profile = optarg;
-                break;
-            case opt_memdump_disable_free_vm:
-                options.memdump_disable_free_vm = true;
-                break;
-            case opt_memdump_disable_protect_vm:
-                options.memdump_disable_protect_vm = true;
-                break;
-            case opt_memdump_disable_write_vm:
-                options.memdump_disable_write_vm = true;
-                break;
-            case opt_memdump_disable_terminate_proc:
-                options.memdump_disable_terminate_proc = true;
-                break;
-            case opt_memdump_disable_create_thread:
-                options.memdump_disable_create_thread = true;
-                break;
-            case opt_memdump_disable_set_thread:
-                options.memdump_disable_set_thread = true;
-                break;
-            case opt_memdump_disable_shellcode_detect:
-                options.memdump_disable_shellcode_detect = true;
-                break;
+        case opt_memdump_dir:
+            options.memdump_dir = optarg;
+            break;
+        case opt_dll_hooks_list:
+            options.dll_hooks_list = optarg;
+            break;
+        case opt_json_clr:
+            options.clr_profile = optarg;
+            break;
+        case opt_json_mscorwks:
+            options.mscorwks_profile = optarg;
+            break;
+        case opt_memdump_disable_free_vm:
+            options.memdump_disable_free_vm = true;
+            break;
+        case opt_memdump_disable_protect_vm:
+            options.memdump_disable_protect_vm = true;
+            break;
+        case opt_memdump_disable_write_vm:
+            options.memdump_disable_write_vm = true;
+            break;
+        case opt_memdump_disable_terminate_proc:
+            options.memdump_disable_terminate_proc = true;
+            break;
+        case opt_memdump_disable_create_thread:
+            options.memdump_disable_create_thread = true;
+            break;
+        case opt_memdump_disable_set_thread:
+            options.memdump_disable_set_thread = true;
+            break;
+        case opt_memdump_disable_shellcode_detect:
+            options.memdump_disable_shellcode_detect = true;
+            break;
 #endif
 #if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
-            case opt_procdump_timeout:
-                options.procdump_timeout = strtoul(optarg, NULL, 0);
-                break;
-            case opt_procdump_dir:
-                options.procdump_dir = optarg;
-                break;
-            case opt_compress_procdumps:
-                options.compress_procdumps = true;
-                break;
-            case opt_json_hal:
-                options.hal_profile = optarg;
-                break;
+        case opt_procdump_timeout:
+            options.procdump_timeout = strtoul(optarg, NULL, 0);
+            break;
+        case opt_procdump_dir:
+            options.procdump_dir = optarg;
+            break;
+        case opt_compress_procdumps:
+            options.compress_procdumps = true;
+            break;
+        case opt_json_hal:
+            options.hal_profile = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP2
-            case opt_procdump_disable_dump_on_finish:
-                procdump_on_finish = false;
-                break;
-            case opt_procdump_new_processes_on_finish:
-                options.procdump_new_processes_on_finish = true;
-                break;
-            case opt_procdump_disable_kideliverapc_hook:
-                options.procdump_disable_kideliverapc_hook = true;
-                break;
-            case opt_procdump_disable_kedelayexecutionthread_hook:
-                options.procdump_disable_kedelayexecutionthread_hook = true;
-                break;
-            case opt_procdump_exclude_list:
-                if (!std::filesystem::exists(optarg))
-                {
-                    fprintf(stderr, "file %s does not exist!\n", optarg);
-                }
-                options.procdump_exclude_file = optarg;
-                break;
+        case opt_procdump_disable_dump_on_finish:
+            procdump_on_finish = false;
+            break;
+        case opt_procdump_new_processes_on_finish:
+            options.procdump_new_processes_on_finish = true;
+            break;
+        case opt_procdump_disable_kideliverapc_hook:
+            options.procdump_disable_kideliverapc_hook = true;
+            break;
+        case opt_procdump_disable_kedelayexecutionthread_hook:
+            options.procdump_disable_kedelayexecutionthread_hook = true;
+            break;
+        case opt_procdump_exclude_list:
+            if (!std::filesystem::exists(optarg))
+            {
+                fprintf(stderr, "file %s does not exist!\n", optarg);
+            }
+            options.procdump_exclude_file = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON
-            case opt_codemon_dump_dir:
-                options.codemon_dump_dir = optarg;
-                break;
-            case opt_codemon_filter_executable:
-                options.codemon_filter_executable = optarg;
-                break;
-            case opt_codemon_log_everything:
-                options.codemon_log_everything = true;
-                break;
-            case opt_codemon_dump_vad:
-                options.codemon_dump_vad = true;
-                break;
-            case opt_codemon_analyse_system_dll_vad:
-                options.codemon_analyse_system_dll_vad = true;
-                break;
-            case opt_codemon_default_benign:
-                options.codemon_default_benign = true;
-                break;
+        case opt_codemon_dump_dir:
+            options.codemon_dump_dir = optarg;
+            break;
+        case opt_codemon_filter_executable:
+            options.codemon_filter_executable = optarg;
+            break;
+        case opt_codemon_log_everything:
+            options.codemon_log_everything = true;
+            break;
+        case opt_codemon_dump_vad:
+            options.codemon_dump_vad = true;
+            break;
+        case opt_codemon_analyse_system_dll_vad:
+            options.codemon_analyse_system_dll_vad = true;
+            break;
+        case opt_codemon_default_benign:
+            options.codemon_default_benign = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_IPT
-            case opt_ipt_dir:
-                options.ipt_dir = optarg;
-                break;
-            case opt_ipt_trace_os:
-                options.ipt_trace_os = true;
-                break;
-            case opt_ipt_trace_user:
-                options.ipt_trace_user = true;
-                break;
+        case opt_ipt_dir:
+            options.ipt_dir = optarg;
+            break;
+        case opt_ipt_trace_os:
+            options.ipt_trace_os = true;
+            break;
+        case opt_ipt_trace_user:
+            options.ipt_trace_user = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_EXPLOITMON
-            case opt_exploitmon_kernel2user_detect:
-                options.exploitmon_kernel2user_detect = true;
-                break;
+        case opt_exploitmon_kernel2user_detect:
+            options.exploitmon_kernel2user_detect = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_OBJMON
-            case opt_objmon_disable_create_hook:
-                options.objmon_disable_create_hook = true;
-                break;
-            case opt_objmon_disable_duplicate_hook:
-                options.objmon_disable_duplicate_hook = true;
-                break;
+        case opt_objmon_disable_create_hook:
+            options.objmon_disable_create_hook = true;
+            break;
+        case opt_objmon_disable_duplicate_hook:
+            options.objmon_disable_duplicate_hook = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_HIDSIM
-            case opt_hidsim_template:
-                options.hidsim_template = optarg;
-                break;
-            case opt_hidsim_monitor_gui:
-                options.hidsim_monitor_gui = true;
-                break;
-            case opt_hidsim_random_clicks:
-                options.hidsim_random_clicks = true;
-                break;
+        case opt_hidsim_template:
+            options.hidsim_template = optarg;
+            break;
+        case opt_hidsim_monitor_gui:
+            options.hidsim_monitor_gui = true;
+            break;
+        case opt_hidsim_random_clicks:
+            options.hidsim_random_clicks = true;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_ROOTKITMON
-            case opt_rootkitmon_json_fwpkclnt:
-                options.fwpkclnt_profile = optarg;
-                break;
-            case opt_rootkitmon_json_fltmgr:
-                options.fltmgr_profile = optarg;
-                break;
-            case opt_rootkitmon_json_ci:
-                options.ci_profile = optarg;
-                break;
+        case opt_rootkitmon_json_fwpkclnt:
+            options.fwpkclnt_profile = optarg;
+            break;
+        case opt_rootkitmon_json_fltmgr:
+            options.fltmgr_profile = optarg;
+            break;
+        case opt_rootkitmon_json_ci:
+            options.ci_profile = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_CALLBACKMON
-            case opt_callbackmon_json_netio:
-                options.netio_profile = optarg;
-                break;
-            case opt_callbackmon_json_ndis:
-                options.ndis_profile = optarg;
-                break;
+        case opt_callbackmon_json_netio:
+            options.netio_profile = optarg;
+            break;
+        case opt_callbackmon_json_ndis:
+            options.ndis_profile = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_DKOMMON
-            case opt_dkommon_json_services:
-                options.services_profile = optarg;
-                break;
+        case opt_dkommon_json_services:
+            options.services_profile = optarg;
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_UNIXSOCKETMON
-            case opt_unixsocketmon_max_size:
-                options.unixsocketmon_max_size = strtoull(optarg, NULL, 0);
-                break;
+        case opt_unixsocketmon_max_size:
+            options.unixsocketmon_max_size = strtoull(optarg, NULL, 0);
+            break;
 #endif
 #ifdef ENABLE_PLUGIN_REBOOTMON
-            case opt_rebootmon_abort_on_power_off:
-                options.rebootmon_abort_on_power_off = true;
-                break;
+        case opt_rebootmon_abort_on_power_off:
+            options.rebootmon_abort_on_power_off = true;
+            break;
 #endif
-            case 'h':
-                print_usage();
-                return drakvuf_exit_code_t::SUCCESS;
-            case opt_libdrakvuf_not_get_userid:
-                libdrakvuf_get_userid = false;
-                break;
-            case opt_enable_active_callback_check:
-                enable_active_callback_check = true;
-                break;
-            default:
-                if (isalnum(c))
-                    fprintf(stderr, "Unrecognized option: %c\n", c);
-                else
-                    fprintf(stderr, "Unrecognized option: %s\n", long_opts[long_index].name);
-                return drakvuf_exit_code_t::FAIL;
+        case 'h':
+            print_usage();
+            return drakvuf_exit_code_t::SUCCESS;
+        case opt_libdrakvuf_not_get_userid:
+            libdrakvuf_get_userid = false;
+            break;
+        case opt_enable_active_callback_check:
+            enable_active_callback_check = true;
+            break;
+        default:
+            if (isalnum(c))
+                fprintf(stderr, "Unrecognized option: %c\n", c);
+            else
+                fprintf(stderr, "Unrecognized option: %s\n", long_opts[long_index].name);
+            return drakvuf_exit_code_t::FAIL;
         }
 
     if (!domain)
@@ -1086,19 +1086,19 @@ int main(int argc, char** argv)
     try
     {
         drakvuf = std::make_unique<drakvuf_c>(
-                domain,
-                json_kernel_path,
-                json_wow_path,
-                output,
-                leave_paused,
-                libvmi_conf,
-                kpgd,
-                fast_singlestep,
-                limited_traps_ttl,
-                ignored_processes,
-                libdrakvuf_get_userid,
-                enable_active_callback_check
-            );
+                      domain,
+                      json_kernel_path,
+                      json_wow_path,
+                      output,
+                      leave_paused,
+                      libvmi_conf,
+                      kpgd,
+                      fast_singlestep,
+                      limited_traps_ttl,
+                      ignored_processes,
+                      libdrakvuf_get_userid,
+                      enable_active_callback_check
+                  );
     }
     catch (const std::exception& e)
     {
@@ -1114,14 +1114,14 @@ int main(int argc, char** argv)
         injector_status_t ret = drakvuf->write_file(injection_pid, injection_thread, src.c_str(), dst.c_str(), write_file_timeout, injection_global_search);
         switch (ret)
         {
-            case INJECTOR_SUCCEEDED:
-                break;
-            case INJECTOR_TIMEOUTED:
-                fprintf(stderr, "Writefile timeout exceeds! (%s)!\n", src.c_str());
-                return drakvuf_exit_code_t::WRITE_FILE_TIMEOUT;
-            default:
-                fprintf(stderr, "Failed to copy file (%s) into VM!\n", src.c_str());
-                return drakvuf_exit_code_t::WRITE_FILE_ERROR;
+        case INJECTOR_SUCCEEDED:
+            break;
+        case INJECTOR_TIMEOUTED:
+            fprintf(stderr, "Writefile timeout exceeds! (%s)!\n", src.c_str());
+            return drakvuf_exit_code_t::WRITE_FILE_TIMEOUT;
+        default:
+            fprintf(stderr, "Failed to copy file (%s) into VM!\n", src.c_str());
+            return drakvuf_exit_code_t::WRITE_FILE_ERROR;
         }
 
         if (is_interrupted)
@@ -1134,29 +1134,29 @@ int main(int argc, char** argv)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, injection_cmd);
         injector_status_t ret = drakvuf->inject_cmd(
-                injection_pid,
-                injection_thread,
-                injection_cmd,
-                injection_cwd,
-                injection_method,
-                binary_path,
-                target_process,
-                injection_timeout,
-                injection_global_search,
-                args.size(),
-                args.data(),
-                &injected_pid
-            );
+                                    injection_pid,
+                                    injection_thread,
+                                    injection_cmd,
+                                    injection_cwd,
+                                    injection_method,
+                                    binary_path,
+                                    target_process,
+                                    injection_timeout,
+                                    injection_global_search,
+                                    args.size(),
+                                    args.data(),
+                                    &injected_pid
+                                );
         switch (ret)
         {
-            case INJECTOR_FAILED_WITH_ERROR_CODE:
-                return drakvuf_exit_code_t::INJECTION_UNSUCCESSFUL;
-            case INJECTOR_FAILED:
-                return drakvuf_exit_code_t::INJECTION_ERROR;
-            case INJECTOR_SUCCEEDED:
-                break;
-            case INJECTOR_TIMEOUTED:
-                return drakvuf_exit_code_t::INJECTION_TIMEOUT;
+        case INJECTOR_FAILED_WITH_ERROR_CODE:
+            return drakvuf_exit_code_t::INJECTION_UNSUCCESSFUL;
+        case INJECTOR_FAILED:
+            return drakvuf_exit_code_t::INJECTION_ERROR;
+        case INJECTOR_SUCCEEDED:
+            break;
+        case INJECTOR_TIMEOUTED:
+            return drakvuf_exit_code_t::INJECTION_TIMEOUT;
         }
 
         if (exit_injection_thread)
@@ -1188,16 +1188,16 @@ int main(int argc, char** argv)
 
     switch (drakvuf->is_interrupted())
     {
-        case SIGDRAKVUFKERNELPANIC:
-            return drakvuf_exit_code_t::KERNEL_PANIC;
-        case SIGDRAKVUFPOWEROFF:
-            PRINT_DEBUG("Exit on power off\n");
-            return drakvuf_exit_code_t::POWER_OFF;
-        case SIGTERM:
-            return drakvuf_exit_code_t::SUCCESS;
-        default:
-            clear_interrupt();
-            break;
+    case SIGDRAKVUFKERNELPANIC:
+        return drakvuf_exit_code_t::KERNEL_PANIC;
+    case SIGDRAKVUFPOWEROFF:
+        PRINT_DEBUG("Exit on power off\n");
+        return drakvuf_exit_code_t::POWER_OFF;
+    case SIGTERM:
+        return drakvuf_exit_code_t::SUCCESS;
+    default:
+        clear_interrupt();
+        break;
     }
 
     if (terminate && injected_pid)

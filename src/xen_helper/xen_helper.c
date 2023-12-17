@@ -241,7 +241,7 @@ int xen_get_evtchn_fd(xen_interface_t* xen)
 }
 
 int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
-    char** name)
+                     char** name)
 {
     uint32_t _domID;
     char* _name = NULL;
@@ -274,7 +274,7 @@ int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
         xc_domaininfo_t info = { 0 };
 
         if ( 1 == xen->xlw.xc_domain_getinfolist(xen->xc, _domID, 1, &info)
-            && info.domain == _domID)
+                && info.domain == _domID)
         {
             _name = xen->xlw.libxl_domid_to_name(xen->xl_ctx, _domID);
         }
@@ -418,7 +418,7 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
     int rc;
 
     rc = xen->xlw.xenforeignmemory_resource_size(
-            xen->fmem, domID, XENMEM_resource_vmtrace_buf, vcpu, &ipt_state->size);
+             xen->fmem, domID, XENMEM_resource_vmtrace_buf, vcpu, &ipt_state->size);
     if (rc)
     {
         fprintf(stderr, "Failed to get trace buffer size\n");
@@ -426,12 +426,12 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
     }
 
     ipt_state->fres = xen->xlw.xenforeignmemory_map_resource(
-            xen->fmem, domID, XENMEM_resource_vmtrace_buf,
-            /* vcpu: */ vcpu,
-            /* frame: */ 0,
-            /* num_frames: */ ipt_state->size >> XC_PAGE_SHIFT,
-            (void**)&ipt_state->buf,
-            PROT_READ, 0);
+                          xen->fmem, domID, XENMEM_resource_vmtrace_buf,
+                          /* vcpu: */ vcpu,
+                          /* frame: */ 0,
+                          /* num_frames: */ ipt_state->size >> XC_PAGE_SHIFT,
+                          (void**)&ipt_state->buf,
+                          PROT_READ, 0);
 
     if (!ipt_state->buf)
     {

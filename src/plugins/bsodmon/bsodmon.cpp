@@ -145,36 +145,36 @@ static void save_file_metadata(
     }
 
     json_object_object_add(jobj,
-        "KernelBase",
-        json_object_new_string(to_hex_string(drakvuf_get_kernel_base(drakvuf)).data()));
+                           "KernelBase",
+                           json_object_new_string(to_hex_string(drakvuf_get_kernel_base(drakvuf)).data()));
 
     json_object_object_add(jobj,
-        "BugCheckCode",
-        json_object_new_string(to_hex_string(code).data()));
+                           "BugCheckCode",
+                           json_object_new_string(to_hex_string(code).data()));
 
     json_object_object_add(jobj,
-        "Param1",
-        json_object_new_string(to_hex_string(param1).data()));
+                           "Param1",
+                           json_object_new_string(to_hex_string(param1).data()));
 
     json_object_object_add(jobj,
-        "Param2",
-        json_object_new_string(to_hex_string(param2).data()));
+                           "Param2",
+                           json_object_new_string(to_hex_string(param2).data()));
 
     json_object_object_add(jobj,
-        "Param3",
-        json_object_new_string(to_hex_string(param3).data()));
+                           "Param3",
+                           json_object_new_string(to_hex_string(param3).data()));
 
     json_object_object_add(jobj,
-        "Param4",
-        json_object_new_string(to_hex_string(param4).data()));
+                           "Param4",
+                           json_object_new_string(to_hex_string(param4).data()));
 
     json_object_object_add(jobj,
-        "CR3",
-        json_object_new_string(to_hex_string(info->regs->cr3).data()));
+                           "CR3",
+                           json_object_new_string(to_hex_string(info->regs->cr3).data()));
 
     json_object_object_add(jobj,
-        "RSP",
-        json_object_new_string(to_hex_string(info->regs->rsp).data()));
+                           "RSP",
+                           json_object_new_string(to_hex_string(info->regs->rsp).data()));
 
     fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
@@ -235,15 +235,15 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     {
         auto tuple = std::make_tuple(
-                keyval("VCPU", fmt::Nval(info->vcpu)),
-                keyval("CR3", fmt::Nval(info->regs->cr3)),
-                keyval("BugCheckCode", fmt::Xval(code, false)),
-                keyval("BugCheckName", fmt::Qstr(bugcheck_name)),
-                keyval("BugCheckParameter1", fmt::Xval(param1, false)),
-                keyval("BugCheckParameter2", fmt::Xval(param2, false)),
-                keyval("BugCheckParameter3", fmt::Xval(param3, false)),
-                keyval("BugCheckParameter4", fmt::Xval(param4, false))
-            );
+                         keyval("VCPU", fmt::Nval(info->vcpu)),
+                         keyval("CR3", fmt::Nval(info->regs->cr3)),
+                         keyval("BugCheckCode", fmt::Xval(code, false)),
+                         keyval("BugCheckName", fmt::Qstr(bugcheck_name)),
+                         keyval("BugCheckParameter1", fmt::Xval(param1, false)),
+                         keyval("BugCheckParameter2", fmt::Xval(param2, false)),
+                         keyval("BugCheckParameter3", fmt::Xval(param3, false)),
+                         keyval("BugCheckParameter4", fmt::Xval(param4, false))
+                     );
 
         fmt::print(f->format, "bsodmon", drakvuf, info, tuple);
     }

@@ -30,17 +30,17 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
     auto delay_interval_miliseconds = fmt::Fval(delay / 10000.0); // delay in miliseconds
 
     fmt::print(sm->format, "delaymon", drakvuf, info,
-        keyval("VCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Nval(info->regs->cr3)),
-        keyval("DelayIntervalMs", delay_interval_miliseconds)
-    );
+               keyval("VCPU", fmt::Nval(info->vcpu)),
+               keyval("CR3", fmt::Nval(info->regs->cr3)),
+               keyval("DelayIntervalMs", delay_interval_miliseconds)
+              );
 
     return 0;
 }
 
 static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
-    drakvuf_trap_t* trap,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+                           drakvuf_trap_t* trap,
+                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     if ( !drakvuf_get_kernel_symbol_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 

@@ -194,49 +194,49 @@ struct argument
 };
 
 void init_argument(struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    const void* data) NOEXCEPT;
+                   argument_type_t type,
+                   size_t size,
+                   const void* data) NOEXCEPT;
 
 void init_int_argument(struct argument* arg,
-    uint64_t value) NOEXCEPT;
+                       uint64_t value) NOEXCEPT;
 
 void init_unicode_argument(struct argument* arg,
-    unicode_string_t* us) NOEXCEPT;
+                           unicode_string_t* us) NOEXCEPT;
 
 void init_string_argument(struct argument* arg,
-    const char* string) NOEXCEPT;
+                          const char* string) NOEXCEPT;
 
 void init_array_argument(struct argument* arg,
-    struct argument array[],
-    int size) NOEXCEPT;
+                         struct argument array[],
+                         int size) NOEXCEPT;
 
 #define init_struct_argument(arg, sv) \
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
 
 addr_t place_array_on_addr_64(vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument* arg,
-    bool null_terminate,
-    addr_t* data_addr,
-    addr_t* array_addr) NOEXCEPT;
+                              x86_registers_t* regs,
+                              struct argument* arg,
+                              bool null_terminate,
+                              addr_t* data_addr,
+                              addr_t* array_addr) NOEXCEPT;
 
 addr_t place_array_on_addr_32(vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument* arg,
-    addr_t* data_addr,
-    addr_t* array_addr) NOEXCEPT;
+                              x86_registers_t* regs,
+                              struct argument* arg,
+                              addr_t* data_addr,
+                              addr_t* array_addr) NOEXCEPT;
 
 bool setup_stack(drakvuf_t drakvuf,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
+                 x86_registers_t* regs,
+                 struct argument args[],
+                 int nb_args) NOEXCEPT;
 
 bool setup_stack_locked(drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
+                        vmi_instance_t vmi,
+                        x86_registers_t* regs,
+                        struct argument args[],
+                        int nb_args) NOEXCEPT;
 
 bool inject_function_call(
     drakvuf_t drakvuf,
@@ -249,30 +249,30 @@ bool inject_function_call(
     uint64_t* stack_marker) NOEXCEPT;
 
 injector_status_t injector_start_app(drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,     // if -m = doppelganging
-    const char* target_process,  // if -m = doppelganging
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search, // out: iff break_loop_on_detection is set
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid) NOEXCEPT;
+                                     vmi_pid_t pid,
+                                     uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                                     const char* app,
+                                     const char* cwd,
+                                     injection_method_t method,
+                                     output_format_t format,
+                                     const char* binary_path,     // if -m = doppelganging
+                                     const char* target_process,  // if -m = doppelganging
+                                     bool break_loop_on_detection,
+                                     injector_t* injector_to_be_freed,
+                                     bool global_search, // out: iff break_loop_on_detection is set
+                                     bool wait_for_exit,
+                                     int args_count,
+                                     const char* args[],
+                                     vmi_pid_t* injected_pid) NOEXCEPT;
 
 void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid);
+                        vmi_pid_t injection_pid,
+                        uint32_t injection_tid,
+                        vmi_pid_t pid);
 
 void injector_exitthread(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid);
+                         vmi_pid_t injection_pid,
+                         uint32_t injection_tid);
 
 
 void injector_free_win(injector_t injector);

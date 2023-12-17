@@ -248,20 +248,20 @@ void codemon::log_all_to_console(const drakvuf_trap_info* trap_info, dump_metada
 
     //Log everything to the screen
     fmt::print(this->m_output_format, "codemon", this->drakvuf, trap_info,
-        keyval("EventType", fmt::Qstr("execframe")),
-        keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
-        keyval("PageVA", fmt::Xval(page_va)),
-        keyval("VADBase", fmt::Xval(dump_metadata->vad_node_base)),
-        keyval("VADEnd", fmt::Xval(dump_metadata->vad_node_end)),
-        keyval("VADName", fmt::Qstr(actual_vad_name)),
-        keyval("DumpSize", fmt::Nval(actual_dump_size)),
-        keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
-        keyval("SHA256", fmt::Qstr(actual_checksum)),
-        keyval("DumpID", fmt::Nval(actual_dump_id)),
-        keyval("MetaFile", fmt::Qstr(actual_metafile)),
-        keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
-        keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
-    );
+               keyval("EventType", fmt::Qstr("execframe")),
+               keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+               keyval("PageVA", fmt::Xval(page_va)),
+               keyval("VADBase", fmt::Xval(dump_metadata->vad_node_base)),
+               keyval("VADEnd", fmt::Xval(dump_metadata->vad_node_end)),
+               keyval("VADName", fmt::Qstr(actual_vad_name)),
+               keyval("DumpSize", fmt::Nval(actual_dump_size)),
+               keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
+               keyval("SHA256", fmt::Qstr(actual_checksum)),
+               keyval("DumpID", fmt::Nval(actual_dump_id)),
+               keyval("MetaFile", fmt::Qstr(actual_metafile)),
+               keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
+               keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
+              );
 }
 
 /**
@@ -523,10 +523,10 @@ done:
  * @return false, if the context was not generated as the vad node was too big.
  */
 bool setup_dump_context(mmvad_info_t mmvad,
-    uint64_t cr3,
-    addr_t page_va,
-    dump_metadata_struct* dump_metadata,
-    access_context_t* ctx_memory_dump)
+                        uint64_t cr3,
+                        addr_t page_va,
+                        dump_metadata_struct* dump_metadata,
+                        access_context_t* ctx_memory_dump)
 {
     //Translate addr via specified directory table base.
     ctx_memory_dump->translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -667,10 +667,10 @@ bool codemon::analyse_memory(const drakvuf_trap_info_t* trap_info, dump_metadata
 
     //Generate the file stem
     if (asprintf(&dump_metadata->file_stem,
-            "%llx_%.16s",
-            (unsigned long long) ctx_memory_dump.addr,
-            dump_metadata->sha256sum)
-        < 0)
+                 "%llx_%.16s",
+                 (unsigned long long) ctx_memory_dump.addr,
+                 dump_metadata->sha256sum)
+            < 0)
     {
         PRINT_DEBUG("[CODEMON] Could not create the file stem\n");
         return malware;
@@ -761,12 +761,12 @@ event_response_t codemon::write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     if (log_everything)
     {
         fmt::print(this->m_output_format, "codemon", drakvuf, trap_info,
-            keyval("EventType", fmt::Qstr("writefault")),
-            keyval("FrameVA", fmt::Xval(params->page_va)),
-            keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
-            keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
-            keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
-        );
+                   keyval("EventType", fmt::Qstr("writefault")),
+                   keyval("FrameVA", fmt::Xval(params->page_va)),
+                   keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
+                   keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+                   keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
+                  );
     }
 
     //Create the new exec trap
@@ -928,11 +928,11 @@ event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drak
         if (log_everything)
         {
             fmt::print(this->m_output_format, "codemon", drakvuf, trap_info,
-                keyval("EventType", fmt::Qstr("pagefault")),
-                keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
-                keyval("VA", fmt::Xval(params->page_va)),
-                keyval("PA", fmt::Xval(p_info.paddr))
-            );
+                       keyval("EventType", fmt::Qstr("pagefault")),
+                       keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+                       keyval("VA", fmt::Xval(params->page_va)),
+                       keyval("PA", fmt::Xval(p_info.paddr))
+                      );
         }
 
         const auto gfn = p_info.paddr >> 12;

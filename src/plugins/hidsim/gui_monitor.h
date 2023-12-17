@@ -117,10 +117,10 @@
 #define DELAY 100000
 
 int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_profile,
-    bool is_x86);
+                            bool is_x86);
 
 /* Find button  */
 int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
-    std::atomic<bool>* has_to_stop);
+                std::atomic<bool>* has_to_stop);
 
 #endif // GUI_RECONSTRUCTION_H

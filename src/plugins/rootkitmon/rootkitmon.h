@@ -124,7 +124,7 @@ public:
     ~rootkitmon() = default;
 
     std::unique_ptr<libhook::ManualHook> register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
-        const char* func_name, hook_cb_t callback);
+            const char* func_name, hook_cb_t callback);
     std::unique_ptr<libhook::ManualHook> register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access);
 
     unicode_string_t* get_object_type_name(vmi_instance_t vmi, addr_t object);

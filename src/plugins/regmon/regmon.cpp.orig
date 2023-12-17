@@ -1,0 +1,664 @@
+/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+*                                                                         *
+* DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+* Tamas K Lengyel is hereinafter referred to as the author.               *
+* This program is free software; you may redistribute and/or modify it    *
+* under the terms of the GNU General Public License as published by the   *
+* Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+* CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+* right to use, modify, and redistribute this software under certain      *
+* conditions.  If you wish to embed DRAKVUF technology into proprietary   *
+* software, alternative licenses can be acquired from the author.         *
+*                                                                         *
+* Note that the GPL places important restrictions on "derivative works",  *
+* yet it does not provide a detailed definition of that term.  To avoid   *
+* misunderstandings, we interpret that term as broadly as copyright law   *
+* allows.  For example, we consider an application to constitute a        *
+* derivative work for the purpose of this license if it does any of the   *
+* following with any software or content covered by this license          *
+* ("Covered Software"):                                                   *
+*                                                                         *
+* o Integrates source code from Covered Software.                         *
+*                                                                         *
+* o Reads or includes copyrighted data files.                             *
+*                                                                         *
+* o Is designed specifically to execute Covered Software and parse the    *
+* results (as opposed to typical shell or execution-menu apps, which will *
+* execute anything you tell them to).                                     *
+*                                                                         *
+* o Includes Covered Software in a proprietary executable installer.  The *
+* installers produced by InstallShield are an example of this.  Including *
+* DRAKVUF with other software in compressed or archival form does not     *
+* trigger this provision, provided appropriate open source decompression  *
+* or de-archiving software is widely available for no charge.  For the    *
+* purposes of this license, an installer is considered to include Covered *
+* Software even if it actually retrieves a copy of Covered Software from  *
+* another source during runtime (such as by downloading it from the       *
+* Internet).                                                              *
+*                                                                         *
+* o Links (statically or dynamically) to a library which does any of the  *
+* above.                                                                  *
+*                                                                         *
+* o Executes a helper program, module, or script to do any of the above.  *
+*                                                                         *
+* This list is not exclusive, but is meant to clarify our interpretation  *
+* of derived works with some common examples.  Other people may interpret *
+* the plain GPL differently, so we consider this a special exception to   *
+* the GPL that we apply to Covered Software.  Works which meet any of     *
+* these conditions must conform to all of the terms of this license,      *
+* particularly including the GPL Section 3 requirements of providing      *
+* source code and allowing free redistribution of the work as a whole.    *
+*                                                                         *
+* Any redistribution of Covered Software, including any derived works,    *
+* must obey and carry forward all of the terms of this license, including *
+* obeying all GPL rules and restrictions.  For example, source code of    *
+* the whole work must be provided and free redistribution must be         *
+* allowed.  All GPL references to "this License", are to be treated as    *
+* including the terms and conditions of this license text as well.        *
+*                                                                         *
+* Because this license imposes special exceptions to the GPL, Covered     *
+* Work may not be combined (even as part of a larger work) with plain GPL *
+* software.  The terms, conditions, and exceptions of this license must   *
+* be included as well.  This license is incompatible with some other open *
+* source licenses as well.  In some cases we can relicense portions of    *
+* DRAKVUF or grant special permissions to use it in other open source     *
+* software.  Please contact tamas.k.lengyel@gmail.com with any such       *
+* requests.  Similarly, we don't incorporate incompatible open source     *
+* software into Covered Software without special permission from the      *
+* copyright holders.                                                      *
+*                                                                         *
+* If you have any questions about the licensing restrictions on using     *
+* DRAKVUF in other works, are happy to help.  As mentioned above,         *
+* alternative license can be requested from the author to integrate       *
+* DRAKVUF into proprietary applications and appliances.  Please email     *
+* tamas.k.lengyel@gmail.com for further information.                      *
+*                                                                         *
+* If you have received a written license agreement or contract for        *
+* Covered Software stating terms other than these, you may choose to use  *
+* and redistribute Covered Software under those terms instead of these.   *
+*                                                                         *
+* Source is provided to this software because we believe users have a     *
+* right to know exactly what a program is going to do before they run it. *
+* This also allows you to audit the software for security holes.          *
+*                                                                         *
+* Source code also allows you to port DRAKVUF to new platforms, fix bugs, *
+* and add new features.  You are highly encouraged to submit your changes *
+* on https://github.com/tklengyel/drakvuf, or by other methods.           *
+* By sending these changes, it is understood (unless you specify          *
+* otherwise) that you are offering unlimited, non-exclusive right to      *
+* reuse, modify, and relicense the code.  DRAKVUF will always be          *
+* available Open Source, but this is important because the inability to   *
+* relicense code has caused devastating problems for other Free Software  *
+* projects (such as KDE and NASM).                                        *
+* To specify special license conditions of your contributions, just say   *
+* so when you send them.                                                  *
+*                                                                         *
+* This program is distributed in the hope that it will be useful, but     *
+* WITHOUT ANY WARRANTY; without even the implied warranty of              *
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the DRAKVUF   *
+* license file for more details (it's in a COPYING file included with     *
+* DRAKVUF, and also available from                                        *
+* https://github.com/tklengyel/drakvuf/COPYING)                           *
+*                                                                         *
+***************************************************************************/
+
+#include <inttypes.h>
+#include <assert.h>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <iomanip>
+
+#include "plugins/plugins.h"
+#include "plugins/output_format.h"
+#include "plugins/plugin_utils.h"
+
+#include "regmon.h"
+
+enum RegistryValueTypes
+{
+    REG_NONE = 0,
+    REG_SZ,
+    REG_EXPAND_SZ,
+    REG_BINARY,
+    REG_DWORD,
+    REG_DWORD_LITTLE_ENDIAN = REG_DWORD,
+    REG_DWORD_BIG_ENDIAN,
+    REG_LINK,
+    REG_MULTI_SZ,
+    REG_RESOURCE_LIST,
+    REG_FULL_RESOURCE_DESCRIPTOR,
+    REG_RESOURCE_REQUIREMENTS_LIST,
+    REG_QWORD,
+    REG_QWORD_LITTLE_ENDIAN = REG_QWORD
+};
+
+enum
+{
+    //REG_OPTION_NON_VOLATILE = 0x00000000,
+    REG_OPTION_VOLATILE = 0x00000001,
+    REG_OPTION_CREATE_LINK = 0x00000002,
+    REG_OPTION_BACKUP_RESTORE = 0x00000004,
+    REG_OPTION_OPEN_LINK = 0x00000008,
+    REG_OPTION_DONT_VIRTUALIZE = 0x00000010,
+};
+
+static const flags_str_t reg_options =
+{
+    //REGISTER_FLAG(REG_OPTION_NON_VOLATILE),
+    REGISTER_FLAG(REG_OPTION_VOLATILE),
+    REGISTER_FLAG(REG_OPTION_CREATE_LINK),
+    REGISTER_FLAG(REG_OPTION_BACKUP_RESTORE),
+    REGISTER_FLAG(REG_OPTION_OPEN_LINK),
+    REGISTER_FLAG(REG_OPTION_DONT_VIRTUALIZE)
+};
+
+void regmon::print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value, uint32_t reg_opts)
+{
+    std::optional<fmt::Qstr<decltype(value_name)>> value_name_opt;
+    std::optional<fmt::Qstr<decltype(value)>> value_opt;
+    std::string flags;
+
+    if (value_name)
+        value_name_opt = fmt::Qstr(value_name);
+    if (value)
+        value_opt = fmt::Qstr(value);
+    if (reg_opts)
+        flags = parse_flags(reg_opts, reg_options, this->m_output_format);
+
+    fmt::print(this->m_output_format, "regmon", drakvuf, info,
+        keyval("Key", fmt::Qstr(key_name)),
+        keyval("ValueName", value_name_opt),
+        keyval("Value", value_opt),
+        flagsval("RegOptions", flags)
+    );
+}
+
+event_response_t regmon::log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    uint64_t key_handle,
+    char const* value_name,
+    char const* data )
+{
+    if (!key_handle) return 0;
+
+    gchar* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
+
+    if ( key_path )
+        print_registry_call_info(drakvuf, info, key_path, value_name, data, 0);
+
+    g_free( key_path );
+
+    return 0;
+}
+
+static char const* get_value_name(unicode_string_t* us)
+{
+    return (us && us->length > 0) ? reinterpret_cast<char const*>(us->contents) : "(Default)";
+}
+
+event_response_t regmon::log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    uint64_t key_handle,
+    addr_t value_name_addr, bool with_value_name,
+    char const* data )
+{
+    unicode_string_t* value_name_us = nullptr;
+    char const* value_name = nullptr;
+    if (with_value_name)
+    {
+        value_name_us = drakvuf_read_unicode(drakvuf, info, value_name_addr);
+        value_name = get_value_name(value_name_us);
+    }
+
+    auto status = log_reg_impl(drakvuf, info, key_handle, value_name, data);
+
+    if (value_name_us) vmi_free_unicode_str(value_name_us);
+
+    return status;
+}
+
+event_response_t regmon::log_reg_key( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    uint64_t key_handle)
+{
+    return log_reg_impl(drakvuf, info, key_handle, 0L, false, nullptr);
+}
+
+event_response_t regmon::log_reg_key_value( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    uint64_t key_handle, addr_t value_name_addr )
+{
+    return log_reg_impl(drakvuf, info, key_handle, value_name_addr, true, nullptr);
+}
+
+char* regmon::get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+{
+    if (!attr) return nullptr;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
+
+    addr_t key_handle;
+    ctx.addr = attr + this->objattr_root;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_handle) )
+        return nullptr;
+
+    addr_t key_name_addr;
+    ctx.addr = attr + this->objattr_name;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_name_addr) )
+        return nullptr;
+
+    gchar* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
+    unicode_string_t* us = drakvuf_read_unicode( drakvuf, info, key_name_addr );
+    if ( !us )
+    {
+        g_free(key_root_p);
+        return nullptr;
+    }
+
+    char* key_path = g_strdup_printf("%s%s%s",
+            key_root_p ?: "",
+            key_root_p ? "\\" : "",
+            (const char*)us->contents ?: "");
+    g_free(key_root_p);
+    vmi_free_unicode_str(us);
+
+    return key_path;
+}
+
+event_response_t regmon::log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr, uint32_t reg_opts)
+{
+    char* key_path = get_key_path_from_attr(drakvuf, info, attr);
+
+    if (key_path)
+        print_registry_call_info(drakvuf, info, key_path, nullptr, nullptr, reg_opts);
+
+    g_free(key_path);
+
+    return 0;
+}
+
+unicode_string_t* regmon::get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    uint32_t type, addr_t data_addr, size_t data_size )
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = data_addr
+    );
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    if ((type == REG_SZ) || (type == REG_LINK) || (type == REG_EXPAND_SZ))
+        return drakvuf_read_wchar_string(drakvuf, &ctx);
+
+    std::vector<uint8_t> data_bytes(data_size, 0);
+
+    size_t bytes_read = 0;
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, data_size, data_bytes.data(), &bytes_read) )
+    {
+        PRINT_DEBUG("[REGMON] Error reading data, expected %zu bytes, but actually read %zu\n", data_size, bytes_read);
+        return nullptr;
+    }
+
+    std::ostringstream rs;
+
+    if (type == REG_MULTI_SZ) // double-zero terminated Unicode strings array
+    {
+        ctx.addr = data_addr;
+        for (size_t i = 0 ; i < data_bytes.size() ; i += 2)
+        {
+            uint16_t value_word;
+            memcpy(&value_word, &data_bytes[i], sizeof(value_word));
+
+            if (value_word == 0)
+            {
+                // Read current wchar string
+                unicode_string_t* us = drakvuf_read_wchar_string(drakvuf, &ctx);
+                if (us)
+                {
+                    rs << "'" << us->contents << "',";
+                    vmi_free_unicode_str(us);
+                }
+                ctx.addr = data_addr + i + 2;
+            }
+
+            if (data_bytes.size() - i >= 4)
+            {
+                uint32_t value_dword;
+                memcpy(&value_dword, &data_bytes[i], sizeof(value_dword));
+                if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
+                    break;
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < data_bytes.size(); ++i)
+        {
+            rs << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(data_bytes[i]) << ' ';
+        }
+    }
+
+    std::string result = rs.str();
+    if (!result.empty()) result.erase(result.size() - 1);
+
+    unicode_string_t* data_us = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
+    data_us->encoding = "UTF-8";
+    data_us->contents = (uint8_t*)g_strdup(result.c_str());
+    data_us->length = result.size() + 1;
+
+    return data_us;
+}
+
+event_response_t regmon::log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    uint64_t key_handle, addr_t value_name_addr,
+    uint32_t type, addr_t data_addr, size_t data_size )
+{
+    unicode_string_t* data_us = get_data_as_string(drakvuf, info, type, data_addr, data_size);
+
+    if ( !data_us )
+        return 0;
+
+    char const* data = (char const*)data_us->contents;
+    auto status = log_reg_impl( drakvuf, info, key_handle, value_name_addr, true, data );
+
+    free(data_us->contents);
+    free(data_us);
+
+    return status;
+}
+
+event_response_t regmon::log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count )
+{
+    /*
+    typedef struct _KEY_VALUE_ENTRY {
+      PUNICODE_STRING ValueName;
+      ULONG           DataLength;
+      ULONG           DataOffset;
+      ULONG           Type;
+    } KEY_VALUE_ENTRY, *PKEY_VALUE_ENTRY;
+    */
+
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    size_t KEY_VALUE_ENTRY_sizeof = drakvuf_get_address_width(drakvuf) + 3 * sizeof(uint32_t) + (is32bit ? 0 : 4 /*padding*/);
+
+    std::ostringstream ss;
+    for (size_t i = 0; i < value_entries_count; ++i)
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof
+        );
+
+        addr_t value_name_addr;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &value_name_addr) )
+            continue;
+
+        unicode_string_t* value_name_us = drakvuf_read_unicode(drakvuf, info, value_name_addr);
+        char const* value_name = get_value_name(value_name_us);
+        ss << value_name << ",";
+        if (value_name_us) vmi_free_unicode_str(value_name_us);
+    }
+    std::string value_names = ss.str();
+    if (!value_names.empty()) value_names.erase(value_names.size() - 1);
+
+    return log_reg_impl(drakvuf, info, key_handle, value_names.c_str(), nullptr);
+}
+
+event_response_t regmon::delete_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwDeleteKey(
+      HANDLE KeyHandle
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
+
+event_response_t regmon::set_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwSetValueKey(
+      HANDLE          KeyHandle,
+      PUNICODE_STRING ValueName,
+      ULONG           TitleIndex,
+      ULONG           Type,
+      PVOID           Data,
+      ULONG           DataSize
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    uint32_t type = drakvuf_get_function_argument(drakvuf, info, 4);
+    addr_t data_addr = drakvuf_get_function_argument(drakvuf, info, 5);
+    uint32_t data_size = drakvuf_get_function_argument(drakvuf, info, 6);
+    return log_reg_key_value_data( drakvuf, info, key_handle, value_name_addr, type, data_addr, data_size );
+}
+
+event_response_t regmon::delete_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwDeleteValueKey(
+      HANDLE          KeyHandle,
+      PUNICODE_STRING ValueName
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    return log_reg_key_value( drakvuf, info, key_handle, value_name_addr );
+}
+
+event_response_t regmon::create_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwCreateKey(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              TitleIndex,
+      PUNICODE_STRING    Class,
+      ULONG              CreateOptions,
+      PULONG             Disposition
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint32_t create_options = drakvuf_get_function_argument(drakvuf, info, 6);
+    return log_reg_objattr( drakvuf, info, objattr_addr, create_options );
+}
+
+event_response_t regmon::create_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwCreateKeyTransacted(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              TitleIndex,
+      PUNICODE_STRING    Class,
+      ULONG              CreateOptions,
+      HANDLE             TransactionHandle,
+      PULONG             Disposition
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint32_t create_options = drakvuf_get_function_argument(drakvuf, info, 6);
+    return log_reg_objattr( drakvuf, info, objattr_addr, create_options );
+}
+
+event_response_t regmon::enumerate_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwEnumerateKey(
+      HANDLE                KeyHandle,
+      ULONG                 Index,
+      KEY_INFORMATION_CLASS KeyInformationClass,
+      PVOID                 KeyInformation,
+      ULONG                 Length,
+      PULONG                ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
+
+event_response_t regmon::enumerate_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwEnumerateValueKey(
+      HANDLE                      KeyHandle,
+      ULONG                       Index,
+      KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass,
+      PVOID                       KeyValueInformation,
+      ULONG                       Length,
+      PULONG                      ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
+
+event_response_t regmon::open_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKey(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr, 0 );
+}
+
+event_response_t regmon::open_key_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKeyEx(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              OpenOptions
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint32_t open_options = drakvuf_get_function_argument(drakvuf, info, 4);
+    return log_reg_objattr( drakvuf, info, objattr_addr, open_options );
+}
+
+event_response_t regmon::open_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKeyTransacted(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      HANDLE             TransactionHandle
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr, 0 );
+}
+
+event_response_t regmon::open_key_transacted_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKeyTransactedEx(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              OpenOptions,
+      HANDLE             TransactionHandle
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint32_t open_options = drakvuf_get_function_argument(drakvuf, info, 4);
+    return log_reg_objattr( drakvuf, info, objattr_addr, open_options );
+}
+
+event_response_t regmon::query_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwQueryKey(
+      HANDLE                KeyHandle,
+      KEY_INFORMATION_CLASS KeyInformationClass,
+      PVOID                 KeyInformation,
+      ULONG                 Length,
+      PULONG                ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
+
+event_response_t regmon::query_multiple_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    __kernel_entry NTSTATUS NtQueryMultipleValueKey(
+      HANDLE           KeyHandle,
+      PKEY_VALUE_ENTRY ValueEntries,
+      ULONG            EntryCount,
+      PVOID            ValueBuffer,
+      PULONG           BufferLength,
+      PULONG           RequiredBufferLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_entries_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    size_t value_entries_count = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_key_value_entries( drakvuf, info, key_handle, value_entries_addr, value_entries_count );
+}
+
+event_response_t regmon::query_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwQueryValueKey(
+      HANDLE                      KeyHandle,
+      PUNICODE_STRING             ValueName,
+      KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass,
+      PVOID                       KeyValueInformation,
+      ULONG                       Length,
+      PULONG                      ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    return log_reg_key_value( drakvuf, info, key_handle, value_name_addr );
+}
+
+regmon::regmon(drakvuf_t drakvuf, output_format_t output)
+    : pluginex(drakvuf, output)
+{
+    if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
+        throw -1;
+    if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
+        throw -1;
+
+    delete_key_hook = createSyscallHook("NtDeleteKey", &regmon::delete_key_cb);
+    set_value_key_hook = createSyscallHook("NtSetValueKey", &regmon::set_value_key_cb);
+    delete_value_key_hook = createSyscallHook("NtDeleteValueKey", &regmon::delete_value_key_cb);
+    create_key_hook = createSyscallHook("NtCreateKey", &regmon::create_key_cb);
+    create_key_transacted_hook = createSyscallHook("NtCreateKeyTransacted", &regmon::create_key_transacted_cb);
+    enumerate_key_hook = createSyscallHook("NtEnumerateKey", &regmon::enumerate_key_cb);
+    enumerate_value_key_hook = createSyscallHook("NtEnumerateValueKey", &regmon::enumerate_value_key_cb);
+    open_key_hook = createSyscallHook("NtOpenKey", &regmon::open_key_cb);
+    open_key_ex_hook = createSyscallHook("NtOpenKeyEx", &regmon::open_key_ex_cb);
+    open_key_transacted_hook = createSyscallHook("NtOpenKeyTransacted", &regmon::open_key_transacted_cb);
+    open_key_transacted_ex_hook = createSyscallHook("NtOpenKeyTransactedEx", &regmon::open_key_transacted_ex_cb);
+    query_key_hook = createSyscallHook("NtQueryKey", &regmon::query_key_cb);
+    query_multiple_value_key_hook = createSyscallHook("NtQueryMultipleValueKey", &regmon::query_multiple_value_key_cb);
+    query_value_key_hook = createSyscallHook("NtQueryValueKey", &regmon::query_value_key_cb);
+}
+
+regmon::~regmon(void) {}
+
+bool regmon::stop_impl()
+{
+    return true;
+}

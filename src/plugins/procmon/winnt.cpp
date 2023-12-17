@@ -129,46 +129,46 @@ std::string stringify_protection_attributes(uint32_t attributes, char sep)
 
         switch (static_cast<page_access_t>(attr))
         {
-            case PAGE_NOACCESS:
-                result.append("PAGE_NOACCESS");
-                break;
-            case PAGE_READONLY:
-                result.append("PAGE_READONLY");
-                break;
-            case PAGE_READWRITE:
-                result.append("PAGE_READWRITE");
-                break;
-            case PAGE_WRITECOPY:
-                result.append("PAGE_WRITECOPY");
-                break;
-            case PAGE_EXECUTE:
-                result.append("PAGE_EXECUTE");
-                break;
-            case PAGE_EXECUTE_READ:
-                result.append("PAGE_EXECUTE_READ");
-                break;
-            case PAGE_EXECUTE_READWRITE:
-                result.append("PAGE_EXECUTE_READWRITE");
-                break;
-            case PAGE_EXECUTE_WRITECOPY:
-                result.append("PAGE_EXECUTE_WRITECOPY");
-                break;
-            case PAGE_GUARD:
-                result.append("PAGE_GUARD");
-                break;
-            case PAGE_NOCACHE:
-                result.append("PAGE_NOCACHE");
-                break;
-            case PAGE_WRITECOMBINE:
-                result.append("PAGE_WRITECOMBINE");
-                break;
-            default:
-            {
-                char tmp[32] = {0};
-                snprintf(tmp, 32, "0x%" PRIx32, attr);
-                result.append(tmp);
-                break;
-            }
+        case PAGE_NOACCESS:
+            result.append("PAGE_NOACCESS");
+            break;
+        case PAGE_READONLY:
+            result.append("PAGE_READONLY");
+            break;
+        case PAGE_READWRITE:
+            result.append("PAGE_READWRITE");
+            break;
+        case PAGE_WRITECOPY:
+            result.append("PAGE_WRITECOPY");
+            break;
+        case PAGE_EXECUTE:
+            result.append("PAGE_EXECUTE");
+            break;
+        case PAGE_EXECUTE_READ:
+            result.append("PAGE_EXECUTE_READ");
+            break;
+        case PAGE_EXECUTE_READWRITE:
+            result.append("PAGE_EXECUTE_READWRITE");
+            break;
+        case PAGE_EXECUTE_WRITECOPY:
+            result.append("PAGE_EXECUTE_WRITECOPY");
+            break;
+        case PAGE_GUARD:
+            result.append("PAGE_GUARD");
+            break;
+        case PAGE_NOCACHE:
+            result.append("PAGE_NOCACHE");
+            break;
+        case PAGE_WRITECOMBINE:
+            result.append("PAGE_WRITECOMBINE");
+            break;
+        default:
+        {
+            char tmp[32] = {0};
+            snprintf(tmp, 32, "0x%" PRIx32, attr);
+            result.append(tmp);
+            break;
+        }
         }
     }
     return result;

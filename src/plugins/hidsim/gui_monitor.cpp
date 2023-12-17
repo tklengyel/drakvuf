@@ -172,14 +172,14 @@ static event_response_t on_draw(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
  * investigating-memory-analysis-tools-ssdt-hooking-via-pointer-replacement/
  */
 static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* profile_json,
-    drakvuf_trap_t* trap, event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info))
+        drakvuf_trap_t* trap, event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info))
 {
 
     addr_t func_rva = 0;
     if (!json_get_symbol_rva(drakvuf, profile_json, TRAP_FUNC, &func_rva))
     {
         PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to get RVA of win32k!%s\n",
-            TRAP_FUNC);
+                    TRAP_FUNC);
         return false;
     }
 
@@ -236,15 +236,15 @@ static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* prof
         }
 
         ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .addr = ssdt_ptr_va,
-            .dtb = trap->breakpoint.dtb
-        );
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .addr = ssdt_ptr_va,
+                       .dtb = trap->breakpoint.dtb
+                      );
 
         if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &ssdt_va))
         {
             PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to read the address of SSDT "
-                "(VA 0x%lx)\n", ssdt_ptr_va);
+                        "(VA 0x%lx)\n", ssdt_ptr_va);
             return false;
         }
     }
@@ -285,12 +285,12 @@ bool check_platform_support(drakvuf_t drakvuf)
     {
 
         PRINT_DEBUG("[HIDSIM] GUI reconstruction supported "
-            "on Windows 7\n");
+                    "on Windows 7\n");
         return true;
     }
 
     PRINT_DEBUG("[HIDSIM] GUI reconstruction is NOT supported "
-        "on this guest system\n");
+                "on this guest system\n");
 
     return false;
 }
@@ -330,7 +330,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
      * publications/2016/05/2x1MicrosoftBug-Economou.pdf, page 11
      */
     bool success = register_NtUserShowWindow_trap(drakvuf, win32k_json,
-            &gui_trap, on_draw);
+                   &gui_trap, on_draw);
     json_object_put(win32k_json);
 
     if (!success)
@@ -349,7 +349,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
  * calls have occured
  */
 int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
-    std::atomic<bool>* has_to_stop)
+                std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [MONITOR] Started GUI reconstruction thread\n");
 
@@ -423,14 +423,14 @@ int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
                 coords->store(x << 16 | y);
 
                 PRINT_DEBUG("[HIDSIM] [MONITOR] Found \"%S\"-button to click at"
-                    "(%d, %d)\n", btn.text, btn.r.x0, btn.r.y0);
+                            "(%d, %d)\n", btn.text, btn.r.x0, btn.r.y0);
 
             }
             /* Some error occured */
             else if (res < 0)
             {
                 PRINT_DEBUG("[HIDSIM] [MONITOR] Error reconstructing GUI:"
-                    "%d\n", res);
+                            "%d\n", res);
                 break;
             }
         }

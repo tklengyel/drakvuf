@@ -258,12 +258,12 @@ provider_t::provider_t(etwmon* plugin, vmi_instance_t vmi, addr_t base) : base(b
 void etwmon::report(drakvuf_t drakvuf, const char* type, const char* name, const char* action, addr_t value, addr_t prev_value)
 {
     fmt::print(format, "etwmon", drakvuf, nullptr,
-        keyval("Type",   fmt::Estr(type)),
-        keyval("Name",   fmt::Estr(name)),
-        keyval("Action", fmt::Estr(action)),
-        keyval("Value",  fmt::Xval(value)),
-        keyval("PreviousValue", fmt::Xval(prev_value))
-    );
+               keyval("Type",   fmt::Estr(type)),
+               keyval("Name",   fmt::Estr(name)),
+               keyval("Action", fmt::Estr(action)),
+               keyval("Value",  fmt::Xval(value)),
+               keyval("PreviousValue", fmt::Xval(prev_value))
+              );
 }
 
 void etwmon::enumerate_loggers(vmi_instance_t vmi)
@@ -464,9 +464,9 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
     if (this->winver.version != VMI_OS_WINDOWS_7)
     {
         if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_ESERVERSILO_GLOBALS", "EtwSiloState", &this->etw_state_rva) ||
-            !drakvuf_get_kernel_struct_member_rva(drakvuf, "_ETW_SILODRIVERSTATE", "EtwpGuidHashTable", &this->hash_table_rva) ||
-            !drakvuf_get_kernel_struct_member_rva(drakvuf, "_ETW_SILODRIVERSTATE", "SystemLoggerSettings", &this->logger_settings_rva) ||
-            !drakvuf_get_kernel_struct_member_rva(drakvuf, "_ETW_SYSTEM_LOGGER_SETTINGS", "EtwpActiveSystemLoggers", &this->active_loggers_rva))
+                !drakvuf_get_kernel_struct_member_rva(drakvuf, "_ETW_SILODRIVERSTATE", "EtwpGuidHashTable", &this->hash_table_rva) ||
+                !drakvuf_get_kernel_struct_member_rva(drakvuf, "_ETW_SILODRIVERSTATE", "SystemLoggerSettings", &this->logger_settings_rva) ||
+                !drakvuf_get_kernel_struct_member_rva(drakvuf, "_ETW_SYSTEM_LOGGER_SETTINGS", "EtwpActiveSystemLoggers", &this->active_loggers_rva))
         {
             PRINT_DEBUG("[ETWMON] Failed to resolve win10 etw struct rva\n");
             throw -1;
@@ -479,7 +479,7 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
         }
 
         if (!drakvuf_get_kernel_struct_size(drakvuf, "_ETW_HASH_BUCKET", &this->bucket_size) ||
-            !drakvuf_get_kernel_struct_size(drakvuf, "_LIST_ENTRY", &this->list_entry_size))
+                !drakvuf_get_kernel_struct_size(drakvuf, "_LIST_ENTRY", &this->list_entry_size))
         {
             PRINT_DEBUG("[ETWMON] Failed to get _ETW_HASH_BUCKET || _LIST_ENTRY size\n");
             throw -1;
@@ -514,16 +514,16 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
 
     switch (this->winver.version)
     {
-        case VMI_OS_WINDOWS_7:
-            handles_names   = &win7_global_handles;
-            callbacks_names = &win7_global_callbacks;
-            break;
-        case VMI_OS_WINDOWS_10:
-            handles_names   = &win10_global_handles;
-            callbacks_names = &win10_global_callbacks;
-            break;
-        default:
-            break;
+    case VMI_OS_WINDOWS_7:
+        handles_names   = &win7_global_handles;
+        callbacks_names = &win7_global_callbacks;
+        break;
+    case VMI_OS_WINDOWS_10:
+        handles_names   = &win10_global_handles;
+        callbacks_names = &win10_global_callbacks;
+        break;
+    default:
+        break;
     }
 
     if (handles_names)
@@ -605,7 +605,7 @@ bool etwmon::stop_impl()
                 for (unsigned i = 0; i < sizeof(provider.enable_info) / sizeof(provider.enable_info[0]); i++)
                 {
                     if ((provider.enable_info[i].enabled != n_provider->enable_info[i].enabled) ||
-                        (provider.enable_info[i].level   != n_provider->enable_info[i].level))
+                            (provider.enable_info[i].level   != n_provider->enable_info[i].level))
                     {
                         report(drakvuf, "Provider", provider.guid.str().c_str(), "Modified");
                     }

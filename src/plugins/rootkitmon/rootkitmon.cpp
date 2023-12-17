@@ -126,8 +126,8 @@ static inline size_t get_ci_table_size(vmi_instance_t vmi)
 }
 
 static inline void report(drakvuf_t drakvuf, const output_format_t format, const char* type, const char* action,
-    const char* name = nullptr, const addr_t* value = nullptr, const addr_t* prev_value = nullptr,
-    const char* module = nullptr)
+                          const char* name = nullptr, const addr_t* value = nullptr, const addr_t* prev_value = nullptr,
+                          const char* module = nullptr)
 {
     std::optional<fmt::Estr<const char*>> name_opt, module_opt;
     std::optional<fmt::Xval<addr_t>> value_opt, prev_value_opt;
@@ -150,13 +150,13 @@ static inline void report(drakvuf_t drakvuf, const output_format_t format, const
     }
 
     fmt::print(format, "rootkitmon", drakvuf, nullptr,
-        keyval("Type", fmt::Estr(type)),
-        keyval("Action", fmt::Estr(action)),
-        keyval("Name", name_opt),
-        keyval("Value", value_opt),
-        keyval("PreviousValue", prev_value_opt),
-        keyval("Module", module_opt)
-    );
+               keyval("Type", fmt::Estr(type)),
+               keyval("Action", fmt::Estr(action)),
+               keyval("Name", name_opt),
+               keyval("Value", value_opt),
+               keyval("PreviousValue", prev_value_opt),
+               keyval("Module", module_opt)
+              );
 }
 
 static bool translate_ksym2p(vmi_instance_t vmi, const char* symbol, addr_t* addr)
@@ -232,10 +232,10 @@ static sha256_checksum_t calc_checksum(vmi_instance_t vmi, addr_t address, size_
     std::vector<void*> access_ptrs(num_pages, nullptr);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
-        .addr = address
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4,
+                   .addr = address
+                  );
 
     if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, PROT_READ, access_ptrs.data()))
     {
@@ -346,7 +346,7 @@ static void initialize_ci_checks(drakvuf_t drakvuf, rootkitmon* plugin, const ro
     if (vmi_get_win_buildnumber(vmi) <= win8_rtm_ver)
     {
         if (VMI_SUCCESS != vmi_translate_ksym2v(vmi, "g_CiEnabled",   &plugin->ci_enabled_va) ||
-            VMI_SUCCESS != vmi_translate_ksym2v(vmi, "g_CiCallbacks", &plugin->ci_callbacks_va))
+                VMI_SUCCESS != vmi_translate_ksym2v(vmi, "g_CiCallbacks", &plugin->ci_callbacks_va))
         {
             PRINT_DEBUG("[ROOTKITMON] Failed to initialize g_CiEnabled or g_CiCallbacks\n");
             throw -1;
@@ -439,10 +439,10 @@ bool rootkitmon::enumerate_cores(vmi_instance_t vmi)
         uint64_t lstar = 0;
 
         if (VMI_SUCCESS == vmi_get_vcpureg(vmi, &idtr_base, IDTR_BASE, vcpu) &&
-            VMI_SUCCESS == vmi_get_vcpureg(vmi, &idtr_limit, IDTR_LIMIT, vcpu) &&
-            VMI_SUCCESS == vmi_get_vcpureg(vmi, &gdtr_base, GDTR_BASE, vcpu) &&
-            VMI_SUCCESS == vmi_get_vcpureg(vmi, &gdtr_limit, GDTR_LIMIT, vcpu) &&
-            VMI_SUCCESS == vmi_get_vcpureg(vmi, &lstar, MSR_LSTAR, vcpu))
+                VMI_SUCCESS == vmi_get_vcpureg(vmi, &idtr_limit, IDTR_LIMIT, vcpu) &&
+                VMI_SUCCESS == vmi_get_vcpureg(vmi, &gdtr_base, GDTR_BASE, vcpu) &&
+                VMI_SUCCESS == vmi_get_vcpureg(vmi, &gdtr_limit, GDTR_LIMIT, vcpu) &&
+                VMI_SUCCESS == vmi_get_vcpureg(vmi, &lstar, MSR_LSTAR, vcpu))
         {
             PRINT_DEBUG("[ROOTKITMON] [VCPU] %zu IDTR 0x%lx:0x%lx\n", vcpu, idtr_base, idtr_limit);
             PRINT_DEBUG("[ROOTKITMON] [VCPU] %zu GDTR 0x%lx:0x%lx\n", vcpu, gdtr_base, gdtr_limit);
@@ -487,10 +487,10 @@ static bool driver_visitor(drakvuf_t drakvuf, const module_info_t* module_info, 
     vmi_lock_guard vmi(drakvuf);
 
     ACCESS_CONTEXT(a_ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
-        .addr = module_info->base_addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4,
+                   .addr = module_info->base_addr
+                  );
 
     // Map 1 4KB page with PE header
     void* module = nullptr;
@@ -833,7 +833,7 @@ event_response_t rootkitmon::cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t
 }
 
 std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
-    const char* func_name, hook_cb_t callback)
+        const char* func_name, hook_cb_t callback)
 {
     addr_t func_rva = 0;
     auto profile_json = json_object_from_file(profile);
@@ -1007,7 +1007,7 @@ void rootkitmon::enumerate_filter_callbacks(vmi_instance_t vmi)
                 {
                     addr_t pre{}, post{};
                     if (VMI_SUCCESS != vmi_read_addr_va(vmi, cb_node + this->flt_offsets[CALLBACKNODE_PREOPERATION], 0, &pre) ||
-                        VMI_SUCCESS != vmi_read_addr_va(vmi, cb_node + this->flt_offsets[CALLBACKNODE_POSTOPERATION], 0, &post))
+                            VMI_SUCCESS != vmi_read_addr_va(vmi, cb_node + this->flt_offsets[CALLBACKNODE_POSTOPERATION], 0, &post))
                     {
                         return;
                     }

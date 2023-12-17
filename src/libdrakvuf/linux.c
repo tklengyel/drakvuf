@@ -123,25 +123,25 @@ addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 {
     switch (narg)
     {
-        case 1:
-            return info->regs->rdi;
-        case 2:
-            return info->regs->rsi;
-        case 3:
-            return info->regs->rdx;
-        case 4:
-            return info->regs->rcx;
-        case 5:
-            return info->regs->r8;
-        case 6:
-            return info->regs->r9;
+    case 1:
+        return info->regs->rdi;
+    case 2:
+        return info->regs->rsi;
+    case 3:
+        return info->regs->rdx;
+    case 4:
+        return info->regs->rcx;
+    case 5:
+        return info->regs->r8;
+    case 6:
+        return info->regs->r9;
     }
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * 8
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = info->regs->rsp + narg * 8
+                  );
 
     uint64_t ret;
     if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
@@ -167,8 +167,8 @@ void linux_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_
 bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     return (info->proc_data.pid == pid)
-        && (info->proc_data.tid == tid)
-        && (!rsp || info->regs->rip == rsp);
+           && (info->proc_data.tid == tid)
+           && (!rsp || info->regs->rip == rsp);
 }
 
 bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
@@ -204,8 +204,8 @@ bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t
 char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = drakvuf->kpgd);
 
     addr_t parent;
     GString* b = g_string_new(NULL);
@@ -270,9 +270,9 @@ static char* linux_get_banner(drakvuf_t drakvuf)
     }
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd,
-        .addr = linux_banner_addr);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = drakvuf->kpgd,
+                   .addr = linux_banner_addr);
 
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
@@ -281,8 +281,8 @@ static char* linux_get_banner(drakvuf_t drakvuf)
 static char* linux_read_kernel_version(drakvuf_t drakvuf, addr_t process_base)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = drakvuf->kpgd);
 
     ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_NSPROXY];
     addr_t nsproxy_addr;

@@ -222,8 +222,8 @@ addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib,
 
         addr_t module_list_head;
         if (drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
-            drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
-            drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
+                drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
+                drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
         {
             drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &module_ctx);
         }
@@ -304,9 +304,9 @@ void print_win_injection_info(output_format_t format, const char* file, injector
         process_name = (const char*)injector->expanded_target->contents;
 
     print_injection_info(format, injector->method,
-        injector->result, injector->target_pid,
-        injector->pid, injector->tid, process_name,
-        arguments, &injector->error_code);
+                         injector->result, injector->target_pid,
+                         injector->pid, injector->tid, process_name,
+                         arguments, &injector->error_code);
 
     g_strfreev(split_results);
 }

@@ -142,9 +142,9 @@ bool linux_filetracer::get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = file_addr + this->offsets[_FILE_F_PATH] + this->offsets[_PATH_DENTRY]);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = file_addr + this->offsets[_FILE_F_PATH] + this->offsets[_PATH_DENTRY]);
 
     addr_t dentry_addr = 0;
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &dentry_addr))
@@ -161,9 +161,9 @@ bool linux_filetracer::get_path_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = path_addr + this->offsets[_PATH_DENTRY]);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = path_addr + this->offsets[_PATH_DENTRY]);
 
     addr_t dentry_addr = 0;
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &dentry_addr))
@@ -187,8 +187,8 @@ bool linux_filetracer::get_dentry_info(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3);
 
     addr_t inode;
     ctx.addr = dentry_addr + this->offsets[_DENTRY_D_INODE];
@@ -259,9 +259,9 @@ char* linux_filetracer::read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = fileaddr);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = fileaddr);
 
     return vmi_read_str(vmi, &ctx);
 }
@@ -336,7 +336,7 @@ event_response_t linux_filetracer::read_file_cb(drakvuf_t drakvuf, drakvuf_trap_
         auto vmi = vmi_lock_guard(drakvuf);
 
         ACCESS_CONTEXT(ctx, .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3, .addr = ppos);
+                       .dtb = info->regs->cr3, .addr = ppos);
 
         if (VMI_FAILURE == vmi_read_64(vmi, &ctx, (uint64_t*)&pos))
             pos = 0;
@@ -559,8 +559,8 @@ event_response_t linux_filetracer::rename_file_cb(drakvuf_t drakvuf, drakvuf_tra
         auto vmi = vmi_lock_guard(drakvuf);
 
         ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3);
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3);
 
         ctx.addr = struct_addr + this->offsets[_RENAMEDATA_OLD_DENTRY];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &old_dentry_addr))
@@ -717,9 +717,9 @@ event_response_t linux_filetracer::utimes_file_cb(drakvuf_t drakvuf, drakvuf_tra
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = struct_timespec64 + this->offsets[_TIMESPEC64_TV_SEC]);
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = struct_timespec64 + this->offsets[_TIMESPEC64_TV_SEC]);
 
     uint64_t time_sec = 0;
     if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &time_sec))

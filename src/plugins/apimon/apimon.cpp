@@ -168,8 +168,8 @@ event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
         const auto& args = params->arguments;
         const auto& printers = params->target->argument_printers;
         for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
-            arg != std::cend(args) && printer != std::cend(printers);
-            ++arg, ++printer)
+                arg != std::cend(args) && printer != std::cend(printers);
+                ++arg, ++printer)
         {
             fmt_args.push_back(fmt::Rstr((*printer)->print(drakvuf, info, *arg)));
         }
@@ -190,14 +190,14 @@ event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
     }
 
     fmt::print(m_output_format, "apimon", drakvuf, info,
-        keyval("Event", fmt::Rstr("api_called")),
-        keyval("CLSID", clsid),
-        keyval("CalledFrom", fmt::Xval(info->regs->rip)),
-        keyval("ReturnValue", fmt::Xval(info->regs->rax)),
-        keyval("FromModule", module_opt),
-        keyval("Arguments", fmt_args),
-        keyval("Extra", fmt_extra)
-    );
+               keyval("Event", fmt::Rstr("api_called")),
+               keyval("CLSID", clsid),
+               keyval("CalledFrom", fmt::Xval(info->regs->rip)),
+               keyval("ReturnValue", fmt::Xval(info->regs->rax)),
+               keyval("FromModule", module_opt),
+               keyval("Arguments", fmt_args),
+               keyval("Extra", fmt_extra)
+              );
 
     uint64_t hookID = make_hook_id(info);
     ret_hooks.erase(hookID);
@@ -243,7 +243,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
     uint64_t hookID = make_hook_id(info);
     auto hook = plugin->createReturnHook<ApimonReturnHookData>(info,
-            &apimon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
+                &apimon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
     auto params = libhook::GetTrapParams<ApimonReturnHookData>(hook->trap_);
 
     params->arguments = std::move(arguments);
@@ -308,11 +308,11 @@ static void on_dll_discovered(drakvuf_t drakvuf, const std::string& dll_name, co
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, nullptr,
-        keyval("Event", fmt::Rstr("dll_discovered")),
-        keyval("DllName", fmt::Estr(dll_name)),
-        keyval("DllBase", fmt::Xval(dll->real_dll_base)),
-        keyval("PID", fmt::Nval(pid))
-    );
+               keyval("Event", fmt::Rstr("dll_discovered")),
+               keyval("DllName", fmt::Estr(dll_name)),
+               keyval("DllBase", fmt::Xval(dll->real_dll_base)),
+               keyval("PID", fmt::Nval(pid))
+              );
 
     plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
     {
@@ -367,7 +367,7 @@ std::optional<std::string> apimon::resolve_module(drakvuf_t drakvuf, addr_t proc
                 {
                     .name = std::move(name),
                     .base = mmvad.starting_vpn << 12,
-                        .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
+                                               .size = (mmvad.ending_vpn - mmvad.starting_vpn) << 12
                 });
                 vmi_free_unicode_str(u_name);
                 return mods.back().name;
@@ -397,7 +397,7 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
     catch (const std::runtime_error& exc)
     {
         std::cerr << "Loading DLL hook configuration for APIMON plugin failed\n"
-            << "Reason: " << exc.what() << "\n";
+                  << "Reason: " << exc.what() << "\n";
         throw -1;
     }
 

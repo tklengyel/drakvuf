@@ -138,7 +138,7 @@ void ipt_vcpu::flush(uint64_t offset)
     this->last_offset = offset;
 
     PRINT_DEBUG("[IPT] Flushing vCPU %d offset: %" PRIx64 " last offset: %" PRIx64 "\n",
-        id, offset, prev);
+                id, offset, prev);
 
     if (!this->output_stream.good())
     {

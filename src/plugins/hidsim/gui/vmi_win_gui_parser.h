@@ -205,7 +205,7 @@ void clear_desktop_container(struct desktop* d);
  * type tagDESKTOP
  */
 status_t populate_winsta(vmi_instance_t vmi, struct winsta* winsta, addr_t addr,
-    vmi_pid_t providing_pid);
+                         vmi_pid_t providing_pid);
 
 /* Iterates over process list an retrieves all tagWINDOWSTATION-structs */
 status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray** resulting_winstas);
@@ -213,6 +213,6 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray** resulting_wins
 status_t find_first_active_desktop(vmi_instance_t vmi, struct desktop* d);
 
 int scan_for_clickable_button(vmi_instance_t vmi, struct desktop* d,
-    struct wnd* btn);
+                              struct wnd* btn);
 
 #endif // VMI_WIN_GUI_PARSER_H

@@ -21,8 +21,8 @@ static bool setup_open_process_stack(injector_t injector, x86_registers_t* regs)
 
     // OpenProcess(PROCESS_TERMINATE, false, PID)
     init_int_argument(&args[0], PROCESS_TERMINATE | PROCESS_CREATE_THREAD |
-        PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ |
-        PROCESS_QUERY_INFORMATION);
+                      PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ |
+                      PROCESS_QUERY_INFORMATION);
 
     init_int_argument(&args[1], 0);
     init_int_argument(&args[2], injector->terminate_pid);
@@ -64,52 +64,52 @@ event_response_t handle_win_terminate(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 
     switch (base_injector->step)
     {
-        case STEP1:
-        {
-            // save registers
-            PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+    case STEP1:
+    {
+        // save registers
+        PRINT_DEBUG("Saving registers\n");
+        memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
 
-            /* We just hit the RIP from the trapframe */
-            PRINT_DEBUG("Open process %d to terminate it.\n", injector->terminate_pid);
+        /* We just hit the RIP from the trapframe */
+        PRINT_DEBUG("Open process %d to terminate it.\n", injector->terminate_pid);
 
-            if (!setup_open_process_stack(injector, info->regs))
-                return cleanup(drakvuf, info);
+        if (!setup_open_process_stack(injector, info->regs))
+            return cleanup(drakvuf, info);
 
-            info->regs->rip = injector->open_process;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        case STEP2:
-        {
-            if (is_fun_error(drakvuf, info, "Could not open process handle"))
-                return cleanup(drakvuf, info);
+        info->regs->rip = injector->open_process;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP2:
+    {
+        if (is_fun_error(drakvuf, info, "Could not open process handle"))
+            return cleanup(drakvuf, info);
 
-            PRINT_DEBUG("Process %d opened with handle %#lx. Terminate it!\n", injector->terminate_pid, info->regs->rax);
+        PRINT_DEBUG("Process %d opened with handle %#lx. Terminate it!\n", injector->terminate_pid, info->regs->rax);
 
-            if (!setup_create_remote_thread_stack(injector, info->regs))
-                return cleanup(drakvuf, info);
+        if (!setup_create_remote_thread_stack(injector, info->regs))
+            return cleanup(drakvuf, info);
 
-            info->regs->rip = injector->exec_func;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        case STEP3:
-        {
-            if (is_fun_error(drakvuf, info, "Could not terminate process"))
-                return cleanup(drakvuf, info);
+        info->regs->rip = injector->exec_func;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    case STEP3:
+    {
+        if (is_fun_error(drakvuf, info, "Could not terminate process"))
+            return cleanup(drakvuf, info);
 
-            PRINT_DEBUG("Process %d terminated successfully!\n", injector->terminate_pid);
+        PRINT_DEBUG("Process %d terminated successfully!\n", injector->terminate_pid);
 
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGINT);
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGINT);
 
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+        memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
     return VMI_EVENT_RESPONSE_NONE;
 }

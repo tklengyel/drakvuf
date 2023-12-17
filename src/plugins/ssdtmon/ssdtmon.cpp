@@ -136,10 +136,10 @@ static std::array<uint8_t, 32> ssdtmon_sha256_calc(vmi_instance_t vmi, addr_t ad
     std::vector<void*> access_ptrs(num_pages, nullptr);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
-        .addr = addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4,
+                   .addr = addr
+                  );
 
     if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, PROT_READ, access_ptrs.data()))
         return out;
@@ -180,9 +180,9 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         int64_t table_index = (info->trap_pa - s->kiservicetable) / sizeof(uint32_t);
         fmt::print(s->format, "ssdtmon", drakvuf, info,
-            keyval("TableIndex", fmt::Nval(table_index)),
-            keyval("Table", fmt::Qstr("SSDT"))
-        );
+                   keyval("TableIndex", fmt::Nval(table_index)),
+                   keyval("Table", fmt::Qstr("SSDT"))
+                  );
     }
     for (size_t i = 0; i < s->w32p_ssdt.size(); i++)
     {
@@ -191,9 +191,9 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             int64_t table_index = (info->trap_pa - base + i * VMI_PS_4KB) / sizeof(uint32_t);
             fmt::print(s->format, "ssdtmon", drakvuf, info,
-                keyval("TableIndex", fmt::Nval(table_index)),
-                keyval("Table", fmt::Qstr("SSDTShadow"))
-            );
+                       keyval("TableIndex", fmt::Nval(table_index)),
+                       keyval("Table", fmt::Qstr("SSDTShadow"))
+                      );
         }
     }
     return 0;
@@ -202,9 +202,9 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 static bool get_driver_base(drakvuf_t drakvuf, ssdtmon* plugin, const char* driver_name, addr_t* base)
 {
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = 4
+                  );
 
     vmi_lock_guard vmi(drakvuf);
 
@@ -253,13 +253,13 @@ std::unique_ptr<libhook::ManualHook> ssdtmon::register_mem_hook(hook_cb_t callba
     {
         .type = MEMACCESS,
         .memaccess.gfn = pa >> 12,
-            .memaccess.type = PRE,
-            .memaccess.access = VMI_MEMACCESS_W,
-            .data = (void*)this,
-            .name = nullptr,
-            .ttl = UNLIMITED_TTL,
-            .ah_cb = nullptr,
-            .cb = callback,
+                            .memaccess.type = PRE,
+                            .memaccess.access = VMI_MEMACCESS_W,
+                            .data = (void*)this,
+                            .name = nullptr,
+                            .ttl = UNLIMITED_TTL,
+                            .ah_cb = nullptr,
+                            .cb = callback,
     };
 
     auto hook = createManualHook(trap, [](drakvuf_trap_t* trap_)
@@ -367,7 +367,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
                 if (page == 0)
                 {
                     PRINT_DEBUG("[SSDTMON] SSDT shadow is at 0x%lx. Number of syscalls: %u. Size: %zu\n",
-                        page_paddr, w32pservicelimit, servicetable_len);
+                                page_paddr, w32pservicelimit, servicetable_len);
                 }
             }
         }
@@ -410,16 +410,16 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
     }
 
     PRINT_DEBUG("SSDT is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
-        this->kiservicetable,
-        this->kiservicelimit,
-        sizeof(uint32_t)*this->kiservicelimit);
+                this->kiservicetable,
+                this->kiservicelimit,
+                sizeof(uint32_t)*this->kiservicelimit);
 
     this->ssdt_traps.push_back(register_mem_hook(write_cb, kiservicetable));
 
     addr_t sdt_rva, sdt_shadow_rva;
 
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, "KeServiceDescriptorTable", &sdt_rva) ||
-        !drakvuf_get_kernel_symbol_rva(drakvuf, "KeServiceDescriptorTableShadow", &sdt_shadow_rva))
+            !drakvuf_get_kernel_symbol_rva(drakvuf, "KeServiceDescriptorTableShadow", &sdt_shadow_rva))
     {
         PRINT_DEBUG("[SSDTMON] Failed to get RVA of nt!KeServiceDescriptorTableShadow or nt!KeServiceDescriptorTable\n");
         throw -1;

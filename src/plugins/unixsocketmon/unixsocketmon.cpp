@@ -136,10 +136,10 @@ bool unixsocketmon::get_socket_family_type(drakvuf_t drakvuf, drakvuf_trap_info_
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = sock + this->socket_ops
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = sock + this->socket_ops
+                  );
 
     addr_t ops;
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ops))
@@ -164,9 +164,9 @@ std::vector<uint8_t> unixsocketmon::get_socket_message(drakvuf_t drakvuf, drakvu
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     addr_t iovec;
     ctx.addr = msghdr + this->msghdr_msg_iter + this->iov_iter_iov;
@@ -231,18 +231,18 @@ event_response_t unixsocketmon::sock_send_msg_cb(drakvuf_t drakvuf, drakvuf_trap
     if (VMI_FAILURE == rc || !is_printable_string(message))
     {
         fmt::print(this->m_output_format, "unixsocketmon", drakvuf, info,
-            keyval("Type", fmt::Rstr(socket_family_str)),
-            keyval("Size", fmt::Nval(size)),
-            keyval("Value", fmt::BinaryString(message.data(), message.size()))
-        );
+                   keyval("Type", fmt::Rstr(socket_family_str)),
+                   keyval("Size", fmt::Nval(size)),
+                   keyval("Value", fmt::BinaryString(message.data(), message.size()))
+                  );
     }
     else
     {
         fmt::print(this->m_output_format, "unixsocketmon", drakvuf, info,
-            keyval("Type", fmt::Rstr(socket_family_str)),
-            keyval("Size", fmt::Nval(size)),
-            keyval("Value", fmt::Estr(reinterpret_cast<char*>(out.contents)))
-        );
+                   keyval("Type", fmt::Rstr(socket_family_str)),
+                   keyval("Size", fmt::Nval(size)),
+                   keyval("Value", fmt::Estr(reinterpret_cast<char*>(out.contents)))
+                  );
     }
 
     g_free(out.contents);

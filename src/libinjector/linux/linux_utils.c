@@ -119,9 +119,9 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     PRINT_DEBUG("Process base: %lx\n", process_base);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = info->proc_data.pid
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = info->proc_data.pid
+                  );
 
     addr_t addr = 0;
     size_t offset = 0;
@@ -179,10 +179,10 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = info->proc_data.pid,
-        .addr = vdso
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .pid = info->proc_data.pid,
+                   .addr = vdso
+                  );
 
     size_t size = 4096;
     size_t bytes_read = 0;
@@ -254,10 +254,10 @@ bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs)
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = regs->rsp - 0x8
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = regs->rsp - 0x8
+                  );
 
     bool success = false;
     if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &regs->rip))
@@ -314,9 +314,9 @@ void print_linux_injection_info(output_format_t format, linux_injector_t injecto
     gchar* arguments = g_strjoinv(" ", (gchar**)injector->args);
 
     print_injection_info(format, injector->method,
-        injector->result, injector->target_pid,
-        injector->pid, injector->tid, process_name,
-        arguments, &injector->error_code);
+                         injector->result, injector->target_pid,
+                         injector->pid, injector->tid, process_name,
+                         arguments, &injector->error_code);
 
     g_free(arguments);
 }

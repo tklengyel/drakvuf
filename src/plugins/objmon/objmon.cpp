@@ -159,10 +159,10 @@ static event_response_t ntduplicateobject_ret_cb(drakvuf_t drakvuf, drakvuf_trap
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = params->target_handle_va
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = params->target_handle_va
+                  );
 
     addr_t target_handle;
     if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &target_handle))
@@ -172,14 +172,14 @@ static event_response_t ntduplicateobject_ret_cb(drakvuf_t drakvuf, drakvuf_trap
     }
 
     fmt::print(plugin->format, "objmon", drakvuf, info,
-        keyval("SourceProcessHandle", fmt::Xval(params->source_process_handle)),
-        keyval("SourceHandle", fmt::Xval(params->source_handle)),
-        keyval("TargetProcessHandle", fmt::Xval(params->target_process_handle)),
-        keyval("TargetHandle", fmt::Xval(target_handle)),
-        keyval("DesiredAccess", fmt::Xval(params->desired_access)),
-        keyval("HandleAttributes", fmt::Xval(params->handle_attributes)),
-        keyval("Options", fmt::Xval(params->options))
-    );
+               keyval("SourceProcessHandle", fmt::Xval(params->source_process_handle)),
+               keyval("SourceHandle", fmt::Xval(params->source_handle)),
+               keyval("TargetProcessHandle", fmt::Xval(params->target_process_handle)),
+               keyval("TargetHandle", fmt::Xval(target_handle)),
+               keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+               keyval("HandleAttributes", fmt::Xval(params->handle_attributes)),
+               keyval("Options", fmt::Xval(params->options))
+              );
 
     //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
     //Deletes this trap from the list of existing traps traps
@@ -199,9 +199,9 @@ static event_response_t ntduplicateobject_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     //Adds a return hook, a hook which will be called after function completes and returns.
     //Each time registers a trap, which is just for the process at the current step -> specific for the RIP
     auto trap = plugin->register_trap<duplicate_result_t>(
-            info,
-            ntduplicateobject_ret_cb,
-            breakpoint_by_dtb_searcher());
+                    info,
+                    ntduplicateobject_ret_cb,
+                    breakpoint_by_dtb_searcher());
 
     //If trap creation failed
     if (!trap)
@@ -267,10 +267,10 @@ static event_response_t obcreateobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     addr_t addr = drakvuf_get_function_argument(drakvuf, info, 2);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr + o->key_offset
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = addr + o->key_offset
+                  );
 
     auto vmi = vmi_lock_guard(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &ckey.key))
@@ -279,8 +279,8 @@ static event_response_t obcreateobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     auto key = std::string(ckey._key, 4);
 
     fmt::print(o->format, "objmon", drakvuf, info,
-        keyval("Key", fmt::Qstr(key))
-    );
+               keyval("Key", fmt::Qstr(key))
+              );
 
     return 0;
 }
@@ -303,7 +303,7 @@ objmon::objmon(drakvuf_t drakvuf, const objmon_config* config, output_format_t o
     }
 
     if (!config->disable_ntduplicateobject &&
-        !register_trap(nullptr, ntduplicateobject_cb, bp.for_syscall_name("NtDuplicateObject")))
+            !register_trap(nullptr, ntduplicateobject_cb, bp.for_syscall_name("NtDuplicateObject")))
     {
         throw -1;
     }

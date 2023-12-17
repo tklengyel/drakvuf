@@ -137,10 +137,10 @@ char* retrieve_objhdr_name(vmi_instance_t vmi, addr_t addr)
     obj_hdr_nameinfo_addr = obj_hdr;
 
     if (VMI_FAILURE == vmi_read_8_va(vmi, obj_hdr + symbol_offsets.objhdr_infomask_offset,
-            0, &im))
+                                     0, &im))
     {
         fprintf(stderr, "Error reading InfoMask from _OBJECT_HEADER at: %" PRIx64
-            "\n", obj_hdr);
+                "\n", obj_hdr);
         return NULL;
     }
 
@@ -159,7 +159,7 @@ char* retrieve_objhdr_name(vmi_instance_t vmi, addr_t addr)
     obj_hdr_nameinfo_addr -= symbol_offsets.objhdr_name_info_length;
 
     us = vmi_read_unicode_str_va(vmi, obj_hdr_nameinfo_addr +
-            symbol_offsets.objhdr_name_info_name_offset, 0);
+                                 symbol_offsets.objhdr_name_info_name_offset, 0);
 
     if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8"))
     {

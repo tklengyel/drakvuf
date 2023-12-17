@@ -114,14 +114,14 @@
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
 
 static void save_file_metadata(const drakvuf_trap_info_t* info,
-    const char* file_path,
-    const char* data_file_name,
-    size_t dump_size,
-    addr_t dump_address,
-    const char* method,
-    const char* dump_reason,
-    int sequence_number,
-    extras_t* extras)
+                               const char* file_path,
+                               const char* data_file_name,
+                               size_t dump_size,
+                               addr_t dump_address,
+                               const char* method,
+                               const char* dump_reason,
+                               int sequence_number,
+                               extras_t* extras)
 {
     char* file = NULL;
     if ( asprintf(&file, "%s.metadata", file_path) < 0 )
@@ -307,21 +307,21 @@ printout:
     // bypasses variable initialization
     {
         auto default_print = std::make_tuple(
-                keyval("DumpReason", fmt::Qstr(reason)),
-                keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
-                keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
-                keyval("DumpSize", fmt::Xval(len_bytes)),
-                keyval("DumpFilename", fmt::Qstr(display_file)),
-                keyval("DumpsCount", fmt::Nval(sequence_number))
-            );
+                                 keyval("DumpReason", fmt::Qstr(reason)),
+                                 keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
+                                 keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
+                                 keyval("DumpSize", fmt::Xval(len_bytes)),
+                                 keyval("DumpFilename", fmt::Qstr(display_file)),
+                                 keyval("DumpsCount", fmt::Nval(sequence_number))
+                             );
         if (print_extras)
         {
             target_pid = fmt::Nval(extras->write_virtual_memory_extras.target_pid);
             write_addr = fmt::Xval(extras->write_virtual_memory_extras.base_address, false);
             auto extra_arguments = std::make_tuple(
-                    keyval("TargetPID", target_pid),
-                    keyval("WriteAddr", write_addr)
-                );
+                                       keyval("TargetPID", target_pid),
+                                       keyval("WriteAddr", write_addr)
+                                   );
             fmt::print(plugin->m_output_format, "memdump", drakvuf, info, default_print, extra_arguments);
         }
         else
@@ -382,10 +382,10 @@ static bool dump_if_points_to_executable_memory(
     }
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = dtb,
-        .addr = mmvad.starting_vpn * VMI_PS_4KB
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = dtb,
+                   .addr = mmvad.starting_vpn * VMI_PS_4KB
+                  );
     size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
     if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, extras != nullptr))
     {
@@ -400,10 +400,10 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = stack_ptr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = stack_ptr
+                  );
 
     size_t bytes_read = 0;
     uint8_t buf[512];
@@ -466,7 +466,7 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
             ctx.addr = begin;
 
             if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len, "Stack heuristic",
-                    nullptr, false))
+                                    nullptr, false))
             {
                 PRINT_DEBUG("[MEMDUMP] Failed to save memory dump - internal error\n");
             }
@@ -541,10 +541,10 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = base_address_ptr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = base_address_ptr
+                  );
 
     addr_t base_address;
     if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &base_address))
@@ -599,10 +599,10 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = mem_base_address_ptr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = mem_base_address_ptr
+                  );
 
     addr_t mem_base_address;
 
@@ -685,10 +685,10 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = mem_base_address_ptr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = mem_base_address_ptr
+                  );
 
     addr_t mem_base_address;
 
@@ -756,17 +756,17 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = buffer_ptr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = buffer_ptr
+                  );
 
     vmi_pid_t target_pid;
     addr_t process_addr = 0;
     char* target_name = nullptr;
 
     if ( drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &target_pid) &&
-        drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr) )
+            drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr) )
     {
         target_name = drakvuf_get_process_name(drakvuf, process_addr, true);
     }
@@ -887,10 +887,10 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
     // Both registers are passed in _WOW64_CONTEXT structure from within caller address space.
     addr_t wow64_context = drakvuf_get_function_argument(drakvuf, info, 3);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = wow64_context + plugin->wow64context_eax_rva
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = wow64_context + plugin->wow64context_eax_rva
+                  );
     uint32_t wow_eax = 0;
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &wow_eax))
     {
@@ -921,10 +921,10 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     addr_t addr = drakvuf_get_function_argument(drakvuf, info, 1) + ptr_size;
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr
-    );
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = addr
+                  );
 
     addr_t data_size = 0;
     if (vmi_read(vmi, &ctx, ptr_size, &data_size, nullptr) != VMI_SUCCESS)
@@ -953,7 +953,7 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     this->memdump_dir = c->memdump_dir;
 
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_rva) ||
-        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTHREAD", "Process", &this->kthread_process_rva))
+            !drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTHREAD", "Process", &this->kthread_process_rva))
     {
         throw -1;
     }
@@ -966,8 +966,8 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
         if (json_wow)
         {
             if (!json_get_struct_member_rva(drakvuf, json_wow, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva) ||
-                !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eip", &this->wow64context_eip_rva) ||
-                !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eax", &this->wow64context_eax_rva))
+                    !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eip", &this->wow64context_eip_rva) ||
+                    !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eax", &this->wow64context_eax_rva))
             {
                 throw -1;
             }

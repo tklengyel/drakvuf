@@ -127,11 +127,11 @@ void memaccessmon::print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info,
     }
 
     fmt::print(this->format, "memaccessmon", drakvuf, info,
-        keyval("TargetName", process_name_opt),
-        keyval("TargetPID", fmt::Nval(mmvad->pid)),
-        keyval("FileName", file_name_opt),
-        keyval("Bytes", fmt::Xval(bytes))
-    );
+               keyval("TargetName", process_name_opt),
+               keyval("TargetPID", fmt::Nval(mmvad->pid)),
+               keyval("FileName", file_name_opt),
+               keyval("Bytes", fmt::Xval(bytes))
+              );
 }
 
 mmvad_context* memaccessmon::find_mmvad(drakvuf_t drakvuf, addr_t process, addr_t base_address, vmi_pid_t pid)

@@ -193,14 +193,14 @@ struct xenlibwrapper
 
             int (*xc_domain_decrease_reservation_exact)
             (xc_interface* xch, uint32_t domid, unsigned long nr_extents,
-                unsigned int extent_order, xen_pfn_t* extent_start);
+             unsigned int extent_order, xen_pfn_t* extent_start);
 
             int (*xc_domain_populate_physmap_exact)(xc_interface* xch,
-                uint32_t domid,
-                unsigned long nr_extents,
-                unsigned int extent_order,
-                unsigned int mem_flags,
-                xen_pfn_t* extent_start);
+                                                    uint32_t domid,
+                                                    unsigned long nr_extents,
+                                                    unsigned int extent_order,
+                                                    unsigned int mem_flags,
+                                                    xen_pfn_t* extent_start);
 
             int (*xc_vmtrace_enable)
             (xc_interface* xch, uint32_t domid, uint32_t vcpu);
@@ -210,19 +210,19 @@ struct xenlibwrapper
 
             int (*xc_vmtrace_reset_and_enable)
             (xc_interface* xch, uint32_t domid,
-                uint32_t vcpu);
+             uint32_t vcpu);
 
             int (*xc_vmtrace_output_position)
             (xc_interface* xch, uint32_t domid,
-                uint32_t vcpu, uint64_t* pos);
+             uint32_t vcpu, uint64_t* pos);
 
             int (*xc_vmtrace_get_option)
             (xc_interface* xch, uint32_t domid,
-                uint32_t vcpu, uint64_t key, uint64_t* value);
+             uint32_t vcpu, uint64_t key, uint64_t* value);
 
             int (*xc_vmtrace_set_option)
             (xc_interface* xch, uint32_t domid,
-                uint32_t vcpu, uint64_t key, uint64_t value);
+             uint32_t vcpu, uint64_t key, uint64_t value);
 
         };
 
@@ -253,8 +253,8 @@ struct xenlibwrapper
 
     int (*libxl_qemu_monitor_command)
     (libxl_ctx* ctx, uint32_t domid,
-        const char* command_line, char** output,
-        const libxl_asyncop_how* ao_how);
+     const char* command_line, char** output,
+     const libxl_asyncop_how* ao_how);
 
     void* xfm_handle;
 
@@ -266,12 +266,12 @@ struct xenlibwrapper
 
     int (*xenforeignmemory_resource_size)
     (xenforeignmemory_handle* fmem, domid_t domid, unsigned int type,
-        unsigned int id, size_t* size);
+     unsigned int id, size_t* size);
 
     xenforeignmemory_resource_handle* (*xenforeignmemory_map_resource)
     (xenforeignmemory_handle* fmem, domid_t domid, unsigned int type,
-        unsigned int id, unsigned long frame, unsigned long nr_frames,
-        void** paddr, int prot, int flags);
+     unsigned int id, unsigned long frame, unsigned long nr_frames,
+     void** paddr, int prot, int flags);
 
     int (*xenforeignmemory_unmap_resource)
     (xenforeignmemory_handle* fmem, xenforeignmemory_resource_handle* fres);

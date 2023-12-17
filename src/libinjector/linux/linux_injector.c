@@ -133,13 +133,13 @@ static bool check_userspace_int3_trap(linux_injector_t injector, drakvuf_trap_in
         if ( injector->child_data.ppid != info->proc_data.ppid )
         {
             PRINT_DEBUG("INT3 received but forked process parent pid (%d) doesn't match the target pid (%d)\n",
-                info->proc_data.ppid, injector->child_data.ppid);
+                        info->proc_data.ppid, injector->child_data.ppid);
             return false;
         }
         if ( strcmp(injector->child_data.name, info->proc_data.name))
         {
             PRINT_DEBUG("INT3 received but forked process name (%s) doesn't match the target process name (%s)\n",
-                info->proc_data.name, injector->child_data.name);
+                        info->proc_data.name, injector->child_data.name);
             return false;
         }
         injector->fork = false;
@@ -152,16 +152,16 @@ static bool check_userspace_int3_trap(linux_injector_t injector, drakvuf_trap_in
     if ( !is_target && !is_child )
     {
         PRINT_DEBUG("INT3 received but '%s' PID:TID (%u:%u) doesn't match target process (%u:%u) or child process (%u:%u)\n",
-            info->proc_data.name, info->proc_data.pid, info->proc_data.tid,
-            injector->target_pid, injector->target_tid,
-            injector->child_data.pid, injector->child_data.tid);
+                    info->proc_data.name, info->proc_data.pid, info->proc_data.tid,
+                    injector->target_pid, injector->target_tid,
+                    injector->child_data.pid, injector->child_data.tid);
         return false;
     }
 
     if (info->regs->rip != info->trap->breakpoint.addr)
     {
         PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)\n",
-            info->trap->breakpoint.addr, info->regs->rip);
+                    info->trap->breakpoint.addr, info->regs->rip);
         if (is_child && !injector->execve)
             PRINT_DEBUG("Trap child process in not execve stage\n");
     }
@@ -175,7 +175,7 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
     base_injector_t base_injector = &injector->base_injector;
 
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
-        info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
+                info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
 
     if (!check_userspace_int3_trap(injector, info))
         return VMI_EVENT_RESPONSE_NONE;
@@ -186,31 +186,31 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
     event_response_t event = 0;
     switch (injector->method)
     {
-        case INJECT_METHOD_SHELLCODE:
-        {
-            event = handle_shellcode(drakvuf, info);
-            break;
-        }
-        case INJECT_METHOD_WRITE_FILE:
-        {
-            event = handle_write_file(drakvuf, info);
-            break;
-        }
-        case INJECT_METHOD_READ_FILE:
-        {
-            event = handle_read_file(drakvuf, info);
-            break;
-        }
-        case INJECT_METHOD_EXECPROC:
-        {
-            event = handle_execve(drakvuf, info);
-            break;
-        }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+    case INJECT_METHOD_SHELLCODE:
+    {
+        event = handle_shellcode(drakvuf, info);
+        break;
+    }
+    case INJECT_METHOD_WRITE_FILE:
+    {
+        event = handle_write_file(drakvuf, info);
+        break;
+    }
+    case INJECT_METHOD_READ_FILE:
+    {
+        event = handle_read_file(drakvuf, info);
+        break;
+    }
+    case INJECT_METHOD_EXECPROC:
+    {
+        event = handle_execve(drakvuf, info);
+        break;
+    }
+    default:
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
     }
 
     // increase the step only if there is no manual override
@@ -226,7 +226,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
 
     // right now we are in kernel space
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u TID: %u\n",
-        info->regs->cr3, info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
+                info->regs->cr3, info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
 
     if (info->proc_data.pid != injector->target_pid || info->proc_data.tid != injector->target_tid)
         return VMI_EVENT_RESPONSE_NONE;
@@ -274,7 +274,7 @@ static event_response_t kernel_panic_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 {
     // right now we are in kernel space
     PRINT_DEBUG("Kernel panic. PID: %u PPID: %u TID: %u\n",
-        info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
+                info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
 
     drakvuf_interrupt(drakvuf, SIGDRAKVUFKERNELPANIC);
 
@@ -290,7 +290,7 @@ static event_response_t kernel_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     // right now we are in kernel space
     PRINT_DEBUG("Target thread exit. PID: %u PPID: %u TID: %u\n",
-        info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
+                info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
 
     drakvuf_interrupt(drakvuf, SIGDRAKVUFCRASH);
 
@@ -412,56 +412,56 @@ static bool init_injector(linux_injector_t injector)
 {
     switch (injector->method)
     {
-        case INJECT_METHOD_SHELLCODE:
+    case INJECT_METHOD_SHELLCODE:
+    {
+        // ret will be appended to shellcode here
+        return load_shellcode_from_file(injector, injector->host_file);
+        break;
+    }
+    case INJECT_METHOD_EXECPROC:
+    {
+        if (!injector->host_file)
         {
-            // ret will be appended to shellcode here
-            return load_shellcode_from_file(injector, injector->host_file);
-            break;
-        }
-        case INJECT_METHOD_EXECPROC:
-        {
-            if (!injector->host_file)
-            {
-                fprintf(stderr, "Inject file is required\n");
-                return false;
-            }
-            return true;
-            break;
-        }
-        case INJECT_METHOD_WRITE_FILE:
-        {
-            if (!injector->target_file)
-            {
-                fprintf(stderr, "Target File is missing");
-                return false;
-            }
-            if (!injector->host_file)
-            {
-                fprintf(stderr, "Host File is missing");
-                return false;
-            }
-            return init_write_file_method(injector, injector->host_file);
-            break;
-        }
-        case INJECT_METHOD_READ_FILE:
-        {
-            if (!injector->target_file)
-            {
-                fprintf(stderr, "Target File is missing");
-                return false;
-            }
-            if (!injector->host_file)
-            {
-                fprintf(stderr, "Host File is missing");
-                return false;
-            }
-            return init_read_file_method(injector, injector->host_file);
-        }
-        default:
-        {
-            fprintf(stderr, "Method not supported for [LINUX]\n");
+            fprintf(stderr, "Inject file is required\n");
             return false;
         }
+        return true;
+        break;
+    }
+    case INJECT_METHOD_WRITE_FILE:
+    {
+        if (!injector->target_file)
+        {
+            fprintf(stderr, "Target File is missing");
+            return false;
+        }
+        if (!injector->host_file)
+        {
+            fprintf(stderr, "Host File is missing");
+            return false;
+        }
+        return init_write_file_method(injector, injector->host_file);
+        break;
+    }
+    case INJECT_METHOD_READ_FILE:
+    {
+        if (!injector->target_file)
+        {
+            fprintf(stderr, "Target File is missing");
+            return false;
+        }
+        if (!injector->host_file)
+        {
+            fprintf(stderr, "Host File is missing");
+            return false;
+        }
+        return init_read_file_method(injector, injector->host_file);
+    }
+    default:
+    {
+        fprintf(stderr, "Method not supported for [LINUX]\n");
+        return false;
+    }
     }
     return true;
 }

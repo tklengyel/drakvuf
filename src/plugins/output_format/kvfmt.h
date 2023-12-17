@@ -143,7 +143,7 @@ struct DataPrinter
     {
         auto restore_flags = fmt::RestoreFlags(os);
         os << t.tv_sec << '.' << std::setfill('0')
-            << std::setw(6) << t.tv_usec;
+           << std::setw(6) << t.tv_usec;
         return true;
     }
 
@@ -212,21 +212,21 @@ struct DataPrinter
         for (unsigned char c: value)
             switch (c)
             {
-                case '\r':
-                    os << "\\r";
-                    break;
-                case '\n':
-                    os << "\\n";
-                    break;
-                case '"':
-                    os << "\\\"";
-                    break;
-                default:
-                    if (c < ' ')
-                        os << "\\x" << hexdig[c >> 4] << hexdig[c & 0xF];
-                    else
-                        os << c;
-                    break;
+            case '\r':
+                os << "\\r";
+                break;
+            case '\n':
+                os << "\\n";
+                break;
+            case '"':
+                os << "\\\"";
+                break;
+            default:
+                if (c < ' ')
+                    os << "\\x" << hexdig[c >> 4] << hexdig[c & 0xF];
+                else
+                    os << c;
+                break;
             }
         os << '"';
         return true;
@@ -350,13 +350,13 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf
 
         const proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
         print_data(os,
-            keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-            keyval("PID", fmt::Nval(proc_data->pid)),
-            keyval("PPID", fmt::Nval(proc_data->ppid)),
-            keyval("TID", fmt::Nval(proc_data->tid)),
-            keyval("ProcessName", fmt::Qstr(proc_data->name)),
-            keyval("Method", method)
-        );
+                   keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+                   keyval("PID", fmt::Nval(proc_data->pid)),
+                   keyval("PPID", fmt::Nval(proc_data->ppid)),
+                   keyval("TID", fmt::Nval(proc_data->tid)),
+                   keyval("ProcessName", fmt::Qstr(proc_data->name)),
+                   keyval("Method", method)
+                  );
     }
 }
 
@@ -387,12 +387,12 @@ void print(const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t
 inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)
 {
     print(plugin_name, drakvuf, nullptr,
-        keyval("Time", TimeVal{UNPACK_TIMEVAL(timestamp)}),
-        keyval("PID", fmt::Nval(proc_data.pid)),
-        keyval("PPID", fmt::Nval(proc_data.ppid)),
-        keyval("RunningProcess", fmt::Qstr(proc_data.name)),
-        keyval("Bitness", fmt::Nval(static_cast<int>(proc_data.bitness)))
-    );
+          keyval("Time", TimeVal{UNPACK_TIMEVAL(timestamp)}),
+          keyval("PID", fmt::Nval(proc_data.pid)),
+          keyval("PPID", fmt::Nval(proc_data.ppid)),
+          keyval("RunningProcess", fmt::Qstr(proc_data.name)),
+          keyval("Bitness", fmt::Nval(static_cast<int>(proc_data.bitness)))
+         );
 }
 
 } // namespace kvfmt

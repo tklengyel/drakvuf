@@ -138,77 +138,77 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
 
     switch (table_levels)
     {
-        case 0:
-            if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + handle * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj) )
-                return 0;
+    case 0:
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + handle * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj) )
+            return 0;
 
-            break;
-        case 1:
-        {
-            addr_t table = 0;
-            size_t psize = drakvuf->address_width;
-            uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
-            uint32_t j;
-            uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
+        break;
+    case 1:
+    {
+        addr_t table = 0;
+        size_t psize = drakvuf->address_width;
+        uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
+        uint32_t j;
+        uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
 
-            handle -= i;
-            j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
+        handle -= i;
+        j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
 
-            if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
                 VMI_FAILURE == vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj) )
-                return 0;
+            return 0;
 
-            break;
-        }
-        case 2:
-        {
-            addr_t table = 0;
-            addr_t table2 = 0;
-            size_t psize = drakvuf->address_width;
-            uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
-            uint32_t mid_count = VMI_PS_4KB / psize;
-            uint32_t k;
-            uint32_t j;
-            uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
+        break;
+    }
+    case 2:
+    {
+        addr_t table = 0;
+        addr_t table2 = 0;
+        size_t psize = drakvuf->address_width;
+        uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
+        uint32_t mid_count = VMI_PS_4KB / psize;
+        uint32_t k;
+        uint32_t j;
+        uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
 
-            handle -= i;
-            j = handle / (low_count * HANDLE_MULTIPLIER / psize);
-            k = j % (mid_count * psize);
-            j = (j-k)/mid_count;
+        handle -= i;
+        j = handle / (low_count * HANDLE_MULTIPLIER / psize);
+        k = j % (mid_count * psize);
+        j = (j-k)/mid_count;
 
-            if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
                 VMI_FAILURE == vmi_read_addr_va(vmi, table + k, 0, &table2) ||
                 VMI_FAILURE == vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj) )
-                return 0;
+            return 0;
 
-            break;
-        }
+        break;
+    }
     }
 
     switch (vmi_get_winver(vmi))
     {
-        case VMI_OS_WINDOWS_XP:     /* fall-through */
-        case VMI_OS_WINDOWS_VISTA:  /* fall-through */
-        case VMI_OS_WINDOWS_2008:   /* fall-through */
-        case VMI_OS_WINDOWS_7:
-            return obj & ~EX_FAST_REF_MASK;
-        case VMI_OS_WINDOWS_8:
-            if ( drakvuf->pm == VMI_PM_IA32E )
-                return ((obj & VMI_BIT_MASK(19, 63)) >> 16) | 0xFFFFE00000000000;
-            else
-                return (obj & VMI_BIT_MASK(2, 31));
-        case VMI_OS_WINDOWS_10:
-            // We set Win10 as the default case as vmi_get_winver may not pinpoint it as VMI_OS_WINDOWS_10 if the buildid is not known
-            if ( drakvuf->pm == VMI_PM_IA32E )
-                return ((obj & VMI_BIT_MASK(19, 63)) >> 16) | 0xFFFF000000000000;
-            else
-                return (obj & VMI_BIT_MASK(2, 31));
-        case VMI_OS_WINDOWS_2000:       /* fall-through */
-        case VMI_OS_WINDOWS_2003:       /* fall-through */
-        case VMI_OS_WINDOWS_UNKNOWN:    /* fall-through */
-        case VMI_OS_WINDOWS_NONE:       /* fall-through */
-        default:
-            return 0;
+    case VMI_OS_WINDOWS_XP:     /* fall-through */
+    case VMI_OS_WINDOWS_VISTA:  /* fall-through */
+    case VMI_OS_WINDOWS_2008:   /* fall-through */
+    case VMI_OS_WINDOWS_7:
+        return obj & ~EX_FAST_REF_MASK;
+    case VMI_OS_WINDOWS_8:
+        if ( drakvuf->pm == VMI_PM_IA32E )
+            return ((obj & VMI_BIT_MASK(19, 63)) >> 16) | 0xFFFFE00000000000;
+        else
+            return (obj & VMI_BIT_MASK(2, 31));
+    case VMI_OS_WINDOWS_10:
+        // We set Win10 as the default case as vmi_get_winver may not pinpoint it as VMI_OS_WINDOWS_10 if the buildid is not known
+        if ( drakvuf->pm == VMI_PM_IA32E )
+            return ((obj & VMI_BIT_MASK(19, 63)) >> 16) | 0xFFFF000000000000;
+        else
+            return (obj & VMI_BIT_MASK(2, 31));
+    case VMI_OS_WINDOWS_2000:       /* fall-through */
+    case VMI_OS_WINDOWS_2003:       /* fall-through */
+    case VMI_OS_WINDOWS_UNKNOWN:    /* fall-through */
+    case VMI_OS_WINDOWS_NONE:       /* fall-through */
+    default:
+        return 0;
     }
 }
 
@@ -230,7 +230,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
 
 
 bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t current_eprocess,
-    addr_t handle, object_manager_object_t obj_type_arg, addr_t* obj_body_addr )
+                                addr_t handle, object_manager_object_t obj_type_arg, addr_t* obj_body_addr )
 {
     bool ret        = false ;
     addr_t obj_addr = 0 ;
@@ -241,9 +241,9 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, ad
     {
         uint8_t object_type ;
         ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3
-        );
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3
+                      );
 
         // Get TypeIndex from _OBJ_HEADER...
         ctx.addr = obj_addr + drakvuf->offsets[ OBJECT_HEADER_TYPEINDEX ] ;

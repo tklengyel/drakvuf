@@ -136,17 +136,17 @@ public:
     int interrupted { 0 };
 
     drakvuf_c(const char* domain,
-        const char* json_kernel_path,
-        const char* json_wow_path,
-        output_format_t output,
-        bool leave_paused,
-        bool libvmi_conf,
-        addr_t kpgd,
-        bool fast_singlestep,
-        uint64_t limited_traps_ttl,
-        const std::set<uint64_t>& ignored_processes,
-        bool libdrakvuf_get_userid,
-        bool enable_active_callback_check);
+              const char* json_kernel_path,
+              const char* json_wow_path,
+              output_format_t output,
+              bool leave_paused,
+              bool libvmi_conf,
+              addr_t kpgd,
+              bool fast_singlestep,
+              uint64_t limited_traps_ttl,
+              const std::set<uint64_t>& ignored_processes,
+              bool libdrakvuf_get_userid,
+              bool enable_active_callback_check);
     ~drakvuf_c();
 
     int is_initialized();
@@ -157,23 +157,23 @@ public:
     void resume();
     void toggle_context_interception(GSList* processes);
     injector_status_t write_file(vmi_pid_t injection_pid,
-        uint32_t injection_tid,
-        const char* src,
-        const char* dst,
-        int timeout,
-        bool global_search);
+                                 uint32_t injection_tid,
+                                 const char* src,
+                                 const char* dst,
+                                 int timeout,
+                                 bool global_search);
     injector_status_t inject_cmd(vmi_pid_t injection_pid,
-        uint32_t injection_tid,
-        const char* injection_cmd,
-        const char* injection_cwd,
-        injection_method_t method,
-        const char* binary_path,
-        const char* target_process,
-        int timeout,
-        bool global_search,
-        int args_count,
-        const char* args[],
-        vmi_pid_t* injected_pid);
+                                 uint32_t injection_tid,
+                                 const char* injection_cmd,
+                                 const char* injection_cwd,
+                                 injection_method_t method,
+                                 const char* binary_path,
+                                 const char* target_process,
+                                 int timeout,
+                                 bool global_search,
+                                 int args_count,
+                                 const char* args[],
+                                 vmi_pid_t* injected_pid);
     void exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid);
     void terminate(vmi_pid_t injection_pid, uint32_t injection_tid, vmi_pid_t pid, int termination_timeout, std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes);
     int start_plugins(const bool* plugin_list, const plugins_options* options);

@@ -127,10 +127,10 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
     for (int i=0; i < 16; i++)
     {
         ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_PID,
-            .pid = info->proc_data.pid,
-            .addr = (addr + i*8)
-        );
+                       .translate_mechanism = VMI_TM_PROCESS_PID,
+                       .pid = info->proc_data.pid,
+                       .addr = (addr + i*8)
+                      );
         addr_t val = 0;
         vmi_read_64(vmi, &ctx, &val);
         if ((i%4)==0)

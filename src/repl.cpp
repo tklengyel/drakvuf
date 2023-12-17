@@ -122,14 +122,14 @@ static void close_handler(int sig)
 static inline void print_help(void)
 {
     fprintf(stderr, "Required input:\n"
-        "\t -r <path to json>         The OS kernel's JSON\n"
-        "\t -d <domain ID or name>    The domain's ID or name\n"
+            "\t -r <path to json>         The OS kernel's JSON\n"
+            "\t -d <domain ID or name>    The domain's ID or name\n"
 #ifdef DRAKVUF_DEBUG
-        "\t -v                        Turn on verbose (debug) output\n"
+            "\t -v                        Turn on verbose (debug) output\n"
 #endif
-        "\t -l                        Use libvmi.conf\n"
-        "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
-    );
+            "\t -l                        Use libvmi.conf\n"
+            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
+           );
 }
 
 static bool is_interrupted(drakvuf_t _drakvuf, void*)
@@ -155,26 +155,26 @@ int main(int argc, char** argv)
     while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlg")) != -1)
         switch (c)
         {
-            case 'r':
-                json_kernel_path = optarg;
-                break;
-            case 'd':
-                domain = optarg;
-                break;
+        case 'r':
+            json_kernel_path = optarg;
+            break;
+        case 'd':
+            domain = optarg;
+            break;
 #ifdef DRAKVUF_DEBUG
-            case 'v':
-                verbose = 1;
-                break;
+        case 'v':
+            verbose = 1;
+            break;
 #endif
-            case 'l':
-                libvmi_conf = true;
-                break;
-            case 'k':
-                kpgd = strtoull(optarg, NULL, 0);
-                break;
-            default:
-                fprintf(stderr, "Unrecognized option: %c\n", c);
-                return return_code;
+        case 'l':
+            libvmi_conf = true;
+            break;
+        case 'k':
+            kpgd = strtoull(optarg, NULL, 0);
+            break;
+        default:
+            fprintf(stderr, "Unrecognized option: %c\n", c);
+            return return_code;
         }
 
     if ( !json_kernel_path || !domain )

@@ -120,7 +120,7 @@ bool fill_kernel_offsets(drakvuf_t drakvuf, size_t size, const char* names [][2]
         return false;
 
     if (!drakvuf_get_kernel_struct_members_array_rva(
-            drakvuf, names, size, drakvuf->offsets))
+                drakvuf, names, size, drakvuf->offsets))
     {
         PRINT_DEBUG("Failed to find offsets for array of structure names and subsymbols.\n");
     }
@@ -524,8 +524,8 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
 }
 
 bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    privilege_mode_t* previous_mode )
+        drakvuf_trap_info_t* info,
+        privilege_mode_t* previous_mode )
 {
     bool ret = false;
 
@@ -692,7 +692,7 @@ bool drakvuf_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head
 }
 
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name,
-    const char* mod_name, addr_t rva)
+                                const char* mod_name, addr_t rva)
 {
     addr_t ret = 0;
 
@@ -721,7 +721,7 @@ addr_t drakvuf_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func)
 }
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
-    const char* module, const char* sym)
+                               const char* module, const char* sym)
 {
     addr_t ret = 0;
 
