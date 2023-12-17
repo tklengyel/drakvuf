@@ -148,7 +148,6 @@ struct plugins_options
     const char* iphlpapi_profile;       // PLUGIN_ENVMON
     const char* mpr_profile;            // PLUGIN_ENVMON
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
-    bool skip_altp2m_check;             // PLUGIN_AGNOSTIC_SKIP_ALTP2M_CHECK
     bool disable_sysret;                // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
     const char* crashdump_dir;          // PLUGIN_BSODMON
