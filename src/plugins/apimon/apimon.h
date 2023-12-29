@@ -143,6 +143,8 @@ public:
 
     event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info);
 
+    void usermode_print(drakvuf_trap_info*, std::vector<uint64_t>&, hook_target_entry_t*);
+
     std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 };
 

@@ -165,7 +165,7 @@ printers_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS) printers/utils.lo
 check_PROGRAMS += userhook_check
 userhook_check_SOURCES = check.cpp
 userhook_check_CFLAGS = $(CHECK_CFLAGS) $(ZLIB_CFLAGS)
-userhook_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS) utils.lo
+userhook_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS) libusermode.la
 
 TESTS = $(check_PROGRAMS)
 
