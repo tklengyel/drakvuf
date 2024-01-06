@@ -146,27 +146,21 @@ static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+void apimon::usermode_print(drakvuf_trap_info* info, std::vector<uint64_t>& args, hook_target_entry_t* target)
 {
-    auto params = libhook::GetTrapParams<ApimonReturnHookData>(info);
-
-    if (!params->verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
-
     std::map < std::string, std::string > extra_data;
 
     if (!strcmp(info->trap->name, "CryptGenKey"))
-        extra_data = CryptGenKey_hook(drakvuf, info, params->arguments);
+        extra_data = CryptGenKey_hook(drakvuf, info, args);
 
     std::optional<fmt::Qstr<std::string>> clsid;
 
-    if (!params->target->clsid.empty())
-        clsid = fmt::Qstr(params->target->clsid);
+    if (!target->clsid.empty())
+        clsid = fmt::Qstr(target->clsid);
 
     std::vector<fmt::Rstr<std::string>> fmt_args{};
     {
-        const auto& args = params->arguments;
-        const auto& printers = params->target->argument_printers;
+        const auto& printers = target->argument_printers;
         for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
             arg != std::cend(args) && printer != std::cend(printers);
             ++arg, ++printer)
@@ -198,6 +192,16 @@ event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
         keyval("Arguments", fmt_args),
         keyval("Extra", fmt_extra)
     );
+}
+
+event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+{
+    auto params = libhook::GetTrapParams<ApimonReturnHookData>(info);
+
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    usermode_print(info, params->arguments, params->target);
 
     uint64_t hookID = make_hook_id(info);
     ret_hooks.erase(hookID);
@@ -241,15 +245,22 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         arguments.push_back(argument);
     }
 
-    uint64_t hookID = make_hook_id(info);
-    auto hook = plugin->createReturnHook<ApimonReturnHookData>(info,
-            &apimon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
-    auto params = libhook::GetTrapParams<ApimonReturnHookData>(hook->trap_);
+    if (target->no_retval)
+    {
+        plugin->usermode_print(info, arguments, target);
+    }
+    else
+    {
+        uint64_t hookID = make_hook_id(info);
+        auto hook = plugin->createReturnHook<ApimonReturnHookData>(info,
+                &apimon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
+        auto params = libhook::GetTrapParams<ApimonReturnHookData>(hook->trap_);
 
-    params->arguments = std::move(arguments);
-    params->target = target;
+        params->arguments = std::move(arguments);
+        params->target = target;
 
-    plugin->ret_hooks[hookID] = std::move(hook);
+        plugin->ret_hooks[hookID] = std::move(hook);
+    }
 
     return VMI_EVENT_RESPONSE_NONE;
 }

@@ -103,9 +103,11 @@
  ***************************************************************************/
 
 #include "utils.hpp"
+#include "printers/printers.hpp"
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
 #include <cctype>
 
 bool is_dll_name_matched(const std::string& dll_name, const std::string& pattern)
@@ -118,4 +120,166 @@ bool is_dll_name_matched(const std::string& dll_name, const std::string& pattern
     // matched last part of DLL name
     bool match_end = static_cast<size_t>(std::distance(it, dll_name.end())) == pattern.size();
     return match_end && (it == dll_name.begin() || *(it - 1) == '\\');
+}
+
+namespace
+{
+
+std::optional<HookActions> get_hook_actions(const std::string& str)
+{
+    if (str == "log")
+    {
+        return HookActions::empty().set_log();
+    }
+    else if (str == "log+stack")
+    {
+        return HookActions::empty().set_log().set_stack();
+    }
+
+    return std::nullopt;
+}
+
+std::optional<std::string> try_parse_token(std::stringstream& ss)
+{
+    const char SEPARATOR = ',';
+    std::string result;
+    if (!std::getline(ss, result, SEPARATOR) || result.empty())
+    {
+        return std::nullopt;
+    }
+    return result;
+}
+
+std::string parse_token(std::stringstream& ss)
+{
+    auto maybe_token = try_parse_token(ss);
+    if (!maybe_token)
+    {
+        throw std::runtime_error{"Expected a token"};
+    }
+    return *maybe_token;
+}
+
+std::unique_ptr<ArgumentPrinter> make_arg_printer(
+    const PrinterConfig& config,
+    const std::string& type,
+    const std::string& name)
+{
+    if (type == "lpstr" || type == "lpcstr" || type == "lpctstr")
+    {
+        return std::make_unique<AsciiPrinter>(name, config);
+    }
+    else if (type == "lpcwstr" || type == "lpwstr" || type == "bstr")
+    {
+        return std::make_unique<WideStringPrinter>(name, config);
+    }
+    else if (type == "punicode_string")
+    {
+        return std::make_unique<UnicodePrinter>(name, config);
+    }
+    else if (type == "pulong")
+    {
+        return std::make_unique<UlongPrinter>(name, config);
+    }
+    else if (type == "pulonglong")
+    {
+        return std::make_unique<UlongLongPrinter>(name, config);
+    }
+    else if (type == "lpvoid*")
+    {
+        return std::make_unique<PointerToPointerPrinter>(name, config);
+    }
+    else if (type == "refclsid" || type == "refiid")
+    {
+        return std::make_unique<GuidPrinter>(name, config);
+    }
+    else if (type == "binary16")
+    {
+        return std::make_unique<Binary16StringPrinter>(name, config);
+    }
+
+    return std::make_unique<ArgumentPrinter>(name, config);
+}
+
+std::vector<std::unique_ptr<ArgumentPrinter>> parse_arguments(
+        const PrinterConfig& config,
+        std::stringstream& ss)
+{
+    std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers;
+
+    for (size_t arg_idx = 0; ; arg_idx++)
+    {
+        auto maybe_arg = try_parse_token(ss);
+        if (!maybe_arg) break;
+
+        const std::string arg = *maybe_arg;
+        std::string arg_name;
+        std::string arg_type;
+        const auto pos = arg.find_first_of(':');
+
+        if (pos == std::string::npos)
+        {
+            arg_name = std::string("Arg") + std::to_string(arg_idx);
+            arg_type = arg;
+        }
+        else
+        {
+            arg_name = arg.substr(0, pos);
+            arg_type = arg.substr(pos + 1);
+        }
+
+        argument_printers.emplace_back(make_arg_printer(config, arg_type, arg_name));
+    }
+    return argument_printers;
+}
+
+} // namespace
+
+plugin_target_config_entry_t parse_entry(
+    std::stringstream& ss,
+    PrinterConfig& config)
+{
+    plugin_target_config_entry_t entry{};
+
+    entry.dll_name = parse_token(ss);
+    entry.function_name = parse_token(ss);
+    entry.type = HOOK_BY_NAME;
+
+    for (;;)
+    {
+        std::string token = parse_token(ss);
+
+        if (token == "clsid")
+        {
+            entry.clsid = parse_token(ss);
+        }
+        else if (token == "no-retval")
+        {
+            entry.no_retval = true;
+        }
+        else
+        {
+            std::optional<HookActions> actions = get_hook_actions(token);
+            if (actions)
+            {
+                entry.actions = *actions;
+                break;
+            }
+
+            // offset found
+            entry.type = HOOK_BY_OFFSET;
+            try
+            {
+                entry.offset = std::stoull(token, 0, 16);
+            }
+            catch (const std::logic_error& exc)
+            {
+                throw std::runtime_error{"Invalid offset"};
+            }
+        }
+    }
+
+    entry.argument_printers = parse_arguments(config, ss);
+
+    return entry;
 }

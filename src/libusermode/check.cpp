@@ -102,9 +102,14 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <check.h>
-
 #include "utils.hpp"
+#include "printers/printers.hpp"
+#include "userhook.hpp"
+
+#include <sstream>
+#include <string>
+
+#include <check.h>
 
 START_TEST(test_match_dll_name)
 {
@@ -133,6 +138,78 @@ static Suite* dll_matching_suite(void)
     return s;
 }
 
+static plugin_target_config_entry_t test_parse_dll_entry(const std::string& entry)
+{
+    PrinterConfig config;
+    std::stringstream ss(entry);
+    return parse_entry(ss, config);
+}
+
+START_TEST(test_parse_dll_hook)
+{
+    auto entry_str = "combase.dll,CoCreateInstance,log,rclsid:refclsid,punkOuter:lpvoid,dwClsContext:dword,riid:refiid,ppv:void**";
+    auto entry = test_parse_dll_entry(entry_str);
+
+    ck_assert(entry.dll_name == "combase.dll");
+    ck_assert(entry.function_name == "CoCreateInstance");
+    ck_assert(entry.type == HOOK_BY_NAME);
+    ck_assert(entry.clsid.empty());
+    ck_assert(entry.offset == 0);
+    ck_assert(!entry.no_retval);
+    ck_assert(entry.actions.log && !entry.actions.stack);
+    ck_assert(entry.argument_printers.size() == 5);
+}
+END_TEST
+
+START_TEST(test_parse_dll_hook_with_offset)
+{
+    auto entry_str = "taskschd.dll,ITaskFolder::RegisterTaskDefinition,clsid,0F87369F-A4E5-4CFC-BD3E-73E6154572DD,13cd3,log,lpvoid,bstr";
+    auto entry = test_parse_dll_entry(entry_str);
+
+    ck_assert(entry.dll_name == "taskschd.dll");
+    ck_assert(entry.function_name == "ITaskFolder::RegisterTaskDefinition");
+    ck_assert(entry.type == HOOK_BY_OFFSET);
+    ck_assert(entry.clsid == "0F87369F-A4E5-4CFC-BD3E-73E6154572DD");
+    ck_assert(entry.offset == 0x13cd3);
+    ck_assert(!entry.no_retval);
+    ck_assert(entry.actions.log && !entry.actions.stack);
+    ck_assert(entry.argument_printers.size() == 2);
+}
+END_TEST
+
+START_TEST(test_parse_dll_hook_with_empty_args)
+{
+    auto entry_str = "combase.dll,CoCreateInstance,log";
+    auto entry = test_parse_dll_entry(entry_str);
+
+    ck_assert(entry.dll_name == "combase.dll");
+    ck_assert(entry.function_name == "CoCreateInstance");
+    ck_assert(entry.type == HOOK_BY_NAME);
+    ck_assert(entry.clsid.empty());
+    ck_assert(entry.offset == 0);
+    ck_assert(!entry.no_retval);
+    ck_assert(entry.actions.log && !entry.actions.stack);
+    ck_assert(entry.argument_printers.empty());
+}
+END_TEST
+
+static Suite* dll_hooks_parsing_suite(void)
+{
+    Suite* s;
+    TCase* tc_core;
+
+    s = suite_create("Parse DLL hooks");
+
+    tc_core = tcase_create("Core");
+
+    tcase_add_test(tc_core, test_parse_dll_hook);
+    tcase_add_test(tc_core, test_parse_dll_hook_with_offset);
+    tcase_add_test(tc_core, test_parse_dll_hook_with_empty_args);
+    suite_add_tcase(s, tc_core);
+
+    return s;
+}
+
 int main(void)
 {
     int number_failed;
@@ -141,6 +218,7 @@ int main(void)
 
     s = dll_matching_suite();
     sr = srunner_create(s);
+    srunner_add_suite(sr, dll_hooks_parsing_suite());
 
     srunner_run_all(sr, CK_NORMAL);
     number_failed = srunner_ntests_failed(sr);
