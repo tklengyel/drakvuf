@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -2399,7 +2399,7 @@ typedef enum ntstatus
     STATUS_PCP_TICKET_MISSING                                          = 0xC0292020L,
     STATUS_PCP_RAW_POLICY_NOT_SUPPORTED                                = 0xC0292021L,
     STATUS_PCP_KEY_HANDLE_INVALIDATED                                  = 0xC0292022L,
-    STATUS_PCP_UNSUPPORTED_PSS_SALT                                    = 0x40292023L,
+    STATUS_PCP_UNSUPPORTED_PSS_SALT                                    = 0x40292024L,
     STATUS_RTPM_CONTEXT_CONTINUE                                       = 0x00293000L,
     STATUS_RTPM_CONTEXT_COMPLETE                                       = 0x00293001L,
     STATUS_RTPM_NO_RESULT                                              = 0xC0293002L,
