@@ -105,5 +105,66 @@
 #pragma once
 
 #include <string>
+#include <sstream>
+#include <vector>
+#include <memory>
 
 bool is_dll_name_matched(const std::string& dll_name, const std::string& pattern);
+
+enum target_hook_type
+{
+    HOOK_BY_NAME,
+    HOOK_BY_OFFSET
+};
+
+struct HookActions
+{
+    bool log;
+    bool stack;
+
+    HookActions() : log{false}, stack{false} {}
+
+    static HookActions empty()
+    {
+        return HookActions{};
+    }
+    HookActions& set_log()
+    {
+        this->log = true;
+        return *this;
+    }
+    HookActions& set_stack()
+    {
+        this->stack = true;
+        return *this;
+    }
+};
+
+class ArgumentPrinter;
+struct PrinterConfig;
+
+struct plugin_target_config_entry_t
+{
+    std::string dll_name;
+    target_hook_type type;
+    std::string function_name;
+    std::string clsid;
+    uint64_t offset;
+    bool no_retval{false};
+    HookActions actions;
+    std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers;
+
+    plugin_target_config_entry_t()
+        : dll_name(), type(), function_name(), offset(), actions(), argument_printers()
+    {}
+
+    plugin_target_config_entry_t(std::string dll_name, std::string function_name, uint64_t offset, HookActions hook_actions, std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers)
+        : dll_name(std::move(dll_name)), type(HOOK_BY_OFFSET), function_name(std::move(function_name)), offset(offset), actions(hook_actions), argument_printers(std::move(argument_printers))
+    {}
+
+    plugin_target_config_entry_t(std::string dll_name, std::string function_name, HookActions hook_actions, std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers)
+        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), offset(), actions(hook_actions), argument_printers(std::move(argument_printers))
+    {}
+};
+
+plugin_target_config_entry_t parse_entry(std::stringstream& ss, PrinterConfig& config);
