@@ -528,10 +528,10 @@ void linux_procmon::print_info(
         keyval("CommandLine", fmt::Estr(params->command_line)),
         keyval("ImagePathName", fmt::Estr(params->image_path_name)),
         keyval("ouid", fmt::Nval(params->old_creds.uid)),
-        keyval("osuid", fmt::Nval(params->old_creds.euid)),
-        keyval("oeuid", fmt::Nval(params->old_creds.uid)),
-        keyval("suid", fmt::Nval(params->new_creds.euid)),
-        keyval("euid", fmt::Nval(params->new_creds.uid)),
+        keyval("osuid", fmt::Nval(params->old_creds.suid)),
+        keyval("oeuid", fmt::Nval(params->old_creds.euid)),
+        keyval("suid", fmt::Nval(params->new_creds.suid)),
+        keyval("euid", fmt::Nval(params->new_creds.euid)),
         std::move(envp),
         std::move(extra_args)
     );
