@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -114,12 +114,25 @@
 #include "win.h"
 #include "win-offsets.h"
 
+//
+// CM_KEY_NODE Flags
+//
+#define KEY_IS_VOLATILE                 0x0001
+#define KEY_HIVE_EXIT                   0x0002
+#define KEY_HIVE_ENTRY                  0x0004
+#define KEY_NO_DELETE                   0x0008
+#define KEY_SYM_LINK                    0x0010
+#define KEY_COMP_NAME                   0x0020
+#define KEY_PREDEF_HANDLE               0x0040
+#define KEY_VIRT_MIRRORED               0x0080
+#define KEY_VIRT_TARGET                 0x0100
+#define KEY_VIRTUAL_STORE               0x0200
+
 
 static char* win_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_control_block )
 {
     status_t vmi_status ;
     addr_t p_name_control_block = 0 ;
-    char* buf_ret ;
     vmi_instance_t vmi = drakvuf->vmi;
     ACCESS_CONTEXT(ctx,
         .addr = p_key_control_block + drakvuf->offsets[ CM_KEY_NAMEBLOCK ],
@@ -139,7 +152,7 @@ static char* win_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_
         {
             if ( name_length && ( name_length < 240 ) )
             {
-                buf_ret = (char*)g_try_malloc0( name_length + 1 );
+                char* buf_ret = (char*)g_try_malloc0( name_length + 1 );
 
                 if ( buf_ret )
                 {
@@ -195,34 +208,46 @@ static gchar* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info
         while ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
         {
             char* key_path = win_reg_keycontrolblock_path( drakvuf, info, p_key_control_block );
+            if ( !key_path )
+                break;
 
-            if ( key_path )
+            /*
+             * struct _CM_KEY_CONTROL_BLOCK
+             * {
+             * [...]
+             *     ULONG KcbUserFlags:4;         //0xb0
+             *     ULONG KcbVirtControlFlags:4;  //0xb0
+             *     ULONG KcbDebug:8;             //0xb0
+             *     ULONG Flags:16;               //0xb0
+             * [...]
+             * };
+             */
+
+            ctx.addr = p_key_control_block + drakvuf->offsets[ CM_KEY_FLAGS ] + 2 ;
+
+            uint16_t flags;
+            vmi_status = vmi_read_16(vmi, &ctx, &flags);
+            if ( VMI_SUCCESS == vmi_status && !( flags & KEY_HIVE_EXIT ) )
             {
                 key_path_list = g_slist_prepend( key_path_list, key_path );
             }
             else
-                break ;
+                g_free(key_path);
 
             ctx.addr = p_key_control_block + drakvuf->offsets[ CM_KEY_PARENTKCB ] ;
-
             vmi_status = vmi_read_addr( vmi, &ctx, &p_key_control_block );
         }
 
         if ( key_path_list )
         {
             GSList* iterator;
-            buf_ret = "";
-            bool first_iteration = 1;
             for ( iterator = key_path_list; iterator ; iterator = iterator->next )
             {
-                gchar* new_buf_ret = g_strconcat( buf_ret, "\\", (gchar*)iterator->data, NULL );
+                gchar* new_buf_ret = g_strconcat( buf_ret ?: "", "\\", (gchar*)iterator->data, NULL );
                 g_free( iterator->data );
 
-                if ( !first_iteration )
-                    g_free(buf_ret);
-
+                g_free(buf_ret);
                 buf_ret = new_buf_ret;
-                first_iteration = 0;
             }
         }
 

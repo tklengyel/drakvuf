@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,7 +105,6 @@
  ***************************************************************************/
 
 #include <libdrakvuf/libdrakvuf.h>  /* eprint_current_time */
-#include "../private.h"             /* PRINT_DEBUG */
 #include "hid_injection.h"          /* hid_inject */
 #include "gui_monitor.h"            /* gui_reconstruct */
 
@@ -120,7 +119,7 @@ bool hidsim::check_platform_support(drakvuf_t drakvuf)
     win_build_info_t bi;
     {
         vmi_lock_guard vmi(drakvuf);
-        if (!vmi_get_windows_build_info(vmi.vmi, &bi))
+        if (!vmi_get_windows_build_info(vmi, &bi))
             return false;
     }
 

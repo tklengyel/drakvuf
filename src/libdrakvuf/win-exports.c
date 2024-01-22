@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
 #include <string.h>
@@ -183,12 +182,12 @@ addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char* mod
     addr_t inloadorder;
     addr_t ret = 0;
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .translate_mechanism = VMI_TM_PROCESS_DTB
     );
 
     if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return 0;
-    if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+    if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb) || peb == 0)
         return 0;
 
     ctx.addr = peb + drakvuf->offsets[PEB_LDR];

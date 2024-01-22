@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -117,9 +117,9 @@
 #include <json-c/json_object.h>
 #include <math.h>
 #include <random>
+#include <cassert>
 
 #include <libdrakvuf/libdrakvuf.h> /* eprint_current_time */
-#include "../private.h" /* PRINT_DEBUG */
 
 /* Hidsim specific includes */
 #include "qmp/keymap_evdev_to_qapi.h"
@@ -528,6 +528,8 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
     int ox, int oy, int dx, int dy, int* newx, int* newy)
 {
     const float DISP_RES = dim->dx < dim->dy ? dim->dy : dim->dx;
+    assert(DISP_RES > 0);
+
     int nx, ny;
     int sleep, s;
     nx = ox + dx;
@@ -567,7 +569,7 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
     int cy = oy;
 
     /* Sleep time between micro movements */
-    sleep = time_frame / (hypot(dx, dy) / DISP_RES);
+    sleep = time_frame / ((hypot(dx, dy) / DISP_RES) ?: 1);
 
     /*
      * Inspired by
@@ -630,8 +632,6 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
 
     int sleep = 0;
     int time_frame = 0;
-
-    int s = _rand()%512;
 
     bool is_click = false;
     int moves_next_click = gaussian_rand(CLK_MEAN, CLK_SIGMA);
@@ -708,7 +708,6 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
         if (sleep>0)
             usleep(sleep);
 
-        s++;
     }
 
     return 0;

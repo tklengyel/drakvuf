@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -105,25 +105,28 @@
 h_sources = libinjector.h private.h debug_helpers.h injector_utils.h \
 	win/win_private.h win/win_injector.h win/win_utils.h win/win_functions.h \
 	win/method_helpers.h win/methods/win_read_file.h win/methods/win_write_file.h win/methods/win_createproc.h \
-	win/methods/win_shellexec.h win/methods/win_shellcode.h win/methods/win_terminate.h \
-	linux/linux_injector.h linux/linux_utils.h linux/linux_syscalls.h \
+	win/methods/win_shellexec.h win/methods/win_shellcode.h win/methods/win_terminate.h win/methods/win_exitthread.h \
+	linux/linux_private.h linux/linux_injector.h linux/linux_utils.h linux/linux_syscalls.h \
 	linux/methods/linux_shellcode.h linux/methods/linux_write_file.h linux/methods/linux_read_file.h linux/methods/linux_execve.h
 c_sources = injector.c  injector_stack.c debug_helpers.c injector_utils.c \
 	win/win_injector.c win/win_utils.c win/win_functions.c \
 	win/method_helpers.c win/methods/win_read_file.c win/methods/win_write_file.c win/methods/win_createproc.c \
-	win/methods/win_shellexec.c win/methods/win_shellcode.c win/methods/win_terminate.c \
+	win/methods/win_shellexec.c win/methods/win_shellcode.c win/methods/win_terminate.c win/methods/win_exitthread.c \
 	linux/linux_injector.c linux/linux_utils.c linux/linux_syscalls.c \
 	linux/methods/linux_shellcode.c linux/methods/linux_write_file.c linux/methods/linux_read_file.c linux/methods/linux_execve.c
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir) -I$(srcdir)/linux -I$(srcdir)/win
-AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS += $(VMI_CFLAGS)
+
+AM_CFLAGS = $(CFLAGS)
+AM_CFLAGS += $(VMI_CFLAGS)
+AM_CFLAGS += $(GLIB_CFLAGS)
 
 AM_LDFLAGS =  $(LDFLAGS)
 AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(GLIB_LIBS)
 
-AM_CFLAGS = $(CFLAGS)
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 AM_LDFLAGS += $(HARDEN_LDFLAGS)

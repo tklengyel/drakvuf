@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,10 +106,13 @@
 #include "plugins/plugins_ex.h"
 #include "private.h"
 
+#include <array>
+
 struct rootkitmon_config
 {
     const char* fwpkclnt_profile;
     const char* fltmgr_profile;
+    const char* ci_profile;
 };
 
 class rootkitmon : public pluginex
@@ -118,50 +121,67 @@ public:
     rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, output_format_t output);
     rootkitmon(const rootkitmon&) = delete;
     rootkitmon& operator=(const rootkitmon&) = delete;
-    ~rootkitmon();
-
-    event_response_t final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    ~rootkitmon() = default;
 
     std::unique_ptr<libhook::ManualHook> register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
         const char* func_name, hook_cb_t callback);
-    std::unique_ptr<libhook::ManualHook> register_reg_hook(hook_cb_t callback, register_t reg);
     std::unique_ptr<libhook::ManualHook> register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access);
 
-    std::set<driver_t> enumerate_driver_objects(vmi_instance_t vmi);
-    std::set<driver_t> enumerate_directory(vmi_instance_t vmi, addr_t addr);
     unicode_string_t* get_object_type_name(vmi_instance_t vmi, addr_t object);
-    device_stack_t enumerate_driver_stacks(vmi_instance_t vmi, addr_t driver_object);
+    unicode_string_t* get_object_name(vmi_instance_t vmi, addr_t object);
+    rootkitmon_ns::device_stack_t enumerate_driver_stacks(vmi_instance_t vmi, addr_t driver_object);
     bool enumerate_cores(vmi_instance_t vmi);
+    void enumerate_filter_callbacks(vmi_instance_t vmi);
 
-    void check_driver_integrity(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    void check_driver_objects(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    void check_descriptors(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    void check_driver_integrity(drakvuf_t drakvuf);
+    void check_driver_objects(drakvuf_t drakvuf);
+    void check_descriptors(drakvuf_t drakvuf);
+    void check_objects(drakvuf_t drakvuf);
+    void check_ci(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    void check_filter_callbacks(drakvuf_t drakvuf);
+    static event_response_t msr_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    static event_response_t rop_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    static event_response_t cr4_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     virtual bool stop_impl() override;
 
     const output_format_t format;
     win_ver_t winver;
 
-    size_t* offsets;
+    std::array<size_t, rootkitmon_ns::__OFFSET_MAX> offsets;
+    std::array<size_t, rootkitmon_ns::__FLT_OFFSET_MAX> flt_offsets;
     size_t guest_ptr_size;
     bool is32bit;
-    size_t object_header_size;
-
-    bool done_final_analysis;
-    bool not_supported;
 
     addr_t halprivatetable;
+    size_t fastio_size;
+    // Object integrity
+    size_t object_header_size;
     addr_t type_idx_table;
+    size_t ob_type_init_size;
     uint8_t ob_header_cookie;
+    addr_t ob_infomask2off;
+    // Code integrity
+    uint8_t ci_enabled;
+    rootkitmon_ns::sha256_checksum_t ci_callbacks;
+    addr_t ci_enabled_va;
+    addr_t ci_callbacks_va;
+    addr_t flt_globals_va;
 
-    std::unordered_map<driver_t, std::vector<checksum_data_t>> driver_sections_checksums;
-    std::unordered_map<driver_t, sha256_checksum_t> driver_object_checksums;
+    bool do_flt_checks;
+    // map of volumes and their callbacks
+    std::unordered_map<uint64_t, rootkitmon_ns::callback_ctl_t> flt_callbacks;
+    std::unordered_map<rootkitmon_ns::driver_t, std::pair<rootkitmon_ns::sha256_checksum_t, std::string>> driver_sections_checksums;
+    std::unordered_map<rootkitmon_ns::driver_t, rootkitmon_ns::sha256_checksum_t> driver_object_checksums;
     // _DRIVER_OBJECT -> _DEVICE_OBJECT -> [_DEVICE_OBJECT, ...]
-    std::unordered_map<driver_t, device_stack_t> driver_stacks;
+    std::unordered_map<rootkitmon_ns::driver_t, rootkitmon_ns::device_stack_t> driver_stacks;
     // VCPU -> Descriptor
-    std::unordered_map<unsigned int, descriptors_t> descriptors;
+    std::unordered_map<unsigned int, rootkitmon_ns::descriptors_t> descriptors;
     // VCPU -> MSR_LSTAR
     std::unordered_map<unsigned int, addr_t> msr_lstar;
     std::vector<std::unique_ptr<libhook::ManualHook>> manual_hooks;
     std::vector<std::unique_ptr<libhook::SyscallHook>> syscall_hooks;
+    std::unique_ptr<libhook::ManualHook> msr_hook;
+    std::map<uint64_t, std::unique_ptr<libhook::ManualHook>> rop_hooks;
+    std::unique_ptr<libhook::ManualHook> cr4_hook;
 };

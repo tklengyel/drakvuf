@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,8 +102,11 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <map>
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
+
+#include <map>
 #include <libdrakvuf/libdrakvuf.h>
 
 /*
@@ -130,14 +133,14 @@ static void close_handler(int sig)
     drakvuf_interrupt(drakvuf, sig);
 }
 
-static bool is_interrupted(drakvuf_t drakvuf, void*)
+static bool is_interrupted(drakvuf_t _drakvuf, void*)
 {
-    return drakvuf_is_interrupted(drakvuf);
+    return drakvuf_is_interrupted(_drakvuf);
 }
 
 int main(int argc, char** argv)
 {
-    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2022 Tamas K Lengyel\n",
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2024 Tamas K Lengyel\n",
         PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     /* this is the VM that we are looking at */
@@ -174,14 +177,14 @@ int main(int argc, char** argv)
     /* Some local variables */
     drakvuf_trap_t trap;
     trap.type = REGISTER;
-    trap.reg = CR3;
+    trap.regaccess.type = CR3;
     trap.cb = cr3_cb;
     trap.ttl = UNLIMITED_TTL;
     trap.ah_cb = nullptr;
 
 
     /* initialize the Drakvuf library */
-    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, false, 0, false, UNLIMITED_TTL))
+    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, 0, false, UNLIMITED_TTL, NULL, true, false))
     {
         printf("Failed to initialize Drakvuf\n");
         goto done;

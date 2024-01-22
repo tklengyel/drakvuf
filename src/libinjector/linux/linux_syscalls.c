@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -121,7 +121,7 @@ bool init_syscalls(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return setup_post_syscall_trap(drakvuf, info, syscall_addr);
 }
 
-bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
+bool setup_mmap_syscall(linux_injector_t injector, x86_registers_t* regs, size_t size)
 {
     // mmap(NULL, size, PROT_EXEC|PROT_WRITE|PROT_READ, MAP_SHARED|MAP_ANONYMOUS, -1, 0)
     struct argument args[6] = { {0} };
@@ -145,7 +145,7 @@ bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
 
 }
 
-bool setup_open_syscall(injector_t injector, x86_registers_t* regs, const char* target_file, int flags, int mode)
+bool setup_open_syscall(linux_injector_t injector, x86_registers_t* regs, const char* target_file, int flags, int mode)
 {
     // open(const char* file, int flags, int mode)
     struct argument args[3] = { {0} };
@@ -165,7 +165,7 @@ bool setup_open_syscall(injector_t injector, x86_registers_t* regs, const char* 
     return true;
 }
 
-bool setup_close_syscall(injector_t injector, x86_registers_t* regs, int fd)
+bool setup_close_syscall(linux_injector_t injector, x86_registers_t* regs, int fd)
 {
     struct argument args[1] = { {0} };
     init_int_argument(&args[0], fd);
@@ -181,7 +181,7 @@ bool setup_close_syscall(injector_t injector, x86_registers_t* regs, int fd)
     return true;
 }
 
-bool setup_write_syscall(injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
+bool setup_write_syscall(linux_injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
 {
     // write(unsigned int fd, const char *buf, size_t count);
     struct argument args[3] = { {0} };
@@ -200,7 +200,7 @@ bool setup_write_syscall(injector_t injector, x86_registers_t* regs, int fd, add
     return true;
 }
 
-bool setup_read_syscall(injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
+bool setup_read_syscall(linux_injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
 {
     // read(unsigned int fd, char *buf, size_t count);
     struct argument args[3] = { {0} };
@@ -219,7 +219,7 @@ bool setup_read_syscall(injector_t injector, x86_registers_t* regs, int fd, addr
     return true;
 }
 
-bool setup_exit_syscall(injector_t injector, x86_registers_t* regs, uint64_t rc)
+bool setup_exit_syscall(linux_injector_t injector, x86_registers_t* regs, uint64_t rc)
 {
     struct argument args[1] = { {0} };
     init_int_argument(&args[0], rc);
@@ -235,7 +235,7 @@ bool setup_exit_syscall(injector_t injector, x86_registers_t* regs, uint64_t rc)
     return true;
 }
 
-void setup_vfork_syscall(injector_t injector, x86_registers_t* regs, char* proc_name, vmi_pid_t parent_pid)
+void setup_vfork_syscall(linux_injector_t injector, x86_registers_t* regs, char* proc_name, vmi_pid_t parent_pid)
 {
     regs->rax = sys_vfork;
     regs->rip = injector->syscall_addr;
@@ -250,15 +250,106 @@ void setup_vfork_syscall(injector_t injector, x86_registers_t* regs, char* proc_
     injector->fork = true;
 }
 
-bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char* binary_file, addr_t argv, addr_t envp)
+static addr_t place_argv(linux_injector_t injector, x86_registers_t* regs, addr_t* data_addr, addr_t* array_addr)
+{
+    struct argument arg; // this will be passed in place_array_on_addr_64
+    struct argument* argv = g_new0(struct argument, injector->args_count + 1);
+
+    PRINT_DEBUG("Total arguments: %d\n", injector->args_count);
+
+    init_string_argument(&argv[0], injector->host_file);
+    PRINT_DEBUG("Args 0: %s\n", injector->host_file);
+
+    for (int i=0; i<injector->args_count; i++)
+    {
+        init_string_argument(&argv[i+1], injector->args[i]);
+        PRINT_DEBUG("Args %d: %s\n", i+1, injector->args[i]);
+    }
+
+    init_array_argument(&arg, argv, injector->args_count + 1);
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+
+    *array_addr = place_array_on_addr_64(vmi, regs, &arg, true, data_addr, array_addr);
+    if (*array_addr == 0)
+        goto err;
+
+    g_free(argv);
+    drakvuf_release_vmi(injector->drakvuf);
+    return arg.data_on_stack;
+
+err:
+    fprintf(stderr, "Could not create argv arrays\n");
+    g_free(argv);
+    drakvuf_release_vmi(injector->drakvuf);
+    return 0;
+}
+
+static addr_t place_environ(linux_injector_t injector, x86_registers_t* regs, GHashTable* environ, addr_t* data_addr, addr_t* array_addr)
+{
+    struct argument arg; // this will be passed in place_array_on_addr_64
+
+    size_t envs_count = g_hash_table_size(environ);
+    struct argument* envp = g_new0(struct argument, envs_count);
+    // Allocate a NULL-terminated array of strings
+    char** str_holder = g_new0(char*, envs_count + 1);
+
+    GHashTableIter iter;
+    gpointer key, value;
+
+    int idx = 0;
+    g_hash_table_iter_init(&iter, environ);
+    while (g_hash_table_iter_next(&iter, &key, &value))
+    {
+        gchar* str = str_holder[idx] = g_strdup_printf("%s=%s", (char*)key, (char*)value);
+        PRINT_DEBUG("Envs %d: %s\n", idx + 1, str);
+        init_string_argument(&envp[idx++], str);
+    }
+
+    init_array_argument(&arg, envp, envs_count);
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+    *array_addr = place_array_on_addr_64(vmi, regs, &arg, true, data_addr, array_addr);
+    drakvuf_release_vmi(injector->drakvuf);
+
+    g_strfreev(str_holder);
+    g_free(envp);
+
+    if (*array_addr == 0)
+    {
+        fprintf(stderr, "Could not create envp arrays\n");
+        return 0;
+    }
+
+    return arg.data_on_stack;
+}
+
+static bool create_argv_and_envp_arrays(linux_injector_t injector, x86_registers_t* regs, GHashTable* environ, addr_t* argv_addr, addr_t* envp_addr)
+{
+    addr_t data_addr = injector->virtual_memory_addr + injector->virtual_memory_size;
+    addr_t array_addr = injector->virtual_memory_addr + injector->virtual_memory_size/2;
+
+    *argv_addr = place_argv(injector, regs, &data_addr, &array_addr);
+    *envp_addr = place_environ(injector, regs, environ, &data_addr, &array_addr);
+
+    return *argv_addr && *envp_addr;
+}
+
+bool setup_execve_syscall(linux_injector_t injector, x86_registers_t* regs, const char* binary_file, const GHashTable* environ)
 {
     // execve(const char *filename, const char *const argv[], const char *const envp[])
     struct argument args[3] = { {0} };
 
+    addr_t argv_addr, envp_addr;
+    if (!create_argv_and_envp_arrays(injector, regs, (GHashTable*)environ, &argv_addr, &envp_addr))
+    {
+        PRINT_DEBUG("Failed to place execve syscall params\n");
+        return false;
+    }
+
     init_string_argument(&args[0], binary_file);
-    // create these arrays manually using place_array_on_addr_64
-    init_int_argument(&args[1], argv);
-    init_int_argument(&args[2], envp);
+    init_int_argument(&args[1], argv_addr);
+    init_int_argument(&args[2], envp_addr);
 
     regs->rax = sys_execve;
     regs->rip = injector->syscall_addr;
@@ -268,10 +359,14 @@ bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char
         PRINT_DEBUG("Failed to setup execve syscall\n");
         return false;
     }
+
+    // this will loosen the checks in check_userspace_int3_trap
+    // if execve fails child process would hit BP with different RIP
+    injector->execve = true;
     return true;
 }
 
-bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
+bool call_read_syscall_cb(linux_injector_t injector, x86_registers_t* regs)
 {
     if (is_syscall_error(regs->rax, "Could not read chunk from guest"))
         return false;
@@ -282,7 +377,7 @@ bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool call_vfork_syscall_cb(injector_t injector, x86_registers_t* regs, vmi_pid_t pid, uint32_t tid)
+bool call_vfork_syscall_cb(linux_injector_t injector, x86_registers_t* regs, vmi_pid_t pid, uint32_t tid)
 {
     if (is_syscall_error(regs->rax, "vfork syscall failed"))
         return false;
@@ -294,7 +389,7 @@ bool call_vfork_syscall_cb(injector_t injector, x86_registers_t* regs, vmi_pid_t
     return true;
 }
 
-bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs)
+bool call_write_syscall_cb(linux_injector_t injector, x86_registers_t* regs)
 {
     if (is_syscall_error(regs->rax, "Could not write chunk to guest"))
         return false;
@@ -303,7 +398,7 @@ bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs)
+bool call_open_syscall_cb(linux_injector_t injector, x86_registers_t* regs)
 {
     if (is_syscall_error(regs->rax, "Could not open file in guest"))
         return false;
@@ -314,13 +409,14 @@ bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs)
+bool call_mmap_syscall_cb(linux_injector_t injector, x86_registers_t* regs, size_t size)
 {
     if (is_syscall_error(regs->rax, "mmap syscall failed"))
         return false;
 
     // save it for future use
     injector->virtual_memory_addr = regs->rax;
+    injector->virtual_memory_size = size;
     PRINT_DEBUG("memory address allocated using mmap: %lx\n", injector->virtual_memory_addr);
 
     return true;

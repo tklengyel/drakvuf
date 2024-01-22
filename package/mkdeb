@@ -4,26 +4,25 @@
 
 set -e
 
-distro="$1"
+distro=$(echo $1 | tr ":" "-")
+version="$2"
+xenversion="$3"
 
 if [ "$distro" = "" ]
 then
     distro=generic
 fi
 
-if [ "$2" = "" ]
+if [ "$version" = "" ]
 then
-    version=$(grep 'PACKAGE_VERSION' 'src/Makefile' | head -n 1 | cut -f2 "-d=" | xargs echo -n)
-    echo "Auto-detected version: $version"
+    echo "Specify DRAKVUF version"
+    exit 1
+fi
 
-    if [ "$version" = "" ]
-    then
-        echo "Unable to recognize package version automatically, please provide it explicitly by the command line:"
-       echo "package/mkdeb <distro> <version>"
-    fi
-else
-    version="$2"
-    echo "Using version: $version"
+if [ "$xenversion" = "" ]
+then
+    echo "Specify Xen version"
+    exit 1
 fi
 
 arch=amd64
@@ -39,8 +38,6 @@ if test -d deb/usr/lib64 ; then
   rm -rf deb/usr/lib64
 fi
 
-xenversion=$(ls deb/boot/*.config | xargs basename | awk -F'\.c' '{print $1}' | awk -F'-' '{print $2}')
-
 # Fill in the debian boilerplate
 mkdir -p deb/DEBIAN
 cat >deb/DEBIAN/control <<EOF
@@ -48,9 +45,9 @@ Package: xen-hypervisor
 Source: xen-hypervisor
 Version: $xenversion
 Architecture: $arch
-Maintainer: Unmaintained snapshot
-Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7, libgnutls30, libfdt1, libyajl2, libaio1
-Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64
+Maintainer: Tamas K Lengyel <tamas@tklengyel.com>
+Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7 | libnettle8, libgnutls30, libfdt1, libyajl2, libaio1, libncurses6, libc6, libtinfo6, libgnutls28-dev, systemd, lvm2
+Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64, xen-hypervisor-4.13-amd64, xen-hypervisor-4.14-amd64, xen-hypervisor-4.15-amd64, xen-hypervisor-4.16-amd64
 Section: admin
 Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
@@ -83,8 +80,8 @@ Package: drakvuf-bundle
 Source: drakvuf-bundle
 Version: $version
 Architecture: $arch
-Maintainer: Unmaintained snapshot
-Depends: libglib2.0-dev, libjson-c3 | libjson-c4
+Maintainer: Tamas K Lengyel <tamas@tklengyel.com>
+Depends: libglib2.0-0, libjson-c3 | libjson-c4 | libjson-c5, python3, libx11-6
 Section: admin
 Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
@@ -100,7 +97,18 @@ cp -avr /build/usr/lib/* deb/usr/lib/
 mkdir -p deb/usr/include/
 cp -avr /build/usr/include/* deb/usr/include/
 
+mkdir -p deb/usr/share/doc/dwarf2json
+cp -avr /build/dwarf2json/LICENSE.txt deb/usr/share/doc/dwarf2json
 cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
+
+mkdir -p deb/opt/volatility3
+cp -avr /build/volatility3/* deb/opt/volatility3
+
+mkdir -p deb/usr/share/doc/libvmi
+cp -avr /build/libvmi/COPYING deb/usr/share/doc/libvmi
+
+mkdir -p deb/usr/share/doc/drakvuf
+cp -avr /build/COPYING deb/usr/share/doc/drakvuf
 
 # Package it up
 chown -R root:root deb

@@ -20,4 +20,8 @@ esac
 
 sed -i.bak "\@^none /proc/xen xenfs defaults,nofail 0 0@d" /etc/fstab
 
+systemctl disable xen-qemu-dom0-disk-backend.service
+systemctl disable xen-init-dom0.service
+systemctl disable xenconsoled.service
+
 exit 0

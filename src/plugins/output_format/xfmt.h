@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -109,7 +109,7 @@ namespace fmt
 {
 
 template<class... Args>
-void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t* info, const Args& ... args)
 {
     switch (format)
     {
@@ -126,6 +126,24 @@ void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, d
             deffmt::print(plugin_name, drakvuf, info, args...);
             break;
     }
+}
+
+template<class... Args>
+void print_proc_data(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, proc_data_t const& proc_data, const Args& ... args)
+{
+    x86_registers_t regs;
+    memset(&regs, 0, sizeof(x86_registers_t));
+    drakvuf_trap_t trap;
+    memset(&trap, 0, sizeof(drakvuf_trap_t));
+    drakvuf_trap_info_t info;
+    memset(&info, 0, sizeof(drakvuf_trap_info_t));
+    info.proc_data = proc_data;
+    info.attached_proc_data = proc_data;
+    info.timestamp = g_get_real_time();
+    info.trap = &trap;
+    info.regs = &regs;
+
+    print(format, plugin_name, drakvuf, &info, args...);
 }
 
 inline void print_running_process(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)

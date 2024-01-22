@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
 #include <string.h>
@@ -158,11 +157,196 @@ addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return ret_addr;
 }
 
+void linux_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid, uint32_t* tid, addr_t* rsp)
+{
+    *pid = info->proc_data.pid;
+    *tid = info->proc_data.tid;
+    *rsp = linux_get_function_return_address(drakvuf, info);
+}
+
 bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     return (info->proc_data.pid == pid)
         && (info->proc_data.tid == tid)
         && (!rsp || info->regs->rip == rsp);
+}
+
+bool linux_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
+{
+    json_object* kernel_json = vmi_get_kernel_json(drakvuf->vmi);
+    if (VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, function, rva))
+    {
+        bool find = false;
+        for (uint8_t i = 0; i < 255; i++)
+        {
+            char tmp[64];
+            snprintf(tmp, sizeof(tmp), "%s.isra.%d", function, i);
+            if (VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, kernel_json, tmp, rva))
+            {
+                find = true;
+                break;
+            }
+        }
+        if (!find)
+            return false;
+    }
+    return true;
+}
+
+/**
+ * @brief Function for extract absolute path from "struct dentry"
+ * https://elixir.bootlin.com/linux/v5.9.14/source/fs/d_path.c#L329
+ *
+ * @param drakvuf drakvuf instanse
+ * @param dentry_addr address of "struct dentry"
+ * @return char* - absolute path of filename
+*/
+char* linux_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd);
+
+    addr_t parent;
+    GString* b = g_string_new(NULL);
+
+    ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
+    // TODO Bound this loop
+    while (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &parent) && parent != dentry_addr)
+    {
+        gchar* name = NULL;
+        addr_t qstr_str_addr;
+        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME];
+        if (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, &qstr_str_addr))
+        {
+            ctx.addr = qstr_str_addr;
+            name = vmi_read_str(drakvuf->vmi, &ctx);
+        }
+
+        if (name == NULL)
+            break;
+
+        // This strlen is bounded by `vmi_read_str` implementation
+        if (strlen(name) > 0)
+        {
+            g_string_prepend(b, name);
+            g_string_prepend(b, "/");
+        }
+
+        g_free(name);
+
+        dentry_addr = parent;
+        ctx.addr = dentry_addr + drakvuf->offsets[DENTRY_D_PARENT];
+    }
+
+    return g_string_free(b, 0);
+}
+
+bool linux_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va)
+{
+    if (!linux_get_kernel_symbol_rva(drakvuf, function, va))
+        return false;
+
+    addr_t _text;
+    if (!linux_get_kernel_symbol_rva(drakvuf, "_text", &_text))
+        return false;
+
+    addr_t kaslr = drakvuf->kernbase - _text;
+    if (!kaslr)
+        return false;
+
+    *va += kaslr;
+    return true;
+}
+
+#ifdef DRAKVUF_DEBUG
+static char* linux_get_banner(drakvuf_t drakvuf)
+{
+    addr_t linux_banner_addr;
+    if (!linux_get_kernel_symbol_va(drakvuf, "linux_banner", &linux_banner_addr))
+    {
+        PRINT_DEBUG("Failed to receive addr of linux banner\n");
+        return NULL;
+    }
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = linux_banner_addr);
+
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+#endif
+
+static char* linux_read_kernel_version(drakvuf_t drakvuf, addr_t process_base)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd);
+
+    ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_NSPROXY];
+    addr_t nsproxy_addr;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &nsproxy_addr))
+        return NULL;
+
+    ctx.addr = nsproxy_addr + drakvuf->offsets[NSPROXY_UTS_NS];
+    addr_t uts_ns_addr;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &uts_ns_addr))
+        return NULL;
+
+    ctx.addr = uts_ns_addr + drakvuf->offsets[UTS_NAMESPACE_NAME] + drakvuf->offsets[NEW_UTSNAME_RELEASE];
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+
+static char* linux_read_kernel_version_from_current(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t process_base = linux_get_current_process(drakvuf, info);
+    return linux_read_kernel_version(drakvuf, process_base);
+}
+
+static void linux_parse_kernel_version(drakvuf_t drakvuf, char* version)
+{
+    int major, minor, patch;
+    int scanned = sscanf(version, "%d.%d.%d", &major, &minor, &patch);
+    g_free(version);
+
+    if (scanned == 3)
+    {
+        drakvuf->kernel_ver.major = major;
+        drakvuf->kernel_ver.minor = minor;
+        drakvuf->kernel_ver.patch = patch;
+        drakvuf->kernel_ver_initialized = true;
+    }
+}
+
+const kernel_version_t* linux_get_kernel_version_from_process(drakvuf_t drakvuf, addr_t process_base)
+{
+    if (!drakvuf->kernel_ver_initialized)
+    {
+        char* version = linux_read_kernel_version(drakvuf, process_base);
+        if (!version)
+        {
+            PRINT_DEBUG("Failed to extract linux kernel version\n");
+            return NULL;
+        }
+        linux_parse_kernel_version(drakvuf, version);
+    }
+    return &drakvuf->kernel_ver;
+}
+
+const kernel_version_t* linux_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if (!drakvuf->kernel_ver_initialized)
+    {
+        char* version = linux_read_kernel_version_from_current(drakvuf, info);
+        if (!version)
+        {
+            PRINT_DEBUG("Failed to extract linux kernel version\n");
+            return NULL;
+        }
+        linux_parse_kernel_version(drakvuf, version);
+    }
+    return &drakvuf->kernel_ver;
 }
 
 static bool find_kernbase(drakvuf_t drakvuf)
@@ -194,13 +378,32 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
     drakvuf->osi.get_process_pid = linux_get_process_pid;
     drakvuf->osi.get_process_tid = linux_get_process_tid;
+    drakvuf->osi.get_process_pgid = linux_get_process_pgid;
     drakvuf->osi.get_process_ppid = linux_get_process_ppid;
     drakvuf->osi.get_process_data = linux_get_process_data;
+    drakvuf->osi.get_process_dtb = linux_get_process_dtb;
     drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
     drakvuf->osi.export_lib_address = get_lib_address;
     drakvuf->osi.get_function_argument = linux_get_function_argument;
     drakvuf->osi.get_function_return_address = linux_get_function_return_address;
+    drakvuf->osi.set_return_context = linux_set_return_context;
     drakvuf->osi.check_return_context = linux_check_return_context;
+    drakvuf->osi.enumerate_processes = linux_enumerate_processes;
+    drakvuf->osi.get_current_process_environ = linux_get_current_process_environ;
+    drakvuf->osi.get_process_arguments = linux_get_process_arguments;
+    drakvuf->osi.get_kernel_symbol_rva = linux_get_kernel_symbol_rva;
+    drakvuf->osi.get_kernel_symbol_va = linux_get_kernel_symbol_va;
+    drakvuf->osi.get_kernel_version = linux_get_kernel_version;
+    drakvuf->osi.get_filepath_from_dentry = linux_get_filepath_from_dentry;
+
+#ifdef DRAKVUF_DEBUG
+    char* banner = linux_get_banner(drakvuf);
+    if (banner)
+    {
+        PRINT_DEBUG("LINUX BANNER: %s", banner);
+        g_free(banner);
+    }
+#endif
 
     return 1;
 }

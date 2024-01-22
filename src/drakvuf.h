@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -115,29 +115,12 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <glib.h>
+
+#include <set>
 
 #include <libdrakvuf/libdrakvuf.h>
 #include <plugins/plugins.h>
 #include <libinjector/libinjector.h>
-
-#ifndef PRINT_DEBUG
-#ifdef DRAKVUF_DEBUG
-// This is defined in libdrakvuf
-extern bool verbose;
-
-#define UNUSED(x) (void)(x)
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
-    } while (0)
-
-#else
-#define PRINT_DEBUG(...)
-#define UNUSED(...)
-
-#endif // DRAKVUF_DEBUG
-#endif // PRINT_DEBUG
 
 class drakvuf_c
 {
@@ -156,12 +139,14 @@ public:
         const char* json_kernel_path,
         const char* json_wow_path,
         output_format_t output,
-        bool verbose,
         bool leave_paused,
         bool libvmi_conf,
         addr_t kpgd,
         bool fast_singlestep,
-        uint64_t limited_traps_ttl);
+        uint64_t limited_traps_ttl,
+        const std::set<uint64_t>& ignored_processes,
+        bool libdrakvuf_get_userid,
+        bool enable_active_callback_check);
     ~drakvuf_c();
 
     int is_initialized();
@@ -189,6 +174,7 @@ public:
         int args_count,
         const char* args[],
         vmi_pid_t* injected_pid);
+    void exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid);
     void terminate(vmi_pid_t injection_pid, uint32_t injection_tid, vmi_pid_t pid, int termination_timeout, std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes);
     int start_plugins(const bool* plugin_list, const plugins_options* options);
     int stop_plugins(const bool* plugin_list);

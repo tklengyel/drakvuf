@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -108,6 +108,7 @@
 #include "writer.h"
 
 using namespace std::string_literals;
+using namespace procdump2_ns;
 
 using std::string;
 
@@ -158,45 +159,116 @@ struct vad_info2
     uint32_t type; // TODO Use backed file name instead of type?
     uint64_t total_number_of_ptes;
     uint32_t idx;                       // index in prototype_ptes
+    bool is_memory_mapped_file;
 };
 using vads_t = std::map<addr_t, vad_info2>;
 
 enum class procdump_stage
 {
-    need_suspend,  // 0
-    suspend,       // 1
-    pending,       // 2
-    get_irql,      // 3
-    allocate_pool, // 4
-    copy_memory,   // 5
-    resume,        // 6
-    awaken,        // 7
-    finished,      // 8
-    invalid        // 9
+    need_suspend,     // 0
+    suspend,          // 1
+    pending,          // 2
+    get_irql,         // 3
+    allocate_pool,    // 4
+    prepare_minidump, // 5
+    copy_memory,      // 6
+    resume,           // 7
+    target_awaken,    // 8
+    // TODO Check if the stage is steel needed
+    finished,         // 9
+    target_wakeup,    // 10
+    timeout,          // 11
 };
+
+int to_int(procdump_stage stage)
+{
+    return static_cast<int>(stage);
+}
+
+std::string to_str(procdump_stage stage)
+{
+    switch (stage)
+    {
+        case procdump_stage::need_suspend:
+            return "need_suspend";
+        case procdump_stage::suspend:
+            return "suspend";
+        case procdump_stage::pending:
+            return "pending";
+        case procdump_stage::get_irql:
+            return "get_irql";
+        case procdump_stage::allocate_pool:
+            return "allocate_pool";
+        case procdump_stage::prepare_minidump:
+            return "prepare_minidump";
+        case procdump_stage::copy_memory:
+            return "copy_memory";
+        case procdump_stage::resume:
+            return "resume";
+        case procdump_stage::target_awaken:
+            return "target_awaken";
+        case procdump_stage::finished:
+            return "finished";
+        case procdump_stage::target_wakeup:
+            return "target_wakeup";
+        case procdump_stage::timeout:
+            return "timeout";
+        default:
+            return "invalid";
+    }
+}
 
 struct return_ctx
 {
+private:
+    uint64_t m_stack_marker;
+
+public:
     vmi_pid_t ret_pid{0};
     addr_t    ret_rsp{0};
     uint32_t  ret_tid{0};
     x86_registers_t regs;
+    bool restored{false};
+
+    uint64_t stack_marker()
+    {
+        // TODO Set initial random value and print this to log
+        return 0x4a4c3ac04a4c3ac0;
+    }
+
+    uint64_t* set_stack_marker()
+    {
+        m_stack_marker = stack_marker();
+        return &m_stack_marker;
+    }
+
+    uint64_t stack_marker_va()
+    {
+        return m_stack_marker;
+    }
 };
 
 // TODO Rename into "task"
 // TODO Move stage transition logic here
 struct procdump2_ctx
 {
+private:
+    bool m_timeout{false};
+    procdump_stage m_stage{procdump_stage::pending};
+    procdump_stage m_old_stage{procdump_stage::pending};
+
+public:
     /* Basic context */
     /* For self-terminating process working thread injects PsSuspendProcess.
      * Thus it should remove task.
      */
-    bool is_hosted = false;
+    bool is_hosted{false};
     /* Processes targeted on analysys finish are not self-terminating neither
      * hosted. So after resuming such a target should be finished.
+     *
+     * TODO Check if to remove because of "return_ctx.restored"
      */
-    bool wait_awaken = true;
-    procdump_stage stage{procdump_stage::pending};
+    bool wait_awaken{true};
     return_ctx host;
     return_ctx target;
     return_ctx working;
@@ -222,13 +294,27 @@ struct procdump2_ctx
     addr_t    target_process_base{0};
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
+    const char* dump_reason;
+
+    const uint8_t TARGET_RESUSPEND_COUNT_MAX{3};
+    uint8_t target_resuspend_count{0};
 
     /* Data */
-    size_t         current_dump_size{0};
-    addr_t         pool{0}; // TODO Use "class pool" here
-    const uint64_t POOL_SIZE_IN_PAGES{0x400}; // TODO Move into "class pool"
+    // Target process virtual address space size
     size_t         size{0};
+
+    addr_t         current_read_bytes_va{0};
+    addr_t         current_dump_base{0};
+    size_t         current_dump_size{0};
+    bool           is_current_memory_mapped_file{false};
     vads_t         vads;
+
+    // Intermediate buffer in guest OS used for coping address space.
+    // The "MmCopyVirtualMemory" creates it's own intermediate buffer.
+    // Thus the memory usage is twice of that size. Be carefull.
+    // TODO Use "class pool" here
+    addr_t         pool{0};
+    const uint64_t POOL_SIZE_IN_PAGES{32}; // 128 KB
 
     /* Backup file context */
     string                          data_file_name;
@@ -241,17 +327,100 @@ struct procdump2_ctx
         vmi_pid_t pid,
         uint64_t idx_,
         std::string procdump_dir,
-        bool use_compression)
+        bool use_compression,
+        const char* dump_reason)
         : is_hosted(is_hosted)
         , target_process_base(base)
         , target_process_name(name)
         , target_process_pid(pid)
+        , dump_reason{dump_reason}
         , idx(idx_)
     {
         data_file_name = "procdump."s + std::to_string(idx);
         writer = ProcdumpWriterFactory::build(
                 procdump_dir + "/"s + data_file_name,
                 use_compression);
+
+        if (is_hosted)
+            /* The hosted target is suspended from it's host... */
+            target.restored = true;
+        else
+            /* The self-terminating target is suspended from it's own context */
+            host.restored = true;
+    }
+
+    ~procdump2_ctx()
+    {
+        PRINT_DEBUG("[PROCDUMP] [%d:%d] [%srestored] Destroy task context\n"
+            , target_process_pid, stage(), is_restored() ? "" : "not ");
+    }
+
+    bool on_target_resuspend()
+    {
+        if (++target_resuspend_count < TARGET_RESUSPEND_COUNT_MAX)
+            return true;
+        else
+            return false;
+    }
+
+    const char* status() const
+    {
+        if (is_timed_out())
+            return "Timeout";
+
+        switch (m_stage)
+        {
+            case procdump_stage::finished:
+                if (size == 0)
+                    return "Empty";
+                else
+                    return "Success";
+            case procdump_stage::target_wakeup:
+                return "WakeUp";
+            case procdump_stage::prepare_minidump:
+                return "PrepareMinidump";
+            case procdump_stage::allocate_pool:
+                return "AllocatePool";
+            default:
+                return "Fail";
+        }
+    }
+
+    bool is_timed_out() const
+    {
+        return m_timeout || m_stage == procdump_stage::timeout;
+    }
+
+    procdump_stage stage()
+    {
+        return m_stage;
+    }
+
+    void stage(const procdump_stage new_stage)
+    {
+        if (new_stage != m_stage)
+        {
+            if (new_stage == procdump_stage::timeout)
+                m_timeout = true;
+            m_old_stage = m_stage;
+            m_stage = new_stage;
+            PRINT_DEBUG("[PROCDUMP] [%d] Stage switch: %s -> %s%s\n"
+                , target_process_pid
+                , to_str(m_old_stage).data()
+                , to_str(m_stage).data()
+                , m_timeout ? "(timeout)" : ""
+            );
+        }
+    }
+
+    procdump_stage old_stage()
+    {
+        return m_old_stage;
+    }
+
+    bool is_restored()
+    {
+        return host.restored && target.restored && working.restored;
     }
 };
 

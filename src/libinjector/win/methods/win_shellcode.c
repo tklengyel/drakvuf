@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,15 +106,15 @@
 #include <win/win_functions.h>
 #include <win/method_helpers.h>
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static bool inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
-    event_response_t event;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1: // allocate virtual memory
         {
@@ -125,12 +125,11 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             if (!setup_virtual_alloc_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->exec_func;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2: // write payload to virtual memory
         {
@@ -142,56 +141,54 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             if (!setup_memset_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->memset;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP3: // inject payload
         {
             if (!inject_payload(drakvuf, info))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP4:
         {
             PRINT_DEBUG("Shellcode executed\n");
             injector->rc = INJECTOR_SUCCEEDED;
 
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP5:
-        {
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-            event = VMI_EVENT_RESPONSE_NONE;
-            break;
+            drakvuf_interrupt(drakvuf, SIGINT);
+
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         default:
         {
             PRINT_DEBUG("Should not be here\n");
             assert(false);
         }
-
     }
-    return event;
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    injector_t injector = info->trap->data;
+
     fprintf(stderr, "Exiting prematurely\n");
 
     if (injector->rc == INJECTOR_SUCCEEDED)
         injector->rc = INJECTOR_FAILED;
 
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
     memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
 static bool write_payload_to_guest_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

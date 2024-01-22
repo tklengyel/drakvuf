@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,44 +105,22 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
-#include <glib.h>
 #include "plugins/plugins_ex.h"
-#include "plugins/private.h"
 #include "plugins/output_format.h"
 
-struct syscalls_config
-{
-    const char* syscalls_filter_file;
-    const char* win32k_profile;
-    bool disable_sysret;
-};
+#include "linux.h"
+#include "win.h"
 
-class syscalls: public pluginex
+// external syscalls class
+class syscalls : public pluginex
 {
 public:
-    GSList* traps; // NOTE Non "pluginex" support for linux
-    GHashTable* filter;
-    json_object* win32k_json;
-
-    uint8_t reg_size;
-    bool is32bit;
-    output_format_t format;
-    os_t os;
-    bool disable_sysret;
-
-    size_t* offsets;
-
-    addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
-
-    addr_t kernel_base;
-    addr_t win32k_base;
-
-    std::vector<std::pair<char const*, fmt::Aarg>> fmt_args; // cache
+    std::unique_ptr<linux_syscalls> _linux_syscalls;
+    std::unique_ptr<win_syscalls> _win_syscalls;
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     syscalls(const syscalls&) = delete;
     syscalls& operator=(const syscalls&) = delete;
-    ~syscalls();
 };
 
 #endif

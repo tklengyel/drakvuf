@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -108,9 +108,10 @@ sources += hooks/syscall.hpp hooks/syscall.cpp
 sources += hooks/return.hpp hooks/return.cpp
 sources += hooks/cr3.hpp hooks/cr3.cpp
 sources += hooks/cpuid.hpp hooks/cpuid.cpp
+sources += hooks/catchall.hpp hooks/catchall.cpp
+sources += hooks/memaccess.hpp hooks/memaccess.cpp
 sources += call_result.hpp
 sources += libhook.hpp
-sources += private.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)

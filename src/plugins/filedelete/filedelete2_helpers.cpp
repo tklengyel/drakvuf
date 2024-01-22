@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -107,6 +107,8 @@
 #include "private.h"
 
 #include <libinjector/libinjector.h>
+
+using namespace filedelete;
 
 void free_pool(std::map<addr_t, bool>& pools, addr_t va)
 {

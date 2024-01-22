@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,10 +106,11 @@
 #include <libdrakvuf/libdrakvuf.h>
 #include <functional>
 #include <memory>
-#include <libhook/private.h>
 
 namespace libhook
 {
+
+struct CallResult;
 
 using callback_t = event_response_t(*)(drakvuf_t drakvuf, drakvuf_trap_info* info);
 using cb_wrapper_t = std::function<event_response_t(drakvuf_t, drakvuf_trap_info*)>;
@@ -146,6 +147,8 @@ public:
      * important to be noexcept, otherwise bad things will happen
      */
     BaseHook& operator=(BaseHook&&) noexcept;
+
+    virtual std::shared_ptr<CallResult> params() = 0;
 
 protected:
     /*

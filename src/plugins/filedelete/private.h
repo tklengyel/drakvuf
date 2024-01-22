@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -107,6 +107,9 @@
 
 #define FILE_DISPOSITION_INFORMATION 13
 #define FILE_DELETE_ON_CLOSE 0x1000
+
+namespace filedelete
+{
 
 enum offset
 {
@@ -318,5 +321,7 @@ bool inject_memcpy(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t 
 void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 void free_pool(std::map<addr_t, bool>& pools, addr_t va);
 addr_t find_pool(std::map<addr_t, bool>& pools);
+
+}
 
 #endif // FILEDELETE_PRIVATE_H

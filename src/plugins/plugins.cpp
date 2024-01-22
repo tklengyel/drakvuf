@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -108,6 +108,7 @@
 #include "poolmon/poolmon.h"
 #include "filetracer/filetracer.h"
 #include "filedelete/filedelete.h"
+#include "fileextractor/fileextractor.h"
 #include "objmon/objmon.h"
 #include "exmon/exmon.h"
 #include "ssdtmon/ssdtmon.h"
@@ -133,11 +134,21 @@
 #include "tlsmon/tlsmon.h"
 #include "codemon/codemon.h"
 #include "libhooktest/libhooktest.h"
+#include "libusermode/userhook.hpp"
 #include "exploitmon/exploitmon.h"
 #include "ipt/ipt.h"
 #include "hidsim/hidsim.h"
 #include "rootkitmon/rootkitmon.h"
+#include "spraymon/spraymon.h"
 #include "callbackmon/callbackmon.h"
+#include "hidevm/hidevm.h"
+#include "ptracemon/ptracemon.h"
+#include "ebpfmon/ebpfmon.h"
+#include "memaccessmon/memaccessmon.h"
+#include "unixsocketmon/unixsocketmon.h"
+#include "etwmon/etwmon.h"
+#include "rebootmon/rebootmon.h"
+#include "linkmon/linkmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -147,6 +158,9 @@ drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _outp
 int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
     const plugins_options* options)
 {
+
+    userhooks_set_injection_mode(options->userhook_injection_mode);
+
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
@@ -179,8 +193,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_FILETRACER
                 case PLUGIN_FILETRACER:
-                    this->plugins[plugin_id] = std::make_unique<filetracer>(this->drakvuf, this->output);
+                {
+                    filetracer_config config =
+                    {
+                        .ole32_profile = options->ole32_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<filetracer>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
                 case PLUGIN_FILEDELETE:
@@ -192,6 +212,21 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .filedelete_use_injector = options->filedelete_use_injector,
                     };
                     this->plugins[plugin_id] = std::make_unique<filedelete>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_FILEEXTRACTOR
+                case PLUGIN_FILEEXTRACTOR:
+                {
+                    fileextractor_config config =
+                    {
+                        .timeout = options->fileextractor_timeout,
+                        .dump_folder = options->dump_folder,
+                        .hash_size = options->fileextractor_hash,
+                        .extract_size = options->fileextractor_extract,
+                        .exclude_file = options->fileextractor_exclude_file,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<fileextractor>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
@@ -256,12 +291,18 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_PROCMON
                 case PLUGIN_PROCMON:
-                    this->plugins[plugin_id] = std::make_unique<procmon>(this->drakvuf, this->output);
+                {
+                    procmon_config config =
+                    {
+                        .procmon_filter_file = options->procmon_filter_file,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<procmon>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
                 case PLUGIN_BSODMON:
-                    this->plugins[plugin_id] = std::make_unique<bsodmon>(this->drakvuf, options->abort_on_bsod, this->output);
+                    this->plugins[plugin_id] = std::make_unique<bsodmon>(this->drakvuf, options->abort_on_bsod, options->crashdump_dir, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_ENVMON
@@ -284,6 +325,28 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_CRASHMON:
                     this->plugins[plugin_id] = std::make_unique<crashmon>(this->drakvuf, this->output);
                     break;
+#endif
+#ifdef ENABLE_PLUGIN_REBOOTMON
+                case PLUGIN_REBOOTMON:
+                {
+                    rebootmon_config config =
+                    {
+                        .abort_on_power_off = options->rebootmon_abort_on_power_off,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<rebootmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_LINKMON
+                case PLUGIN_LINKMON:
+                {
+                    linkmon_config config =
+                    {
+                        .ole32_profile = options->ole32_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<linkmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_CLIPBOARDMON
                 case PLUGIN_CLIPBOARDMON:
@@ -320,8 +383,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_DKOMMON
                 case PLUGIN_DKOMMON:
-                    this->plugins[plugin_id] = std::make_unique<dkommon>(this->drakvuf, nullptr, this->output);
+                {
+                    dkommon_config config =
+                    {
+                        .services_profile = options->services_profile
+                    };
+                    this->plugins[plugin_id] = std::make_unique<dkommon>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_WMIMON
                 case PLUGIN_WMIMON:
@@ -389,13 +458,15 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     procdump2_config config =
                     {
+                        .timeout = options->procdump_timeout,
                         .procdump_dir = options->procdump_dir,
                         .compress_procdumps = options->compress_procdumps,
-                        .procdump_on_finish = options->procdump_on_finish,
-                        .terminated_processes = options->terminated_processes,
+                        .dump_process_on_finish = options->procdump_on_finish,
+                        .dump_new_processes_on_finish = options->procdump_new_processes_on_finish,
                         .hal_profile = options->hal_profile,
                         .disable_kideliverapc_hook = options->procdump_disable_kideliverapc_hook,
-                        .disable_kedelayexecutionthread_hook = options->procdump_disable_kedelayexecutionthread_hook
+                        .disable_kedelayexecutionthread_hook = options->procdump_disable_kedelayexecutionthread_hook,
+                        .exclude_file = options->procdump_exclude_file
                     };
                     this->plugins[plugin_id] =
                         std::make_unique<procdump2>(this->drakvuf, &config, this->output);
@@ -421,12 +492,12 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     codemon_config_struct config =
                     {
-                        .codemon_dump_dir = options->codemon_dump_dir,
-                        .codemon_filter_executable = options->codemon_filter_executable,
-                        .codemon_log_everything = options->codemon_log_everything,
-                        .codemon_dump_vad = options->codemon_dump_vad,
-                        .codemon_analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
-                        .codemon_default_benign = options->codemon_default_benign,
+                        .dump_dir = options->codemon_dump_dir,
+                        .filter_executable = options->codemon_filter_executable,
+                        .log_everything = options->codemon_log_everything,
+                        .dump_vad = options->codemon_dump_vad,
+                        .analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
+                        .default_benign = options->codemon_default_benign,
                     };
                     this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
                     break;
@@ -484,8 +555,20 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     {
                         .fwpkclnt_profile = options->fwpkclnt_profile,
                         .fltmgr_profile = options->fltmgr_profile,
+                        .ci_profile = options->ci_profile
                     };
                     this->plugins[plugin_id] = std::make_unique<rootkitmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_SPRAYMON
+                case PLUGIN_SPRAYMON:
+                {
+                    spraymon_config config =
+                    {
+                        .win32k_profile = options->win32k_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<spraymon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
@@ -495,8 +578,59 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     callbackmon_config config =
                     {
                         .netio_profile = options->netio_profile,
+                        .ndis_profile  = options->ndis_profile
                     };
                     this->plugins[plugin_id] = std::make_unique<callbackmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_HIDEVM
+                case PLUGIN_HIDEVM:
+                {
+                    hidevm_config config =
+                    {
+                        .delay = options->hidevm_delay,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<hidevm>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_PTRACEMON
+                case PLUGIN_PTRACEMON:
+                {
+                    this->plugins[plugin_id] = std::make_unique<ptracemon>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_EBPFMON
+                case PLUGIN_EBPFMON:
+                {
+                    this->plugins[plugin_id] = std::make_unique<ebpfmon>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_MEMACCESSMON
+                case PLUGIN_MEMACCESSMON:
+                {
+                    this->plugins[plugin_id] = std::make_unique<memaccessmon>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_UNIXSOCKETMON
+                case PLUGIN_UNIXSOCKETMON:
+                {
+                    unixsocketmon_config config =
+                    {
+                        .print_max_size = options->unixsocketmon_max_size
+                    };
+                    this->plugins[plugin_id] = std::make_unique<unixsocketmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_ETWMON
+                case PLUGIN_ETWMON:
+                {
+                    this->plugins[plugin_id] = std::make_unique<etwmon>(this->drakvuf, this->output);
                     break;
                 }
 #endif

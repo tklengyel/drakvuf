@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -102,7 +102,7 @@
 #                                                                         #
 #*************************************************************************#
 
-h_sources = xen_helper.h
+h_sources = xen_helper.h private.h
 c_sources = xen_helper.c
 
 AM_CPPFLAGS = -I$(top_srcdir)
@@ -118,8 +118,7 @@ AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wpointer-arith -Winit-self -Wshadow \
              -Wswitch-enum -Wstrict-prototypes \
              -Wmissing-prototypes -Wredundant-decls \
-             -Wfloat-equal -Wundef -Wvla \
-             -Wc++-compat
+             -Wfloat-equal -Wundef -Wvla
 endif
 
 if HARDENING
@@ -128,14 +127,12 @@ AM_LDFLAGS += $(HARDEN_LDFLAGS)
 endif
 
 if SANITIZE
-# For some reason this doesn't work.
-
-#AM_CFLAGS += $(SANITIZE_CFLAGS)
-#AM_LDFLAGS += $(SANITIZE_LDFLAGS)
+AM_CFLAGS += $(SANITIZE_CFLAGS)
+AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
 if ENABLE_IPT
-AM_CFLAGS += $(HARDEN_CFLAGS) -DENABLE_IPT
+AM_CFLAGS += -DENABLE_IPT
 endif
 
 noinst_LTLIBRARIES= libxenhelper.la

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,8 +105,45 @@
 #ifndef SYSCALLS_WIN_H
 #define SYSCALLS_WIN_H
 
-void setup_windows(drakvuf_t drakvuf, syscalls* s);
-char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val);
+#include "private.h"
+#include "private_2.h"
+
+class win_syscalls : public syscalls_base
+{
+public:
+    GSList* strings_to_free = nullptr;
+
+    std::array<std::array<addr_t, 2>, 2> sst;
+
+    std::unordered_map<vmi_pid_t, std::vector<syscalls_ns::syscalls_module>> procs;
+
+    addr_t image_path_name;
+    std::string win32k_profile;
+    bool win32k_initialized;
+
+    std::unique_ptr<libhook::SyscallHook> load_driver_hook;
+    std::unique_ptr<libhook::SyscallHook> create_process_hook;
+    std::unique_ptr<libhook::SyscallHook> delete_process_hook;
+    std::unique_ptr<libhook::ReturnHook> wait_process_creation_hook;
+
+    bool setup_win32k_syscalls(drakvuf_t drakvuf);
+
+    event_response_t load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, std::array<addr_t, 2> _sst, json_object* json);
+    virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
+
+    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* module, const syscalls_ns::syscall_t* sc, std::vector<uint64_t> args, privilege_mode_t mode, std::optional<std::string> from_dll, std::optional<std::string> from_parent_dll);
+
+    win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+    ~win_syscalls();
+};
+
+namespace syscalls_ns
+{
 
 #define NUMBER_SERVICE_TABLES   2
 #define NTOS_SERVICE_INDEX      0
@@ -314,6 +351,15 @@ SYSCALL(NtAllocateVirtualMemory, NTSTATUS,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "AllocationType", "", DIR_IN, DWORD,
     "Protect", "", DIR_IN, DWORD,
+);
+SYSCALL(NtAllocateVirtualMemoryEx, NTSTATUS,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "RegionSize", "", DIR_INOUT, PSIZE_T,
+    "AllocationType", "", DIR_IN, DWORD,
+    "Protect", "", DIR_IN, DWORD,
+    "ExtendedParameter", "opt", DIR_INOUT, PMEM_EXTENDED_PARAMETER,
+    "ExtendedParameterCount", "", DIR_IN, ULONG,
 );
 SYSCALL(NtAlpcAcceptConnectPort, NTSTATUS,
     "PortHandle", "", DIR_OUT, PHANDLE,
@@ -740,6 +786,17 @@ SYSCALL(NtCreateSection, NTSTATUS,
     "SectionPageProtection", "", DIR_IN, ULONG,
     "AllocationAttributes", "", DIR_IN, ULONG,
     "FileHandle", "opt", DIR_IN, HANDLE,
+);
+SYSCALL(NtCreateSectionEx, NTSTATUS,
+    "SectionHandle", "", DIR_OUT, PHANDLE,
+    "DesiredAccess", "", DIR_IN, ACCESS_MASK,
+    "ObjectAttributes", "opt", DIR_IN, POBJECT_ATTRIBUTES,
+    "MaximumSize", "opt", DIR_IN, PLARGE_INTEGER,
+    "SectionPageProtection", "", DIR_IN, ULONG,
+    "AllocationAttributes", "", DIR_IN, ULONG,
+    "FileHandle", "opt", DIR_IN, HANDLE,
+    "ExtendedParameter", "opt", DIR_INOUT, PMEM_EXTENDED_PARAMETER,
+    "ExtendedParameterCount", "", DIR_IN, ULONG,
 );
 SYSCALL(NtCreateSemaphore, NTSTATUS,
     "SemaphoreHandle", "", DIR_OUT, PHANDLE,
@@ -1213,6 +1270,17 @@ SYSCALL(NtMapViewOfSection, NTSTATUS,
     "InheritDisposition", "", DIR_IN, SECTION_INHERIT,
     "AllocationType", "", DIR_IN, ULONG,
     "Win32Protect", "", DIR_IN, WIN32_PROTECTION_MASK,
+);
+SYSCALL(NtMapViewOfSectionEx, NTSTATUS,
+    "SectionHandle", "", DIR_IN, HANDLE,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "SectionOffset", "opt", DIR_INOUT, PLARGE_INTEGER,
+    "ViewSize", "", DIR_INOUT, PSIZE_T,
+    "AllocationType", "", DIR_IN, ULONG,
+    "Win32Protect", "", DIR_IN, WIN32_PROTECTION_MASK,
+    "ExtendedParameter", "opt", DIR_INOUT, PMEM_EXTENDED_PARAMETER,
+    "ExtendedParameterCount", "", DIR_IN, ULONG,
 );
 SYSCALL(NtModifyBootEntry, NTSTATUS,
     "BootEntry", "", DIR_IN, PBOOT_ENTRY,
@@ -1912,6 +1980,14 @@ SYSCALL(NtReadVirtualMemory, NTSTATUS,
     "BufferSize", "", DIR_IN, SIZE_T,
     "NumberOfBytesRead", "opt", DIR_OUT, PSIZE_T,
 );
+SYSCALL(NtReadVirtualMemoryEx, NTSTATUS,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "BaseAddress", "opt", DIR_IN, PVOID,
+    "Buffer", "bcount(BufferSize)", DIR_OUT, PVOID,
+    "BufferSize", "", DIR_IN, SIZE_T,
+    "NumberOfBytesRead", "opt", DIR_OUT, PSIZE_T,
+    "Flags", "", DIR_IN, ULONG,
+);
 SYSCALL(NtRecoverEnlistment, NTSTATUS,
     "EnlistmentHandle", "", DIR_IN, HANDLE,
     "EnlistmentKey", "opt", DIR_IN, PVOID,
@@ -2600,7 +2676,6 @@ SYSCALL(NtYieldExecution, NTSTATUS);
 SYSCALL(NtAcquireProcessActivityReference, NTSTATUS);
 SYSCALL(NtAddAtomEx, NTSTATUS);
 SYSCALL(NtAlertThreadByThreadId, NTSTATUS);
-SYSCALL(NtAllocateVirtualMemoryEx, NTSTATUS);
 SYSCALL(NtAlpcConnectPortEx, NTSTATUS);
 SYSCALL(NtAlpcImpersonateClientContainerOfPort, NTSTATUS);
 SYSCALL(NtAssociateWaitCompletionPacket, NTSTATUS);
@@ -2632,7 +2707,6 @@ SYSCALL(NtInitializeEnclave, NTSTATUS);
 SYSCALL(NtLoadEnclaveData, NTSTATUS);
 SYSCALL(NtLoadHotPatch, NTSTATUS);
 SYSCALL(NtManagePartition, NTSTATUS);
-SYSCALL(NtMapViewOfSectionEx, NTSTATUS);
 SYSCALL(NtNotifyChangeDirectoryFileEx, NTSTATUS);
 SYSCALL(NtOpenPartition, NTSTATUS);
 SYSCALL(NtOpenRegistryTransaction, NTSTATUS);
@@ -2656,7 +2730,6 @@ SYSCALL(NtTerminateEnclave, NTSTATUS);
 SYSCALL(NtUnsubscribeWnfStateChange, NTSTATUS);
 SYSCALL(NtUpdateWnfStateData, NTSTATUS);
 SYSCALL(NtWaitForAlertByThreadId, NTSTATUS);
-SYSCALL(NtCreateSectionEx, NTSTATUS);
 SYSCALL(NtManageHotPatch, NTSTATUS);
 SYSCALL(BvgaSetVirtualFrameBuffer, NTSTATUS);
 SYSCALL(CmpCleanUpHigherLayerKcbCachesPreCallback, NTSTATUS);
@@ -4089,6 +4162,13 @@ SYSCALL(NtUserWindowFromPoint, NTSTATUS);
 SYSCALL(NtUserYieldTask, NTSTATUS);
 SYSCALL(NtValidateCompositionSurfaceHandle, NTSTATUS);
 SYSCALL(NtVisualCaptureBits, NTSTATUS);
+SYSCALL(NtAcquireCrossVmMutant, NTSTATUS);
+SYSCALL(NtAllocateUserPhysicalPagesEx, NTSTATUS);
+SYSCALL(NtContinueEx, NTSTATUS);
+SYSCALL(NtCreateCrossVmEvent, NTSTATUS);
+SYSCALL(NtCreateCrossVmMutant, NTSTATUS);
+SYSCALL(NtPssCaptureVaSpaceBulk, NTSTATUS);
+SYSCALL(NtLoadKey3, NTSTATUS);
 
 #pragma clang diagnostic pop
 
@@ -4119,6 +4199,7 @@ static const syscall_t* nt[] =
     &NtAllocateUserPhysicalPages,
     &NtAllocateUuids,
     &NtAllocateVirtualMemory,
+    &NtAllocateVirtualMemoryEx,
     &NtAlpcAcceptConnectPort,
     &NtAlpcCancelMessage,
     &NtAlpcConnectPort,
@@ -4184,6 +4265,7 @@ static const syscall_t* nt[] =
     &NtCreateProfile,
     &NtCreateResourceManager,
     &NtCreateSection,
+    &NtCreateSectionEx,
     &NtCreateSemaphore,
     &NtCreateSymbolicLinkObject,
     &NtCreateThreadEx,
@@ -4268,6 +4350,7 @@ static const syscall_t* nt[] =
     &NtMapUserPhysicalPages,
     &NtMapUserPhysicalPagesScatter,
     &NtMapViewOfSection,
+    &NtMapViewOfSectionEx,
     &NtModifyBootEntry,
     &NtModifyDriverEntry,
     &NtNotifyChangeDirectoryFile,
@@ -4377,6 +4460,7 @@ static const syscall_t* nt[] =
     &NtReadOnlyEnlistment,
     &NtReadRequestData,
     &NtReadVirtualMemory,
+    &NtReadVirtualMemoryEx,
     &NtRecoverEnlistment,
     &NtRecoverResourceManager,
     &NtRecoverTransactionManager,
@@ -4485,6 +4569,7 @@ static const syscall_t* nt[] =
     &NtUnlockFile,
     &NtUnlockVirtualMemory,
     &NtUnmapViewOfSection,
+    &NtUnmapViewOfSectionEx,
     &NtVdmControl,
     &NtWaitForDebugEvent,
     &NtWaitForKeyedEvent,
@@ -4503,7 +4588,6 @@ static const syscall_t* nt[] =
     &NtAcquireProcessActivityReference,
     &NtAddAtomEx,
     &NtAlertThreadByThreadId,
-    &NtAllocateVirtualMemoryEx,
     &NtAlpcConnectPortEx,
     &NtAlpcImpersonateClientContainerOfPort,
     &NtAssociateWaitCompletionPacket,
@@ -4535,7 +4619,6 @@ static const syscall_t* nt[] =
     &NtLoadEnclaveData,
     &NtLoadHotPatch,
     &NtManagePartition,
-    &NtMapViewOfSectionEx,
     &NtNotifyChangeDirectoryFileEx,
     &NtOpenPartition,
     &NtOpenRegistryTransaction,
@@ -4556,17 +4639,22 @@ static const syscall_t* nt[] =
     &NtSetWnfProcessNotificationEvent,
     &NtSubscribeWnfStateChange,
     &NtTerminateEnclave,
-    &NtUnmapViewOfSectionEx,
     &NtUnsubscribeWnfStateChange,
     &NtUpdateWnfStateData,
     &NtWaitForAlertByThreadId,
-    &NtCreateSectionEx,
     &NtManageHotPatch,
     &BvgaSetVirtualFrameBuffer,
     &CmpCleanUpHigherLayerKcbCachesPreCallback,
     &GetPnpProperty,
     &ArbPreprocessEntry,
     &ArbAddReserved,
+    &NtAcquireCrossVmMutant,
+    &NtAllocateUserPhysicalPagesEx,
+    &NtContinueEx,
+    &NtCreateCrossVmEvent,
+    &NtCreateCrossVmMutant,
+    &NtPssCaptureVaSpaceBulk,
+    &NtLoadKey3,
 };
 
 static const syscall_t* win32k[] =
@@ -6012,5 +6100,7 @@ static const syscall_t* win32k[] =
 
 #define NUM_SYSCALLS_NT sizeof(nt)/sizeof(syscall_t*)
 #define NUM_SYSCALLS_WIN32K sizeof(win32k)/sizeof(syscall_t*)
+
+}
 
 #endif

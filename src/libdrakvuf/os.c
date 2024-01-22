@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -297,30 +297,32 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* 
 
 typedef struct pass_context
 {
-    addr_t* dtb;
-    addr_t* process;
-    vmi_pid_t* pid;
+    addr_t dtb;
+    addr_t process;
+    vmi_pid_t pid;
+    bool found;
 } pass_context_t;
 
 static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx)
 {
-    vmi_pid_t temp_pid;
     pass_context_t* ctx = (pass_context_t*)(visitor_ctx);
 
+    vmi_pid_t temp_pid;
     if (!drakvuf_get_process_pid(drakvuf, eprocess, &temp_pid))
     {
         PRINT_DEBUG("[LIBDRAKVUF] Failed to get process pid\n");
         return;
     }
-    if (temp_pid == *ctx->pid)
+    if (temp_pid == ctx->pid)
     {
         PRINT_DEBUG("[LIBDRAKVUF] Found remote process base! Getting dtb..\n");
-        if (!drakvuf_get_process_dtb(drakvuf, eprocess, ctx->dtb))
+        if (!drakvuf_get_process_dtb(drakvuf, eprocess, &ctx->dtb))
         {
             PRINT_DEBUG("[LIBDRAKVUF] Failed to get process dtb\n");
             return;
         }
-        *ctx->process = eprocess;
+        ctx->process = eprocess;
+        ctx->found = true;
     }
 }
 
@@ -333,27 +335,17 @@ bool drakvuf_get_process_by_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
         {
             PRINT_DEBUG("[LIBDRAKVUF] Failed to get remote process pid\n");
-            return VMI_EVENT_RESPONSE_NONE;
+            return false;
         }
 
-        pass_context_t pctx =
-        {
-            .pid = &pid,
-            .process = process,
-            .dtb = dtb
-        };
-        // Get process by pid
-        drakvuf_enumerate_processes(drakvuf, process_visitor, (void*)(&pctx));
-    }
-    // Self process
-    else
-    {
-        *process = info->attached_proc_data.base_addr;
-        *dtb     = info->regs->cr3;
+        return drakvuf_get_process_by_pid(drakvuf, pid, process, dtb);
     }
 
-    if (!*process || !*dtb)
-        return false;
+    // Self process
+    if (process)
+        *process = info->attached_proc_data.base_addr;
+    if (dtb)
+        *dtb = info->regs->cr3;
     return true;
 }
 
@@ -361,16 +353,20 @@ bool drakvuf_get_process_by_pid(drakvuf_t drakvuf, vmi_pid_t pid, addr_t* proces
 {
     pass_context_t pctx =
     {
-        .pid = &pid,
-        .process = process,
-        .dtb = dtb
+        .pid = pid,
     };
     // Get process by pid
     drakvuf_enumerate_processes(drakvuf, process_visitor, (void*)(&pctx));
 
-    if (!*process || !*dtb)
-        return false;
-    return true;
+    if (pctx.found)
+    {
+        if (process)
+            *process = pctx.process;
+        if (dtb)
+            *dtb = pctx.dtb;
+        return true;
+    }
+    return false;
 }
 
 bool drakvuf_get_process_thread_id(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid)
@@ -381,6 +377,20 @@ bool drakvuf_get_process_thread_id(drakvuf_t drakvuf, addr_t process_base, uint3
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.get_process_tid(drakvuf, process_base, tid);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_get_process_group_id(drakvuf_t drakvuf, addr_t process_base, uint32_t* pgid)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_process_pgid )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_process_pgid(drakvuf, process_base, pgid);
         drakvuf_release_vmi(drakvuf);
     }
 
@@ -451,6 +461,34 @@ bool drakvuf_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.get_process_dtb(drakvuf, process_base, dtb);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_get_process_arguments(drakvuf_t drakvuf, addr_t process_base, addr_t* argv)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_process_arguments )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_process_arguments(drakvuf, process_base, argv);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_get_current_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_current_process_environ )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_current_process_environ(drakvuf, info, environ);
         drakvuf_release_vmi(drakvuf);
     }
 
@@ -541,6 +579,32 @@ bool drakvuf_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* statu
     }
 
     return ret;
+}
+
+GHashTable* drakvuf_enum_threads(drakvuf_t drakvuf, addr_t process)
+{
+    GHashTable* ret = NULL;
+
+    if ( drakvuf->osi.enum_threads )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.enum_threads(drakvuf, process);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+addr_t drakvuf_get_thread(drakvuf_t drakvuf, addr_t process, uint32_t tid)
+{
+    GHashTable* threads = drakvuf_enum_threads(drakvuf, process);
+    if (!threads)
+        return 0;
+
+    gpointer key = GUINT_TO_POINTER((uint64_t)tid);
+    addr_t thread = (addr_t)g_hash_table_lookup(threads, key);
+    g_hash_table_destroy(threads);
+    return thread;
 }
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t process_base, addr_t* module_list)
@@ -642,6 +706,20 @@ addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const ch
     return ret;
 }
 
+addr_t drakvuf_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func)
+{
+    addr_t ret = 0;
+
+    if ( drakvuf->osi.kernel_symbol_to_va )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.kernel_symbol_to_va(drakvuf, func);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
     const char* module, const char* sym)
 {
@@ -725,6 +803,20 @@ char* drakvuf_get_filename_from_object_attributes(drakvuf_t drakvuf, drakvuf_tra
     return ret;
 }
 
+char* drakvuf_get_filepath_from_dentry(drakvuf_t drakvuf, addr_t dentry_addr)
+{
+    char* ret = NULL;
+
+    if (drakvuf->osi.get_filepath_from_dentry)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_filepath_from_dentry(drakvuf, dentry_addr);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     bool ret = false;
@@ -795,7 +887,7 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* modu
     return ret;
 }
 
-bool drakvuf_enumerate_drivers(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t driver, void* visitor_ctx), void* visitor_ctx)
+bool drakvuf_enumerate_drivers(drakvuf_t drakvuf, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx), void* visitor_ctx)
 {
     bool ret = false;
 
@@ -817,6 +909,20 @@ bool drakvuf_enumerate_process_modules(drakvuf_t drakvuf, addr_t eprocess, bool 
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.enumerate_process_modules( drakvuf, eprocess, visitor_func, visitor_ctx );
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_enumerate_object_directory(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx)
+{
+    bool ret = false;
+
+    if (drakvuf->osi.enumerate_object_directory)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.enumerate_object_directory(drakvuf, visitor_func, visitor_ctx);
         drakvuf_release_vmi(drakvuf);
     }
 
@@ -908,6 +1014,34 @@ uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uin
     return ret;
 }
 
+bool drakvuf_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.mmvad_private_memory )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.mmvad_private_memory(drakvuf, mmvad);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+uint64_t drakvuf_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    uint64_t ret = 0;
+
+    if ( drakvuf->osi.mmvad_protection )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.mmvad_protection(drakvuf, mmvad);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
 {
     bool ret = false;
@@ -992,6 +1126,16 @@ addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t epro
     return ret;
 }
 
+void drakvuf_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid, uint32_t* tid, addr_t* rsp)
+{
+    if ( drakvuf->osi.set_return_context )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        drakvuf->osi.set_return_context(drakvuf, info, pid, tid, rsp);
+        drakvuf_release_vmi(drakvuf);
+    }
+}
+
 bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     bool ret = false;
@@ -1000,6 +1144,90 @@ bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.check_return_context(info, pid, tid, rsp);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+addr_t drakvuf_get_rspbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t ret = 0;
+
+    if (drakvuf->osi.get_rspbase)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_rspbase(drakvuf, info);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva)
+{
+    bool ret = false;
+
+    if (drakvuf->osi.get_kernel_symbol_rva)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_kernel_symbol_rva(drakvuf, function, rva);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+bool drakvuf_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* rva)
+{
+    bool ret = false;
+
+    if (drakvuf->osi.get_kernel_symbol_rva)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_kernel_symbol_va(drakvuf, function, rva);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+const kernel_version_t* drakvuf_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    const kernel_version_t* ret = NULL;
+
+    if (drakvuf->osi.get_kernel_version)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_kernel_version(drakvuf, info);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+unicode_string_t* drakvuf_get_object_name(drakvuf_t drakvuf, addr_t object)
+{
+    unicode_string_t* ret = NULL;
+
+    if (drakvuf->osi.get_object_name)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_object_name(drakvuf, object);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+unicode_string_t* drakvuf_get_object_type_name(drakvuf_t drakvuf, addr_t object)
+{
+    unicode_string_t* ret = NULL;
+
+    if (drakvuf->osi.get_object_type_name)
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_object_type_name(drakvuf, object);
         drakvuf_release_vmi(drakvuf);
     }
 

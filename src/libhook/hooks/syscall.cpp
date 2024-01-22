@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,7 +119,7 @@ SyscallHook::~SyscallHook()
         };
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
         {
-            delete static_cast<CallResult*>(trap->data);
+            trap->data = nullptr;
             delete trap;
         });
     }
@@ -131,27 +131,71 @@ SyscallHook::~SyscallHook()
     }
 }
 
-SyscallHook::SyscallHook(SyscallHook&& rhs) noexcept
-    : BaseHook(std::forward<BaseHook>(rhs))
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->syscall_name_, rhs.syscall_name_);
-    std::swap(this->callback_, rhs.callback_);
-}
-
-SyscallHook& SyscallHook::operator=(SyscallHook&& rhs) noexcept
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->syscall_name_, rhs.syscall_name_);
-    std::swap(this->callback_, rhs.callback_);
-    return *this;
-}
-
-SyscallHook::SyscallHook(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
-    : BaseHook(drakvuf),
-      syscall_name_(syscall_name),
-      callback_(cb),
-      trap_()
+SyscallHook::SyscallHook(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, const std::string& display_name)
+    :BaseHook(drakvuf),
+     syscall_name_(syscall_name),
+     display_name_(display_name),
+     callback_(cb),
+     trap_()
 {}
+
+drakvuf_trap_t* SyscallHook::createWindowsTrap(drakvuf_t drakvuf, const std::string& syscall_name, uint64_t ttl)
+{
+    addr_t rva;
+    if (!drakvuf_get_kernel_symbol_rva(drakvuf, syscall_name.data(), &rva))
+    {
+        PRINT_DEBUG("[LIBHOOK] Failed to receive addr of function %s\n", syscall_name.data());
+        return nullptr;
+    }
+
+    auto trap = new drakvuf_trap_t();
+    trap->breakpoint.rva = rva;
+    trap->breakpoint.lookup_type = LOOKUP_PID;
+    trap->breakpoint.pid = 4;
+    trap->breakpoint.addr_type = ADDR_RVA;
+    trap->breakpoint.module = "ntoskrnl.exe";
+    trap->type = BREAKPOINT;
+    trap->ah_cb = nullptr;
+    trap->name = "empty";
+    trap->ttl = ttl;
+    trap->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
+        return GetTrapHook<SyscallHook>(info)->callback_(drakvuf, info);
+    };
+
+    return trap;
+}
+
+drakvuf_trap_t* SyscallHook::createLinuxTrap(drakvuf_t drakvuf, const std::string& syscall_name, uint64_t ttl)
+{
+    addr_t addr;
+    if (!drakvuf_get_kernel_symbol_va(drakvuf, syscall_name.data(), &addr))
+    {
+        PRINT_DEBUG("[LIBHOOK] Failed to receive addr of function %s\n", syscall_name.data());
+        return nullptr;
+    }
+
+    auto trap = new drakvuf_trap_t();
+    trap->breakpoint.addr = addr;
+    trap->breakpoint.lookup_type = LOOKUP_PID;
+    trap->breakpoint.pid = 0;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.module = "linux";
+    trap->type = BREAKPOINT;
+    trap->ah_cb = nullptr;
+    trap->name = "empty";
+    trap->ttl = ttl;
+    trap->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
+        return GetTrapHook<SyscallHook>(info)->callback_(drakvuf, info);
+    };
+
+    return trap;
+}
+
+std::shared_ptr<CallResult> SyscallHook::params()
+{
+    return this->params_;
+}
 
 } // namespace libhook

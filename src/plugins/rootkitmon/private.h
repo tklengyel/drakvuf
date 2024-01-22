@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,26 +105,23 @@
 #ifndef ROOTKITMON_PRIVATE_H
 #define ROOTKITMON_PRIVATE_H
 
+namespace rootkitmon_ns
+{
 // PDEVICE_OBJECT
 using device_t  = addr_t;
 // LDR_DATA_TABLE_ENTRY of the driver
 using driver_t  = addr_t;
 using device_stack_t = std::unordered_map<device_t, std::vector<device_t>>;
+using callback_ctl_t = std::array<std::vector<std::pair<addr_t, addr_t>>, 50>;
 using sha256_checksum_t = std::array<uint8_t, 32>;
 
 enum
 {
-    EPROCESS_UNIQUE_PROCESS_ID,
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    OBJECT_DIRECTORY_ENTRY_CHAINLINK,
-    OBJECT_DIRECTORY_ENTRY_OBJECT,
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_TYPE_NAME,
     DRIVER_OBJECT_DEVICEOBJECT,
     DRIVER_OBJECT_STARTIO,
     DRIVER_OBJECT_DRIVERNAME,
+    DRIVER_OBJECT_DRIVERSTART,
+    DRIVER_OBJECT_FASTIODISPATCH,
     DEVICE_OBJECT_ATTACHEDDEVICE,
     DEVICE_OBJECT_DRIVEROBJECT,
     DEVICE_OBJECT_NEXTDEVICE,
@@ -133,26 +130,48 @@ enum
 
 static const char* offset_names[__OFFSET_MAX][2] =
 {
-    [EPROCESS_UNIQUE_PROCESS_ID] = {"_EPROCESS", "UniqueProcessId"},
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [OBJECT_DIRECTORY_ENTRY_CHAINLINK] = { "_OBJECT_DIRECTORY_ENTRY", "ChainLink" },
-    [OBJECT_DIRECTORY_ENTRY_OBJECT] = { "_OBJECT_DIRECTORY_ENTRY", "Object" },
-    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
-    [OBJECT_TYPE_NAME] = { "_OBJECT_TYPE", "Name" },
-    [DRIVER_OBJECT_DEVICEOBJECT] = { "_DRIVER_OBJECT", "DeviceObject" },
-    [DRIVER_OBJECT_STARTIO] = { "_DRIVER_OBJECT", "DriverStartIo" },
-    [DRIVER_OBJECT_DRIVERNAME] = { "_DRIVER_OBJECT", "DriverName" },
+    [DRIVER_OBJECT_DEVICEOBJECT]   = { "_DRIVER_OBJECT", "DeviceObject" },
+    [DRIVER_OBJECT_STARTIO]        = { "_DRIVER_OBJECT", "DriverStartIo" },
+    [DRIVER_OBJECT_DRIVERNAME]     = { "_DRIVER_OBJECT", "DriverName" },
+    [DRIVER_OBJECT_DRIVERSTART]    = { "_DRIVER_OBJECT", "DriverStart" },
+    [DRIVER_OBJECT_FASTIODISPATCH] = { "_DRIVER_OBJECT", "FastIoDispatch" },
     [DEVICE_OBJECT_ATTACHEDDEVICE] = { "_DEVICE_OBJECT", "AttachedDevice" },
-    [DEVICE_OBJECT_DRIVEROBJECT] = { "_DEVICE_OBJECT", "DriverObject" },
-    [DEVICE_OBJECT_NEXTDEVICE] = { "_DEVICE_OBJECT", "NextDevice" },
+    [DEVICE_OBJECT_DRIVEROBJECT]   = { "_DEVICE_OBJECT", "DriverObject" },
+    [DEVICE_OBJECT_NEXTDEVICE]     = { "_DEVICE_OBJECT", "NextDevice" },
+};
+
+enum
+{
+    FLT_GLOBALS_FRAMELIST,
+    FLTP_FRAME_ATTACHEDVOLUMES,
+    FLT_RESOURCE_LIST_HEAD_RLIST,
+    FLT_VOLUME_DEVICE_NAME,
+    FLT_VOLUME_CALLBACKS,
+    FLT_CALLBACK_CTRL_LISTS,
+    CALLBACKNODE_PREOPERATION,
+    CALLBACKNODE_POSTOPERATION,
+    __FLT_OFFSET_MAX
+};
+
+static const char* flt_offset_names[__FLT_OFFSET_MAX][2] =
+{
+    [FLT_GLOBALS_FRAMELIST]        = { "_GLOBALS", "FrameList" },
+    [FLTP_FRAME_ATTACHEDVOLUMES]   = { "_FLTP_FRAME", "AttachedVolumes" },
+    [FLT_RESOURCE_LIST_HEAD_RLIST] = { "_FLT_RESOURCE_LIST_HEAD", "rList" },
+    [FLT_VOLUME_DEVICE_NAME]       = { "_FLT_VOLUME", "DeviceName" },
+    [FLT_VOLUME_CALLBACKS]         = { "_FLT_VOLUME", "Callbacks" },
+    [FLT_CALLBACK_CTRL_LISTS]      = { "_CALLBACK_CTRL", "OperationLists" },
+    [CALLBACKNODE_PREOPERATION]    = { "_CALLBACK_NODE", "PreOperation" },
+    [CALLBACKNODE_POSTOPERATION]   = { "_CALLBACK_NODE", "PostOperation" },
 };
 
 static constexpr uint32_t mem_not_paged = 0x08000000;
 static constexpr uint32_t mem_execute = 0x20000000;
 static constexpr uint32_t mem_write = 0x80000000;
-
+static constexpr uint32_t msr_lstar_index = 0xc0000082;
+static constexpr uint64_t ac_smap_mask = 0x40000;
+static constexpr uint32_t cr4_smep_mask_bitoffset = 20;
+static constexpr uint32_t cr4_smap_mask_bitoffset = 21;
 struct section_header_t
 {
     char     name[8];
@@ -305,6 +324,29 @@ struct descriptors_t
     addr_t gdtr_limit;
     // Pair of descriptor entry VA and its parsed entry
     std::vector<std::pair<addr_t, gdt_entry_t>> gdt;
+};
+
+struct filter_cb_t
+{
+    addr_t base_addr;
+    addr_t pre;
+    addr_t post;
+
+    bool operator==(const filter_cb_t& other) const
+    {
+        return other.pre == pre && other.post == post && other.base_addr == base_addr;
+    }
+
+    bool operator!=(const filter_cb_t& other) const
+    {
+        return !operator==(other);
+    }
+
+    bool operator<(const filter_cb_t& other) const
+    {
+        return base_addr < other.base_addr;
+    }
+};
 };
 
 #endif

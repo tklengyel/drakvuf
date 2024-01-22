@@ -18,9 +18,9 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
         ctx.dtb = info->regs->cr3;
         ctx.addr = delay_addr;
 
-        vmi_lock_guard vmi_lg(drakvuf);
+        auto vmi = vmi_lock_guard(drakvuf);
 
-        if ( VMI_FAILURE == vmi_read_64(vmi_lg.vmi, &ctx, reinterpret_cast<uint64_t*>(&delay)) )
+        if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, reinterpret_cast<uint64_t*>(&delay)) )
         {
             fprintf(stderr, PLUGIN_NAME " Couldn't read delay value in %s(...) trap.\n", info->trap->name);
             return 0;

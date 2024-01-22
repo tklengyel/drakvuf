@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -110,6 +110,7 @@
 #include "methods/win_createproc.h"
 #include "methods/win_shellexec.h"
 #include "methods/win_terminate.h"
+#include "methods/win_exitthread.h"
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
 {
@@ -147,6 +148,7 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 {
     (void)drakvuf;
     injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     if ( info->proc_data.pid != injector->target_pid || ( injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid ))
     {
@@ -206,11 +208,11 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         }
     }
 
-    if (!injector->step_override)
-        injector->step+=1;
+    if (!base_injector->step_override)
+        base_injector->step+=1;
 
-    injector->step_override = false;
-    return handle_gprs_registers(drakvuf, info, event);
+    base_injector->step_override = false;
+    return handle_gprs_registers(drakvuf, info, base_injector, event);
 }
 
 static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -229,6 +231,119 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
     return 0;
 }
 
+static event_response_t setup_usermode_trap_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    /**
+     * For 64-bit Windows we use the trapframe approach, where we read
+     * the saved RIP from the stack trap frame and breakpoint it.
+     * When this address is hit, we hijack the flow and afterwards return
+     * the registers to the original values, thus the process continues to run.
+     */
+    injector_t injector = info->trap->data;
+    addr_t thread = drakvuf_get_current_thread(drakvuf, info);
+    if (!thread)
+    {
+        PRINT_DEBUG("Failed to find current thread\n");
+        return 0;
+    }
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    addr_t trapframe = 0;
+    status_t status;
+
+    status = vmi_read_addr_va(vmi,
+            thread + injector->offsets[KTHREAD_TRAPFRAME],
+            0, &trapframe);
+
+    if (status == VMI_FAILURE || !trapframe)
+    {
+        PRINT_DEBUG("setup_usermode_trap: failed to read trapframe (0x%lx)\n", trapframe);
+        goto done;
+    }
+
+    addr_t bp_addr;
+    status = vmi_read_addr_va(vmi,
+            trapframe + injector->offsets[KTRAP_FRAME_RIP],
+            0, &bp_addr);
+
+    if (status == VMI_FAILURE || !bp_addr)
+    {
+        PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
+        goto done;
+    }
+
+    if (VMI_GET_BIT(bp_addr, 47))
+    {
+        PRINT_DEBUG("Got return address from kernel address space, waiting for another one.\n");
+        goto done;
+    }
+
+    if (setup_int3_trap(injector, info, bp_addr))
+    {
+        PRINT_DEBUG("Got return address 0x%lx from trapframe and it's now trapped!\n", bp_addr);
+        // Unsubscribe from the CR3 trap
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    }
+    else
+        fprintf(stderr, "Failed to trap trapframe return address\n");
+
+done:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
+static event_response_t setup_usermode_trap_x86(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    /**
+     * For 32-bit Windows we use memory traps on user space.
+     * Trap frame method is unreliable because in 32-bit Windows
+     * most syscalls exit in common point: KiFastSystemCallRet
+     * which may interfere with apicalls made by injector methods,
+     * trapping them in the middle of the call. As KiFastSystemCallRet
+     * is in User/Supervisor part of ntdll, we can solve this by
+     * trapping on User-only pages.
+     */
+    injector_t injector = info->trap->data;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    drakvuf_pause(drakvuf);
+
+    GSList* va_pages = vmi_get_va_pages(vmi, info->regs->cr3);
+    GSList* loop = va_pages;
+    while (loop)
+    {
+        page_info_t* page = loop->data;
+        if (page->vaddr < 0x80000000 && USER_SUPERVISOR(page->x86_pae.pte_value))
+        {
+            drakvuf_trap_t* new_trap = g_try_malloc0(sizeof(drakvuf_trap_t));
+            new_trap->type = MEMACCESS;
+            new_trap->cb = mem_callback;
+            new_trap->data = injector;
+            new_trap->ttl = UNLIMITED_TTL;
+            new_trap->ah_cb = NULL;
+            new_trap->memaccess.access = VMI_MEMACCESS_X;
+            new_trap->memaccess.type = POST;
+            new_trap->memaccess.gfn = page->paddr >> 12;
+            if ( drakvuf_add_trap(injector->drakvuf, new_trap) )
+                injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
+            else
+                g_free(new_trap);
+        }
+        g_free(page);
+        loop = loop->next;
+    }
+    g_slist_free(va_pages);
+
+    // Unsubscribe from the CR3 trap
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+
+    drakvuf_resume(drakvuf);
+
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
 static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
@@ -241,105 +356,21 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
 
     if (injector->target_tid && injector->target_tid != (uint32_t)info->proc_data.tid)
         return 0;
-
-    addr_t thread = drakvuf_get_current_thread(drakvuf, info);
-    if (!thread)
-    {
-        PRINT_DEBUG("Failed to find current thread\n");
-        return 0;
-    }
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
     /*
      * At this point the process is still in kernel mode, so
      * we need to trap when it enters into user mode.
      * For this we use different mechanisms on 32-bit and 64-bit.
      * The reason for this is that the same methods are not equally
      * reliable.
-     *
-     * For 64-bit Windows we use the trapframe approach, where we read
-     * the saved RIP from the stack trap frame and breakpoint it.
-     * When this address is hit, we hijack the flow and afterwards return
-     * the registers to the original values, thus the process continues to run.
-     * This method is workable on 32-bit Windows as well but finding the trapframe
-     * sometimes fail for yet unknown reasons.
      */
     if (!injector->is32bit)
     {
-        addr_t trapframe = 0;
-        status_t status;
-        status = vmi_read_addr_va(vmi,
-                thread + injector->offsets[KTHREAD_TRAPFRAME],
-                0, &trapframe);
-
-        if (status == VMI_FAILURE || !trapframe)
-        {
-            PRINT_DEBUG("cr3_cb: failed to read trapframe (0x%lx)\n", trapframe);
-            goto done;
-        }
-
-        addr_t bp_addr;
-        status = vmi_read_addr_va(vmi,
-                trapframe + injector->offsets[KTRAP_FRAME_RIP],
-                0, &bp_addr);
-
-        if (status == VMI_FAILURE || !bp_addr)
-        {
-            PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
-            goto done;
-        }
-
-        if (setup_int3_trap(injector, info, bp_addr))
-        {
-            PRINT_DEBUG("Got return address 0x%lx from trapframe and it's now trapped!\n",
-                bp_addr);
-
-            // Unsubscribe from the CR3 trap
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-        }
-        else
-            fprintf(stderr, "Failed to trap trapframe return address\n");
+        return setup_usermode_trap_x64(drakvuf, info);
     }
     else
     {
-        drakvuf_pause(drakvuf);
-
-        GSList* va_pages = vmi_get_va_pages(vmi, info->regs->cr3);
-        GSList* loop = va_pages;
-        while (loop)
-        {
-            page_info_t* page = loop->data;
-            if (page->vaddr < 0x80000000 && USER_SUPERVISOR(page->x86_pae.pte_value))
-            {
-                drakvuf_trap_t* new_trap = g_try_malloc0(sizeof(drakvuf_trap_t));
-                new_trap->type = MEMACCESS;
-                new_trap->cb = mem_callback;
-                new_trap->data = injector;
-                new_trap->ttl = UNLIMITED_TTL;
-                new_trap->ah_cb = NULL;
-                new_trap->memaccess.access = VMI_MEMACCESS_X;
-                new_trap->memaccess.type = POST;
-                new_trap->memaccess.gfn = page->paddr >> 12;
-                if ( drakvuf_add_trap(injector->drakvuf, new_trap) )
-                    injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
-                else
-                    g_free(new_trap);
-            }
-            g_free(page);
-            loop = loop->next;
-        }
-        g_slist_free(va_pages);
-
-        // Unsubscribe from the CR3 trap
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
-
-        drakvuf_resume(drakvuf);
+        return setup_usermode_trap_x86(drakvuf, info);
     }
-
-done:
-    drakvuf_release_vmi(drakvuf);
-    return 0;
 }
 
 bool check_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
@@ -382,6 +413,7 @@ bool check_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     if (!check_int3_trap(injector, info))
         return VMI_EVENT_RESPONSE_NONE;
@@ -422,6 +454,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             event = handle_win_terminate(drakvuf, info);
             break;
         }
+        case INJECT_METHOD_EXITTHREAD:
+        {
+            event = handle_win_exitthread(drakvuf, info);
+            break;
+        }
         default:
         {
             fprintf(stderr, "This method is not implemented for 64bit\n");
@@ -435,11 +472,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!injector->hijacked)
         return 0;
 
-    if (!injector->step_override)
-        injector->step+=1;
+    if (!base_injector->step_override)
+        base_injector->step+=1;
 
-    injector->step_override = false;
-    return handle_gprs_registers(drakvuf, info, event);
+    base_injector->step_override = false;
+    return handle_gprs_registers(drakvuf, info, base_injector, event);
 
 }
 
@@ -455,7 +492,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     drakvuf_trap_t trap =
     {
         .type = REGISTER,
-        .reg = CR3,
+        .regaccess.type = CR3,
         .cb = wait_for_target_process_cb,
         .data = injector,
     };
@@ -465,7 +502,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     drakvuf_trap_t trap_crashreporter =
     {
         .type = REGISTER,
-        .reg = CR3,
+        .regaccess.type = CR3,
         .cb = wait_for_crash_of_target_process,
         .data = injector,
     };
@@ -474,7 +511,9 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     if (!drakvuf_is_interrupted(drakvuf))
     {
-        const char* method = injector->method == INJECT_METHOD_TERMINATEPROC ? "termination" : "injection";
+#ifdef DRAKVUF_DEBUG
+        const char* method = injector->method == INJECT_METHOD_TERMINATEPROC ? "termination" : ( injector->method == INJECT_METHOD_EXITTHREAD ? "exitthread" : "injection");
+#endif
         PRINT_DEBUG("Starting %s loop\n", method);
         drakvuf_loop(drakvuf, is_interrupted, NULL);
         PRINT_DEBUG("Finished %s loop\n", method);
@@ -527,6 +566,12 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
             injector->exit_process = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserProcess", injector->global_search);
             if (!injector->exit_process) return false;
             injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateRemoteThread", injector->global_search);
+            break;
+        }
+        case INJECT_METHOD_EXITTHREAD:
+        {
+            injector->exit_thread = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserThread", injector->global_search);
+            if (!injector->exit_thread) return false;
             break;
         }
         case INJECT_METHOD_SHELLEXEC:
@@ -648,15 +693,15 @@ injector_status_t injector_start_app_on_win(
     injector->error_code.valid = false;
     injector->error_code.code = -1;
     injector->error_code.string = "<UNKNOWN>";
-    injector->step = STEP1;
-    injector->step_override = false;
-    injector->set_gprs_only = true;
+    injector->base_injector.step = STEP1;
+    injector->base_injector.step_override = false;
+    injector->base_injector.set_gprs_only = true;
 
     if (!initialize_injector_functions(drakvuf, injector, file))
     {
         PRINT_DEBUG("Unable to initialize injector functions\n");
         injector->result = INJECT_RESULT_INIT_FAIL;
-        print_injection_info(format, file, injector);
+        print_win_injection_info(format, file, injector);
         free_injector(injector);
         return 0;
     }
@@ -664,7 +709,7 @@ injector_status_t injector_start_app_on_win(
     if (inject(drakvuf, injector) && injector->rc == INJECTOR_SUCCEEDED)
     {
         injector->result = INJECT_RESULT_SUCCESS;
-        print_injection_info(format, file, injector);
+        print_win_injection_info(format, file, injector);
     }
     else
     {
@@ -672,13 +717,13 @@ injector_status_t injector_start_app_on_win(
         {
             PRINT_DEBUG("Injection timeout\n");
             injector->result = INJECT_RESULT_TIMEOUT;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
         else if (SIGDRAKVUFCRASH == drakvuf_is_interrupted(drakvuf))
         {
             PRINT_DEBUG("Target process crash detected\n");
             injector->result = INJECT_RESULT_CRASH;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
         else if (injector->error_code.valid)
         {
@@ -686,13 +731,13 @@ injector_status_t injector_start_app_on_win(
                 injector->error_code.string,
                 injector->error_code.code);
             injector->result = INJECT_RESULT_ERROR_CODE;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
         else
         {
             PRINT_DEBUG("Injection premature break\n");
             injector->result = INJECT_RESULT_PREMATURE;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
     }
 
@@ -740,8 +785,38 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     injector->target_tid = injection_tid;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->terminate_pid = pid;
-    injector->step_override = false;
-    injector->step = STEP1;
+    injector->base_injector.step_override = false;
+    injector->base_injector.step = STEP1;
+
+    if (!initialize_injector_functions(drakvuf, injector, NULL))
+    {
+        PRINT_DEBUG("Unable to initialize injector functions\n");
+        free_injector(injector);
+        return;
+    }
+
+    inject(drakvuf, injector);
+    PRINT_DEBUG("Finished with termination. Ret: %i.\n", injector->rc);
+
+    free_injector(injector);
+}
+
+void injector_exitthread_on_win(drakvuf_t drakvuf,
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid)
+{
+    PRINT_DEBUG("Target PID %u to terminate TID %u\n", injection_pid, injection_tid);
+    drakvuf_interrupt(drakvuf, 0); // clean
+
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+
+    injector->method = INJECT_METHOD_EXITTHREAD;
+    injector->drakvuf = drakvuf;
+    injector->target_pid = injection_pid;
+    injector->target_tid = injection_tid;
+    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    injector->base_injector.step_override = false;
+    injector->base_injector.step = STEP1;
 
     if (!initialize_injector_functions(drakvuf, injector, NULL))
     {

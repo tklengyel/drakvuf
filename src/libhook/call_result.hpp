@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,7 +105,6 @@
 
 #include <libdrakvuf/libdrakvuf.h>
 #include <libhook/hooks/base.hpp>
-#include <libhook/private.h>
 
 namespace libhook
 {
@@ -118,11 +117,9 @@ struct CallResult
 
     virtual ~CallResult() = default;
 
-    void setResultCallParams(const drakvuf_trap_info_t* info)
+    void setResultCallParams(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
     {
-        target_pid = info->attached_proc_data.pid;
-        target_tid = info->attached_proc_data.tid;
-        target_rsp = info->regs->rsp;
+        drakvuf_set_return_context(drakvuf, const_cast<drakvuf_trap_info_t*>(info), &target_pid, &target_tid, &target_rsp);
     }
 
     bool verifyResultCallParams(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

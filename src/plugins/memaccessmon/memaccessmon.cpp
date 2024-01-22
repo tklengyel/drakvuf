@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -101,43 +101,122 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#pragma once
 
-#include <libhook/libhook.hpp>
-#include "plugins.h"
+#include <algorithm>
+#include <fstream>
 
-/*
- * These 2 templates convert member-function-pointer to class type.
- * It is required to properly call member-function-pointer.
- * Read more in <libhook/libhook.hpp>.
- */
-template <typename T>
-struct class_type;
+#include <libdrakvuf/libdrakvuf.h>
+#include <libvmi/libvmi.h>
 
-template <typename T, typename R, typename... Args>
-struct class_type<R (T::*)(Args...)>
+#include "plugins/output_format.h"
+#include "memaccessmon.h"
+#include "private.h"
+
+void memaccessmon::print_result(mmvad_context* mmvad, drakvuf_trap_info_t* info, size_t bytes)
 {
-    using type = T;
-};
+    std::optional<fmt::Qstr<std::string>> process_name_opt;
+    if (mmvad->process_name)
+    {
+        process_name_opt = fmt::Qstr(mmvad->process_name.value());
+    }
 
-/**
- * This class is only needed for better backwards compatibility.
- * The new hooking interface prefers to use member-functions as callbacks
- * which provides `this`.
- */
-class PluginResult : public libhook::CallResult
+    std::optional<fmt::Qstr<std::string>> file_name_opt;
+    if (mmvad->filename)
+    {
+        file_name_opt = fmt::Qstr(mmvad->filename.value());
+    }
+
+    fmt::print(this->format, "memaccessmon", drakvuf, info,
+        keyval("TargetName", process_name_opt),
+        keyval("TargetPID", fmt::Nval(mmvad->pid)),
+        keyval("FileName", file_name_opt),
+        keyval("Bytes", fmt::Xval(bytes))
+    );
+}
+
+mmvad_context* memaccessmon::find_mmvad(drakvuf_t drakvuf, addr_t process, addr_t base_address, vmi_pid_t pid)
 {
-public:
-    PluginResult()
-        : libhook::CallResult()
-    {};
+    for (auto& vad : vads[pid])
+    {
+        if (base_address >= vad.starting_va && base_address <= vad.ending_va)
+        {
+            return &vad;
+        }
+    }
 
-    class pluginex* plugin_ = nullptr;
-};
+    // Didn't find in cache, try to resolve.
+    //
+    if (mmvad_info_t mmvad{}; drakvuf_find_mmvad(drakvuf, process, base_address, &mmvad))
+    {
+        mmvad_context vad =
+        {
+            .starting_va = mmvad.starting_vpn * VMI_PS_4KB,
+            .ending_va = mmvad.ending_vpn * VMI_PS_4KB,
+            .process = process,
+            .pid = pid
+        };
 
-template<typename Plugin>
-Plugin* GetTrapPlugin(const drakvuf_trap_info_t* info)
+        if (auto process_name = drakvuf_get_process_name(drakvuf, process, true))
+        {
+            vad.process_name = process_name;
+            g_free(process_name);
+        }
+
+        if (mmvad.file_name_ptr)
+        {
+            if (auto filename = drakvuf_read_unicode_va(drakvuf, mmvad.file_name_ptr, pid))
+            {
+                vad.filename = (char*)filename->contents;
+                vmi_free_unicode_str(filename);
+            }
+        }
+
+        vads[pid].push_back(std::move(vad));
+        return &vads[pid].back();
+    }
+
+    return nullptr;
+}
+
+event_response_t memaccessmon::readwrite_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    static_assert(std::is_base_of_v<pluginex, Plugin>, "Plugin must derive from pluginex");
-    return dynamic_cast<Plugin*>(libhook::GetTrapParams<PluginResult>(info)->plugin_);
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t base_address = drakvuf_get_function_argument(drakvuf, info, 2);
+    size_t bytes = drakvuf_get_function_argument(drakvuf, info, 4);
+
+    // Ignore self reading
+    if (handle == -1UL)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    vmi_pid_t pid;
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
+    {
+        PRINT_DEBUG("[MEMACCESSMON] Failed to get pid from handle\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    addr_t process;
+    if (!drakvuf_get_process_by_pid(drakvuf, pid, &process, nullptr))
+    {
+        PRINT_DEBUG("[MEMACCESSMON] Failed to get process by pid\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    };
+
+    if (auto* mmvad = find_mmvad(drakvuf, process, base_address, pid))
+    {
+        print_result(mmvad, info, bytes);
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+memaccessmon::memaccessmon(drakvuf_t drakvuf, output_format_t output)
+    : pluginex(drakvuf, output), format(output)
+{
+    PRINT_DEBUG("[MEMACCESSMON] Starting initialization...\n");
+    this->write_hook = createSyscallHook("NtWriteVirtualMemory", &memaccessmon::readwrite_cb);
+    this->read_hook = createSyscallHook("NtReadVirtualMemory", &memaccessmon::readwrite_cb);
+    this->read_ex_hook = createSyscallHook("NtReadVirtualMemoryEx", &memaccessmon::readwrite_cb);
 }

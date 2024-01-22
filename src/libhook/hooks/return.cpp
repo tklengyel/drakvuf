@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -103,12 +103,15 @@
  ***************************************************************************/
 #include <libhook/hooks/return.hpp>
 
+#include <glib.h>
+
 namespace libhook
 {
 
-ReturnHook::ReturnHook(drakvuf_t drakvuf, cb_wrapper_t cb)
+ReturnHook::ReturnHook(drakvuf_t drakvuf, cb_wrapper_t cb, const char* display_name)
     : BaseHook(drakvuf),
-      callback_(cb)
+      callback_(cb),
+      display_name_(g_strdup(display_name))
 {}
 
 ReturnHook::~ReturnHook()
@@ -122,17 +125,32 @@ ReturnHook::~ReturnHook()
             PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
             return VMI_EVENT_RESPONSE_NONE;
         };
-        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+        if (this->display_name_ != this->trap_->name)
         {
-            delete static_cast<CallResult*>(trap->data);
-            delete trap;
-        });
+            g_free(this->display_name_);
+            drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+            {
+                trap->data = nullptr;
+                delete trap;
+            });
+        }
+        else
+        {
+            drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+            {
+                trap->data = nullptr;
+                g_free(const_cast<char*>(trap->name));
+                delete trap;
+            });
+        }
+        this->display_name_ = nullptr;
     }
     else
     {
         // otherwise this has been moved from and we don't free the trap
         // as the ownership has been passed elsewhere, so we do nothing
         PRINT_DEBUG("[LIBHOOK] destruction not needed, as return hook was moved from\n");
+        g_free(this->display_name_);
     }
 }
 
@@ -141,13 +159,20 @@ ReturnHook::ReturnHook(ReturnHook&& rhs) noexcept
 {
     std::swap(this->callback_, rhs.callback_);
     std::swap(this->trap_, rhs.trap_);
+    std::swap(this->display_name_, rhs.display_name_);
 }
 
 ReturnHook& ReturnHook::operator=(ReturnHook&& rhs) noexcept
 {
     std::swap(this->callback_, rhs.callback_);
     std::swap(this->trap_, rhs.trap_);
+    std::swap(this->display_name_, rhs.display_name_);
     return *this;
+}
+
+std::shared_ptr<CallResult> ReturnHook::params()
+{
+    return this->params_;
 }
 
 } // namespace libhook

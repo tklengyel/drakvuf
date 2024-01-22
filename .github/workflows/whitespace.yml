@@ -1,14 +1,16 @@
 name: whitespace
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
+permissions:
+  contents: read
 jobs:
   whitespace:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: check
         run: |
           git remote add upstream https://github.com/$GITHUB_REPOSITORY
           git fetch upstream
-          git diff --check upstream/master
+          git diff --check upstream/main

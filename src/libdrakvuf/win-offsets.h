@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -125,9 +125,10 @@ enum win_offsets
     EPROCESS_INHERITEDPID,
     EPROCESS_WOW64PROCESS,
     EPROCESS_WOW64PROCESS_WIN10,
-
+    EPROCESS_SECTIONOBJECT,
     EPROCESS_VADROOT,
     EPROCESS_LISTTHREADHEAD,
+    EPROCESS_FLAGS2,
 
     RTL_AVL_TREE_ROOT,
     RTL_BALANCED_NODE_LEFT,
@@ -141,7 +142,9 @@ enum win_offsets
     MMVAD_SHORT_FLAGS,
     MMVAD_SHORT_FLAGS1,
 
-
+    SECTION_CONTROLAREA,
+    SECTIONOBJECT_SEGMENT,
+    SEGMENT_CONTROLAREA,
     VADROOT_BALANCED_ROOT,
 
     MMVAD_LEFT_CHILD,
@@ -177,6 +180,7 @@ enum win_offsets
     KPCR_PRCBDATA,
     KPCR_IRQL,
     KPRCB_CURRENTTHREAD,
+    KPRCB_RSPBASE,
 
     KTHREAD_APCSTATE,
     KTHREAD_APCSTATEINDEX,
@@ -202,7 +206,11 @@ enum win_offsets
 
     OBJECT_HEADER_TYPEINDEX,
     OBJECT_HEADER_BODY,
-
+    OBJECT_HEADER_INFOMASK,
+    OBJECT_HEADER_NAME_INFO_NAME,
+    OBJECT_DIRECTORY_ENTRY_CHAINLINK,
+    OBJECT_DIRECTORY_ENTRY_OBJECT,
+    OBJECT_TYPE_NAME,
     POOL_HEADER_BLOCKSIZE,
     POOL_HEADER_POOLTYPE,
     POOL_HEADER_POOLTAG,
@@ -215,6 +223,7 @@ enum win_offsets
     CM_KEY_NAMELENGTH,
     CM_KEY_PARENTKCB,
     CM_KEY_PROCESSID,
+    CM_KEY_FLAGS,
 
     PROCCREATIONINFO_IMAGEFILENAME,
 
@@ -243,12 +252,18 @@ enum win_bitfields
     MMVAD_FLAGS1_VADTYPE,
     MMVAD_FLAGS_COMMITCHARGE,
     MMVAD_FLAGS1_COMMITCHARGE,
+    MMVAD_FLAGS_PRIVATEMEMORY,
+
+    EPROCESS_EXITPROCESSREPORTED,
+
     __WIN_BITFIELDS_MAX
 };
 
 enum win_sizes
 {
+    EPROCESS,
     HANDLE_TABLE_ENTRY,
+    OBJECT_HEADER,
 
     __WIN_SIZES_MAX
 };

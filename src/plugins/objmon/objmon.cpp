@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -114,12 +113,12 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <dirent.h>
-#include <glib.h>
 #include <err.h>
 
-#include <libvmi/libvmi.h>
-#include "objmon.h"
+#include "plugins/plugins.h"
 #include "plugins/output_format.h"
+
+#include "objmon.h"
 
 /*
 NTSYSAPI NTSTATUS ZwDuplicateObject(
@@ -158,7 +157,7 @@ static event_response_t ntduplicateobject_ret_cb(drakvuf_t drakvuf, drakvuf_trap
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    vmi_lock_guard lg(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
@@ -166,7 +165,7 @@ static event_response_t ntduplicateobject_ret_cb(drakvuf_t drakvuf, drakvuf_trap
     );
 
     addr_t target_handle;
-    if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &target_handle))
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &target_handle))
     {
         PRINT_DEBUG("[OBJMON] Failed to read HANDLE at %#lx\n", params->target_handle_va);
         return VMI_EVENT_RESPONSE_NONE;

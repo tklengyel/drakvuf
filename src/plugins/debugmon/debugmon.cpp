@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -114,14 +113,13 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <dirent.h>
-#include <glib.h>
 #include <err.h>
 
-#include <libvmi/libvmi.h>
-#include "../plugins.h"
+#include "plugins/plugins.h"
+#include "plugins/output_format.h"
+
 #include "private.h"
 #include "debugmon.h"
-#include "plugins/output_format.h"
 
 # define HVMOP_TRAP_ext_int    0
 # define HVMOP_TRAP_nmi        2

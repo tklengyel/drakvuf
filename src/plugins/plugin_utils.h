@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -131,6 +131,18 @@ std::string parse_flags(uint64_t flags,
     const flags_str_t& flags_map,
     output_format_t format = OUTPUT_DEFAULT,
     std::string empty = std::string());
+
+
+/* Represent enum as string.
+ *
+ * value binary enum value.
+ * enum_map mapping from enum values to names.
+ *
+ * Return string representation for a known enum value.
+ * Return to_string(value) otherwise.
+ */
+std::string parse_enum(uint64_t value,
+    const flags_str_t& enum_map);
 
 /* Dump buffer from VA to stdout.
  *

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -123,39 +123,48 @@ bool json_lookup_array(
     addr_t* rva,
     addr_t* size)
 {
+    vmi_instance_t vmi = drakvuf->vmi;
+
     if (!json)
     {
-        fprintf(stderr, "JSON profile is NULL!\n");
+        PRINT_DEBUG("JSON profile is NULL!\n");
         return false;
     }
 
     int errors = 0;
     for (size_t i = 0; i < array_size; i++)
     {
-        if (!symbol_subsymbol_array[i][0])
+        const char* symbol = symbol_subsymbol_array[i][0];
+        const char* subsymbol = symbol_subsymbol_array[i][1];
+
+        if (!symbol)
         {
             errors++;
+            PRINT_DEBUG("Found non-initialized symbol\n");
             continue;
         }
 
-        if (!symbol_subsymbol_array[i][1])
+        if (subsymbol)
         {
-            if ( rva && VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], &rva[i]) )
+            if ( rva && VMI_FAILURE == vmi_get_struct_member_offset_from_json(vmi, json, symbol, subsymbol, &rva[i]) )
             {
                 errors++;
-                PRINT_DEBUG("Failed to find address for symbol %s\n", symbol_subsymbol_array[i][0]);
-            }
-
-            if ( size && VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], &size[i]) )
-            {
-                errors++;
-                PRINT_DEBUG("Failed to find address for symbol %s\n", symbol_subsymbol_array[i][0]);
+                PRINT_DEBUG("Failed to find offset for %s:%s\n", symbol, subsymbol);
             }
         }
-        else if ( rva && VMI_FAILURE == vmi_get_struct_member_offset_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1], &rva[i]) )
+        else
         {
-            errors++;
-            PRINT_DEBUG("Failed to find offset for %s:%s\n", symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1]);
+            if ( rva && VMI_FAILURE == vmi_get_symbol_addr_from_json(vmi, json, symbol, &rva[i]) )
+            {
+                errors++;
+                PRINT_DEBUG("Failed to find address for symbol %s\n", symbol);
+            }
+
+            if ( size && VMI_FAILURE == vmi_get_struct_size_from_json(vmi, json, symbol, &size[i]) )
+            {
+                errors++;
+                PRINT_DEBUG("Failed to find address for symbol %s\n", symbol);
+            }
         }
     }
 
@@ -253,13 +262,6 @@ void drakvuf_free_symbols(symbols_t* symbols)
     }
     g_free(symbols->symbols);
     g_free(symbols);
-}
-
-bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
-    const char* function,
-    addr_t* rva)
-{
-    return VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), function, rva);
 }
 
 bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,

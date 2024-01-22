@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,6 +105,8 @@
 #ifndef LIBINJECTOR_H
 #define LIBINJECTOR_H
 
+#include <libdrakvuf/libdrakvuf.h>
+
 #ifdef __cplusplus
 extern "C" {
 #define NOEXCEPT noexcept
@@ -113,8 +115,6 @@ extern "C" {
 #endif
 
 #pragma GCC visibility push(default)
-
-#include <libdrakvuf/libdrakvuf.h>
 
 typedef struct injector* injector_t;
 
@@ -143,6 +143,7 @@ typedef enum
     // win
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_TERMINATEPROC,
+    INJECT_METHOD_EXITTHREAD,
     INJECT_METHOD_SHELLEXEC,
     INJECT_METHOD_SHELLCODE,
     INJECT_METHOD_READ_FILE,
@@ -189,13 +190,13 @@ struct argument
     uint32_t type;
     uint32_t size;
     uint64_t data_on_stack;
-    void* data;
+    const void* data;
 };
 
 void init_argument(struct argument* arg,
     argument_type_t type,
     size_t size,
-    void* data) NOEXCEPT;
+    const void* data) NOEXCEPT;
 
 void init_int_argument(struct argument* arg,
     uint64_t value) NOEXCEPT;
@@ -216,6 +217,7 @@ void init_array_argument(struct argument* arg,
 addr_t place_array_on_addr_64(vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument* arg,
+    bool null_terminate,
     addr_t* data_addr,
     addr_t* array_addr) NOEXCEPT;
 
@@ -235,6 +237,16 @@ bool setup_stack_locked(drakvuf_t drakvuf,
     x86_registers_t* regs,
     struct argument args[],
     int nb_args) NOEXCEPT;
+
+bool inject_function_call(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args,
+    addr_t function_addr,
+    uint64_t* stack_marker) NOEXCEPT;
 
 injector_status_t injector_start_app(drakvuf_t drakvuf,
     vmi_pid_t pid,
@@ -258,7 +270,14 @@ void injector_terminate(drakvuf_t drakvuf,
     uint32_t injection_tid,
     vmi_pid_t pid);
 
-void injector_free(drakvuf_t drakvuf, injector_t injector);
+void injector_exitthread(drakvuf_t drakvuf,
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid);
+
+
+void injector_free_win(injector_t injector);
+
+const char* injection_method_name(injection_method_t method);
 
 #pragma GCC visibility pop
 

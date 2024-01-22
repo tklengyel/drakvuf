@@ -17,9 +17,15 @@ else
     apt-get update
 fi
 
-apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev libsystemd-dev nasm bc libx11-dev ninja-build
+apt-get --quiet --yes install build-essential git wget curl cmake flex bison \
+    libjson-c-dev autoconf-archive clang python3-dev libsystemd-dev nasm bc \
+    libx11-dev ninja-build python3-pip meson llvm lld
 
-wget -O /usr/local/go1.15.3.linux-amd64.tar.gz https://golang.org/dl/go1.15.3.linux-amd64.tar.gz
+if [ $(apt-cache show gcc-9 2>/dev/null | wc -l) -gt 0 ]; then
+    apt-get --quiet --yes install gcc-9
+fi
+
+wget http://go.dev/dl/go1.15.3.linux-amd64.tar.gz -O /usr/local/go1.15.3.linux-amd64.tar.gz
 tar -C /usr/local -xzf /usr/local/go1.15.3.linux-amd64.tar.gz
 
 HAS_PYTHON_IS_PYTHON=$(apt-cache search --names-only '^python-is-python2$')
@@ -29,6 +35,9 @@ then
     apt-get --quiet --yes install python-is-python2
 fi
 
+# libgnutls28 is required for the password-protected VNC to work in Xen 4.16+.
+# See: https://bugs.gentoo.org/832494
+apt-get install -y libgnutls28-dev
 apt-get --quiet --yes build-dep xen
 apt-get autoremove -y
 apt-get clean

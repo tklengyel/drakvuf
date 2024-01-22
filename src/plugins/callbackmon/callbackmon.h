@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -109,15 +109,30 @@
 struct callbackmon_config
 {
     const char* netio_profile = nullptr;
+    const char* ndis_profile  = nullptr;
 };
+
+using api_bind_t    = std::pair<const char*, addr_t>;
+using protocol_cb_t = std::unordered_map<addr_t, std::vector<api_bind_t>>;
 
 class callbackmon : public pluginex
 {
 public:
     callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output);
 
+    void report(drakvuf_t drakvuf, const char* list_name, addr_t addr, const char* action);
+
+    event_response_t load_unload_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     const callbackmon_config config;
     const output_format_t format;
+
+    std::array<size_t, callbackmon_ns::__OFFSET_MAX> offsets;
+    std::array<size_t, callbackmon_ns::__OFFSET_OPEN_MAX> open_offsets;
+    std::array<size_t, callbackmon_ns::__OFFSET_GENERIC_MAX> generic_offsets;
+    std::array<size_t, callbackmon_ns::__OFFSET_MINIPORT_MAX> miniport_offsets;
+
+    addr_t ob_type_table_va;
 
     std::vector<addr_t> process_cb;
     std::vector<addr_t> thread_cb;
@@ -140,6 +155,13 @@ public:
     std::vector<addr_t> pnp_class_cb;
     std::vector<addr_t> w32callouts;
     std::vector<addr_t> wfpcallouts;
+
+    std::vector<callbackmon_ns::object_type_t> object_type;
+    std::vector<callbackmon_ns::object_t> object_cb;
+    std::unordered_map<addr_t, protocol_cb_t> ndis_protocol_cb;
+
+    std::vector<callbackmon_ns::callbackmon_module_t> drivers;
+    std::unique_ptr<libhook::SyscallHook> driver_hook;
 
     virtual bool stop_impl() override;
 };

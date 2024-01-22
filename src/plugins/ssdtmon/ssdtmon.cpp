@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -114,15 +113,14 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <dirent.h>
-#include <glib.h>
 #include <err.h>
 
-#include <libvmi/libvmi.h>
-#include "../plugins.h"
+#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
+#include "plugins/output_format.h"
+
 #include "private.h"
 #include "ssdtmon.h"
-#include "plugins/output_format.h"
-#include "plugins/plugins_ex.h"
 
 static std::array<uint8_t, 32> ssdtmon_sha256_calc(vmi_instance_t vmi, addr_t addr, size_t size)
 {
@@ -143,7 +141,7 @@ static std::array<uint8_t, 32> ssdtmon_sha256_calc(vmi_instance_t vmi, addr_t ad
         .addr = addr
     );
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, PROT_READ, access_ptrs.data()))
         return out;
 
     auto checksum = g_checksum_new(G_CHECKSUM_SHA256);
@@ -205,7 +203,7 @@ static bool get_driver_base(drakvuf_t drakvuf, ssdtmon* plugin, const char* driv
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
+        .pid = 4
     );
 
     vmi_lock_guard vmi(drakvuf);

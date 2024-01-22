@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,60 +102,12 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
-#define DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
-#pragma once
-
-#include <type_traits>
-
-template<class T>
-struct always_false: std::false_type {};
-
-/**/
-
-template <class T, class = void>
-struct has_begin_helper : std::false_type {};
-
-template <class T>
-struct has_begin_helper<T, std::void_t<decltype(std::begin(std::declval<T>()))>> : std::true_type {};
-
-template <class T, class = void>
-struct has_end_helper : std::false_type {};
-
-template <class T>
-struct has_end_helper<T, std::void_t<decltype(std::end(std::declval<T>()))>> : std::true_type {};
+#ifndef LIBUSERMODE_PRINTERS_UTILS_H
+#define LIBUSERMODE_PRINTERS_UTILS_H
 
 
-template <class T, class = void>
-struct is_iterable_helper : std::false_type {};
+#include <string>
 
-template <class T>
-struct is_iterable_helper<T, std::enable_if_t<has_begin_helper<T>::value&& has_end_helper<T>::value, void>> : std::true_type {};
+std::string escape_str(const std::string& s);
 
-template <class T>
-struct is_iterable : is_iterable_helper<T> {};
-
-/**/
-
-template <class T, class = void>
-struct is_printable_helper : std::false_type {};
-
-template <class T>
-struct is_printable_helper<T, std::void_t<decltype(std::declval<std::ostream>().operator<<(std::declval<T>()))>> : std::true_type {};
-
-template <class T>
-struct is_printable : is_printable_helper<T> {};
-
-/**/
-
-template <class T>
-std::true_type has_mapped_type_helper(typename T::mapped_type*);
-
-template <class>
-std::false_type has_mapped_type_helper(...);
-
-template <class T>
-struct has_mapped_type : decltype(has_mapped_type_helper<T>(nullptr))
-{};
-
-#endif // DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
+#endif

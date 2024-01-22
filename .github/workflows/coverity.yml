@@ -3,8 +3,9 @@ on:
   schedule:
     - cron: '0 18 * * *' # Daily at 18:00 UTC
   push:
-    branches: master
-
+    branches: main
+permissions:
+  contents: read
 jobs:
   latest:
     runs-on: ubuntu-20.04
@@ -14,7 +15,7 @@ jobs:
       TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -24,10 +25,10 @@ jobs:
       - name: Get Xen version
         id: get-xen-hash
         run: |
-          echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
+          echo XEN_HASH=$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
       - name: Cache Xen debball
         id: cache-xen
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
           key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}
@@ -66,11 +67,10 @@ jobs:
       - name: Download Coverity hash
         id: hash
         run: |
-          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
-          hash=$(cat coverity_tool.md5)
-          echo ::set-output name=hash::$hash
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
+          echo hash=$(cat coverity_tool.md5) >> $GITHUB_OUTPUT
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         id: cache-coverity
         with:
           path: coverity
@@ -79,7 +79,7 @@ jobs:
       - name: Download Coverity Build Tool
         if: steps.cache-coverity.outputs.cache-hit != 'true'
         run: |
-          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf" -O coverity_tool.tgz
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf" -O coverity_tool.tgz
           mkdir -p coverity
           tar xzf coverity_tool.tgz --strip 1 -C coverity
 
@@ -106,6 +106,6 @@ jobs:
             --form token=$TOKEN \
             --form email=tamas.k.lengyel@gmail.com \
             --form file=@drakvuf.tgz \
-            --form version=master \
+            --form version=main \
             --form description="`git describe --always`" \
             https://scan.coverity.com/builds?project=tklengyel%2Fdrakvuf

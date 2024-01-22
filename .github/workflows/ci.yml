@@ -1,9 +1,16 @@
 name: ci
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
   push:
-    branches: [ master ]
+    branches: [ main ]
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   init:
     runs-on: ${{ matrix.os }}
@@ -11,56 +18,63 @@ jobs:
       matrix:
         os:
           - 'ubuntu-20.04'
-    env:
-      CC: clang
-      CXX: clang++
+          - 'ubuntu-latest'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y\
+            build-essential flex bison libjson-c-dev liblzo2-dev \
+            libglib2.0-dev meson ninja-build lld llvm clang
+
       - name: Get submodule hashes version
         id: get-hash
         run: |
-          echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
-          echo ::set-output name=LIBVMI_HASH::$(git submodule | grep libvmi | awk '{ print $1 }')
+          echo XEN_HASH=$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
+          echo LIBVMI_HASH=$(git submodule | grep libvmi | awk '{ print $1 }') >> $GITHUB_OUTPUT
 
       - name: Cache Xen debball
         id: cache-xen
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ steps.get-hash.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ steps.get-hash.outputs.XEN_HASH }}
 
       - name: Create Xen debball
         if: steps.cache-xen.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get install -y wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential make gcc clang libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libfuse-dev liblzma-dev kpartx python3-dev python3-pip golang python-dev libsystemd-dev ninja-build
+          sudo apt-get install -y \
+            wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev \
+            bzip2 libpci-dev libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev \
+            patch libvncserver-dev libssl-dev iasl libbz2-dev e2fslibs-dev git-core \
+            uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext \
+            libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libfuse-dev \
+            liblzma-dev kpartx python3-dev python3-pip golang libsystemd-dev ninja-build
           rm -rfv xen
           git submodule update --init xen
           cd xen
-          ./configure --enable-githttp --disable-pvshim
+          ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs
           make -j2 debball
           cd ..
 
       - name: Install Xen debball
         run: |
           sudo apt-get install -f ./xen/dist/xen-*.deb
+          sudo ldconfig
 
       - name: Cache Libvmi files
         id: cache-libvmi
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ steps.get-hash.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ steps.get-hash.outputs.LIBVMI_HASH }}
 
       - name: Build LibVMI
         if: steps.cache-libvmi.outputs.cache-hit != 'true'
         run: |
           rm -rfv libvmi
-          sudo apt-get install -y build-essential autoconf-archive flex bison libjson-c-dev libxen-dev debhelper
+          sudo apt-get install -y build-essential autoconf-archive automake libtool flex bison libjson-c-dev debhelper
           git submodule update --init libvmi
           cd libvmi
           sed -i 's/--disable-kvm/--disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs/g' debian/rules
@@ -88,36 +102,35 @@ jobs:
         matrix:
           os:
             - 'ubuntu-20.04'
+            - 'ubuntu-latest'
           flags:
             - ''
-            - '--enable-debug'
-            - '--enable-debug --disable-plugin-syscalls'
-            - '--enable-debug --enable-sanitize'
-            - '--enable-debug --enable-repl'
-            - '--enable-debug --enable-threadsafety'
-    env:
-      CC: clang
-      CXX: clang++
+            - '-Dbuildtype=debug -Db_lto=false'
+            - '-Dbuildtype=debug -Db_lto=false -Dplugin-syscalls=false'
+            - '-Dbuildtype=debug -Db_lto=false -Db_sanitize=address,undefined'
+            - '-Dbuildtype=debug -Db_lto=false -Drepl=true'
+            - '-Dbuildtype=debug -Db_lto=false -Dthreadsafety=true'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y \
+            clang llvm lld build-essential flex bison \
+            libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -130,42 +143,46 @@ jobs:
           sudo ldconfig
           cd ../..
 
-      - name: autoreconf
-        run: autoreconf -vif
-
       - name: Compile ${{ matrix.flags }}
         run: |
-          ./configure ${{ matrix.flags }}
-          make -j2
+          meson setup build --native-file llvm.ini ${{ matrix.flags }}
+          ninja -C build
 
   tarbuild:
+    name: Build using autoconf tarball
     runs-on: ${{ matrix.os }}
     needs:
       - init
-    if: ${{ github.event_name == 'pull_request' }}
     strategy:
-        matrix:
-          os:
-            - 'ubuntu-20.04'
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-20.04'
+          - 'ubuntu-latest'
+
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Install dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y \
+            clang autoconf-archive automake \
+            libjson-c-dev liblzo2-dev libglib2.0-dev
+          sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -182,6 +199,9 @@ jobs:
         run: autoreconf -vif
 
       - name: Compile from make dist tarball
+        env:
+          CC: clang
+          CXX: clang++
         run: |
           ./configure
           make -j2 dist
@@ -200,42 +220,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['cpp']
         os:
           - 'ubuntu-20.04'
+          - 'ubuntu-latest'
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
-      with:
-        # We must fetch at least the immediate parents so that if this is
-        # a pull request then we can checkout the head.
-        fetch-depth: 2
+      uses: actions/checkout@v3
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
+      uses: github/codeql-action/init@v2
       with:
-        languages: ${{ matrix.language }}
+        languages: cpp
         queries: security-and-quality
 
     - name: Install dependencies
       run: |
         sudo apt-get update -q
-        sudo apt-get remove -y clang
-        sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+        sudo apt-get install -y \
+            clang llvm lld build-essential libjson-c-dev \
+            liblzo2-dev libglib2.0-dev meson ninja-build
 
     - name: Cache Xen debball
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: xen/dist
-        key: xen-${{ needs.init.outputs.XEN_HASH }}
+        key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
     - name: Cache Libvmi files
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: libvmi/dist
-        key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+        key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
 
     - name: Install Xen debball
       run: |
@@ -250,41 +267,39 @@ jobs:
 
     - name: Compile and install DRAKVUF
       run: |
-        autoreconf -vif
-        ./configure
-        make -j2
+        meson setup build --native-file llvm.ini
+        ninja -C build
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v1
+      uses: github/codeql-action/analyze@v2
 
   scan-build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - 'ubuntu-20.04'
+    runs-on: ubuntu-latest
     needs:
       - init
     if: ${{ github.event_name == 'pull_request' }}
+
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang-10 clang-tools-10 autoconf-archive flex bison libjson-c-dev
+          sudo apt-get install -y \
+            clang clang-tools-15 llvm lld \
+            libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
-          key: xen-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
-          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -299,12 +314,74 @@ jobs:
 
       - name: Scan build
         run: |
-          # Set Exports
-          export PATH=/usr/lib/llvm-10/bin:$PATH
-          export CC=clang-10
-          export CXX=clang++-10
+          meson setup build --buildtype debug --native-file llvm.ini
+          analyze-build-15 -v --cdb build/compile_commands.json \
+            --status-bugs \
+            --disable-checker deadcode.DeadStores
 
-          # scan-build
-          autoreconf -vif
-          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
-          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make -j2
+  cognitive-complexity:
+    runs-on: ubuntu-latest
+    needs:
+      - init
+    if: ${{ github.event_name == 'pull_request' }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          # Install packages
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            clang clang-tools clang-tidy llvm lld \
+            libjson-c-dev meson ninja-build
+
+      - name: Cache Xen debball
+        uses: actions/cache@v3
+        with:
+          path: xen/dist
+          key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v3
+        with:
+          path: libvmi/dist
+          key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
+          sudo ldconfig
+          cd ../..
+
+      - name: Calculate cognitive complexity for pr
+        run: |
+          cp scripts/complexity.sh /tmp
+          /tmp/complexity.sh
+          mv complexity.log /tmp/complexity.log
+
+      - uses: actions/checkout@v3
+        with:
+          ref: main
+
+      - name: Calculate cognitive complexity for main
+        run: /tmp/complexity.sh
+
+      - name: compare complexity
+        run: |
+          FUNCTIONS=$(tail -2 complexity.log | head -1 | awk '{ print $2 }')
+          THRESHOLD=$(tail -1 complexity.log | awk '{ print $2 }')
+
+          CURRENT_FUNCTIONS=$(tail -2 /tmp/complexity.log | head -1 | awk '{ print $2 }')
+          COMPLEXITY=$(tail -1 /tmp/complexity.log | awk '{ print $2 }')
+
+          if [ $CURRENT_FUNCTIONS -gt $FUNCTIONS ] || [ $COMPLEXITY -gt $THRESHOLD ]; then
+            echo "Please don't increase complexity of existing complex functions or introduce new ones"
+            echo "Showing diff of main (<) and this PR (>)"
+            diff complexity.log /tmp/complexity.log | egrep '>|<'
+            exit 1
+          fi

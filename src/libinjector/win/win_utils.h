@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -135,23 +135,9 @@
 #define PAGE_EXECUTE_READWRITE  0x40
 #define CREATE_SUSPENDED 0x00000004
 
-typedef enum
-{
-    INJECT_RESULT_SUCCESS,
-    INJECT_RESULT_TIMEOUT,
-    INJECT_RESULT_CRASH,
-    INJECT_RESULT_PREMATURE,
-    INJECT_RESULT_ERROR_CODE,
-    INJECT_RESULT_INIT_FAIL
-} inject_result_t;
-
 struct injector
 {
-    // common in win and linux
-    // KEEP THESE IN TOP and in sync with the order in injector_utils.c
-    injector_step_t step;
-    bool step_override; // set this as true for jumping to some arbitrary step
-    bool set_gprs_only;
+    struct base_injector base_injector;
 
     // Inputs:
     unicode_string_t* target_file_us;
@@ -176,6 +162,7 @@ struct injector
     vmi_pid_t terminate_pid;
     addr_t open_process;
     addr_t exit_process;
+    addr_t exit_thread;
 
     // For shellcode execution
     addr_t payload, payload_addr, memset;
@@ -205,16 +192,12 @@ struct injector
     // Results:
     injector_status_t rc;
     inject_result_t result;
-    struct
-    {
-        bool valid;
-        uint32_t code;
-        const char* string;
-    } error_code;
+    injection_error_t error_code;
 
     uint32_t pid, tid;
     uint64_t hProc, hThr;
 };
+typedef struct injector* injector_t;
 
 
 struct startup_info_32
@@ -283,7 +266,7 @@ addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib,
 void free_memtraps(injector_t injector);
 void free_injector(injector_t injector);
 void injector_free_win(injector_t injector);
-void print_injection_info(output_format_t format, const char* file, injector_t injector);
+void print_win_injection_info(output_format_t format, const char* file, injector_t injector);
 
 struct module_context
 {

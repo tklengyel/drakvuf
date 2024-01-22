@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,9 +106,12 @@
 #define FILETRACER_PRIVATE_H
 
 #include <string>
+#include <optional>
 #include "plugins/plugin_utils.h"
-#include "win.h"
-#include "linux.h"
+#include "plugins/plugins_ex.h"
+
+namespace filetracer_ns
+{
 
 struct win_objattrs_t
 {
@@ -122,9 +125,44 @@ struct win_objattrs_t
     std::string dacl;
 };
 
-struct wrapper
+struct file_basic_information_t
 {
-    win_filetracer* f;
+    uint64_t creation_time;
+    uint64_t last_access_time;
+    uint64_t last_write_time;
+    uint64_t change_time;
+    std::string file_attributes;
+};
+
+struct file_network_open_information_t
+{
+    uint64_t creation_time;
+    uint64_t last_access_time;
+    uint64_t last_write_time;
+    uint64_t change_time;
+    uint64_t allocation_size;
+    uint64_t end_of_file;
+    std::string file_attributes;
+};
+
+struct win_data : PluginResult
+{
+    win_data()
+        : PluginResult()
+        , pid()
+        , tid()
+        , rsp()
+        , handle()
+        , obj_attr()
+        , file_attrs()
+        , share_access()
+        , create_disposition()
+        , create_opts()
+        , open_opts()
+        , desired_access()
+        , io_status_block()
+    {
+    }
 
     vmi_pid_t pid;
     uint32_t tid;
@@ -137,23 +175,38 @@ struct wrapper
     uint64_t share_access;
     uint64_t create_disposition;
     uint64_t create_opts;
+    uint64_t open_opts;
     uint64_t desired_access;
+    addr_t io_status_block;
+
+    addr_t file_information;
+    uint32_t file_information_class;
 };
 
-struct linux_wrapper
+struct linux_data : PluginResult
 {
-    vmi_pid_t pid = 0;
-    uint32_t tid = 0;
-    uint64_t rsp = 0;
-    int permissions = 0;
+    linux_data()
+        : PluginResult()
+        , file_handle()
+        , permissions()
+        , filename()
+        , flags()
+        , modes()
+        , uid()
+        , gid()
+        , args()
+    {
+    }
 
-    linux_filetracer* f;
-    GString* filename = g_string_new(NULL);
-    GString* flags = g_string_new(NULL);
-    GString* modes = g_string_new(NULL);
-    GString* uid = g_string_new(NULL);
-    GString* gid = g_string_new(NULL);
-    std::map<std::string, GString*> args;
+    int file_handle;
+    int permissions;
+
+    std::string filename;
+    std::string flags;
+    std::string modes;
+    std::optional<uint32_t> uid;
+    std::optional<uint32_t> gid;
+    std::map<std::string, std::string> args;
 };
 
 struct pool_header_x86
@@ -204,7 +257,29 @@ enum
     _SID_SubAuthority,
     _ACL_AceCount,
     _ACL_AclSize,
+    _IO_STATUS_BLOCK_Information,
+    _FILE_BASIC_INFORMATION_CreationTime,
+    _FILE_BASIC_INFORMATION_LastAccessTime,
+    _FILE_BASIC_INFORMATION_LastWriteTime,
+    _FILE_BASIC_INFORMATION_ChangeTime,
+    _FILE_BASIC_INFORMATION_FileAttributes,
+    _FILE_NETWORK_OPEN_INFORMATION_AllocationSize,
+    _FILE_NETWORK_OPEN_INFORMATION_CreationTime,
+    _FILE_NETWORK_OPEN_INFORMATION_ChangeTime,
+    _FILE_NETWORK_OPEN_INFORMATION_EndOfFile,
+    _FILE_NETWORK_OPEN_INFORMATION_FileAttributes,
+    _FILE_NETWORK_OPEN_INFORMATION_LastAccessTime,
+    _FILE_NETWORK_OPEN_INFORMATION_LastWriteTime,
     __OFFSET_MAX
+};
+
+enum
+{
+    _FILE_RENAME_INFORMATION_RootDirectory,
+    _FILE_RENAME_INFORMATION_FileName,
+    _FILE_RENAME_INFORMATION_FileNameLength,
+    _FILE_ALL_INFORMATION_BasicInformation,
+    __OLE32_OFFSET_MAX
 };
 
 enum
@@ -380,6 +455,27 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_SID_SubAuthority] = {"_SID", "SubAuthority"},
     [_ACL_AceCount] = {"_ACL", "AceCount"},
     [_ACL_AclSize] = {"_ACL", "AclSize"},
+    [_IO_STATUS_BLOCK_Information] = {"_IO_STATUS_BLOCK", "Information"},
+    [_FILE_BASIC_INFORMATION_CreationTime] = {"_FILE_BASIC_INFORMATION", "CreationTime"},
+    [_FILE_BASIC_INFORMATION_LastAccessTime] = {"_FILE_BASIC_INFORMATION", "LastAccessTime"},
+    [_FILE_BASIC_INFORMATION_LastWriteTime] = {"_FILE_BASIC_INFORMATION", "LastWriteTime"},
+    [_FILE_BASIC_INFORMATION_ChangeTime] = {"_FILE_BASIC_INFORMATION", "ChangeTime"},
+    [_FILE_BASIC_INFORMATION_FileAttributes] = {"_FILE_BASIC_INFORMATION", "FileAttributes"},
+    [_FILE_NETWORK_OPEN_INFORMATION_CreationTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "CreationTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_LastAccessTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "LastAccessTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_LastWriteTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "LastWriteTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_ChangeTime] = {"_FILE_NETWORK_OPEN_INFORMATION", "ChangeTime"},
+    [_FILE_NETWORK_OPEN_INFORMATION_AllocationSize] = {"_FILE_NETWORK_OPEN_INFORMATION", "AllocationSize"},
+    [_FILE_NETWORK_OPEN_INFORMATION_EndOfFile] = {"_FILE_NETWORK_OPEN_INFORMATION", "EndOfFile"},
+    [_FILE_NETWORK_OPEN_INFORMATION_FileAttributes] = {"_FILE_NETWORK_OPEN_INFORMATION", "FileAttributes"},
+};
+
+static const char* ole32_offset_names[__OLE32_OFFSET_MAX][2] =
+{
+    [_FILE_RENAME_INFORMATION_RootDirectory] = {"_FILE_RENAME_INFORMATION", "RootDirectory"},
+    [_FILE_RENAME_INFORMATION_FileName] = {"_FILE_RENAME_INFORMATION", "FileName"},
+    [_FILE_RENAME_INFORMATION_FileNameLength] = {"_FILE_RENAME_INFORMATION", "FileNameLength"},
+    [_FILE_ALL_INFORMATION_BasicInformation] = {"_FILE_ALL_INFORMATION", "BasicInformation"},
 };
 
 static const flags_str_t object_attrs =
@@ -561,16 +657,17 @@ enum
     _INODE_I_FLAGS,
 
     _PATH_DENTRY,
-    _DENTRY_D_NAME,
     _DENTRY_D_INODE,
-    _QSTR_NAME,
-    // _TIMESPEC64_TV_SEC,
+    _TIMESPEC64_TV_SEC,
+
+    _RENAMEDATA_OLD_DENTRY,
+    _RENAMEDATA_NEW_DENTRY,
 
     __LINUX_OFFSET_MAX,
 };
 
 // Linux Offsets
-static const char* linux_offset_names[__OFFSET_MAX][2] =
+static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
 {
     [_FILE_F_FLAGS] = {"file", "f_flags"},
     [_FILE_F_PATH] = {"file", "f_path"},
@@ -582,36 +679,37 @@ static const char* linux_offset_names[__OFFSET_MAX][2] =
     [_INODE_I_FLAGS] = {"inode", "i_flags"},
 
     [_PATH_DENTRY] = {"path", "dentry"},
-    [_DENTRY_D_NAME] = {"dentry", "d_name"},
     [_DENTRY_D_INODE] = {"dentry", "d_inode"},
-    [_QSTR_NAME] = {"qstr", "name"},
-    // [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
+    [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
+
+    [_RENAMEDATA_OLD_DENTRY] = {"renamedata", "old_dentry"},
+    [_RENAMEDATA_NEW_DENTRY] = {"renamedata", "new_dentry"},
 };
 
 // Linux Inode Flags
 enum
 {
-    FLAG_O_ACCMODE = 0x000000003,
-    FLAG_O_RDONLY = 0x000000000,
-    FLAG_O_WRONLY = 0x000000001,
-    FLAG_O_RDWR = 0x000000002,
-    FLAG_O_CREAT = 0x000000100,
-    FLAG_O_EXCL = 0x000000200,
-    FLAG_O_NOCTTY = 0x000000400,
-    FLAG_O_TRUNC = 0x000001000,
-    FLAG_O_APPEND = 0x000002000,
-    FLAG_O_NONBLOCK = 0x000004000,
-    FLAG_O_DSYNC = 0x000010000,
-    FLAG_FASYNC = 0x000020000,
-    FLAG_O_DIRECT = 0x000040000,
-    FLAG_O_LARGEFILE = 0x000100000,
-    FLAG_O_DIRECTORY = 0x000200000,
-    FLAG_O_NOFOLLOW = 0x000400000,
-    FLAG_O_NOATIME = 0x001000000,
-    FLAG_O_CLOEXEC = 0x002000000,
-    FLAG___O_SYNC = 0x004000000,
-    FLAG_O_PATH = 0x010000000,
-    FLAG___O_TMPFILE = 0x020000000,
+    FLAG_O_ACCMODE = 00000003,
+    FLAG_O_RDONLY = 00000000,
+    FLAG_O_WRONLY = 00000001,
+    FLAG_O_RDWR = 00000002,
+    FLAG_O_CREAT = 00000100,
+    FLAG_O_EXCL = 00000200,
+    FLAG_O_NOCTTY = 00000400,
+    FLAG_O_TRUNC = 00001000,
+    FLAG_O_APPEND = 00002000,
+    FLAG_O_NONBLOCK = 00004000,
+    FLAG_O_DSYNC = 00010000,
+    FLAG_FASYNC = 00020000,
+    FLAG_O_DIRECT = 00040000,
+    FLAG_O_LARGEFILE = 00100000,
+    FLAG_O_DIRECTORY = 00200000,
+    FLAG_O_NOFOLLOW = 00400000,
+    FLAG_O_NOATIME = 01000000,
+    FLAG_O_CLOEXEC = 02000000,
+    FLAG___O_SYNC = 04000000,
+    FLAG_O_PATH = 010000000,
+    FLAG___O_TMPFILE = 020000000,
 };
 
 static const flags_str_t linux_inode_flags =
@@ -685,5 +783,73 @@ static const flags_str_t linux_lseek_whence =
     REGISTER_FLAG(LSEEK_DATA),
     REGISTER_FLAG(LSEEK_HOLE),
 };
+
+// Linux memfd flags
+static const flags_str_t linux_memfd_flags =
+{
+    REGISTER_FLAG(MFD_CLOEXEC),
+    REGISTER_FLAG(MFD_ALLOW_SEALING),
+    REGISTER_FLAG(MFD_HUGETLB)
+};
+
+enum linux_pt_regs
+{
+    PT_REGS_R15,
+    PT_REGS_R14,
+    PT_REGS_R13,
+    PT_REGS_R12,
+    PT_REGS_RBP,
+    PT_REGS_RBX,
+
+    PT_REGS_R11,
+    PT_REGS_R10,
+    PT_REGS_R9,
+    PT_REGS_R8,
+    PT_REGS_RAX,
+    PT_REGS_RCX,
+    PT_REGS_RDX,
+    PT_REGS_RSI,
+    PT_REGS_RDI,
+
+    PT_REGS_ORIG_RAX,
+
+    PT_REGS_RIP,
+    PT_REGS_CS,
+    PT_REGS_EFLAGS,
+    PT_REGS_RSP,
+    PT_REGS_SS,
+
+    __PT_REGS_MAX
+};
+
+static const char* linux_pt_regs_offsets_name[__PT_REGS_MAX][2] =
+{
+    [PT_REGS_R15]      = {"pt_regs", "r15"},
+    [PT_REGS_R14]      = {"pt_regs", "r14"},
+    [PT_REGS_R13]      = {"pt_regs", "r13"},
+    [PT_REGS_R12]      = {"pt_regs", "r12"},
+    [PT_REGS_RBP]      = {"pt_regs", "bp"},
+    [PT_REGS_RBX]      = {"pt_regs", "bx"},
+
+    [PT_REGS_R11]      = {"pt_regs", "r11"},
+    [PT_REGS_R10]      = {"pt_regs", "r10"},
+    [PT_REGS_R9]       = {"pt_regs", "r9"},
+    [PT_REGS_R8]       = {"pt_regs", "r8"},
+    [PT_REGS_RAX]      = {"pt_regs", "ax"},
+    [PT_REGS_RCX]      = {"pt_regs", "cx"},
+    [PT_REGS_RDX]      = {"pt_regs", "dx"},
+    [PT_REGS_RSI]      = {"pt_regs", "si"},
+    [PT_REGS_RDI]      = {"pt_regs", "di"},
+
+    [PT_REGS_ORIG_RAX] = {"pt_regs", "orig_ax"},
+
+    [PT_REGS_RIP]      = {"pt_regs", "ip"},
+    [PT_REGS_CS]       = {"pt_regs", "cs"},
+    [PT_REGS_EFLAGS]   = {"pt_regs", "flags"},
+    [PT_REGS_RSP]      = {"pt_regs", "sp"},
+    [PT_REGS_SS]       = {"pt_regs", "ss"},
+};
+
+}
 
 #endif

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,15 +105,12 @@
 #ifndef XEN_HELPER_H
 #define XEN_HELPER_H
 
-#define LIBXL_API_VERSION 0x040500
 #define XC_WANT_COMPAT_EVTCHN_API 1
 #define XC_WANT_COMPAT_MAP_FOREIGN_API 1
 
 #include <stdbool.h>
-#include <libxl_utils.h>
 #include <xenctrl.h>
 #include <xenforeignmemory.h>
-#include <libxl.h>
 
 #define MSR_RTIT_CTL 0x00000570
 #define RTIT_CTL_OS        (1 <<  2)
@@ -121,18 +118,7 @@
 #define RTIT_CTL_DIS_RETC  (1 << 11)
 #define RTIT_CTL_BRANCH_EN (1 << 13)
 
-typedef struct xen_interface
-{
-    //struct xs_handle *xsh;
-    xc_interface* xc;
-    libxl_ctx* xl_ctx;
-    xentoollog_logger* xl_logger;
-    xc_evtchn* evtchn;             // the Xen event channel
-    int evtchn_fd;                 // its FD
-
-    xenforeignmemory_handle* fmem;
-} xen_interface_t;
-
+typedef struct xen_interface xen_interface_t;
 typedef struct ipt_state
 {
     uint8_t* buf;
@@ -144,21 +130,21 @@ typedef struct ipt_state
     xenforeignmemory_resource_handle* fres;
 } ipt_state_t;
 
-/* FUNCTIONS */
-
 bool xen_init_interface(xen_interface_t** xen);
 void xen_free_interface(xen_interface_t* xen);
 
-int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
-    char** name);
+int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID, char** name);
+xc_evtchn* xen_get_evtchn(xen_interface_t* xen);
+int xen_get_evtchn_fd(xen_interface_t* xen);
 
 uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID);
+bool xen_set_maxmemkb(xen_interface_t* xen, domid_t domID, uint64_t mem);
 
 bool xen_pause(xen_interface_t* xen, domid_t domID);
 void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
 int xen_send_qemu_monitor_command(xen_interface_t* xen, domid_t domID, const char* command_line, char** output);
-bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID);
+bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID);
 int xen_version(void);
 bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
 bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
@@ -168,4 +154,8 @@ bool xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, 
 bool xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value);
 bool xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value);
 bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
+
+bool xen_decrease_reservation(xen_interface_t* xen, domid_t domID, xen_pfn_t* r);
+bool xen_populate_physmap(xen_interface_t* xen, domid_t domID, xen_pfn_t* r);
+
 #endif

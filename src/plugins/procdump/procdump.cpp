@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -255,7 +255,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
 
     bool res = true;
     uint8_t zeros[VMI_PS_4KB] = {};
-    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, PROT_READ, access_ptrs))
     {
         for (size_t i = 0; i < num_pages; ++i)
         {
@@ -325,7 +325,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     auto skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
             vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
 
-    if (!ptes_to_dump)
+    if (!skip && !ptes_to_dump)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
             ctx->pid, ptes_to_dump, vad->second.idx, total_number_of_ptes);
@@ -339,15 +339,14 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
         for (uint32_t i = 0; i < ptes_to_dump; ++i)
             ctx->writer->append(zeros, VMI_PS_4KB);
 
-        vad->second.idx += ptes_to_dump;
-        skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
-
         if (0 == ptes_to_dump)
         {
             ctx->vads.erase(vad_start);
             return RTLCOPY_GO_NEXT_VAD;
         }
+
+
+        vad->second.idx += ptes_to_dump;
     }
 
     if (ptes_to_dump > ctx->POOL_SIZE_IN_PAGES)
@@ -682,8 +681,8 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
             // Otherwise collect prototype PTEs for RtlCopyMemoryNonTemporal.
             auto buf = new addr_t[ptes];
             size_t bytes_read = 0;
-            vmi_lock_guard vmi_lg(drakvuf);
-            if (VMI_SUCCESS != vmi_read_va(vmi_lg.vmi, mmvad->prototype_pte, 0,
+            auto vmi = vmi_lock_guard(drakvuf);
+            if (VMI_SUCCESS != vmi_read_va(vmi, mmvad->prototype_pte, 0,
                     sizeof(addr_t) * ptes, buf,
                     &bytes_read) ||
                 bytes_read != sizeof(addr_t) * ptes)
@@ -969,26 +968,6 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     return detach(drakvuf, info, ctx);
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, const char* lib,
-    const char* func_name)
-{
-    addr_t rva;
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, func_name, &rva))
-    {
-        PRINT_DEBUG("[PROCDUMP] [Init] Failed to get RVA of %s\n", func_name);
-        throw -1;
-    }
-
-    addr_t va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib, rva);
-    if (!va)
-    {
-        PRINT_DEBUG("[PROCDUMP] [Init] Failed to get VA of %s\n", func_name);
-        throw -1;
-    }
-
-    return va;
-}
-
 procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     output_format_t output)
     : pluginex(drakvuf, output)
@@ -1015,16 +994,24 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
         return;
 
     this->malloc_va =
-        get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
+        drakvuf_kernel_symbol_to_va(drakvuf, "ExAllocatePoolWithTag");
     this->memcpy_va =
-        get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
+        drakvuf_kernel_symbol_to_va(drakvuf, "RtlCopyMemoryNonTemporal");
     this->clean_process_va =
-        get_function_va(drakvuf, "ntoskrnl.exe", "MmCleanProcessAddressSpace");
+        drakvuf_kernel_symbol_to_va(drakvuf, "MmCleanProcessAddressSpace");
+
+    if (!this->malloc_va ||
+        !this->memcpy_va ||
+        !this->clean_process_va)
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to get function address\n");
+        throw -1;
+    }
 
     vmi_lock_guard vmi(drakvuf);
     num_cpus = vmi_get_num_vcpus(vmi);
     win_build_info_t build_info;
-    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+    if (!vmi_get_windows_build_info(vmi, &build_info))
         throw -1;
 
     win_build_number = build_info.buildnumber;

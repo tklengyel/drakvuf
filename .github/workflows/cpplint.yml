@@ -1,12 +1,14 @@
 name: cpplint
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
+permissions:
+  contents: read
 jobs:
   cpplint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: install dependencies
         run: |
           pip3 install cpplint

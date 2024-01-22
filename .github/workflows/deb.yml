@@ -1,126 +1,157 @@
 name: Build package
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
+permissions:
+  contents: read
+concurrency:
+  group: deb-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  release:
-    runs-on: ubuntu-18.04
-    steps:
-    - name: Generate variables
-      id: gen_vars
-      run: |
-        echo "::set-output name=short_sha::$(echo ${GITHUB_SHA} | cut -c1-8)"
-        echo "::set-output name=cur_datetime::$(date '+%Y-%m-%d %H:%M:%S')"
-    - name: Create a Release
-      uses: actions/create-release@v1
-      id: create_release
-      if: github.event_name == 'push'
-      env:
-        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-      with:
-        tag_name: build-${{ github.sha }}
-        release_name: DRAKVUF ${{ steps.gen_vars.outputs.cur_datetime }} ${{ steps.gen_vars.outputs.short_sha }}
-        owner: tklengyel
-        repo: drakvuf-builds
-        commitish: master
-        draft: false
-        prerelease: false
-    - name: Store release URL as file
-      if: github.event_name == 'push'
-      run: |
-        echo "${{ steps.create_release.outputs.upload_url }}" > release-url.txt
-    - name: Upload release URL artifact
-      if: github.event_name == 'push'
-      uses: actions/upload-artifact@v1
-      with:
-        name: release-url
-        path: release-url.txt
-    - name: Delete old release
-      uses: dev-drprasad/delete-older-releases@v0.2.0
-      if: github.ref == 'refs/heads/master'
-      env:
-        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-      with:
-        repo: tklengyel/drakvuf-builds
-        keep_latest: 1
-        delete_tags: true
   deb:
-    needs: [release]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         container:
-          - "debian:10-slim"
-          - "debian:11-slim"
+          - "debian:bullseye"
+          - "debian:bookworm"
           - "ubuntu:focal"
+          - "ubuntu:jammy"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - name: Fetch release URL
-        if: github.event_name == 'push'
-        uses: actions/download-artifact@v1
-        with:
-          name: release-url
       - name: Generate variables
         id: gen_vars
         run: |
-          SYSTEM_ID=$(echo ${{ matrix.container }} | cut -f1 '-d:')
-          DISTRIBUTION=$(echo ${{ matrix.container }} | cut -f2 '-d:')
-          ARTIFACT_PREFIX="${SYSTEM_ID}_${DISTRIBUTION}"
-          echo "Artifact prefix: $ARTIFACT_PREFIX"
-          ls -la release-url || :
-          if [ -f release-url/release-url.txt ] ; then
-            RELEASE_URL=$(cat release-url/release-url.txt)
-            echo "Release URL: $RELEASE_URL"
-            echo "::set-output name=release_url::${RELEASE_URL}"
-          fi
-          echo "::set-output name=artifact_prefix::${ARTIFACT_PREFIX}"
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
           echo "Xen commit: $XEN_COMMIT"
-          echo "::set-output name=xen_commit::${XEN_COMMIT}"
+          echo xen_commit=${XEN_COMMIT} >> $GITHUB_OUTPUT
+          CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
+          echo "container=$CONTAINER" >> $GITHUB_OUTPUT
+          DRAKVUFVERSION=$(./scripts/version.sh --dev)
+          echo "DRAKVUF version: $DRAKVUFVERSION"
+          echo "drakvufversion=$DRAKVUFVERSION" >> $GITHUB_OUTPUT
+          XENVERSION=$(./xen/version.sh --full ./xen/xen/Makefile)
+          echo "Xen version: $XENVERSION"
+          echo "xenversion=$XENVERSION" >> $GITHUB_OUTPUT
       - name: Cache Xen intermediate
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             package/cache
-          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v2
+          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}-v6
       - name: Build package
         id: build_drakvuf_deb
         run: |
-          sh package/build.sh ${{ matrix.container }}
+          sh package/build.sh "${{ matrix.container }}" "${{ steps.gen_vars.outputs.drakvufversion }}" "${{ steps.gen_vars.outputs.xenversion }}"
           DRAKVUF_DEB_PATH=$(find package/out/drakvuf*.deb | head -n1)
-          DRAKVUF_DEB_NAME=$(basename "$DRAKVUF_DEB_PATH")
           XEN_DEB_PATH=$(find package/out/xen*.deb | head -n1)
-          XEN_DEB_NAME=$(basename "$XEN_DEB_PATH")
           if [ ! -z $DRAKVUF_DEB_PATH ]; then
-            echo "::set-output name=drakvuf_deb_path::${DRAKVUF_DEB_PATH}"
-            echo "::set-output name=drakvuf_deb_name::${{ steps.gen_vars.outputs.artifact_prefix }}_${DRAKVUF_DEB_NAME}"
+            cp $DRAKVUF_DEB_PATH ${{ github.workspace}}
           fi
           if [ ! -z $XEN_DEB_PATH ]; then
-            echo "::set-output name=xen_deb_path::${XEN_DEB_PATH}"
-            echo "::set-output name=xen_deb_name::${{ steps.gen_vars.outputs.artifact_prefix }}_${XEN_DEB_NAME}"
+            cp $XEN_DEB_PATH ${{ github.workspace }}
           fi
-      - name: Upload DRAKVUF asset
-        if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.drakvuf_deb_path != ''
-        uses: actions/upload-release-asset@v1.0.2
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.gen_vars.outputs.container }}-debs
+          path: ${{ github.workspace }}/*.deb
+
+  release:
+    needs: [deb]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/download-artifact@v3
+      - name: Generate variables
+        id: gen_vars
+        run: |
+          echo short_sha=$(echo ${GITHUB_SHA} | cut -c1-8) >> $GITHUB_OUTPUT
+          echo cur_datetime=$(date '+%Y-%m-%d %H:%M:%S') >> $GITHUB_OUTPUT
+
+      - name: Delete old release
+        uses: dev-drprasad/delete-older-releases@653dc03d96473ac9e585c68c8bf5aaccb0dadb61 # pin 0.2.1
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
-          upload_url: ${{ steps.gen_vars.outputs.release_url }}
-          asset_path: ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_path }}
-          asset_name: ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
-          asset_content_type: application/vnd.debian.binary-package
-      - name: Upload Xen asset
-        if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.xen_deb_path != ''
-        uses: actions/upload-release-asset@v1.0.2
+          repo: tklengyel/drakvuf-builds
+          keep_latest: 0
+          delete_tags: true
+
+      - name: Create a Release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          release_tag="build-${{ github.sha }}"
+          title="DRAKVUF ${{ steps.gen_vars.outputs.cur_datetime }} ${{ steps.gen_vars.outputs.short_sha }}"
+          gh release create $release_tag --notes "Automated build" -R tklengyel/drakvuf-builds -t "$title"
+          for deb in $(find . -name "*.deb"); do
+            gh release upload $release_tag $deb -R tklengyel/drakvuf-builds
+          done
+
+  install:
+    needs: [deb]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - "debian:bullseye"
+          - "debian:bookworm"
+          - "ubuntu:focal"
+          - "ubuntu:jammy"
+    container:
+      image: ${{ matrix.container}}
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: gen_vars
+        run: |
+          CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
+          echo "container=$CONTAINER" >> $GITHUB_OUTPUT
+
+      - uses: actions/download-artifact@v3
         with:
-          upload_url: ${{ steps.gen_vars.outputs.release_url }}
-          asset_path: ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }}
-          asset_name: ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
-          asset_content_type: application/vnd.debian.binary-package
+          name: ${{ steps.gen_vars.outputs.container }}-debs
+          path: ~/debs
+
+      - name: install
+        run: ./scripts/install.sh ~/debs
+
+  registry:
+    needs: [deb]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: debianbullseye-debs
+          path: debs
+
+      - name: remove xen
+        run: rm debs/*xen*
+
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: package/Dockerfile-registry
+          push: true
+          tags: tklengyel/drakvuf:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

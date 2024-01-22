@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -125,19 +125,6 @@
 #include <libinjector/private.h>
 #include "injector_utils.h"
 
-// syscall limit for error codes
-#define MAX_ERRNO 4096UL
-#define FILE_BUF_SIZE 65536UL
-
-typedef enum
-{
-    INJECT_RESULT_SUCCESS,
-    INJECT_RESULT_TIMEOUT,
-    INJECT_RESULT_CRASH,
-    INJECT_RESULT_ERROR_CODE,
-    INJECT_RESULT_METHOD_UNSUPPORTED,
-} inject_result_t;
-
 typedef enum
 {
     sys_read = 0,
@@ -154,27 +141,25 @@ typedef enum
     sys_kill = 62,
 } syscall_t;
 
-struct injector
+struct linux_injector
 {
-    // common in win and linux
-    // KEEP THESE IN TOP and in sync with the order in injector_utils.c
-    injector_step_t step;
-    bool step_override; // set this as true for jumping to some arbitrary step
-    bool set_gprs_only;
+    struct base_injector base_injector;
 
     // Inputs:
     vmi_pid_t target_pid;
     uint32_t target_tid;
+    addr_t target_process;
     const char* target_file;
     const char* host_file;
     int args_count;
+    // A NULL-terminated array of arguments
     const char** args;
-    output_format_t format;
 
     // Internal:
     drakvuf_t drakvuf;
     injection_method_t method;
     addr_t syscall_addr;
+    bool injection_failed;
 
     // Buffer
     struct
@@ -191,6 +176,7 @@ struct injector
 
     // mmap
     addr_t virtual_memory_addr;
+    size_t virtual_memory_size;
 
     // for restoring stack
     x86_registers_t saved_regs;
@@ -200,29 +186,27 @@ struct injector
 
     // execve
     bool fork;
+    bool execve;
     proc_data_t child_data;
-
-    // Traps
-    drakvuf_trap_t* cr3_trap;
 
     // Results:
     injector_status_t rc;
     inject_result_t result;
-    struct
-    {
-        bool valid;
-        uint32_t code;
-        const char* string;
-    } error_code;
-};
+    injection_error_t error_code;
 
-void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap);
-void injector_free_linux(injector_t injector);
+    uint32_t pid, tid;
+};
+typedef struct linux_injector* linux_injector_t;
+
+void free_bp_trap(drakvuf_t drakvuf, linux_injector_t injector, drakvuf_trap_t* trap);
+void injector_free_linux(linux_injector_t injector);
 bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs);
 addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso);
 bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr);
-event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event);
 bool is_syscall_error(addr_t rax, const char* err);
+void print_linux_injection_info(output_format_t format, linux_injector_t injector);
+
+GHashTable* get_injection_environ(linux_injector_t injector, drakvuf_trap_info_t* info);
 
 #endif

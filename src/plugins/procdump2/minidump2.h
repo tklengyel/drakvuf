@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -123,6 +123,9 @@ using rva64_t = uint64_t;
 #define MDMP_NUMBER_OF_STREAMS 3
 #define MDMP_MAX_MEMORY_RANGES 256
 #define MDMP_MAX_THREADS 1
+
+namespace procdump2_ns
+{
 
 enum mdmp_type
 {
@@ -684,4 +687,6 @@ struct __attribute__ ((packed, aligned(4))) minidump
     }
 };
 
-#endif // PROCDUMP_MINIDUMP_H
+}
+
+#endif // PROCDUMP2_MINIDUMP_H

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -109,9 +109,8 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include <libvmi/libvmi.h>
-#include <librepl/librepl.h>
 #include <libdrakvuf/libdrakvuf.h>
+#include <librepl/librepl.h>
 
 static drakvuf_t drakvuf;
 
@@ -133,9 +132,9 @@ static inline void print_help(void)
     );
 }
 
-static bool is_interrupted(drakvuf_t drakvuf, void*)
+static bool is_interrupted(drakvuf_t _drakvuf, void*)
 {
-    return drakvuf_is_interrupted(drakvuf);
+    return drakvuf_is_interrupted(_drakvuf);
 }
 
 int main(int argc, char** argv)
@@ -145,7 +144,6 @@ int main(int argc, char** argv)
     char* json_kernel_path = NULL;
     char* domain = NULL;
     bool libvmi_conf = false;
-    bool verbose = 0;
     addr_t kpgd = 0;
 
     if (argc < 4)
@@ -195,7 +193,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf, kpgd, false, UNLIMITED_TTL))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, libvmi_conf, kpgd, false, UNLIMITED_TTL, NULL, true, false))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;
@@ -204,7 +202,7 @@ int main(int argc, char** argv)
     drakvuf_trap_t inject_trap =
     {
         .type = REGISTER,
-        .reg = CR3,
+        .regaccess.type = CR3,
         .cb = &repl_start,
         .name = "repl_trap",
     };

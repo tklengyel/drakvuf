@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,22 +105,20 @@
 #ifndef FILETRACER_H
 #define FILETRACER_H
 
-#include "plugins/private.h"
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 #include "win.h"
 #include "linux.h"
 
-class filetracer: public plugin
+#include <memory>
+
+class filetracer : public pluginex
 {
 public:
-    os_t os;
-    win_filetracer* wf;
-    linux_filetracer* lf;
-    filetracer(drakvuf_t drakvuf, output_format_t output);
-    filetracer(const filetracer&) = delete;
-    filetracer& operator=(const filetracer&) = delete;
-    ~filetracer();
-    virtual bool stop_impl() override;
+    std::unique_ptr<win_filetracer> wf;
+    std::unique_ptr<linux_filetracer> lf;
+
+    filetracer(drakvuf_t drakvuf, const filetracer_config* config, output_format_t output);
+    ~filetracer() = default;
 };
 
 #endif

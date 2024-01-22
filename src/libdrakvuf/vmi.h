@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -122,10 +122,6 @@
 bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep);
 void close_vmi(drakvuf_t drakvuf);
 
-event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t* event);
-event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event);
-event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t* event);
-
 void drakvuf_vmi_event_callback (int fd, void* data);
 
 bool inject_trap(drakvuf_t drakvuf,
@@ -146,7 +142,10 @@ void remove_trap(drakvuf_t drakvuf,
     const drakvuf_trap_t* trap);
 
 bool control_cr3_trap(drakvuf_t drakvuf, bool toggle);
+bool control_cr4_trap(drakvuf_t drakvuf, bool toggle);
 bool control_debug_trap(drakvuf_t drakvuf, bool toggle);
 bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle);
+bool control_io_trap(drakvuf_t drakvuf, bool toggle);
 bool control_msr_trap(drakvuf_t drakvuf, bool toggle);
+bool control_msr_trap_any(drakvuf_t drakvuf, bool toggle, uint32_t index);
 #endif

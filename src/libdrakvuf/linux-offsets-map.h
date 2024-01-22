@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -110,27 +110,53 @@
  */
 static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
 {
+    [_TEXT] = {"_text", NULL},
+    [INIT_TASK] = {"init_task", NULL},
     [CURRENT_TASK] = {"current_task", NULL},
+    [PCPU_HOT] = {"pcpu_hot", NULL},
+    [PCPU_HOT_CURRENT_TASK] = {"pcpu_hot", "current_task"},
+    [TASK_STRUCT_FLAGS] = {"task_struct", "flags"},
     [TASK_STRUCT_COMM] = {"task_struct", "comm"},
     [TASK_STRUCT_CRED] = {"task_struct", "cred"},
     [TASK_STRUCT_PID] = {"task_struct", "pid"},
     [TASK_STRUCT_TGID] = {"task_struct", "tgid"},
     [TASK_STRUCT_REALPARENT] = {"task_struct", "real_parent"},
     [TASK_STRUCT_PARENT] = {"task_struct", "parent"},
+    [TASK_STRUCT_TASKS] = {"task_struct", "tasks"},
+    [TASK_STRUCT_FS] = {"task_struct", "fs"},
+    [TASK_STRUCT_NAMEIDATA] = {"task_struct", "nameidata"},
+    [TASK_STRUCT_NSPROXY] = {"task_struct", "nsproxy"},
     [TASK_STRUCT_MMSTRUCT] = {"task_struct", "mm"},
     [TASK_STRUCT_ACTIVE_MMSTRUCT] = {"task_struct", "active_mm"},
+    [TASK_STRUCT_THREAD_PID] = {"task_struct", "thread_pid"},
+    [TASK_STRUCT_SIGNAL] = {"task_struct", "signal"},
+    [SIGNAL_STRUCT_PIDS] = {"signal_struct", "pids"},
+    [PID_LEVEL] = {"pid", "level"},
+    [PID_NUMBERS] = {"pid", "numbers"},
+    [PID_NAMESPACE_LEVEL] = {"pid_namespace", "level"},
+    [UPID_NS] = {"upid", "ns"},
+    [UPID_NR] = {"upid", "nr"},
     [MM_STRUCT_MMAP] = {"mm_struct", "mmap"},
     [MM_STRUCT_PGD] = {"mm_struct", "pgd"},
+    [MM_STRUCT_ARG_START] = {"mm_struct", "arg_start"},
+    [MM_STRUCT_ENV_START] = {"mm_struct", "env_start"},
+    [MM_STRUCT_ENV_END] = {"mm_struct", "env_end"},
+    [MM_STRUCT_EXE_FILE] = {"mm_struct", "exe_file"},
     [VM_AREA_STRUCT_FILE] = {"vm_area_struct", "vm_file"},
     [VM_AREA_STRUCT_START] = {"vm_area_struct", "vm_start"},
     [VM_AREA_STRUCT_END] = {"vm_area_struct", "vm_end"},
     [VM_AREA_STRUCT_NEXT] = {"vm_area_struct", "vm_next"},
     [VM_AREA_STRUCT_PGOFF] = {"vm_area_struct", "vm_pgoff"},
     [VM_AREA_STRUCT_FLAGS] = {"vm_area_struct", "vm_flags"},
-    [FILE_PATH] = {"file", "f_path"},
+    [VFSMOUNT_MNT_ROOT] = {"vfsmount", "mnt_root"},
+    [FILE_F_PATH] = {"file", "f_path"},
     [PATH_DENTRY] = {"path", "dentry"},
+    [PATH_MNT] = {"path", "mnt"},
     [DENTRY_D_NAME] = {"dentry", "d_name"},
+    [DENTRY_D_PARENT] = {"dentry", "d_parent"},
     [QSTR_NAME] = {"qstr", "name"},
+    [QSTR_LEN] = {"qstr", "len"},
+    [FS_STRUCT_ROOT] = {"fs_struct", "root"},
     [CRED_UID] = {"cred", "uid"},
     [ELF64HDR_PHNUM] = {"elf64_hdr", "e_phnum"},
     [ELF64HDR_PHENTSIZE] = {"elf64_hdr", "e_phentsize"},
@@ -143,6 +169,9 @@ static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
     [ELF64RELA_ADDEND] = {"elf64_rela", "r_addend"},
     [ELF64RELA_INFO] = {"elf64_rela", "r_info"},
     [ELF64RELA_OFFSET] = {"elf64_rela", "r_offset"},
+    [NSPROXY_UTS_NS] = {"nsproxy", "uts_ns"},
+    [UTS_NAMESPACE_NAME] = {"uts_namespace", "name"},
+    [NEW_UTSNAME_RELEASE] = {"new_utsname", "release"},
 };
 
 #endif

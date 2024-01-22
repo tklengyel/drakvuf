@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,13 +102,14 @@
  *                                                                         *
  ***************************************************************************/
 #include <libdrakvuf/libdrakvuf.h>
-#include <libvmi/libvmi.h>
-#include <libdrakvuf/private.h>
 #include <plugins/plugins_ex.h>
 #include <plugins/output_format.h>
 #include <mutex>
 
 #include "callbackmon.h"
+#include "private.h"
+
+using namespace callbackmon_ns;
 
 static constexpr uint16_t win_vista_ver     = 6000;
 static constexpr uint16_t win_vista_sp1_ver = 6001;
@@ -117,12 +118,7 @@ static constexpr uint16_t win_8_1_ver       = 9600;
 static constexpr uint16_t win_10_rs1_ver    = 14393;
 static constexpr uint16_t win_10_1803_ver   = 17134;
 
-static std::once_flag once;
-static addr_t name_rva;
-static addr_t base_rva;
-static addr_t size_rva;
-
-static const std::vector<const char*> callout_syms =
+static const std::vector<const char*> callout_symbols =
 {
     "PspW32ProcessCallout",
     "PspW32ThreadCallout",
@@ -150,29 +146,6 @@ static const std::unordered_map<uint16_t, std::tuple<size_t, size_t, size_t>> wf
     { win_7_sp1_ver, { 0x40, 0x548, 0x550 } },
     { win_10_1803_ver, { 0x50, 0x190, 0x198 } },
 };
-
-namespace
-{
-struct pass_ctx
-{
-    addr_t cb_va;
-    std::string name = "<Unknown>";
-    addr_t base_va = 0;
-
-    explicit pass_ctx(drakvuf_t drakvuf, addr_t cb_va) : cb_va(cb_va)
-    {
-        std::call_once(once, [&]()
-        {
-            if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "FullDllName",  &name_rva) ||
-                !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "DllBase",      &base_rva) ||
-                !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage",  &size_rva))
-            {
-                throw -1;
-            }
-        });
-    };
-};
-}
 
 static inline size_t get_process_cb_table_size(uint16_t winver)
 {
@@ -215,37 +188,332 @@ static inline size_t get_power_cb_offset(vmi_instance_t vmi)
         return vmi_get_address_width(vmi) == 8 ? 0x40 : 0x28;
 }
 
-static void driver_visitor(drakvuf_t drakvuf, addr_t ldr_table, void* ctx)
+static protocol_cb_t collect_protocol_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, callbackmon* plugin, addr_t protocol_block)
 {
-    auto data = static_cast<pass_ctx*>(ctx);
-
-    vmi_lock_guard vmi(drakvuf);
-    addr_t base;
-    uint32_t size;
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_table + base_rva, 4, &base) ||
-        VMI_SUCCESS != vmi_read_32_va(vmi, ldr_table + size_rva, 4, &size))
+    protocol_cb_t out;
+    // Read first open block.
+    //
+    addr_t open_block{};
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, protocol_block + plugin->generic_offsets[NDIS_PROTOCOL_BLOCK_OPENQUEUE], 0, &open_block) || !open_block)
     {
-        throw -1;
+        return out;
     }
 
-    if (data->cb_va >= base && data->cb_va < base + size)
+    while (open_block)
     {
-        unicode_string_t* module_name = drakvuf_read_unicode_va(drakvuf, ldr_table + name_rva, 4);
-        if (module_name && module_name->contents)
+        // Read all callbacks.
+        //
+        std::vector<api_bind_t> callbacks;
+        for (int i = 0; i < __OFFSET_OPEN_MAX; i++)
         {
-            data->name.assign(reinterpret_cast<char*>(module_name->contents));
-            vmi_free_unicode_str(module_name);
+            // We don't care about struct name so we use w7 by default.
+            //
+            const auto [_, cb_name] = offset_open_names_w7[i];
+            addr_t cb;
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, open_block + plugin->open_offsets[i], 0, &cb))
+            {
+                PRINT_DEBUG("[CALLBACKMON] Failed to read api\n");
+                throw -1;
+            }
+            callbacks.push_back(std::make_pair(cb_name, cb));
         }
 
-        data->base_va = base;
+        // Read corresponding miniport block.
+        //
+        addr_t miniport_block{};
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, open_block + plugin->generic_offsets[NDIS_OPEN_BLOCK_MINIPORTHANDLE], 0, &miniport_block) || !miniport_block)
+        {
+            PRINT_DEBUG("[CALLBACKMON] Failed to read miniport block!\n");
+            throw -1;
+        }
+
+        for (int i = 0; i < __OFFSET_MINIPORT_MAX; i++)
+        {
+            const auto [_, cb_name] = offset_miniport_names[i];
+            addr_t cb;
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, miniport_block + plugin->miniport_offsets[i], 0, &cb))
+            {
+                PRINT_DEBUG("[CALLBACKMON] Failed to read miniport api\n");
+                throw -1;
+            }
+            callbacks.push_back(std::make_pair(cb_name, cb));
+        }
+
+        out.insert({ open_block, std::move(callbacks) });
+
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, open_block + plugin->generic_offsets[NDIS_OPEN_BLOCK_PROTOCOLNEXTOPEN], 0, &open_block))
+        {
+            PRINT_DEBUG("[CALLBACKMON] Failed to read protocol next open\n");
+            throw -1;
+        }
     }
+    return out;
 }
 
-static inline std::pair<std::string, addr_t> get_module_by_addr(drakvuf_t drakvuf, addr_t addr)
+static bool consume_ndis_protocols(drakvuf_t drakvuf, vmi_instance_t vmi, callbackmon* plugin, const char* profile)
 {
-    pass_ctx ctx{ drakvuf, addr };
-    drakvuf_enumerate_drivers(drakvuf, driver_visitor, &ctx);
-    return { ctx.name, ctx.base_va };
+    addr_t ndis_protocol_list_rva;
+
+    const auto winver = vmi_get_winver(vmi);
+
+    const char* protocol_symname  = winver == VMI_OS_WINDOWS_10 ? "?ndisProtocolList@@3PEAU_NDIS_PROTOCOL_BLOCK@@EA" : "ndisProtocolList";
+
+    auto profile_json = json_object_from_file(profile);
+    if (!profile_json)
+    {
+        PRINT_DEBUG("[CALLBACKMON] Failed to load profile\n");
+        return false;
+    }
+
+    // Locate core symbols.
+    //
+    if (winver == VMI_OS_WINDOWS_10)
+    {
+        if (!json_get_struct_members_array_rva(drakvuf, profile_json, offset_generic_names_w10, plugin->generic_offsets.size(), plugin->generic_offsets.data()) ||
+            !json_get_struct_members_array_rva(drakvuf, profile_json, offset_open_names_w10,    plugin->open_offsets.size(),    plugin->open_offsets.data()))
+        {
+            json_object_put(profile_json);
+            return false;
+        }
+    }
+    else
+    {
+        if (!json_get_struct_members_array_rva(drakvuf, profile_json, offset_generic_names_w7, plugin->generic_offsets.size(), plugin->generic_offsets.data()) ||
+            !json_get_struct_members_array_rva(drakvuf, profile_json, offset_open_names_w7,    plugin->open_offsets.size(),    plugin->open_offsets.data()))
+        {
+            json_object_put(profile_json);
+            return false;
+        }
+    }
+
+    if (!json_get_struct_members_array_rva(drakvuf, profile_json, offset_miniport_names, plugin->miniport_offsets.size(), plugin->miniport_offsets.data()) ||
+        !json_get_symbol_rva(drakvuf, profile_json, protocol_symname, &ndis_protocol_list_rva))
+    {
+        json_object_put(profile_json);
+        return false;
+    }
+    json_object_put(profile_json);
+    // Read global values.
+    //
+    addr_t list_head, ndis_base, protocol_head;
+    if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head)  ||
+        !drakvuf_get_module_base_addr(drakvuf, list_head, "NDIS.SYS", &ndis_base) ||
+        VMI_SUCCESS != vmi_read_addr_va(vmi, ndis_base + ndis_protocol_list_rva, 0, &protocol_head))
+    {
+        return false;
+    }
+    // Iterate all installed protocols.
+    //
+    while (protocol_head)
+    {
+        plugin->ndis_protocol_cb.insert({ protocol_head, collect_protocol_callbacks(drakvuf, vmi, plugin, protocol_head) });
+        // Read next protocol address.
+        //
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, protocol_head + plugin->generic_offsets[NDIS_PROTOCOL_BLOCK_NEXTPROTOCOL], 0, &protocol_head))
+        {
+            PRINT_DEBUG("[CALLBACKMON] Failed to read next protocol\n");
+            return false;
+        }
+    }
+    return true;
+}
+
+static std::vector<addr_t> get_callback_object_callbacks(drakvuf_t drakvuf, callbackmon* plugin, addr_t object)
+{
+    std::vector<addr_t> out;
+    // typedef struct _CALLBACK_OBJECT <- undocumented
+    // {
+    //   ULONG Signature;                   // 0x00
+    //   KSPIN_LOCK Lock;                   // 0x08
+    //   LIST_ENTRY RegisteredCallbacks;    // 0x10
+    //   BOOLEAN AllowMultipleCallbacks;
+    //   UCHAR reserved[3];
+    // } CALLBACK_OBJECT, *PCALLBACK_OBJECT;
+    const addr_t callbacks_off = drakvuf_get_address_width(drakvuf) * 2;
+    // typedef struct _CALLBACK_REGISTRATION <- undocumented
+    // {
+    //   LIST_ENTRY Link;                       // 0x00
+    //   PCALLBACK_OBJECT CallbackObject;       // 0x10
+    //   PCALLBACK_FUNCTION CallbackFunction;   // 0x18
+    //   PVOID CallbackContext;
+    //   ULONG Busy;
+    //   BOOLEAN UnregisterWaiting;
+    // } CALLBACK_REGISTRATION, *PCALLBACK_REGISTRATION;
+    const addr_t callback_fn_off = drakvuf_get_address_width(drakvuf) * 3;
+    // Read flink entry.
+    //
+    addr_t head  = object + callbacks_off;
+    addr_t entry = 0;
+
+    vmi_lock_guard vmi(drakvuf);
+
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 0, &entry))
+        return out;
+
+    while (entry != head && entry)
+    {
+        addr_t callback{};
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, entry + callback_fn_off, 0, &callback) ||
+            VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
+            return out;
+        if (callback)
+        {
+            out.push_back(callback);
+        }
+    }
+    return out;
+}
+
+static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, callbackmon* plugin)
+{
+    if (drakvuf_get_address_width(drakvuf) != 8)
+        return true;
+    // Enumerate callback objects.
+    //
+    if (!drakvuf_enumerate_object_directory(drakvuf, [](drakvuf_t drakvuf, const object_info_t* info, void* ctx)
+{
+    auto plugin = static_cast<callbackmon*>(ctx);
+
+        if (!strcmp((const char*)info->name->contents, "Callback"))
+        {
+            auto name = drakvuf_get_object_name(drakvuf, info->base_addr);
+            plugin->object_cb.push_back(
+            {
+                .base = info->base_addr,
+                .name = name ? (const char*)name->contents : "Anonymous",
+                .callbacks = get_callback_object_callbacks(drakvuf, plugin, info->base_addr)
+            });
+            if (name) vmi_free_unicode_str(name);
+        }
+    }, plugin))
+    {
+        return false;
+    }
+    // Enumerate every object type. First 2 entries are not used.
+    //
+    for (size_t i = 2; ; i++)
+    {
+        object_type_t ob_type{};
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, plugin->ob_type_table_va + i * drakvuf_get_address_width(drakvuf), 0, &ob_type.base))
+            return false;
+        // if reached the end.
+        //
+        if (!ob_type.base)
+            break;
+        // Collect type initializer callbacks.
+        //
+        for (size_t cb_n = 0; cb_n < 8; cb_n++)
+        {
+            addr_t callback{};
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, ob_type.base + plugin->offsets[OBJECT_TYPE_TYPEINFO] + plugin->offsets[OBJECT_TYPE_INITIALIZER_DUMP_CB] + cb_n * drakvuf_get_address_width(drakvuf), 0, &callback))
+            {
+                return false;
+            }
+            if (callback)
+            {
+                ob_type.initializer.push_back(callback);
+            }
+        }
+        // Collect object type callbacks.
+        //
+        addr_t head = ob_type.base + plugin->offsets[OBJECT_TYPE_CALLBACKLIST];
+        addr_t entry{};
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 0, &entry))
+            return false;
+
+        while (entry != head && entry)
+        {
+            uint32_t active{};
+            addr_t pre_cb{}, post_cb{};
+            // Undocumented structure. No symbols.
+            // typedef struct _CALLBACK_ENTRY_ITEM
+            // {
+            //     LIST_ENTRY CallbackList; // 0x0
+            //     OB_OPERATION Operations; // 0x10
+            //     DWORD Active; // 0x14
+            //     CALLBACK_ENTRY *CallbackEntry; // 0x18
+            //     PVOID ObjectType; // 0x20
+            //     POB_PRE_OPERATION_CALLBACK PreOperation; // 0x28
+            //     POB_POST_OPERATION_CALLBACK PostOperation; // 0x30
+            //     QWORD unk1; // 0x38
+            // } CALLBACK_ENTRY_ITEM, *PCALLBACK_ENTRY_ITEM; // size: 0x40
+            if (VMI_SUCCESS != vmi_read_32_va  (vmi, entry + 0x14, 0, &active)  ||
+                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x28, 0, &pre_cb)  ||
+                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x30, 0, &post_cb) ||
+                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
+            {
+                return false;
+            }
+
+            if (active)
+            {
+                if (pre_cb)
+                    ob_type.callbacks.push_back({ .base = entry, .callback = pre_cb  });
+                if (post_cb)
+                    ob_type.callbacks.push_back({ .base = entry, .callback = post_cb });
+            }
+        }
+        // Fill object type name.
+        //
+        if (auto name = drakvuf_get_object_name(drakvuf, ob_type.base))
+        {
+            ob_type.name = (const char*)name->contents;
+            vmi_free_unicode_str(name);
+        }
+        else
+        {
+            ob_type.name = "Anonymous";
+        }
+        plugin->object_type.push_back(std::move(ob_type));
+    }
+    return true;
+}
+
+event_response_t callbackmon::load_unload_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto entry = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    vmi_lock_guard vmi(drakvuf);
+
+    if (drakvuf_get_function_argument(drakvuf, info, 2))
+    {
+        callbackmon_module_t module_info{};
+        if (VMI_SUCCESS == vmi_read_addr_va(vmi, entry + offsets[LDR_TABLE_ENTRY_DLLBASE],     info->proc_data.pid, &module_info.base) &&
+            VMI_SUCCESS == vmi_read_addr_va(vmi, entry + offsets[LDR_TABLE_ENTRY_SIZEOFIMAGE], info->proc_data.pid, &module_info.size))
+        {
+            if (auto name = vmi_read_unicode_str_va(vmi, entry + offsets[LDR_TABLE_ENTRY_FULLDLLNAME], info->proc_data.pid))
+            {
+                module_info.name.assign((const char*)name->contents);
+                drivers.push_back(std::move(module_info));
+                vmi_free_unicode_str(name);
+            }
+        }
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+void callbackmon::report(drakvuf_t drakvuf, const char* list_name, addr_t addr, const char* action)
+{
+    auto get_module_by_addr = [&]() -> callbackmon_module_t
+    {
+        for (const auto& module : this->drivers)
+        {
+            if (addr >= module.base && addr < module.base + module.size)
+            {
+                return module;
+            }
+        }
+        return { .base = 0, .size = 0, .name = "<Unknown>" };
+    };
+
+    const auto& module = get_module_by_addr();
+    fmt::print(format, "callbackmon", drakvuf, nullptr,
+        keyval("Type", fmt::Rstr("Callback")),
+        keyval("ListName", fmt::Estr(list_name)),
+        keyval("Module", fmt::Estr(module.name)),
+        keyval("RVA", fmt::Xval(module.base ? addr - module.base : 0)),
+        keyval("Action", fmt::Estr(action))
+    );
 }
 
 callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output)
@@ -254,14 +522,21 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     const addr_t krnl_base = drakvuf_get_kernel_base(drakvuf);
     const size_t ptrsize   = drakvuf_get_address_width(drakvuf);
     const size_t fast_ref  = (ptrsize == 8 ? 15 : 7);
-    addr_t drv_obj_rva, mj_array_rva;
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_DEVICE_OBJECT", "DriverObject", &drv_obj_rva) ||
-        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_DRIVER_OBJECT", "MajorFunction", &mj_array_rva))
+
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, offsets.size(), offsets.data()))
+    {
+        PRINT_DEBUG("[CALLBACKMON] Failed to get kernel struct member offsets\n");
+        throw -1;
+    }
+
+    if (!drakvuf_get_kernel_symbol_va(drakvuf, "ObTypeIndexTable", &ob_type_table_va))
     {
         throw -1;
     }
 
     vmi_lock_guard vmi(drakvuf);
+    const uint16_t ver = vmi_get_win_buildnumber(vmi);
+
     auto get_ksymbol_va = [&](const char* symb) -> addr_t
     {
         addr_t rva = 0;
@@ -312,17 +587,17 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         return out;
     };
     // Extract IRP_MJ_SHUTDOWN from device objects
-    auto extract_cb = [&](std::vector<addr_t> dev_objs) -> std::vector<addr_t>
+    auto extract_cb = [&](std::vector<addr_t> devices) -> std::vector<addr_t>
     {
         constexpr size_t irp_mj_shutdown = 0x10;
-        for (auto& dev_obj : dev_objs)
+        for (auto& device : devices)
         {
-            addr_t drv_obj = 0;
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, dev_obj + drv_obj_rva, 4, &drv_obj) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, drv_obj + mj_array_rva + irp_mj_shutdown * ptrsize, 4, &dev_obj))
+            addr_t driver{};
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, device + offsets[DEVICE_OBJECT_DRIVER_OBJECT], 0, &driver) ||
+                VMI_SUCCESS != vmi_read_addr_va(vmi, device + offsets[DRIVER_OBJECT_MAJOR_FUNCTION] + irp_mj_shutdown * ptrsize, 0, &device))
                 throw -1;
         }
-        return dev_objs;
+        return devices;
     };
     // Extract PsWin32Callouts
     auto consume_w32callouts = [&]() -> std::vector<addr_t>
@@ -330,10 +605,10 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         std::vector<addr_t> out;
         if (vmi_get_win_buildnumber(vmi) < win_8_1_ver)
         {
-            for (const auto& sym : callout_syms)
+            for (const auto& symbol : callout_symbols)
             {
                 addr_t fn = 0;
-                if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va(sym), 4, &fn))
+                if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va(symbol), 4, &fn))
                     throw -1;
                 out.push_back(fn);
             }
@@ -355,7 +630,6 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     auto consume_wfpcallouts = [&](const char* profile) -> std::vector<addr_t>
     {
         std::vector<addr_t> out;
-        const uint16_t ver = vmi_get_win_buildnumber(vmi);
         // only Windows 7 sp1 x64 and Windows 10 1803 x64 currently supported
         if (wfp_offsets.find(ver) == wfp_offsets.end() || !profile)
             return {};
@@ -365,8 +639,10 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
             throw -1;
 
         addr_t gwfp_rva;
-        json_get_symbol_rva(drakvuf, profile_json, "gWfpGlobal", &gwfp_rva);
+        bool res = json_get_symbol_rva(drakvuf, profile_json, "gWfpGlobal", &gwfp_rva);
         json_object_put(profile_json);
+        if (!res)
+            throw -1;
 
         addr_t list_head;
         if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head))
@@ -398,6 +674,21 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         return out;
     };
 
+    if (config->ndis_profile && (ver == win_7_sp1_ver || ver == win_10_1803_ver))
+    {
+        if (!consume_ndis_protocols(drakvuf, vmi, this, config->ndis_profile))
+        {
+            PRINT_DEBUG("[CALLBACKMON] Failed to process ndis callbacks\n");
+            throw -1;
+        }
+    }
+
+    if (!consume_object_callbacks(drakvuf, vmi, this))
+    {
+        PRINT_DEBUG("[CALLBACKMON] Failed to process object callbacks\n");
+        throw -1;
+    }
+
     this->process_cb   = consume_callbacks_ex("PspCreateProcessNotifyRoutine", get_cb_table_size(vmi, "process"));
     this->thread_cb    = consume_callbacks_ex("PspCreateThreadNotifyRoutine",  get_cb_table_size(vmi, "thread"));
     this->image_cb     = consume_callbacks_ex("PspLoadImageNotifyRoutine",     get_cb_table_size(vmi, "image"));
@@ -419,23 +710,38 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     this->emp_cb       = consume_callbacks("EmpCallbackListHead", -3 * ptrsize);
     this->w32callouts  = consume_w32callouts();
     this->wfpcallouts  = consume_wfpcallouts(this->config.netio_profile);
+
+    drakvuf_enumerate_drivers(drakvuf, [](drakvuf_t drakvuf, const module_info_t* info, bool*, bool*, void* ctx)
+    {
+        static_cast<callbackmon*>(ctx)->drivers.push_back(
+        {
+            .base = info->base_addr,
+            .size = info->size,
+            .name = (const char*)info->full_name->contents
+        });
+        return true;
+    }, this);
+    this->driver_hook = createSyscallHook("MiProcessLoaderEntry", &callbackmon::load_unload_cb);
 }
 
 bool callbackmon::stop_impl()
 {
-    auto snapshot = std::make_unique<callbackmon>(drakvuf, &config, format);
-
-    auto report = [&](const auto& list_name, const auto& addr, const auto& action)
+    std::unique_ptr<callbackmon> snapshot;
+    try
     {
-        const auto& [name, base] = get_module_by_addr(drakvuf, addr);
-        fmt::print(format, "callbackmon", drakvuf, nullptr,
-            keyval("Type", fmt::Qstr("Callback")),
-            keyval("ListName", fmt::Qstr(list_name)),
-            keyval("Module", fmt::Qstr(name)),
-            keyval("RVA", fmt::Xval(base ? addr - base : 0)),
-            keyval("Action", fmt::Qstr(action))
-        );
-    };
+        snapshot = std::make_unique<callbackmon>(drakvuf, &config, format);
+    }
+    catch (const std::exception& e)
+    {
+        PRINT_DEBUG("[CALLBACKMON] Failed to perform final analsys. err: %s\n", e.what());
+        return true;
+    }
+
+    uint16_t winver;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        winver = vmi_get_win_buildnumber(vmi);
+    }
 
     auto check_callbacks = [&](const auto& previous, const auto& current, const auto& list_name)
     {
@@ -443,7 +749,7 @@ bool callbackmon::stop_impl()
         {
             for (const auto& cb : current)
                 if (std::find(previous.begin(), previous.end(), cb) == previous.end())
-                    report(list_name, cb, action);
+                    report(drakvuf, list_name, cb, action);
         };
         walk_list(previous, current, "Added");
         walk_list(current, previous, "Removed");
@@ -451,22 +757,41 @@ bool callbackmon::stop_impl()
 
     auto check_callouts = [&](const auto& previous, const auto& current)
     {
-
-        uint16_t winver;
-        {
-            vmi_lock_guard vmi(drakvuf);
-            winver = vmi_get_win_buildnumber(vmi);
-        }
         if (winver < win_8_1_ver)
         {
-            for (size_t i = 0; i < callout_syms.size(); i++)
+            for (size_t i = 0; i < callout_symbols.size(); i++)
                 if (previous[i] != current[i])
-                    report(callout_syms[i], current[i], "Replaced");
+                    report(drakvuf, callout_symbols[i], current[i], "Replaced");
         }
         else
         {
             if (previous[0] != current[0])
-                report("PsWin32CallBack", current[0], "Replaced");
+                report(drakvuf, "PsWin32CallBack", current[0], "Replaced");
+        }
+    };
+
+    auto check_ndis_cbs = [&](const auto& previous, const auto& current)
+    {
+        for (const auto& [prot_addr, callbacks] : previous)
+        {
+            if (current.find(prot_addr) == current.end())
+                continue;
+
+            const auto& curr_prot = current.at(prot_addr);
+
+            for (const auto& [openblk, cbs] : callbacks)
+            {
+                if (curr_prot.find(openblk) == curr_prot.end())
+                    continue;
+
+                const auto& curr_openblk = curr_prot.at(openblk);
+
+                for (const auto& cb : cbs)
+                {
+                    if (std::find(curr_openblk.begin(), curr_openblk.end(), cb) == curr_openblk.end())
+                        report(drakvuf, cb.first, cb.second, "Modified");
+                }
+            }
         }
     };
 
@@ -491,6 +816,35 @@ bool callbackmon::stop_impl()
     check_callbacks(this->emp_cb,       snapshot->emp_cb,        "EMP");
     check_callbacks(this->wfpcallouts,  snapshot->wfpcallouts,   "WfpCallouts");
     check_callouts (this->w32callouts,  snapshot->w32callouts);
+    check_ndis_cbs (this->ndis_protocol_cb, snapshot->ndis_protocol_cb);
 
+    for (const auto& past_object : this->object_cb)
+    {
+        const auto& new_object = std::find_if(snapshot->object_cb.begin(), snapshot->object_cb.end(),
+                [&past_object](const auto& object)
+        {
+            return object.base == past_object.base;
+        });
+
+        if (new_object != snapshot->object_cb.end())
+        {
+            check_callbacks(past_object.callbacks, new_object->callbacks, past_object.name.c_str());
+        }
+    }
+
+    for (const auto& past_object : this->object_type)
+    {
+        const auto& new_object = std::find_if(snapshot->object_type.begin(), snapshot->object_type.end(),
+                [&past_object](const auto& object)
+        {
+            return object.base == past_object.base;
+        });
+
+        if (new_object != snapshot->object_type.end())
+        {
+            check_callbacks(past_object.callbacks, new_object->callbacks, past_object.name.c_str());
+            check_callbacks(past_object.initializer, new_object->initializer, past_object.name.c_str());
+        }
+    }
     return true;
 }

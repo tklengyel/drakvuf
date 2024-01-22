@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -111,11 +111,12 @@
 
 #include "linux_read_file.h"
 #include "linux_syscalls.h"
+#include "linux_private.h"
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
 static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int amount);
 
-bool init_read_file_method(injector_t injector, const char* file)
+bool init_read_file_method(linux_injector_t injector, const char* file)
 {
     FILE* fp = fopen(file, "wb");
     if (!fp)
@@ -167,11 +168,10 @@ bool init_read_file_method(injector_t injector, const char* file)
  */
 event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = (linux_injector_t)info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
-    event_response_t event;
-
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1: // Finds vdso and sets up mmap
         {
@@ -186,13 +186,11 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, false);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2: // open file handle
         {
-            if (!call_mmap_syscall_cb(injector, info->regs))
+            if (!call_mmap_syscall_cb(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, true);
 
             PRINT_DEBUG("Opening file descriptor\n");
@@ -201,8 +199,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     O_RDONLY, S_IRWXU | S_IRWXG | S_IRWXO))
                 return cleanup(drakvuf, info, true);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP3: // verify fd and setups first read syscall
         {
@@ -213,8 +210,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     injector->virtual_memory_addr, injector->buffer.len))
                 return cleanup(drakvuf, info, true);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP4: // loop till all chunks are written and then close the fd
         {
@@ -228,6 +224,8 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
                 if (!setup_close_syscall(injector, info->regs, injector->fd))
                     return cleanup(drakvuf, info, true);
+
+                return VMI_EVENT_RESPONSE_SET_REGISTERS;
             }
             else
             {
@@ -240,12 +238,8 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                         injector->virtual_memory_addr, injector->buffer.len))
                     return cleanup(drakvuf, info, true);
 
-                injector->step_override = true;
-                injector->step = STEP4;
+                return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
             }
-
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
         }
         case STEP5: // restore the registers
         {
@@ -257,10 +251,9 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             free_bp_trap(drakvuf, injector, info->trap);
 
             // restore regs
-            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+            copy_gprs(info->regs, &injector->saved_regs);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP6: // cleanup
         {
@@ -270,8 +263,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             free_bp_trap(drakvuf, injector, info->trap);
             drakvuf_interrupt(drakvuf, SIGINT);
 
-            event = VMI_EVENT_RESPONSE_NONE;
-            break;
+            return VMI_EVENT_RESPONSE_NONE;
         }
         default:
         {
@@ -280,32 +272,29 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
 {
     PRINT_DEBUG("Doing premature cleanup\n");
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = (linux_injector_t)info->trap->data;
+    base_injector_t base_injector = &injector->base_injector;
 
     // restore regs
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+    copy_gprs(info->regs, &injector->saved_regs);
 
     if (clear_trap)
         free_bp_trap(drakvuf, injector, info->trap);
 
     // since we are jumping to some arbitrary step, we will set this
-    injector->step_override = true;
-
     // give the last step for cleanup
-    injector->step = STEP6;
-
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    return override_step(base_injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }
 
 static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int size)
 {
-    injector_t injector = (injector_t)info->trap->data;
+    linux_injector_t injector = (linux_injector_t)info->trap->data;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,

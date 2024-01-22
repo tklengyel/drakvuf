@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -125,6 +125,12 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EPROCESS_WOW64PROCESS_WIN10] = { "_EPROCESS", "WoW64Process" },
     [EPROCESS_VADROOT] = { "_EPROCESS", "VadRoot" },
     [EPROCESS_LISTTHREADHEAD] = { "_EPROCESS", "ThreadListHead" },
+    [EPROCESS_SECTIONOBJECT] = { "_EPROCESS", "SectionObject" },
+    [EPROCESS_FLAGS2] = { "_EPROCESS", "Flags2" },
+
+    [SECTIONOBJECT_SEGMENT] = { "_SECTION_OBJECT", "Segment" },
+    [SECTION_CONTROLAREA] = { "_SECTION", "ControlArea" },
+    [SEGMENT_CONTROLAREA] = { "_SEGMENT", "ControlArea" },
 
     // Windows >=8 specific
     [RTL_AVL_TREE_ROOT] = { "_RTL_AVL_TREE", "Root"},
@@ -168,6 +174,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
     [KPCR_IRQL] = { "_KPCR", "Irql" },
     [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
+    [KPRCB_RSPBASE] = { "_KPRCB", "RspBase" },
     [KTHREAD_APCSTATE] = {"_KTHREAD", "ApcState" },
     [KTHREAD_APCSTATEINDEX] = {"_KTHREAD", "ApcStateIndex" },
     [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
@@ -189,6 +196,11 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
+    [OBJECT_HEADER_INFOMASK] = { "_OBJECT_HEADER", "InfoMask" },
+    [OBJECT_HEADER_NAME_INFO_NAME] = { "_OBJECT_HEADER_NAME_INFO", "Name" },
+    [OBJECT_DIRECTORY_ENTRY_CHAINLINK] = { "_OBJECT_DIRECTORY_ENTRY", "ChainLink" },
+    [OBJECT_DIRECTORY_ENTRY_OBJECT] = { "_OBJECT_DIRECTORY_ENTRY", "Object" },
+    [OBJECT_TYPE_NAME] = { "_OBJECT_TYPE", "Name" },
     [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
     [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
     [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
@@ -200,6 +212,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [CM_KEY_NAMELENGTH]    = { "_CM_NAME_CONTROL_BLOCK", "NameLength"      },
     [CM_KEY_PARENTKCB]     = { "_CM_KEY_CONTROL_BLOCK",  "ParentKcb"       },
     [CM_KEY_PROCESSID]     = { "_CM_KEY_BODY",           "ProcessID"       },
+    [CM_KEY_FLAGS]         = { "_CM_KEY_CONTROL_BLOCK",  "Flags"           },
 
     [PROCCREATIONINFO_IMAGEFILENAME] = { "_SE_AUDIT_PROCESS_CREATION_INFO", "ImageFileName" },
     [OBJECTNAMEINFORMATION_NAME] = { "_OBJECT_NAME_INFORMATION", "Name" },
@@ -223,6 +236,9 @@ static const char* win_bitfields_names[__WIN_OFFSETS_MAX][2] =
     [MMVAD_FLAGS_VADTYPE] = { "_MMVAD_FLAGS", "VadType" },
     [MMVAD_FLAGS_COMMITCHARGE] = { "_MMVAD_FLAGS", "CommitCharge" },
     [MMVAD_FLAGS1_COMMITCHARGE] = { "_MMVAD_FLAGS1", "CommitCharge" },
+    [MMVAD_FLAGS_PRIVATEMEMORY] = { "_MMVAD_FLAGS",  "PrivateMemory" },
+
+    [EPROCESS_EXITPROCESSREPORTED] = { "_EPROCESS", "ExitProcessReported" },
 };
 
 #endif

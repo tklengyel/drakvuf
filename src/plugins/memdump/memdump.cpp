@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,16 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <glib.h>
 #include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
 #include <assert.h>
-#include <libdrakvuf/json-util.h>
+
+#include "plugins/plugins.h"
+#include "plugins/output_format.h"
 
 #include "memdump.h"
-#include "plugins/output_format.h"
 #include "private.h"
 
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
@@ -123,6 +120,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     addr_t dump_address,
     const char* method,
     const char* dump_reason,
+    int sequence_number,
     extras_t* extras)
 {
     char* file = NULL;
@@ -151,6 +149,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     }
 
     json_object_object_add(jobj, "DataFileName", json_object_new_string(data_file_name));
+    json_object_object_add(jobj, "SequenceNumber", json_object_new_int(sequence_number));
 
     fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
@@ -201,6 +200,8 @@ bool dump_memory_region(
     std::optional<fmt::Nval<decltype(extras->write_virtual_memory_extras.target_pid)>> target_pid;
     std::optional<fmt::Xval<decltype(extras->write_virtual_memory_extras.base_address)>> write_addr;
 
+    int sequence_number = ++plugin->dumps_count;
+
     if (!plugin->memdump_dir)
     {
         // dry run, just print that the dump would be saved
@@ -225,7 +226,7 @@ bool dump_memory_region(
 
     access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
 
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, PROT_READ, access_ptrs))
     {
         PRINT_DEBUG("[MEMDUMP] Failed mmap guest\n");
         goto done;
@@ -294,10 +295,10 @@ bool dump_memory_region(
     if (rename(tmp_file_path, file_path) != 0)
         goto done;
 
-    if (asprintf(&metafile, "%s/memdump.%06d", plugin->memdump_dir, ++plugin->dumps_count) < 0)
+    if (asprintf(&metafile, "%s/memdump.%06d", plugin->memdump_dir, sequence_number) < 0)
         goto done;
 
-    save_file_metadata(info, metafile, file, len_bytes, ctx->addr, info->trap->name, reason, extras);
+    save_file_metadata(info, metafile, file, len_bytes, ctx->addr, info->trap->name, reason, sequence_number, extras);
 
     ret = true;
 
@@ -305,25 +306,23 @@ printout:
     // scoping the block as goto jumps
     // bypasses variable initialization
     {
-        auto default_print=std::make_tuple(
+        auto default_print = std::make_tuple(
                 keyval("DumpReason", fmt::Qstr(reason)),
                 keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
                 keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
                 keyval("DumpSize", fmt::Xval(len_bytes)),
                 keyval("DumpFilename", fmt::Qstr(display_file)),
-                keyval("DumpsCount", fmt::Nval(plugin->dumps_count))
+                keyval("DumpsCount", fmt::Nval(sequence_number))
             );
         if (print_extras)
         {
             target_pid = fmt::Nval(extras->write_virtual_memory_extras.target_pid);
             write_addr = fmt::Xval(extras->write_virtual_memory_extras.base_address, false);
-            auto extra_arguments=std::make_tuple(
+            auto extra_arguments = std::make_tuple(
                     keyval("TargetPID", target_pid),
                     keyval("WriteAddr", write_addr)
                 );
-            fmt::print(plugin->m_output_format, "memdump", drakvuf, info,
-                std::tuple_cat(default_print, extra_arguments)
-            );
+            fmt::print(plugin->m_output_format, "memdump", drakvuf, info, default_print, extra_arguments);
         }
         else
         {
@@ -980,12 +979,12 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     }
 
     if (c->clr_profile)
-        this->setup_dotnet_hooks(drakvuf, "clr.dll", c->clr_profile);
+        this->setup_dotnet_hooks("clr.dll", c->clr_profile);
     else
         PRINT_DEBUG("clr.dll profile not found, memdump will proceed without .NET hooks\n");
 
     if (c->mscorwks_profile)
-        this->setup_dotnet_hooks(drakvuf, "mscorwks.dll", c->mscorwks_profile);
+        this->setup_dotnet_hooks("mscorwks.dll", c->mscorwks_profile);
     else
         PRINT_DEBUG("mscorwks.dll profile not found, memdump will proceed without .NET hooks\n");
 
@@ -1012,10 +1011,15 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
         if (!register_trap(nullptr, shellcode_cb, bp.for_syscall_name("NtFreeVirtualMemory")))
             throw -1;
 
-    this->userhook_init(drakvuf, c, output);
+    this->userhook_init(c, output);
 }
 
 memdump::~memdump()
 {
     userhook_destroy();
+}
+
+bool memdump::stop_impl()
+{
+    return this->userhooks_stop() && pluginex::stop_impl();
 }

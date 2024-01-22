@@ -1,0 +1,17 @@
+FROM debian:bullseye
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV USER root
+
+COPY ./debs/*.deb /tmp
+COPY ./package/extra/etc/ld.so.conf.d/host.conf /etc/ld.so.conf.d
+
+RUN apt-get update
+RUN apt-get --yes install nano wget git curl openssh-client && apt-get clean
+RUN dpkg -i /tmp/*.deb || : && \
+    apt-get -f --yes install && \
+    rm /tmp/*.deb
+
+RUN ldconfig
+
+CMD /bin/bash

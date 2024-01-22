@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -106,8 +106,8 @@ bin_PROGRAMS = drakvuf injector proc_stat
 
 SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libusermode libhook helpers/hiddump
 
-drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h exitcodes.h filesystem.hpp
-injector_SOURCES = injector.c
+drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h exitcodes.h
+injector_SOURCES = injector.cpp
 proc_stat_SOURCES = proc_stat.cpp
 
 AM_CPPFLAGS = $(CPPFLAGS)
@@ -136,6 +136,10 @@ if SANITIZE
 AM_CFLAGS += $(SANITIZE_CFLAGS)
 AM_CXXFLAGS += $(SANITIZE_CFLAGS)
 AM_LDFLAGS += $(SANITIZE_LDFLAGS)
+endif
+
+if !OUTPUT_BUFFERING
+AM_CXXFLAGS += -DDISABLE_OUTPUT_BUFFERING
 endif
 
 # Note that -pg is incompatible with HARDENING

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,14 +106,14 @@
 #include <stdexcept>
 #include <errno.h>
 
-static bool startup_timer(drakvuf_c* drakvuf, int timeout)
+static bool startup_timer(drakvuf_c* drakvuf, int _timeout)
 {
     drakvuf->interrupted = 0;
-    drakvuf->timeout = timeout;
+    drakvuf->timeout = _timeout;
 
     struct itimerval it =
     {
-        .it_value.tv_sec = timeout
+        .it_value.tv_sec = _timeout
     };
 
     if ( setitimer(ITIMER_REAL, &it, NULL) )
@@ -193,9 +193,9 @@ static bool is_stopped(drakvuf_t drakvuf, void* data)
     }
 }
 
-void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)
+void drakvuf_c::plugin_stop_loop(int _timeout, const bool* plugin_list)
 {
-    if ( !startup_timer(this, timeout) )
+    if ( !startup_timer(this, _timeout) )
         return;
 
     struct stop_plugins_data data;
@@ -209,18 +209,39 @@ drakvuf_c::drakvuf_c(const char* domain,
     const char* json_kernel_path,
     const char* json_wow_path,
     output_format_t output,
-    bool verbose,
     bool leave_paused,
     bool libvmi_conf,
     addr_t kpgd,
     bool fast_singlestep,
-    uint64_t limited_traps_ttl)
+    uint64_t limited_traps_ttl,
+    const std::set<uint64_t>& ignored_processes_,
+    bool libdrakvuf_get_userid,
+    bool enable_active_callback_check)
     : leave_paused{ leave_paused }
     , format{ output }
 {
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl))
+    GSList* ignored_processes = NULL;
+    for (auto pid : ignored_processes_)
+        ignored_processes = g_slist_prepend(ignored_processes, GUINT_TO_POINTER(pid));
+
+    bool success = drakvuf_init(
+            &drakvuf,
+            domain,
+            json_kernel_path,
+            json_wow_path,
+            libvmi_conf,
+            kpgd,
+            fast_singlestep,
+            limited_traps_ttl,
+            ignored_processes,
+            libdrakvuf_get_userid,
+            enable_active_callback_check
+        );
+
+    if (!success)
     {
         drakvuf_close(drakvuf, leave_paused);
+        g_slist_free(ignored_processes);
         throw std::runtime_error("drakvuf_init() failed");
     }
 
@@ -232,7 +253,7 @@ drakvuf_c::~drakvuf_c()
     if ( !interrupted )
         interrupt(SIGDRAKVUFERROR);
 
-    injector_free(drakvuf, injector_to_be_freed);
+    injector_free_win(injector_to_be_freed);
 
     delete plugins;
 
@@ -315,10 +336,10 @@ injector_status_t drakvuf_c::write_file(
     uint32_t injection_tid,
     const char* src,
     const char* dst,
-    int timeout,
+    int _timeout,
     bool global_search)
 {
-    if ( !startup_timer(this, timeout) )
+    if ( !startup_timer(this, _timeout) )
         return INJECTOR_FAILED;
 
     auto rc = injector_start_app(drakvuf,
@@ -353,13 +374,13 @@ injector_status_t drakvuf_c::inject_cmd(
     injection_method_t method,
     const char* binary_path,
     const char* target_process,
-    int timeout,
+    int _timeout,
     bool global_search,
     int args_count,
     const char* args[],
     vmi_pid_t* injected_pid)
 {
-    if ( !startup_timer(this, timeout) )
+    if ( !startup_timer(this, _timeout) )
         return INJECTOR_FAILED;
 
     auto rc = injector_start_app(drakvuf,
@@ -384,6 +405,11 @@ injector_status_t drakvuf_c::inject_cmd(
 
     cleanup_timer();
     return rc;
+}
+
+void drakvuf_c::exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid)
+{
+    injector_exitthread(drakvuf, injection_pid, injection_tid);
 }
 
 struct termination_info

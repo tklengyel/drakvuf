@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -114,6 +114,7 @@
 #include <sys/inotify.h>
 #include <signal.h>
 #include <time.h>
+#include <poll.h>
 #include <config.h>
 
 #include "../xen_helper/xen_helper.h"
@@ -171,7 +172,7 @@ make_clone(xen_interface_t* xen, domid_t* cloneID, uint16_t vlan, char** clone_n
     char* output = NULL;
     g_spawn_command_line_sync(command, &output, NULL, NULL, NULL);
     g_free(command);
-    get_dom_info(xen, output, cloneID, clone_name);
+    xen_get_dom_info(xen, output, cloneID, clone_name);
     g_free(output);
 }
 
@@ -368,7 +369,7 @@ int main(int argc, char** argv)
     struct sigaction act;
     shutting_down = 0;
 
-    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2022 Tamas K Lengyel\n",
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2024 Tamas K Lengyel\n",
         PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc!=15)

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,7 +119,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
+    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
     -> std::unique_ptr<ReturnHook>;
 
     /**
@@ -149,74 +149,74 @@ public:
      */
     ReturnHook& operator=(ReturnHook&&) noexcept;
 
-    cb_wrapper_t callback_;
+    std::shared_ptr<CallResult> params() override;
+
+    cb_wrapper_t callback_ = nullptr;
     drakvuf_trap_t* trap_ = nullptr;
+    std::shared_ptr<CallResult> params_;
+    char* display_name_;
 
 protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
-    ReturnHook(drakvuf_t, cb_wrapper_t cb);
+    ReturnHook(drakvuf_t, cb_wrapper_t cb, const char* display_name);
 };
 
 template<typename Params>
-auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
+auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
 -> std::unique_ptr<ReturnHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
-
-    // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb));
-    hook->trap_ = new drakvuf_trap_t();
 
     auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if (!ret_addr)
     {
         PRINT_DEBUG("[LIBHOOK] Failed to receive return addr of function\n");
-        delete hook->trap_;
-        hook->trap_ = nullptr;
-        return std::unique_ptr<ReturnHook>();
+        return {};
     }
 
-    hook->trap_->breakpoint.lookup_type = LOOKUP_DTB;
+    auto trap = new drakvuf_trap_t();
+    trap->breakpoint.lookup_type = LOOKUP_DTB;
     // TODO: decide whether to use CR3 or PID
-    hook->trap_->breakpoint.dtb = info->regs->cr3;
-    hook->trap_->breakpoint.addr_type = ADDR_VA;
-    hook->trap_->breakpoint.addr = ret_addr;
-    hook->trap_->breakpoint.module = info->trap->breakpoint.module;
+    trap->breakpoint.dtb = info->regs->cr3;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = ret_addr;
+    trap->breakpoint.module = info->trap->breakpoint.module;
 
-    hook->trap_->type = BREAKPOINT;
-    hook->trap_->name = "ReturnHook";
-    hook->trap_->ah_cb = nullptr;
-    hook->trap_->ttl = ttl;
-    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    trap->type = BREAKPOINT;
+    trap->ah_cb = nullptr;
+    trap->ttl = ttl;
+    trap->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         return GetTrapHook<ReturnHook>(info)->callback_(drakvuf, info);
     };
+
+    // not using std::make_unique because ctor is private
+    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb, display_name ?: "ReturnHook"));
+    hook->trap_ = trap;
+    hook->trap_->name = hook->display_name_;
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
     static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
 
     // pupulate backref
-    auto* params = new Params();
-    params->hook_ = hook.get();
-    hook->trap_->data = static_cast<void*>(params);
+    hook->params_ = std::make_shared<Params>();
+    hook->params_->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(hook->params_.get());
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for return hook\n");
-
-        delete static_cast<CallResult*>(hook->trap_->data);
         hook->trap_->data = nullptr;
-
         delete hook->trap_;
         hook->trap_ = nullptr;
-
-        return std::unique_ptr<ReturnHook>();
+        hook->params_.reset();
+        return {};
     }
 
     PRINT_DEBUG("[LIBHOOK] return hook OK\n");
     return hook;
 }
 
-};  // namespace libhook
+}  // namespace libhook

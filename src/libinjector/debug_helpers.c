@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -120,6 +120,7 @@ void print_hex(const char* array, size_t len)
 
 void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 {
+#ifdef DRAKVUF_DEBUG
     PRINT_DEBUG("Stack\n");
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -133,16 +134,18 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
         addr_t val = 0;
         vmi_read_64(vmi, &ctx, &val);
         if ((i%4)==0)
-            PRINT_DEBUG("\n%016lx:", addr + (i/4)*32);
-        PRINT_DEBUG(" %016lx", val);
+            fprintf(stderr, "\n%016lx:", addr + (i/4)*32);
+        fprintf(stderr, " %016lx", val);
     }
-    PRINT_DEBUG("\n");
+    fprintf(stderr, "\n");
 
     drakvuf_release_vmi(drakvuf);
+#endif
 }
 
 void print_registers(drakvuf_trap_info_t* info)
 {
+#ifdef DRAKVUF_DEBUG
     const char* fmt = "%s:\t%016lx\n";
     PRINT_DEBUG(fmt, "rax",    info->regs->rax);
     PRINT_DEBUG(fmt, "rcx",    info->regs->rcx);
@@ -168,4 +171,5 @@ void print_registers(drakvuf_trap_info_t* info)
     PRINT_DEBUG(fmt, "cr2",    info->regs->cr2);
     PRINT_DEBUG(fmt, "cr3",    info->regs->cr3);
     PRINT_DEBUG(fmt, "cr4",    info->regs->cr4);
+#endif
 }

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -110,8 +110,6 @@
 #include <signal.h>
 #include <atomic>
 #include <mutex>
-
-#include "../private.h" //  PRINT_DEBUG
 
 /* Injects random HID events or events specified in a template file */
 int hid_inject(const char* sock_path, const char* template_path,

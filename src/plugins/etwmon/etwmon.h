@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -58,7 +58,7 @@
  *                                                                         *
  * Because this license imposes special exceptions to the GPL, Covered     *
  * Work may not be combined (even as part of a larger work) with plain GPL *
- * software.  The terms, conditions, and exceptions of this license must   *
+ * saoftware.  The terms, conditions, and exceptions of this license must   *
  * be included as well.  This license is incompatible with some other open *
  * source licenses as well.  In some cases we can relicense portions of    *
  * DRAKVUF or grant special permissions to use it in other open source     *
@@ -101,34 +101,50 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
 
-#ifndef DRAKVUF_PLUGINS_PRIVATE_H
-#define DRAKVUF_PLUGINS_PRIVATE_H
-#include <libvmi/libvmi.h>
+#include "plugins/plugins_ex.h"
+#include "private.h"
 
-static const char* userid[] =
+class etwmon : public pluginex
 {
-    [VMI_OS_WINDOWS] = "SessionID",
-    [VMI_OS_LINUX] = "UID"
+public:
+    etwmon(drakvuf_t drakvuf, output_format_t output);
+    virtual bool stop_impl() override;
+
+    etwmon(const etwmon& other);
+    void report(drakvuf_t drakvuf, const char* type, const char* name, const char* action, addr_t value = 0, addr_t prev_value = 0);
+
+    bool is_supported(drakvuf_t drakvuf, bool quite);
+    void enumerate_loggers(vmi_instance_t vmi);
+    void enumerate_providers(vmi_instance_t vmi);
+    void enumerate_callbacks(vmi_instance_t vmi);
+    void enumerate_handles(vmi_instance_t vmi);
+
+    output_format_t format;
+    win_build_info_t winver;
+    size_t address_width;
+
+    std::array<size_t, etwmon_ns::__OFFSET_MAX> offsets{};
+
+    addr_t logger_cb_ctx_rva;
+    addr_t etw_state_rva;
+    addr_t hash_table_rva;
+    addr_t logger_settings_rva;
+    addr_t active_loggers_rva;
+    addr_t silo_globals_va;
+    addr_t bucket_size;
+    addr_t list_entry_size;
+
+    addr_t guid_list_head_va;
+    addr_t etw_debugger_data_va;
+    uint32_t active_system_loggers;
+
+    std::vector<addr_t> global_handles_va;
+    std::vector<addr_t> global_callbacks_va;
+
+    std::vector<etwmon_ns::wmi_logger_t> loggers;
+    std::vector<etwmon_ns::provider_t>   providers;
+    std::vector<addr_t>                  global_handles;
+    std::vector<addr_t>                  global_callbacks;
 };
-
-#define USERIDSTR(drakvuf) (userid[drakvuf_get_os_type(drakvuf)])
-
-#ifndef PRINT_DEBUG
-#ifdef DRAKVUF_DEBUG
-// This is defined in libdrakvuf
-extern bool verbose;
-
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
-    } while (0)
-
-#else
-
-#define PRINT_DEBUG(...) \
-    do {} while(0)
-#endif
-
-#endif // DRAKVUF_DEBUG
-#endif // PRINT_DEBUG

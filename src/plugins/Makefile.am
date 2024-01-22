@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -114,6 +114,7 @@ sources += syscalls/linux.h
 sources += syscalls/win.cpp
 sources += syscalls/win.h
 sources += syscalls/private.h
+sources += syscalls/private_2.h
 endif
 
 if PLUGIN_POOLMON
@@ -139,6 +140,12 @@ sources += filedelete/filedelete.cpp
 sources += filedelete/filedelete.h
 sources += filedelete/private.h
 sources += filedelete/filedelete2_helpers.cpp
+endif
+
+if PLUGIN_FILEEXTRACTOR
+sources += fileextractor/fileextractor.cpp
+sources += fileextractor/fileextractor.h
+sources += fileextractor/private.h
 endif
 
 if PLUGIN_OBJMON
@@ -189,6 +196,13 @@ endif
 if PLUGIN_PROCMON
 sources += procmon/procmon.cpp
 sources += procmon/procmon.h
+sources += procmon/linux.cpp
+sources += procmon/linux.h
+sources += procmon/linux_utils.cpp
+sources += procmon/linux_utils.h
+sources += procmon/private.h
+sources += procmon/win.cpp
+sources += procmon/win.h
 sources += procmon/winnt.cpp
 sources += procmon/winnt.h
 sources += procmon/privileges.cpp
@@ -338,22 +352,84 @@ sources += rootkitmon/rootkitmon.h
 sources += rootkitmon/private.h
 endif
 
+if PLUGIN_SPRAYMON
+sources += spraymon/spraymon.cpp
+sources += spraymon/spraymon.h
+endif
+
 if PLUGIN_CALLBACKMON
 sources += callbackmon/callbackmon.cpp
 sources += callbackmon/callbackmon.h
+sources += callbackmon/private.h
+endif
+
+if PLUGIN_HIDEVM
+sources += hidevm/hidevm.cpp
+sources += hidevm/hidevm.h
+sources += hidevm/private.h
+endif
+
+if PLUGIN_PTRACEMON
+sources += ptracemon/ptracemon.cpp
+sources += ptracemon/ptracemon.h
+sources += ptracemon/private.h
+endif
+
+if PLUGIN_EBPFMON
+sources += ebpfmon/ebpfmon.cpp
+sources += ebpfmon/ebpfmon.h
+sources += ebpfmon/private.h
+endif
+
+if PLUGIN_MEMACCESSMON
+sources += memaccessmon/memaccessmon.cpp
+sources += memaccessmon/memaccessmon.h
+sources += memaccessmon/private.h
+endif
+
+if PLUGIN_UNIXSOCKETMON
+sources += unixsocketmon/unixsocketmon.cpp
+sources += unixsocketmon/unixsocketmon.h
+sources += unixsocketmon/private.h
+endif
+
+if PLUGIN_ETWMON
+sources += etwmon/etwmon.cpp
+sources += etwmon/etwmon.h
+sources += etwmon/private.h
+endif
+
+if PLUGIN_REBOOTMON
+sources += rebootmon/rebootmon.cpp
+sources += rebootmon/rebootmon.h
+sources += rebootmon/linux.cpp
+sources += rebootmon/linux.h
+sources += rebootmon/linux-private.h
+endif
+
+if PLUGIN_LINKMON
+sources += linkmon/linkmon.cpp
+sources += linkmon/linkmon.h
+sources += linkmon/private.h
 endif
 
 ###############################################################################
-sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
+sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
 sources += output_format/xfmt.h output_format/ostream.h output_format/ostream.cpp
+sources += helpers/type_traits.h helpers/hooks.h helpers/unicode_string.h helpers/vmi_lock_guard.h helpers/profile_guard.h helpers/exclude_matcher.h helpers/exclude_matcher.cpp
 
-AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
-AM_CPPFLAGS += $(CPPFLAGS)
+AM_CPPFLAGS = $(CPPFLAGS) -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir) -I$(srcdir)/helpers
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
 AM_CPPFLAGS += $(JSONC_CFLAGS)
 AM_CPPFLAGS += $(PTHREAD_CFLAGS)
+
+AM_CFLAGS = $(CFLAGS)
+AM_CFLAGS += $(VMI_CFLAGS)
+AM_CFLAGS += $(GLIB_CFLAGS)
+AM_CFLAGS += $(JSONC_CFLAGS)
+AM_CFLAGS += $(PTHREAD_CFLAGS)
 
 AM_LDFLAGS =  $(LDFLAGS)
 AM_LDFLAGS += $(GLIB_LIBS)
@@ -404,12 +480,23 @@ AM_DEFAULT_SOURCE_EXT = .cpp
 
 check_PROGRAMS =
 
+check_PROGRAMS += plugin_utils_check
+plugin_utils_check_SOURCES = plugin_utils_check.cpp
+plugin_utils_check_CFLAGS = $(CHECK_CFLAGS)
+plugin_utils_check_LDADD = $(CHECK_LIBS) plugin_utils.lo
+
 if PLUGIN_PROCMON
 check_PROGRAMS += procmon/check
 procmon_check_SOURCES = procmon/check.cpp
 procmon_check_CFLAGS = $(CHECK_CFLAGS)
-procmon_check_LDADD = $(CHECK_LIBS) procmon/winnt.lo
+procmon_check_LDADD = $(CHECK_LIBS) procmon/linux_utils.lo procmon/winnt.lo
 endif
+
+# Unit tests for output format
+check_PROGRAMS += output_format/check
+output_format_check_SOURCES = output_format/check.cpp
+output_format_check_CFLAGS = $(CHECK_CFLAGS) $(ZLIB_CFLAGS)
+output_format_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS)
 
 TESTS = $(check_PROGRAMS)
 

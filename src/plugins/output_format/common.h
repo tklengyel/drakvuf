@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -108,8 +108,7 @@
 #include "ostream.h"
 
 #include <libdrakvuf/libdrakvuf.h>
-#include <plugins/private.h>
-#include <plugins/type_traits_helpers.h>
+#include <plugins/helpers/type_traits.h>
 
 #include <algorithm>
 #include <functional>
@@ -131,6 +130,15 @@ struct TimeVal
     glong tv_usec;
 };
 
+struct flagsval
+{
+    const char* name;
+    std::string values;
+
+    flagsval() = default;
+    flagsval(const char* n, std::string v) : name{n}, values{std::move(v)} {}
+};
+
 template<class Value>
 auto keyval(const char* key, Value&& value)
 {
@@ -145,6 +153,14 @@ struct ValHolder
 {
     T value;
     ValHolder(T v): value(std::move(v)) {}
+};
+
+template<class T>
+struct ArrayHolder
+{
+    T value;
+    size_t size;
+    ArrayHolder(T v, size_t _size): value(std::move(v)), size(_size) {}
 };
 
 /* numeric value */
@@ -250,8 +266,79 @@ struct Qstr<T,
     Qstr(T v): Rstr<std::string>(nullptr == v ? std::string("(null)") : std::string(v)) {}
 };
 
+/* format specific encoded string value */
+template<class T, class = void>
+struct Estr
+{
+    Estr(T v)
+    {
+        static_assert(always_false<T>::value, "should be the one of: const char*, std::string, std::string_view");
+    }
+};
+
+template<class T>
+struct Estr<T,
+           std::enable_if_t<
+           std::is_same_v<std::decay_t<T>, std::string>
+           || std::is_same_v<std::decay_t<T>, std::string_view>,
+           void>
+           >: Rstr<std::string>
+{
+    Estr(T v): Rstr<std::string>(std::string_view(v).empty() ? std::string("(null)") : std::move(v)) {}
+};
+
+template<class T>
+struct Estr<T,
+           std::enable_if_t<
+           std::is_same_v<T, const char*>
+           || std::is_same_v<T, char*>,
+           void>
+           >: Rstr<std::string>
+{
+    Estr(T v): Rstr<std::string>(nullptr == v ? std::string("(null)") : std::string(v)) {}
+};
+
+/* format specific binary string value */
+template<class T, class = void>
+struct BinaryString
+{
+    BinaryString(T v, size_t _size)
+    {
+        static_assert(always_false<T>::value, "should be uint8_t*");
+    }
+};
+
+template<class T>
+struct BinaryString<T,
+           std::enable_if_t<
+           std::is_same_v<T, const uint8_t*>
+           || std::is_same_v<T, uint8_t*>,
+           void>
+           >: ArrayHolder<uint8_t*>
+{
+    BinaryString(T v, size_t size): ArrayHolder<uint8_t*>(const_cast<uint8_t*>(v), size) {}
+    void format(std::ostream& os) const
+    {
+        auto restore_flags = RestoreFlags(os);
+        os << std::hex << std::setfill('0');
+        for (size_t it = 0; it < size; it++)
+        {
+            os << std::setw(2) << static_cast<int>(value[it]);
+        }
+    }
+};
+
 /* Any argument type */
-using Aarg = std::variant<fmt::Nval<unsigned long>, fmt::Xval<unsigned long>, fmt::Fval<long double>, fmt::Rstr<std::string>, fmt::Qstr<std::string>>;
+using Aarg = std::variant<
+    fmt::Nval<unsigned long>,
+    fmt::Xval<unsigned long>,
+    fmt::Fval<long double>,
+    fmt::Rstr<const char*>,
+    fmt::Rstr<std::string>,
+    fmt::Qstr<const char*>,
+    fmt::Qstr<std::string>,
+    fmt::Estr<const char*>,
+    fmt::Estr<std::string>>;
 
 } // namespace fmt
 

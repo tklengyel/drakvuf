@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -105,21 +105,20 @@
 #ifndef PROCMON_H
 #define PROCMON_H
 
-#include <glib.h>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
+#include "win.h"
+#include "linux.h"
+
+#include <memory>
 
 class procmon: public pluginex
 {
 public:
-    addr_t command_line;
-    addr_t image_path_name;
-    addr_t dll_path;
-    addr_t current_directory_handle;
-    addr_t current_directory_dospath;
-    addr_t cid_tid;
+    std::unique_ptr<win_procmon> wp;
+    std::unique_ptr<linux_procmon> lp;
 
-    procmon(drakvuf_t drakvuf, output_format_t output);
+    procmon(drakvuf_t drakvuf, const procmon_config* config, output_format_t output);
+    ~procmon() = default;
 };
 
 #endif

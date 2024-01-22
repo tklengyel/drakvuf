@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,14 +106,14 @@
 #include <win/win_functions.h>
 #include <win/method_helpers.h>
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
-    event_response_t event;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1:
         {
@@ -124,34 +124,28 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_shell_execute_stack(injector, info->regs))
             {
                 fprintf(stderr, "Failed to setup shellexec stack\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->exec_func;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2:
         {
             // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND(6) while
             // successfully opening file.
             if (info->regs->rax != 6 && is_fun_error(drakvuf, info, "ShellExecute failed"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             PRINT_DEBUG("ShellExecute successful\n");
 
             injector->rc = INJECTOR_SUCCEEDED;
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP3:
-        {
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-            event = VMI_EVENT_RESPONSE_NONE;
-            break;
+            drakvuf_interrupt(drakvuf, SIGINT);
+
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         default:
         {
@@ -160,16 +154,21 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    injector_t injector = info->trap->data;
+
     fprintf(stderr, "Exiting prematurely\n");
 
     if (injector->rc == INJECTOR_SUCCEEDED)
         injector->rc = INJECTOR_FAILED;
 
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
     memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP3, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }

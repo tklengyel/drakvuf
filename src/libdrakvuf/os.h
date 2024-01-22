@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -121,6 +121,9 @@ typedef struct os_interface
     addr_t (*get_current_thread_stackbase)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+    addr_t (*get_rspbase)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
@@ -156,6 +159,9 @@ typedef struct os_interface
 
     bool (*get_process_tid)
     (drakvuf_t drakvuf, addr_t process_base, uint32_t* tid);
+
+    bool (*get_process_pgid)
+    (drakvuf_t drakvuf, addr_t process_base, uint32_t* pgid);
 
     int64_t (*get_current_process_userid)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -193,6 +199,8 @@ typedef struct os_interface
     bool (*get_module_base_addr_ctx)
     (drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
 
+    addr_t (*kernel_symbol_to_va)(drakvuf_t drakvuf, const char* func);
+
     addr_t (*exportksym_to_va)
     (drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva);
 
@@ -214,6 +222,9 @@ typedef struct os_interface
     char* (*get_filename_from_object_attributes)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
 
+    char* (*get_filepath_from_dentry)
+    (drakvuf_t drakvuf, addr_t dentry_addr);
+
     bool (*is_wow64)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
@@ -230,10 +241,13 @@ typedef struct os_interface
     (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
 
     bool (*enumerate_drivers)
-    (drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t driver, void* visitor_ctx), void* visitor_ctx);
+    (drakvuf_t drakvuf, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx), void* visitor_ctx);
 
     bool (*enumerate_process_modules)
     (drakvuf_t drakvuf, addr_t eprocess, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx), void* visitor_ctx);
+
+    bool (*enumerate_object_directory)
+    (drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx);
 
     bool (*is_crashreporter)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
@@ -253,6 +267,12 @@ typedef struct os_interface
     uint64_t (*mmvad_commit_charge)
     (drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
 
+    bool (*mmvad_private_memory)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
+
+    uint64_t (*mmvad_protection)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
+
     bool (*get_pid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
@@ -261,6 +281,8 @@ typedef struct os_interface
 
     bool (*is_process_suspended)
     (drakvuf_t drakvuf, addr_t process, bool* status);
+
+    GHashTable* (*enum_threads)(drakvuf_t drakvuf, addr_t process);
 
     bool (*get_wow_context)
     (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
@@ -274,8 +296,32 @@ typedef struct os_interface
     addr_t (*get_wow_peb)
     (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
 
+    void (*set_return_context)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid, uint32_t* tid, addr_t* rsp);
+
     bool (*check_return_context)
     (drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
+
+    bool (*get_current_process_environ)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ);
+
+    bool (*get_process_arguments)
+    (drakvuf_t drakvuf, addr_t process_base, addr_t* argv);
+
+    bool (*get_kernel_symbol_rva)
+    (drakvuf_t drakvuf, const char* function, addr_t* rva);
+
+    const kernel_version_t* (*get_kernel_version)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    bool (*get_kernel_symbol_va)
+    (drakvuf_t drakvuf, const char* function, addr_t* va);
+
+    unicode_string_t* (*get_object_name)
+    (drakvuf_t drakvuf, addr_t object);
+
+    unicode_string_t* (*get_object_type_name)
+    (drakvuf_t drakvuf, addr_t object);
 
 } os_interface_t;
 

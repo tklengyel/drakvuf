@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,43 +102,18 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <glib.h>
 #include <inttypes.h>
-#include <libvmi/libvmi.h>
 #include <assert.h>
 
 #include "filetracer.h"
-#include "private.h"
 #include "linux.h"
 #include "win.h"
 
-filetracer::filetracer(drakvuf_t drakvuf, output_format_t output) :
-    os(drakvuf_get_os_type(drakvuf)), wf(), lf()
+filetracer::filetracer(drakvuf_t drakvuf, const filetracer_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
-    if (this->os == VMI_OS_WINDOWS)
-    {
-        this->wf = new win_filetracer(drakvuf, output);
-    }
+    auto os = drakvuf_get_os_type(drakvuf);
+    if (os == VMI_OS_WINDOWS)
+        this->wf = std::make_unique<win_filetracer>(drakvuf, config, output);
     else
-    {
-        this->lf = new linux_filetracer(drakvuf, output);
-    }
-}
-
-filetracer::~filetracer()
-{
-    if (this->os == VMI_OS_WINDOWS)
-    {
-        delete this->wf;
-    }
-    else
-    {
-        delete this->lf;
-    }
-}
-
-bool filetracer::stop_impl()
-{
-    return true;
+        this->lf = std::make_unique<linux_filetracer>(drakvuf, output);
 }

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -124,8 +124,12 @@ public:
 protected:
     int sync() final
     {
+#ifdef DISABLE_OUTPUT_BUFFERING
+        const int threshold = 0;
+#else
         // Disable buffering when printing on tty
         const int threshold = stdout_is_tty_ ? 0 : 4 * 1024;
+#endif
         return sync(threshold);
     }
 

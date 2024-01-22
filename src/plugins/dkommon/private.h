@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,4 +119,11 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [LIST_ENTRY_FLINK] = {"_LIST_ENTRY", "Flink"},
     [LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] = {"_LDR_DATA_TABLE_ENTRY", "InLoadOrderLinks"},
     [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = {"_LDR_DATA_TABLE_ENTRY", "BaseDllName"},
+};
+
+struct srv_result_t : public call_result_t
+{
+    srv_result_t() : call_result_t(), srv_record()
+    {}
+    addr_t srv_record;
 };

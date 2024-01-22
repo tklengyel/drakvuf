@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -107,7 +107,7 @@
 
 #include "common.h"
 
-#include "type_traits_helpers.h"
+#include "plugins/helpers/type_traits.h"
 
 namespace deffmt
 {
@@ -147,6 +147,11 @@ struct DataPrinter
         return true;
     }
 
+    static bool print(std::ostream& os, const flagsval& flags, char sep)
+    {
+        return print_data(os, keyval(flags.name, fmt::Rstr(flags.values)), sep);
+    }
+
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Nval<Tv>& data, char)
     {
@@ -182,6 +187,22 @@ struct DataPrinter
     static bool print(std::ostream& os, const fmt::Qstr<Tv>& data, char)
     {
         os << '"' << data.value << '"';
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::BinaryString<Tv>& data, char)
+    {
+        data.format(os);
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::Estr<Tv>& data, char)
+    {
+        gchar* escaped = drakvuf_escape_str(data.value.c_str());
+        os << escaped;
+        g_free(escaped);
         return true;
     }
 
@@ -286,11 +307,23 @@ constexpr bool print_data(std::ostream& os, const T& data, const Ts& ... rest)
 
 /**/
 
-inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+inline const char* userid_field_name(drakvuf_t drakvuf)
+{
+    switch (drakvuf_get_os_type(drakvuf))
+    {
+        case VMI_OS_WINDOWS:
+            return "SessionID";
+        case VMI_OS_LINUX:
+        default:
+            return "UID";
+    }
+}
+
+inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
     if (info)
     {
-        proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+        const proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
         const char* method = info->trap->name ?: "";
         std::string procname = "\"";
         procname += proc_data->name ?: "NOPROC";
@@ -301,7 +334,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
             keyval("VCPU", fmt::Nval(info->vcpu)),
             keyval("CR3", fmt::Xval(info->regs->cr3)),
             keyval(procname.c_str(), fmt::Rstr(method)),
-            keyval(USERIDSTR(drakvuf), fmt::Nval(info->proc_data.userid)),
+            keyval(userid_field_name(drakvuf), fmt::Nval(proc_data->userid)),
             keyval("PID", fmt::Nval(proc_data->pid)),
             keyval("PPID", fmt::Nval(proc_data->ppid))
         );
@@ -309,7 +342,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
 }
 
 template<class... Args>
-void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t* info, const Args& ... args)
 {
     std::string up_name(plugin_name);
     std::transform(up_name.begin(), up_name.end(), up_name.begin(),

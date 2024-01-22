@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,15 +106,15 @@
 #include "win_functions.h"
 #include "method_helpers.h"
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static bool write_chunk_to_buffer(injector_t injector, x86_registers_t* regs, uint8_t* buf, size_t amount);
 
 event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
-    event_response_t event;
+    base_injector_t base_injector = &injector->base_injector;
 
-    switch (injector->step)
+    switch (base_injector->step)
     {
         case STEP1: // allocate virtual memory
         {
@@ -124,12 +124,11 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_virtual_alloc_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->exec_func;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2: // write payload to virtual memory
         {
@@ -141,12 +140,11 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_memset_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->memset;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP3: // expand env in memory
         {
@@ -154,17 +152,16 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_expand_env_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->expand_env;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP4: // open file handle
         {
             if (is_fun_error(drakvuf, info, "Failed to expand environment variables!\n"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             PRINT_DEBUG("Env expand status: %lx\n", info->regs->rax);
 
@@ -178,21 +175,21 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 return VMI_EVENT_RESPONSE_NONE;
 
             info->regs->rip = injector->create_file;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP5: // verify file handle and open host file
         {
             PRINT_DEBUG("File create result %lx\n", info->regs->rax);
 
             if (is_fun_error(drakvuf, info, "Couldn't open guest file"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             injector->file_handle = info->regs->rax;
 
             if (!open_host_file(injector, "rb"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
+            fall_through_step(base_injector, STEP6);
         }
         // fall through
         case STEP6: // read chunk from host and write to guest
@@ -201,7 +198,7 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             size_t amount;
 
             if (is_fun_error(drakvuf, info, "Failed to write to the guest file"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             PRINT_DEBUG("Writing file...\n");
             amount = fread(buf + FILE_BUF_RESERVED, 1, FILE_BUF_SIZE - FILE_BUF_RESERVED, injector->host_file);
@@ -210,7 +207,7 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (ferror(injector->host_file))
             {
                 fprintf(stderr, "Failed to read the chunk of file.\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             if (!amount)
@@ -221,27 +218,27 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 if (!setup_close_handle_stack(injector, info->regs))
                 {
                     PRINT_DEBUG("Failed to setup stack for closing handle\n");
-                    return cleanup(injector, info);
+                    return cleanup(drakvuf, info);
                 }
 
                 info->regs->rip = injector->close_handle;
-                event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+                return VMI_EVENT_RESPONSE_SET_REGISTERS;
             }
             else
             {
                 PRINT_DEBUG("Writing...\n");
 
                 if (!write_chunk_to_buffer(injector, info->regs, buf + FILE_BUF_RESERVED, amount))
-                    return cleanup(injector, info);
+                    return cleanup(drakvuf, info);
 
                 if (!setup_write_file_stack(injector, info->regs, amount))
                 {
                     PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                    return cleanup(injector, info);
+                    return cleanup(drakvuf, info);
                 }
 
                 info->regs->rip = injector->write_file;
-                event = override_step(injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
+                return override_step(base_injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
             }
             break;
         }
@@ -251,22 +248,16 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             fclose(injector->host_file);
 
             if (is_fun_error(drakvuf, info, "Could not close File handle"))
-                return cleanup(injector, info);
-
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+                return cleanup(drakvuf, info);
 
             PRINT_DEBUG("File operation executed OK\n");
             injector->rc = INJECTOR_SUCCEEDED;
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP8: // exit loop
-        {
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-            event = VMI_EVENT_RESPONSE_NONE;
-            break;
+            drakvuf_interrupt(drakvuf, SIGINT);
+
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         default:
         {
@@ -275,14 +266,20 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    injector_t injector = info->trap->data;
+
     PRINT_DEBUG("Exiting prematurely\n");
+
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
     memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP8, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
 static bool write_chunk_to_buffer(injector_t injector, x86_registers_t* regs, uint8_t* buf, size_t amount)

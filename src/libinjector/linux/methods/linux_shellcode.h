@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -110,5 +110,5 @@
 #include "linux_injector.h"
 
 event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-bool load_shellcode_from_file(injector_t injector, const char* file);
+bool load_shellcode_from_file(linux_injector_t injector, const char* file);
 #endif

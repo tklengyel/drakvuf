@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -196,7 +196,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (!drakvuf_init(&drakvuf, argv[1], NULL, NULL, true, false, 0, false, UNLIMITED_TTL))
+    if (!drakvuf_init(&drakvuf, argv[1], NULL, NULL, true, 0, false, UNLIMITED_TTL, NULL, true, false))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", argv[1]);
         return 1;

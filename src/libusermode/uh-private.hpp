@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -111,10 +111,11 @@
 #include <map>
 
 #include <glib.h>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 class userhook; // Forward declaration.
+
+#define VAD_TYPE_DLL 2
 
 enum offset
 {
@@ -145,8 +146,12 @@ struct rh_data_t
     // Additional data. Stored here for optimalization.
     target_hook_state state;
     vmi_pid_t target_process_pid;
+    uint32_t target_process_tid;
+    uint64_t target_process_rsp;
     addr_t target_process_dtb;
     addr_t func_addr;
+    x86_registers_t regs;
+    bool inject_in_progress{false};
 
     // We need to pass this around as we need offsets.
     userhook* userhook_plugin;
@@ -180,6 +185,35 @@ struct dll_t
     // internal, for page faults
     addr_t pf_current_addr;
     addr_t pf_max_addr;
+
+    bool in_progress{false};
+    x86_registers_t regs;
+
+    uint64_t stack_marker()
+    {
+        // TODO Set initial random value and print this to log
+        return 0x1aef05de1aef05de;
+    }
+
+    uint64_t* set_stack_marker()
+    {
+        m_stack_marker = stack_marker();
+        return &m_stack_marker;
+    }
+
+    uint64_t stack_marker_va()
+    {
+        return m_stack_marker;
+    }
+
+    uint64_t m_stack_marker;
+};
+
+struct protect_virtual_memory_result_t : public call_result_t
+{
+    protect_virtual_memory_result_t() : call_result_t(), base_address() {}
+
+    addr_t base_address;
 };
 
 struct map_view_of_section_result_t : public call_result_t
@@ -204,24 +238,38 @@ struct copy_on_write_result_t : public call_result_t
 class userhook : public pluginex
 {
 public:
-    drakvuf_t m_drakvuf = nullptr;
+    addr_t copy_virt_mem_va{0};
 
     userhook(userhook const&) = delete;
     userhook& operator=(userhook const&) = delete;
 
+    virtual bool stop_impl() override;
+
     std::array<size_t, __OFFSET_MAX> offsets;
 
     std::vector<usermode_cb_registration> plugins;
-    // map pid -> list of hooked dlls
+
+    // map pid -> list of loaded/hooked dlls
     std::map<vmi_pid_t, std::vector<dll_t>> loaded_dlls;
 
-    std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
-
-    static userhook& get_instance(drakvuf_t drakvuf)
+    struct module_context_t
     {
-        static userhook instance(drakvuf);
-        return instance;
-    }
+        std::optional<mmvad_info_t> mmvad;
+        bool is_hooked;
+    };
+
+    std::map<vmi_pid_t, module_context_t> proc_ntdll;
+
+    const bool injection_mode;
+    int injection_in_progress = 0;
+    std::set<std::pair<vmi_pid_t, uint32_t /*tid*/>> pf_in_progress;
+
+    void increment_injection_in_progress_count(const proc_data_t& proc_data);
+    void decrement_injection_in_progress_count(const proc_data_t& proc_data);
+    bool is_injection_in_progress(drakvuf_t drakvuf, drakvuf_trap_info_t* info) const;
+    bool no_injection_in_progress() const;
+
+    static userhook& get_instance(drakvuf_t drakvuf);
 
     static bool is_supported(drakvuf_t drakvuf);
     void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
@@ -234,7 +282,7 @@ public:
     void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
 private:
-    userhook(drakvuf_t drakvuf); // Force get_instance().
+    userhook(drakvuf_t drakvuf, bool injection_mode_enabled); // Force get_instance().
     ~userhook();
 
     // We need to keep these for memory management purposes.
@@ -244,5 +292,20 @@ private:
     std::vector<drakvuf_trap_t*> running_rh_traps;
 };
 
+proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info);
+bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func);
+bool is_pagetable_loaded(vmi_instance_t vmi, const drakvuf_trap_info* info, addr_t vaddr);
+
+event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
+event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
+
+bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+    uint64_t* stack_marker,
+    addr_t addr,
+    addr_t* stack_pointer);
+
+event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #endif

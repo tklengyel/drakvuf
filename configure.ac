@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -104,7 +104,7 @@
 
 AC_PREREQ([2.60])
 AC_INIT([DRAKVUF],
-        m4_join([], [1.0-git],
+        m4_join([], [1.1-git],
             m4_esyscmd_s([git log -1 --date=format:%Y%m%d%H%M%S --pretty=format:%cd]), [+], m4_esyscmd_s([git describe --always]), [-1]),
         [tamas@tklengyel.com], [],
         [https://drakvuf.com])
@@ -117,9 +117,6 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC_STDC
 AC_PROG_CXX(clang++)
-
-# Pthread support!
-AX_PTHREAD(, [AC_MSG_ERROR([libpthread is required])])
 
 AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX])
 AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
@@ -185,13 +182,23 @@ if test x$plugin_filetracer = xyes; then
 fi
 
 AC_ARG_ENABLE([plugin_filedelete],
-  [AS_HELP_STRING([--disable-plugin-filedelete],
-    [Enable the file delete catching plugin @<:@yes@:>@])],
+  [AS_HELP_STRING([--enable-plugin-filedelete],
+    [Enable the file delete catching plugin @<:@no@:>@])],
   [plugin_filedelete="$enableval"],
-  [plugin_filedelete="yes"])
+  [plugin_filedelete="no"])
 AM_CONDITIONAL([PLUGIN_FILEDELETE], [test x$plugin_filedelete = xyes])
 if test x$plugin_filedelete = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILEDELETE, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_fileextractor],
+  [AS_HELP_STRING([--disable-plugin-fileextractor],
+    [Enable the file extractor (aka filedelete2) catching plugin @<:@yes@:>@])],
+  [plugin_fileextractor="$enableval"],
+  [plugin_fileextractor="yes"])
+AM_CONDITIONAL([PLUGIN_FILEEXTRACTOR], [test x$plugin_fileextractor = xyes])
+if test x$plugin_fileextractor = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILEEXTRACTOR, 1, "")
 fi
 
 AC_ARG_ENABLE([plugin_objmon],
@@ -355,7 +362,7 @@ if test x$plugin_dkommon = xyes; then
 fi
 
 AC_ARG_ENABLE([plugin_wmimon],
-  [AS_HELP_STRING([--disable-plugin-wmimon],
+  [AS_HELP_STRING([--enable-plugin-wmimon],
     [Enable the WMI monitor plugin @<:@no@:>@])],
   [plugin_wmimon="$enableval"],
   [plugin_wmimon="no"])
@@ -471,6 +478,7 @@ AC_ARG_ENABLE([plugin_hidsim],
   [plugin_hidsim="yes"])
 AM_CONDITIONAL([PLUGIN_HIDSIM], [test x$plugin_hidsim = xyes])
 if test x$plugin_hidsim = xyes; then
+  AX_PTHREAD(, [AC_MSG_ERROR([libpthread is required])])
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDSIM, 1, "")
 fi
 
@@ -502,6 +510,96 @@ AC_ARG_ENABLE([DISABLE_ATOMS],
 AM_CONDITIONAL([DISABLE_ATOMS], [test x$disable_atoms = xyes])
 if test x$disable_atoms = xyes; then
   AC_DEFINE_UNQUOTED(DISABLE_ATOMS, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_spraymon],
+  [AS_HELP_STRING([--disable-plugin-spraymon],
+    [Enable the spraymon plugin @<:@yes@:>@])],
+  [plugin_spraymon="$enableval"],
+  [plugin_spraymon="yes"])
+AM_CONDITIONAL([PLUGIN_SPRAYMON], [test x$plugin_spraymon = xyes])
+if test x$plugin_spraymon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SPRAYMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_hidevm],
+  [AS_HELP_STRING([--disable-plugin-hidevm],
+    [Enable the HIDEVM plugin @<:@yes@:>@])],
+  [plugin_hidevm="$enableval"],
+  [plugin_hidevm="yes"])
+AM_CONDITIONAL([PLUGIN_HIDEVM], [test x$plugin_hidevm = xyes])
+if test x$plugin_hidevm = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDEVM, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_ptracemon],
+  [AS_HELP_STRING([--disable-plugin-ptracemon],
+    [Enable the ptracemon plugin @<:@yes@:>@])],
+  [plugin_ptracemon="$enableval"],
+  [plugin_ptracemon="yes"])
+AM_CONDITIONAL([PLUGIN_PTRACEMON], [test x$plugin_ptracemon = xyes])
+if test x$plugin_ptracemon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PTRACEMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_ebpfmon],
+  [AS_HELP_STRING([--disable-plugin-ebpfmon],
+    [Enable the epbfmon plugin @<:@yes@:>@])],
+  [plugin_ebpfmon="$enableval"],
+  [plugin_ebpfmon="yes"])
+AM_CONDITIONAL([PLUGIN_EBPFMON], [test x$plugin_ebpfmon = xyes])
+if test x$plugin_ebpfmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EBPFMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_memaccessmon],
+  [AS_HELP_STRING([--disable-plugin-memaccessmon],
+    [Enable memaccessmon plugin @<:@yes@:>@])],
+  [plugin_memaccessmon="$enableval"],
+  [plugin_memaccessmon="yes"])
+AM_CONDITIONAL([PLUGIN_MEMACCESSMON], [test x$plugin_memaccessmon = xyes])
+if test x$plugin_memaccessmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_MEMACCESSMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_unixsocketmon],
+  [AS_HELP_STRING([--disable-plugin-unixsocketmon],
+    [Enable the unixsocketmon plugin @<:@yes@:>@])],
+  [plugin_unixsocketmon="$enableval"],
+  [plugin_unixsocketmon="yes"])
+AM_CONDITIONAL([PLUGIN_UNIXSOCKETMON], [test x$plugin_unixsocketmon = xyes])
+if test x$plugin_unixsocketmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_UNIXSOCKETMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_etwmon],
+  [AS_HELP_STRING([--disable-plugin-etwmon],
+    [Enable the epbfmon plugin @<:@yes@:>@])],
+  [plugin_etwmon="$enableval"],
+  [plugin_etwmon="yes"])
+AM_CONDITIONAL([PLUGIN_ETWMON], [test x$plugin_etwmon = xyes])
+if test x$plugin_etwmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_ETWMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_rebootmon],
+  [AS_HELP_STRING([--disable-plugin-rebootmon],
+    [Enable the power off monitoring plugin @<:@yes@:>@])],
+  [plugin_rebootmon="$enableval"],
+  [plugin_rebootmon="yes"])
+AM_CONDITIONAL([PLUGIN_REBOOTMON], [test x$plugin_rebootmon = xyes])
+if test x$plugin_rebootmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_REBOOTMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_linkmon],
+  [AS_HELP_STRING([--disable-plugin-linkmon],
+    [Enable plugin for NTFS links extraction @<:@yes@:>@])],
+  [plugin_linkmon="$enableval"],
+  [plugin_linkmon="yes"])
+AM_CONDITIONAL([PLUGIN_LINKMON], [test x$plugin_linkmon = xyes])
+if test x$plugin_linkmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LINKMON, 1, "")
 fi
 
 #####################################################
@@ -562,6 +660,13 @@ AC_ARG_ENABLE([threadsafety],
 if test x$threadsafety = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_THREADSAFETY, 1, "")
 fi
+
+AC_ARG_ENABLE([output_buffering],
+  [AS_HELP_STRING([--disable-ouput-buffering],
+    [Disable TTY output buffering @<:@yes@:>@])],
+  [output_buffering="$enableval"],
+  [output_buffering="yes"])
+AM_CONDITIONAL([OUTPUT_BUFFERING], [test x$output_buffering = xyes])
 
 #####################################################
 # AUTOHARDEN START
@@ -714,10 +819,8 @@ AS_IF([test x$plugin_procdump == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
 AS_IF([test x$plugin_procdump2 == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
-PKG_CHECK_MODULES([LIBXC], [xencontrol], [], [AC_ERROR([libxc not found])])
-PKG_CHECK_MODULES([LIBXL], [xenlight], [], [AC_ERROR([libxl not found])])
-PKG_CHECK_MODULES([XENFMEM], [xenforeignmemory], [], [AC_ERROR([xenforeignmemory not found])])
-PKG_CHECK_MODULES([XENTOOLLOG], [xentoollog], [], [AC_ERROR([xentoollog not found])])
+
+AC_CHECK_HEADERS([xenctrl.h libxl_utils.h libxl.h xenforeignmemory.h])
 
 if test x$repl = xyes; then
   PKG_CHECK_MODULES([PYTHON3], [python3])
@@ -744,6 +847,8 @@ fi
 PKG_CHECK_MODULES([X11], [x11], [lx11=1], [lx11=0])
 AM_CONDITIONAL([HAVE_LIBX11], [test x$lx11 = x1])
 
+AC_CHECK_LIB(dl, dlopen, [], [AC_ERROR([No dl found, dynamic linking isn't possible.])])
+
 #####################################################
 
 AC_CONFIG_FILES([Makefile src/Makefile
@@ -769,42 +874,51 @@ Build system type: $build
 Installation prefix: $prefix
 -------------------------------------------------------------------------------
 DRAKVUF Plugins
-Syscalls:     $plugin_syscalls
-Poolmon:      $plugin_poolmon
-Filetracer:   $plugin_filetracer
-Filedelete:   $plugin_filedelete
-Objmon:       $plugin_objmon
-Exmon:        $plugin_exmon
-SSDTmon:      $plugin_ssdtmon
-CPUIDmon:     $plugin_cpuidmon
-Debugmon:     $plugin_debugmon
-Socketmon:    $plugin_socketmon
-Regmon:       $plugin_regmon
-Procmon:      $plugin_procmon
-BSODmon:      $plugin_bsodmon
-EnvMon:       $plugin_envmon
-CrashMon:     $plugin_crashmon
-ClipboardMon: $plugin_clipboardmon
-WindowMon:    $plugin_windowmon
-LibraryMon:   $plugin_librarymon
-DKOMmon:      $plugin_dkommon
-MEMDump:      $plugin_memdump
-ProcDump:     $plugin_procdump
-ProcDump2:    $plugin_procdump2
-APIMon:       $plugin_apimon
-RPCMon:       $plugin_rpcmon
-TLSMon:       $plugin_tlsmon
-Codemon:      $plugin_codemon
-Exploitmon:   $plugin_exploitmon
-LibHookTest:  $plugin_libhooktest
-IPT:          $plugin_ipt
-HidSim:       $plugin_hidsim
-Rootkitmon:   $plugin_rootkitmon
-Callbackmon:  $plugin_callbackmon
+Syscalls:           $plugin_syscalls
+Poolmon:            $plugin_poolmon
+Filetracer:         $plugin_filetracer
+Fileextractor:      $plugin_fileextractor
+Objmon:             $plugin_objmon
+Exmon:              $plugin_exmon
+SSDTmon:            $plugin_ssdtmon
+CPUIDmon:           $plugin_cpuidmon
+Debugmon:           $plugin_debugmon
+Socketmon:          $plugin_socketmon
+Regmon:             $plugin_regmon
+Procmon:            $plugin_procmon
+BSODmon:            $plugin_bsodmon
+EnvMon:             $plugin_envmon
+CrashMon:           $plugin_crashmon
+ClipboardMon:       $plugin_clipboardmon
+WindowMon:          $plugin_windowmon
+LibraryMon:         $plugin_librarymon
+DKOMmon:            $plugin_dkommon
+MEMDump:            $plugin_memdump
+ProcDump:           $plugin_procdump
+ProcDump2:          $plugin_procdump2
+APIMon:             $plugin_apimon
+RPCMon:             $plugin_rpcmon
+TLSMon:             $plugin_tlsmon
+Codemon:            $plugin_codemon
+Exploitmon:         $plugin_exploitmon
+LibHookTest:        $plugin_libhooktest
+IPT:                $plugin_ipt
+HidSim:             $plugin_hidsim
+Rootkitmon:         $plugin_rootkitmon
+Spraymon:           $plugin_spraymon
+Callbackmon:        $plugin_callbackmon
+HideVM:             $plugin_hidevm
+Etwmon:             $plugin_etwmon
+Memaccessmon:       $plugin_memaccessmon
+Unixsocketmon:      $plugin_unixsocketmon
+Rebootmon:          $plugin_rebootmon
+Linkmon:            $plugin_linkmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
-WMIMon:       $plugin_wmimon
+WMIMon:             $plugin_wmimon
+Filedelete:         $plugin_filedelete
 -------------------------------------------------------------------------------
-REPL:         $repl
-Thread safe:  $threadsafety
+REPL:               $repl
+Thread safe:        $threadsafety
+Output buffering:   $output_buffering
 -------------------------------------------------------------------------------])

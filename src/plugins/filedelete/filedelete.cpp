@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -103,22 +103,22 @@
 ***************************************************************************/
 
 #include <glib.h>
-#include <config.h>
 #include <inttypes.h>
-#include <libvmi/x86.h>
 #include <cassert>
 #include <sstream>
 #include <string>
 
-#include "../plugins.h"
-#include "../plugin_utils.h"
-#include "filedelete.h"
-#include "plugins/output_format.h"
-#include "private.h"
-
 #include <libinjector/libinjector.h>
 #include <libdrakvuf/json-util.h>
 
+#include "plugins/plugins.h"
+#include "plugins/plugin_utils.h"
+#include "plugins/output_format.h"
+
+#include "filedelete.h"
+#include "private.h"
+
+using namespace filedelete;
 using std::ostringstream;
 using std::string;
 
@@ -287,28 +287,14 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
             break;
     }
 
-    if (f->format == OUTPUT_KV)
-    {
-        kvfmt::print("fileextractor", drakvuf, info,
-            keyval("FileName", fmt::Qstr(filename)),
-            keyval("Size", fmt::Nval(bytes_read)),
-            keyval("Flags", fmt::Xval(fo_flags)),
-            fmt::Rstr(flags),
-            keyval("SeqNum", fmt::Nval(seq_number)),
-            keyval("Reason", fmt::Qstr(r))
-        );
-    }
-    else
-    {
-        fmt::print(f->format, "fileextractor", drakvuf, info,
-            keyval("FileName", fmt::Qstr(filename)),
-            keyval("Size", fmt::Nval(bytes_read)),
-            keyval("Flags", fmt::Xval(fo_flags)),
-            keyval("FlagsExpanded", fmt::Qstr(flags)),
-            keyval("SeqNum", fmt::Nval(seq_number)),
-            keyval("Reason", fmt::Qstr(r))
-        );
-    }
+    fmt::print(f->format, "fileextractor", drakvuf, info,
+        keyval("FileName", fmt::Qstr(filename)),
+        keyval("Size", fmt::Nval(bytes_read)),
+        keyval("Flags", fmt::Xval(fo_flags)),
+        flagsval("FlagsExpanded", std::move(flags)),
+        keyval("SeqNum", fmt::Nval(seq_number)),
+        keyval("Reason", fmt::Qstr(r))
+    );
 }
 
 static void print_extraction_failure(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const string& filename, const string& message)
@@ -556,7 +542,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .addr = filetype,
-            .dtb = info->regs->cr3,
+            .dtb = info->regs->cr3
         );
         extract_file(f, drakvuf, info, vmi, file, &ctx, filename.c_str(), fo_flags, reason);
         return;
@@ -777,7 +763,7 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = injector->createsection.handle,
+            .addr = injector->createsection.handle
         );
 
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->section_handle), &injector->section_handle, NULL)))
@@ -864,7 +850,7 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = injector->queryvolumeinfo.out,
+            .addr = injector->queryvolumeinfo.out
         );
 
         struct FILE_FS_DEVICE_INFORMATION dev_info = {};
@@ -1090,13 +1076,13 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         .addr = w->handle
     );
 
-    vmi_lock_guard vmi_lg(drakvuf);
-    if (VMI_SUCCESS != vmi_read_32(vmi_lg.vmi, &ctx, &handle))
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
         PRINT_DEBUG("[FILEDELETE2] Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);
 
     if (handle)
     {
-        auto filename = get_file_name(w->f, drakvuf, vmi_lg.vmi, info, handle, nullptr, nullptr);
+        auto filename = get_file_name(w->f, drakvuf, vmi, info, handle, nullptr, nullptr);
         if (filename.empty()) filename = "<UNKNOWN>";
 
         w->f->files[ {info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};
@@ -1370,25 +1356,6 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* func_name)
-{
-    addr_t rva;
-    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, func_name, &rva) )
-    {
-        PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get RVA of %s\n", func_name);
-        throw -1;
-    }
-
-    addr_t va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib, rva);
-    if (!va)
-    {
-        PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get VA of %s\n", func_name);
-        throw -1;
-    }
-
-    return va;
-}
-
 filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_format_t output)
     : drakvuf(drakvuf)
     , offsets(new size_t[__OFFSET_MAX])
@@ -1413,17 +1380,17 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
     }
     else
     {
-        this->queryvolumeinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
-        this->queryinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryInformationFile");
-        this->createsection_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwCreateSection");
-        this->close_handle_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwClose");
-        this->mapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwMapViewOfSection");
-        this->unmapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwUnmapViewOfSection");
-        this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");
-        this->waitobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwWaitForSingleObject");
-        this->exallocatepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
-        this->exfreepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExFreePoolWithTag");
-        this->memcpy_va = get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
+        this->queryvolumeinfo_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwQueryVolumeInformationFile");
+        this->queryinfo_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwQueryInformationFile");
+        this->createsection_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwCreateSection");
+        this->close_handle_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwClose");
+        this->mapview_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwMapViewOfSection");
+        this->unmapview_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwUnmapViewOfSection");
+        this->readfile_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwReadFile");
+        this->waitobject_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwWaitForSingleObject");
+        this->exallocatepool_va = drakvuf_kernel_symbol_to_va(drakvuf, "ExAllocatePoolWithTag");
+        this->exfreepool_va = drakvuf_kernel_symbol_to_va(drakvuf, "ExFreePoolWithTag");
+        this->memcpy_va = drakvuf_kernel_symbol_to_va(drakvuf, "RtlCopyMemoryNonTemporal");
 
         assert(sizeof(traps)/sizeof(traps[0]) > 3);
         register_trap(drakvuf, "NtSetInformationFile", &traps[0], setinformation_cb);

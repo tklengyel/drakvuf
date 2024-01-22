@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -107,14 +107,13 @@
 
 #include "common.h"
 
-#include "plugins/type_traits_helpers.h"
+#include "plugins/helpers/type_traits.h"
 
 namespace jsonfmt
 {
 
 template <class T>
 constexpr bool print_data(std::ostream& os, const T& data, char sep);
-
 
 template <class T, class = void>
 class DataPrinter
@@ -170,6 +169,24 @@ public:
     }
 
     template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::Estr<Tv>& data, char)
+    {
+        gchar* escaped = drakvuf_escape_str(data.value.c_str());
+        os << escaped;
+        g_free(escaped);
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::BinaryString<Tv>& data, char)
+    {
+        os << "\"";
+        data.format(os);
+        os << "\"";
+        return true;
+    }
+
+    template <class Tv = T>
     static bool print(std::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
     {
         auto pos = os.tellp();
@@ -206,6 +223,11 @@ public:
         }
         os.seekp(pos);
         return false;
+    }
+
+    static bool print(std::ostream& os, const flagsval& flags, char sep)
+    {
+        return print_data(os, keyval(flags.name, fmt::Rstr(flags.values)), sep);
     }
 
     template <class... Ts>
@@ -279,6 +301,11 @@ private:
         if (!printed)
             os.seekp(pos);
         return printed;
+    }
+
+    static bool print_data(std::ostream& os, const flagsval& flags, char sep)
+    {
+        return print_data(os, keyval(flags.name, fmt::Rstr(flags.values)), sep);
     }
 
     template <class Tv, class... Ts>
@@ -402,28 +429,27 @@ constexpr bool print_data(std::ostream& os, char sep, Ts&& ... args)
 
 /**/
 
-inline auto get_common_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+inline auto get_common_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
     std::optional<fmt::Qstr<decltype(info->trap->name)>> method;
     if (info->trap->name)
         method = fmt::Qstr(info->trap->name);
 
-    proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+    const proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
     return std::make_tuple(
             keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
             keyval("PID", fmt::Nval(proc_data->pid)),
             keyval("PPID", fmt::Nval(proc_data->ppid)),
             keyval("TID", fmt::Nval(proc_data->tid)),
-            keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
-            keyval("UserId", fmt::Nval(info->proc_data.userid)),
-            keyval("ProcessName", fmt::Qstr(proc_data->name)),
+            keyval("UserId", fmt::Nval(proc_data->userid)),
+            keyval("ProcessName", fmt::Estr(proc_data->name)),
             keyval("Method", method),
             keyval("EventUID", fmt::Xval(info->event_uid))
         );
 }
 
 template<class... Args>
-void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, const drakvuf_trap_info_t* info, const Args& ... args)
 {
     constexpr char sep = ',';
 
@@ -442,7 +468,8 @@ inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gi
         keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(timestamp)}),
         keyval("PID", fmt::Nval(proc_data.pid)),
         keyval("PPID", fmt::Nval(proc_data.ppid)),
-        keyval("RunningProcess", fmt::Qstr(proc_data.name))
+        keyval("RunningProcess", fmt::Qstr(proc_data.name)),
+        keyval("Bitness", fmt::Nval(static_cast<int>(proc_data.bitness)))
     );
 }
 

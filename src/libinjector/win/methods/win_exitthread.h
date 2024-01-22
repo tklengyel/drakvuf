@@ -1,6 +1,6 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+/*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -100,23 +100,12 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
- ***************************************************************************/
-#pragma once
+***************************************************************************/
 
-#ifndef PRINT_DEBUG
-#ifdef DRAKVUF_DEBUG
-// This is defined in libdrakvuf
-extern bool verbose;
+#ifndef WIN_METHOD_EXITTHREAD
+#define WIN_METHOD_EXITTHREAD
 
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
-    } while (0)
+#include "win_utils.h"
 
-#else
-
-#define PRINT_DEBUG(...) \
-    do {} while(0)
-
-#endif // DRAKVUF_DEBUG
-#endif // PRINT_DEBUG
+event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+#endif

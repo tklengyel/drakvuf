@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -112,63 +112,11 @@
 #include <functional>
 
 #include <glib.h>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
+#include "utils.hpp"
 #include "printers/printers.hpp"
 
 typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
-
-enum target_hook_type
-{
-    HOOK_BY_NAME,
-    HOOK_BY_OFFSET
-};
-
-struct HookActions
-{
-    bool log;
-    bool stack;
-
-    HookActions() : log{false}, stack{false} {}
-
-    static HookActions empty()
-    {
-        return HookActions{};
-    }
-    HookActions& set_log()
-    {
-        this->log = true;
-        return *this;
-    }
-    HookActions& set_stack()
-    {
-        this->stack = true;
-        return *this;
-    }
-};
-
-struct plugin_target_config_entry_t
-{
-    std::string dll_name;
-    target_hook_type type;
-    std::string function_name;
-    std::string clsid;
-    addr_t offset;
-    HookActions actions;
-    std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
-
-    plugin_target_config_entry_t()
-        : dll_name(), type(), function_name(), offset(), actions(), argument_printers()
-    {}
-
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, addr_t offset, HookActions hook_actions, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
-        : dll_name(std::move(dll_name)), type(HOOK_BY_OFFSET), function_name(std::move(function_name)), offset(offset), actions(hook_actions), argument_printers(std::move(argument_printers))
-    {}
-
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, HookActions hook_actions, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
-        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), offset(), actions(hook_actions), argument_printers(std::move(argument_printers))
-    {}
-};
 
 enum target_hook_state
 {
@@ -180,41 +128,51 @@ enum target_hook_state
 
 struct hook_target_entry_t
 {
-    vmi_pid_t pid;
+    vmi_pid_t pid = 0;
     target_hook_type type;
     std::string target_name;
     std::string clsid;
     addr_t offset;
+    bool no_retval{false};
     callback_t callback;
     const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers;
     target_hook_state state;
-    drakvuf_trap_t* trap;
+    drakvuf_trap_t* trap = nullptr;
     void* plugin;
 
-    hook_target_entry_t(std::string target_name, std::string clsid, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers, void* plugin)
-        : pid(0), type(HOOK_BY_NAME), target_name(target_name), clsid(clsid), offset(0), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), trap(nullptr), plugin(plugin)
+    hook_target_entry_t(std::string target_name,
+        std::string clsid,
+        bool no_retval,
+        callback_t callback,
+        const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers,
+        void* plugin)
+        : type(HOOK_BY_NAME)
+        , target_name(std::move(target_name))
+        , clsid(std::move(clsid))
+        , offset(0)
+        , no_retval(no_retval)
+        , callback(callback)
+        , argument_printers(argument_printers)
+        , state(HOOK_FIRST_TRY)
+        , plugin(plugin)
     {}
 
-    hook_target_entry_t(std::string target_name, std::string clsid, addr_t offset, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers, void* plugin)
-        : pid(0), type(HOOK_BY_OFFSET), target_name(target_name), clsid(clsid), offset(offset), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), trap(nullptr), plugin(plugin)
+    hook_target_entry_t(std::string target_name,
+        std::string clsid,
+        addr_t offset,
+        bool no_retval,
+        callback_t callback,
+        const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers,
+        void* plugin)
+        : type(HOOK_BY_OFFSET)
+        , target_name(std::move(target_name))
+        , clsid(std::move(clsid))
+        , offset(offset)
+        , no_retval(no_retval)
+        , callback(callback)
+        , argument_printers(argument_printers)
+        , state(HOOK_FIRST_TRY), plugin(plugin)
     {}
-};
-
-struct return_hook_target_entry_t
-{
-    vmi_pid_t pid;
-    uint32_t tid;
-    addr_t rsp;
-
-    drakvuf_trap_t* trap;
-    std::string clsid;
-    void* plugin;
-    std::vector < uint64_t > arguments;
-    const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers;
-
-    return_hook_target_entry_t(vmi_pid_t pid, uint32_t tid, addr_t rsp,
-        std::string clsid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers) :
-        pid(pid), tid(tid), rsp(rsp), trap(nullptr), clsid(clsid), plugin(plugin), argument_printers(argument_printers) {}
 };
 
 struct hook_target_view_t
@@ -231,7 +189,7 @@ struct dll_view_t
 {
     // relevant while loading
     addr_t dtb;
-    uint32_t thread_id;
+    uint32_t tid;
     addr_t real_dll_base;
     mmvad_info_t mmvad;
     bool is_hooked;
@@ -262,16 +220,7 @@ public:
         return hooks.empty();
     }
 
-    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const
-    {
-        for (const auto& [pattern, wanted_hooks] : hooks)
-        {
-            if (dll_name.find(pattern) != std::string::npos)
-            {
-                std::for_each(std::begin(wanted_hooks), std::end(wanted_hooks), visitor);
-            }
-        }
-    }
+    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const;
 
 private:
     std::map<std::string, std::vector<plugin_target_config_entry_t>> hooks;
@@ -309,4 +258,14 @@ void drakvuf_request_userhook_on_running_process(drakvuf_t drakvuf, addr_t targe
 
 
 void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
+
+void userhooks_set_injection_mode(bool enable);
+
+/**
+ * Requests to stop the userhooks subsystem.
+ * @param[in] drakvuf drakvuf context
+ * @return true if userhooks subsystem has been stopped, false otherwise.
+ */
+bool drakvuf_stop_userhooks(drakvuf_t drakvuf);
+
 #endif

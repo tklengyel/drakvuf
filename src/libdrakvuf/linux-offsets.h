@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -111,27 +111,53 @@
  */
 enum linux_offsets
 {
+    _TEXT,
+    INIT_TASK,
     CURRENT_TASK,
+    PCPU_HOT,
+    PCPU_HOT_CURRENT_TASK,
+    TASK_STRUCT_FLAGS,
     TASK_STRUCT_COMM,
     TASK_STRUCT_CRED,
     TASK_STRUCT_PID,
     TASK_STRUCT_TGID,
     TASK_STRUCT_REALPARENT,
     TASK_STRUCT_PARENT,
+    TASK_STRUCT_TASKS,
+    TASK_STRUCT_FS,
+    TASK_STRUCT_NAMEIDATA,
+    TASK_STRUCT_NSPROXY,
     TASK_STRUCT_MMSTRUCT,
     TASK_STRUCT_ACTIVE_MMSTRUCT,
+    TASK_STRUCT_THREAD_PID,
+    TASK_STRUCT_SIGNAL,
+    SIGNAL_STRUCT_PIDS,
+    PID_LEVEL,
+    PID_NUMBERS,
+    PID_NAMESPACE_LEVEL,
+    UPID_NS,
+    UPID_NR,
     MM_STRUCT_MMAP,
     MM_STRUCT_PGD,
+    MM_STRUCT_ARG_START,
+    MM_STRUCT_ENV_START,
+    MM_STRUCT_ENV_END,
+    MM_STRUCT_EXE_FILE,
     VM_AREA_STRUCT_FILE,
     VM_AREA_STRUCT_START,
     VM_AREA_STRUCT_END,
     VM_AREA_STRUCT_NEXT,
     VM_AREA_STRUCT_PGOFF,
     VM_AREA_STRUCT_FLAGS,
-    FILE_PATH,
+    VFSMOUNT_MNT_ROOT,
+    FILE_F_PATH,
     PATH_DENTRY,
+    PATH_MNT,
     DENTRY_D_NAME,
+    DENTRY_D_PARENT,
     QSTR_NAME,
+    QSTR_LEN,
+    FS_STRUCT_ROOT,
     CRED_UID,
     ELF64HDR_PHNUM,
     ELF64HDR_PHENTSIZE,
@@ -144,7 +170,9 @@ enum linux_offsets
     ELF64RELA_ADDEND,
     ELF64RELA_INFO,
     ELF64RELA_OFFSET,
-
+    NSPROXY_UTS_NS,
+    UTS_NAMESPACE_NAME,
+    NEW_UTSNAME_RELEASE,
     __LINUX_OFFSETS_MAX
 };
 

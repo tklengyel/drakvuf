@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,8 +102,10 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <libinjector/libinjector.h>
+#include "libinjector.h"
 #include "private.h"
+#include "win/win_utils.h"
+#include "linux/linux_utils.h"
 
 injector_status_t injector_start_app(
     drakvuf_t drakvuf,
@@ -142,9 +144,6 @@ injector_status_t injector_start_app(
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
-        if (injected_pid)
-            *injected_pid = 0;
-
         if (!tid)
             tid = pid;
 
@@ -152,11 +151,12 @@ injector_status_t injector_start_app(
                 pid,
                 tid,
                 app,
-                binary_path,
                 method,
-                OUTPUT_DEFAULT,
+                format,
+                binary_path,
                 args_count,
-                args);
+                args,
+                injected_pid);
     }
     else
     {
@@ -176,10 +176,38 @@ void injector_terminate(drakvuf_t drakvuf,
         PRINT_DEBUG("WARNING Unsupported OS!\n");
 }
 
-void injector_free(drakvuf_t drakvuf, injector_t injector)
+void injector_exitthread(drakvuf_t drakvuf,
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid)
 {
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_free_win(injector);
+        injector_exitthread_on_win(drakvuf, injection_pid, injection_tid);
     else
-        injector_free_linux(injector);
+        PRINT_DEBUG("WARNING Unsupported OS!\n");
+}
+
+const char* injection_method_name(injection_method_t method)
+{
+    switch (method)
+    {
+        case INJECT_METHOD_CREATEPROC:
+            return "CreateProc";
+        case INJECT_METHOD_TERMINATEPROC:
+            return "TerminateProc";
+        case INJECT_METHOD_EXITTHREAD:
+            return "ExitThread";
+        case INJECT_METHOD_SHELLEXEC:
+            return "ShellExec";
+        case INJECT_METHOD_SHELLCODE:
+            return "Shellcode";
+        case INJECT_METHOD_READ_FILE:
+            return "ReadFile";
+        case INJECT_METHOD_WRITE_FILE:
+            return "WriteFile";
+        case INJECT_METHOD_EXECPROC:
+            return "ExecProc";
+        case __INJECT_METHOD_MAX:
+            break;
+    }
+    return "Unknown";
 }

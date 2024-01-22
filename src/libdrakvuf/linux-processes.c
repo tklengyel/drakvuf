@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -118,6 +118,18 @@
 #define STACK_SIZE_8K  0x1fff
 #define STACK_SIZE_16K 0x3fff
 #define MIN_KERNEL_BOUNDARY 0x80000000
+#define PAGE_OFFSET 0xffff800000000000
+#define PF_EXITING		0x00000004	/* Getting shut down */
+#define PF_KTHREAD		0x00200000	/* I am a kernel thread */
+
+enum
+{
+    PIDTYPE_PID,
+    PIDTYPE_TGID,
+    PIDTYPE_PGID,
+    PIDTYPE_SID,
+    PIDTYPE_MAX,
+};
 
 static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t* ctx)
 {
@@ -149,27 +161,41 @@ static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t*
 
 addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t process = 0;
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-    );
-
+    addr_t dtb, gs_base;
     if (info->regs->cs_sel & 3)
     {
         // Let's assume a modern kernel with KPTI enabled first
-        ctx.dtb = info->regs->cr3 & ~0x1fffull;
-        ctx.addr = info->regs->shadow_gs;
+        dtb = info->regs->cr3 & ~0x1fffull;
+        gs_base = info->regs->shadow_gs;
     }
     else
     {
         // Mask PCID bits
-        ctx.dtb = info->regs->cr3 & ~0xfffull;
+        dtb = info->regs->cr3 & ~0xfffull;
         // We might trap before swapgs
-        ctx.addr = VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
+        gs_base = VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
     }
 
-    ctx.addr += drakvuf->offsets[CURRENT_TASK];
+    addr_t current_task_offset = drakvuf->offsets[CURRENT_TASK];
+    // for kernel 6.2+ need use new structure
+    // https://elixir.bootlin.com/linux/v6.2-rc1/source/arch/x86/include/asm/current.h
+    if (!current_task_offset)
+        current_task_offset = drakvuf->offsets[PCPU_HOT] + drakvuf->offsets[PCPU_HOT_CURRENT_TASK];
 
+    addr_t addr = gs_base + current_task_offset;
+
+    addr_t process;
+    if ( VMI_SUCCESS == vmi_read_addr_va(drakvuf->vmi, addr, 0, &process) && process >= MIN_KERNEL_BOUNDARY )
+        return process;
+
+    // NOTE The old method is leaved here as is to make diff as little as possible.
+    // This also allows to make more robust research before removing old method.
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = dtb,
+        .addr = addr
+    );
     process = read_process_base(drakvuf, info->regs->rsp, &ctx);
 
     if ( !process && (info->regs->cs_sel & 3) )
@@ -190,16 +216,240 @@ addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return linux_get_current_process(drakvuf, info);
 }
 
-char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
+static bool get_kernel_struct_field_pointer(drakvuf_t drakvuf, addr_t struct_addr, int offset_field, addr_t* addr)
 {
-    UNUSED(fullpath);
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 0,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
-    );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = struct_addr + drakvuf->offsets[offset_field]);
+
+    return (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, addr));
+}
+
+static bool get_mm_struct(drakvuf_t drakvuf, addr_t process_base, addr_t* mm_struct)
+{
+    return get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_MMSTRUCT, mm_struct);
+}
+
+static bool get_active_mm_struct(drakvuf_t drakvuf, addr_t process_base, addr_t* mm_struct)
+{
+    return get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_ACTIVE_MMSTRUCT, mm_struct);
+}
+
+static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString* b)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = path + drakvuf->offsets[PATH_DENTRY]);
+    addr_t dentry;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &dentry))
+    {
+        PRINT_DEBUG("Can't get path->dentry from struct path\n");
+        return;
+    }
+
+    ctx.addr = path + drakvuf->offsets[PATH_MNT];
+    addr_t vfsmnt;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &vfsmnt))
+    {
+        PRINT_DEBUG("Can't get path->mnt from struct path\n");
+        return;
+    }
+
+    addr_t root_dentry;
+    ctx.addr = root + drakvuf->offsets[PATH_DENTRY];
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &root_dentry))
+    {
+        PRINT_DEBUG("Can't get root->dentry from root\n");
+        return;
+    }
+
+    addr_t root_mnt;
+    ctx.addr = root + drakvuf->offsets[PATH_MNT];
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &root_mnt))
+    {
+        PRINT_DEBUG("Can't get root->mnt from root\n");
+        return;
+    }
+
+    while (dentry != root_dentry || vfsmnt != root_mnt)
+    {
+        addr_t mnt_mnt_root;
+        ctx.addr = vfsmnt + drakvuf->offsets[VFSMOUNT_MNT_ROOT];
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mnt_mnt_root))
+        {
+            PRINT_DEBUG("Can't read path->mnt->mnt_root from vfsmnt\n");
+            return;
+        }
+
+        addr_t dentry_parent;
+        ctx.addr = dentry + drakvuf->offsets[DENTRY_D_PARENT];
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &dentry_parent))
+        {
+            PRINT_DEBUG("Can't read path->dentry->d_parent\n");
+            return;
+        }
+
+        // End of cycle
+        if (dentry == mnt_mnt_root || dentry == dentry_parent)
+            break;
+
+        addr_t qname_addr;
+        ctx.addr = dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME];
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &qname_addr))
+        {
+            PRINT_DEBUG("Can't read path->dentry->qstr->name pointer\n");
+            return;
+        }
+
+        ctx.addr = qname_addr;
+        gchar* res = vmi_read_str(drakvuf->vmi, &ctx);
+        if (!res)
+        {
+            PRINT_DEBUG("Can't read path->dentry->qstr->name string\n");
+            return;
+        }
+
+        g_string_prepend(b, res);
+        g_string_prepend(b, "/");
+
+        g_free(res);
+
+        addr_t parent;
+        ctx.addr = dentry + drakvuf->offsets[DENTRY_D_PARENT];
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &parent))
+        {
+            PRINT_DEBUG("Can't read path->dentry->d_parent\n");
+            return;
+        }
+
+        dentry = parent;
+    }
+}
+
+static bool get_fs_root_rcu(drakvuf_t drakvuf, addr_t process_base, addr_t* root)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_FS]);
+
+    addr_t fs_struct;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &fs_struct))
+        return false;
+
+    *root = fs_struct + drakvuf->offsets[FS_STRUCT_ROOT];
+    return true;
+}
+
+/**
+ * @brief Just implementation of https://elixir.bootlin.com/linux/v5.10.39/source/fs/d_path.c#L38
+ *
+ * @param drakvuf drakvuf instanse
+ * @param process_base task_struct of searching process
+ * @param path pointer to struct
+ * @return char* - full path of binary
+ */
+static char* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
+{
+    addr_t root;
+    if (!get_fs_root_rcu(drakvuf, process_base, &root))
+        return NULL;
+
+    GString* b = g_string_new("");
+    prepend_path(drakvuf, path, root, b);
+    return g_string_free(b, 0);
+}
+
+static char* linux_get_short_process_name(drakvuf_t drakvuf, addr_t process_base)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]);
 
     return vmi_read_str(drakvuf->vmi, &ctx);
+}
+
+static bool linux_get_process_flags(drakvuf_t drakvuf, addr_t process_base, uint64_t* pflags)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_FLAGS]);
+
+    uint64_t flags;
+    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &flags))
+    {
+        PRINT_DEBUG("Can't read flags from task_struct.\n");
+        return false;
+    }
+
+    if (pflags)
+        *pflags = flags;
+    return true;
+}
+
+// solution: https://stackoverflow.com/questions/18658295/full-process-name-from-task-struct
+static char* linux_get_full_process_name(drakvuf_t drakvuf, addr_t process_base)
+{
+    uint64_t flags;
+    if (!linux_get_process_flags(drakvuf, process_base, &flags))
+        return NULL;
+
+    // This is a kernel thread (with null pointer to mm_struct)
+    bool is_kernel_thread = (flags & PF_KTHREAD);
+
+    if (is_kernel_thread)
+        return linux_get_short_process_name(drakvuf, process_base);
+
+    // The terminating process has no name due to the fact that its structures have already been cleared in memory
+    bool is_exiting = (flags & PF_EXITING);
+    if (is_exiting)
+    {
+        vmi_pid_t pid;
+        if (linux_get_process_pid(drakvuf, process_base, &pid))
+        {
+            gchar tmp[32] = {0};
+
+            if (g_snprintf(tmp, 32, "process-%d", pid))
+                return g_strdup(tmp);
+            else
+                return NULL;
+        }
+        else
+            return NULL;
+    }
+
+    addr_t mm_struct;
+    if (!get_mm_struct(drakvuf, process_base, &mm_struct))
+    {
+        PRINT_DEBUG("Can't get mm_struct from task_struct\n");
+        return NULL;
+    }
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = mm_struct + drakvuf->offsets[MM_STRUCT_EXE_FILE]);
+
+    addr_t exe_file;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &exe_file))
+    {
+        PRINT_DEBUG("Can't get exe_file from mm_struct\n");
+        return NULL;
+    }
+
+    addr_t f_path = exe_file + drakvuf->offsets[FILE_F_PATH];
+    return d_path(drakvuf, process_base, f_path);
+}
+
+char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
+{
+    if (fullpath)
+        return linux_get_full_process_name(drakvuf, process_base);
+    return linux_get_short_process_name(drakvuf, process_base);
 }
 
 bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid )
@@ -209,33 +459,134 @@ bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pi
      * what getpid() would return. Because THAT makes sense.
      */
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 0,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
-    );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]);
 
-    if ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid) )
-        return true;
-
-    return false;
+    return ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid) );
 }
 
 bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid )
 {
     /*
-     * On Linux PID is actually the thread ID....... ... ...
+     * On Linux TASK_STRUCT_PID is actually the thread ID.
      */
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 0,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]);
+
+    return ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, tid) );
+}
+
+static bool linux_get_task_pid(drakvuf_t drakvuf, addr_t process_base, addr_t* thread_pid)
+{
+    return get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_THREAD_PID, thread_pid);
+}
+
+static bool linux_get_task_pgrp(drakvuf_t drakvuf, addr_t process_base, addr_t* struct_pid)
+{
+    addr_t signal;
+    if (!get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_SIGNAL, &signal))
+        return false;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd
     );
 
-    if ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, tid))
-        return true;
+    ctx.addr = signal + drakvuf->offsets[SIGNAL_STRUCT_PIDS] + sizeof(addr_t) * PIDTYPE_PGID;
 
-    return false;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, struct_pid))
+        return false;
+
+    return true;
 }
+
+static bool linux_get_ns_of_pid(drakvuf_t drakvuf, addr_t struct_pid, addr_t* ns)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd
+    );
+
+    uint32_t level;
+    ctx.addr = struct_pid + drakvuf->offsets[PID_LEVEL];
+    if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &level))
+        return false;
+
+    // In the version before 4.15, the "struct upid" has a different size, but this version is not supported
+    // https://elixir.bootlin.com/linux/v6.5.7/source/include/linux/pid.h#L54
+    const uint32_t size_of_upid = 8;
+
+    ctx.addr = struct_pid + drakvuf->offsets[PID_NUMBERS] + level * size_of_upid + drakvuf->offsets[UPID_NS];
+    return ( VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, ns) );
+}
+
+static bool linux_get_pid_ns(drakvuf_t drakvuf, addr_t process_base, addr_t* ns)
+{
+    addr_t thread_pid;
+    if (!linux_get_task_pid(drakvuf, process_base, &thread_pid))
+        return false;
+
+    return linux_get_ns_of_pid(drakvuf, thread_pid, ns);
+}
+
+/*
+ * get process group id
+ * by default return zero: https://elixir.bootlin.com/linux/v6.5.7/source/kernel/pid.c#L475
+ */
+bool linux_get_process_pgid(drakvuf_t drakvuf, addr_t process_base, uint32_t* pgid)
+{
+    *pgid = 0;
+    const kernel_version_t* version = linux_get_kernel_version_from_process(drakvuf, process_base);
+    if (version->major <= 4 && version->minor < 19)
+    {
+        PRINT_DEBUG("Failed to extract PGID (unsupported kernel version)\n");
+        return false;
+    }
+
+    addr_t struct_pid;
+    if (!linux_get_task_pgrp(drakvuf, process_base, &struct_pid))
+        return false;
+
+    addr_t ns;
+    if (!linux_get_pid_ns(drakvuf, process_base, &ns))
+        return false;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd
+    );
+
+    uint32_t ns_level;
+    ctx.addr = ns + drakvuf->offsets[PID_NAMESPACE_LEVEL];
+    if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &ns_level))
+        return false;
+
+    uint32_t pid_level;
+    ctx.addr = struct_pid + drakvuf->offsets[PID_LEVEL];
+    if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &pid_level))
+        return false;
+
+    if (ns_level <= pid_level)
+    {
+        // TODO: maybe ns_level incorrect (usually 0)
+        addr_t upid = struct_pid + drakvuf->offsets[PID_NUMBERS] + ns_level;
+
+        addr_t upid_ns;
+        ctx.addr = upid + drakvuf->offsets[UPID_NS];
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &upid_ns))
+            return false;
+
+        ctx.addr = upid + drakvuf->offsets[UPID_NR];
+        if (upid_ns == ns)
+            return ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, pgid) );
+    }
+
+    return true;
+}
+
 
 char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {
@@ -279,46 +630,16 @@ int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if ( !process_base )
         return -1;
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
-    );
-
-    addr_t cred;
-    if ( VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &cred) )
-        return -1;
-
-    uint32_t uid;
-    ctx.addr = cred + drakvuf->offsets[CRED_UID];
-    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &uid) )
-        return -1;
-
-    return uid;
+    return linux_get_process_userid(drakvuf, process_base);
 }
 
 bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id )
 {
-    /*
-     * On Linux PID is actually the thread ID....... ... ...
-     */
     addr_t process_base = linux_get_current_process(drakvuf, info);
     if ( !process_base )
         return false;
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
-    );
-    uint32_t _thread_id;
-
-    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &_thread_id) )
-        return false;
-
-    *thread_id = _thread_id;
-
-    return true;
+    return linux_get_process_tid(drakvuf, process_base, thread_id);
 }
 
 bool linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
@@ -363,10 +684,11 @@ bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv
             proc_data->name = linux_get_process_name(drakvuf, base_addr, true);
             if ( linux_get_process_ppid(drakvuf, base_addr, &proc_data->ppid))
             {
-                proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
-                linux_get_process_tid(drakvuf, base_addr, &proc_data->tid);
-                if ( proc_data->tid )
-                    return true;
+                if (drakvuf->get_userid)
+                    proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
+                else
+                    proc_data->userid = 0;
+                return linux_get_process_tid(drakvuf, base_addr, &proc_data->tid);
             }
             else
                 PRINT_DEBUG("Failed to gather info for %s:%u\n", proc_data->name, proc_data->pid);
@@ -374,4 +696,147 @@ bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv
     }
 
     return false;
+}
+
+bool linux_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
+{
+    // based on: https://carteryagemann.com/pid-to-cr3.html
+    addr_t mm;
+    if (!get_mm_struct(drakvuf, process_base, &mm))
+        return false;
+    if (!mm && !get_active_mm_struct(drakvuf, process_base, &mm))
+        return false;
+    if (!mm)
+        return false;
+
+    addr_t pgd;
+    if (!get_kernel_struct_field_pointer(drakvuf, mm, MM_STRUCT_PGD, &pgd))
+        return false;
+
+    *dtb = pgd - PAGE_OFFSET;
+    return true;
+}
+
+
+bool linux_find_process_list(drakvuf_t drakvuf, addr_t* list_head)
+{
+    addr_t kernel_base = drakvuf_get_kernel_base(drakvuf);
+    addr_t init_task = (kernel_base - drakvuf->offsets[_TEXT]) + drakvuf->offsets[INIT_TASK];
+    *list_head = init_task + drakvuf->offsets[TASK_STRUCT_TASKS];
+    return true;
+}
+
+bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t* next_list_entry)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = current_list_entry);
+    return (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, next_list_entry));
+}
+
+static addr_t linux_process_list_entry_to_process(drakvuf_t drakvuf, addr_t list_entry)
+{
+    return list_entry - drakvuf->offsets[TASK_STRUCT_TASKS];
+}
+
+bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx)
+{
+    addr_t list_head;
+    if (!linux_find_process_list(drakvuf, &list_head))
+        return false;
+
+    addr_t current_list_entry = list_head;
+    addr_t next_list_entry;
+
+    do
+    {
+        addr_t process_base = linux_process_list_entry_to_process(drakvuf, current_list_entry);
+
+        visitor_func(drakvuf, process_base, visitor_ctx);
+
+        if (!linux_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
+        {
+            PRINT_DEBUG("Failed to find next task!\n");
+            return false;
+        }
+        current_list_entry = next_list_entry;
+    } while (list_head != next_list_entry);
+
+    return true;
+}
+
+static bool linux_get_process_env_start_end(drakvuf_t drakvuf, addr_t process_base, addr_t* env_start, addr_t* env_end)
+{
+    addr_t mm_struct;
+    if (!get_mm_struct(drakvuf, process_base, &mm_struct))
+        return false;
+
+    return (get_kernel_struct_field_pointer(drakvuf, mm_struct, MM_STRUCT_ENV_START, env_start)
+            && get_kernel_struct_field_pointer(drakvuf, mm_struct, MM_STRUCT_ENV_END, env_end));
+}
+
+static bool linux_get_process_environ_buffer(drakvuf_t drakvuf, addr_t process_base, addr_t process_dtb, void** buffer, size_t* size)
+{
+    addr_t env_start, env_end;
+    if (!linux_get_process_env_start_end(drakvuf, process_base, &env_start, &env_end) ||
+        !env_start || env_start >= env_end)
+    {
+        PRINT_DEBUG("Failed to get env_start and env_end\n");
+        return false;
+    }
+
+    size_t buffer_size = env_end - env_start;
+    void* _buffer = g_new0(char, buffer_size);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = process_dtb,
+        .addr = env_start);
+
+    if (VMI_SUCCESS != vmi_read(drakvuf->vmi, &ctx, buffer_size, _buffer, NULL))
+    {
+        PRINT_DEBUG("Failed to read environ buffer\n");
+        g_free(_buffer);
+        return false;
+    }
+
+    *buffer = _buffer;
+    *size = buffer_size;
+    return true;
+}
+
+bool linux_get_current_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ)
+{
+    addr_t process_base = info->proc_data.base_addr;
+    addr_t process_dtb = info->regs->cr3;
+
+    void* buffer = NULL;
+    size_t buffer_size = 0;
+    if (!linux_get_process_environ_buffer(drakvuf, process_base, process_dtb, &buffer, &buffer_size))
+        return false;
+
+    *environ = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+    for (size_t offset = 0;
+        offset < buffer_size;
+        offset += strlen((char*)((uint64_t)buffer + offset)) + 1)
+    {
+        gchar* var_str = (char*)((uint64_t)buffer + offset);
+        gchar** var_kv = g_strsplit(var_str, "=", 2);
+        g_hash_table_insert(*environ, g_strdup(var_kv[0]), g_strdup(var_kv[1]));
+        g_strfreev(var_kv);
+    }
+
+    g_free(buffer);
+    return true;
+}
+
+bool linux_get_process_arguments(drakvuf_t drakvuf, addr_t process_base, addr_t* argv)
+{
+    addr_t mm_struct;
+    if (!get_mm_struct(drakvuf, process_base, &mm_struct))
+        return false;
+
+    *argv = mm_struct + drakvuf->offsets[MM_STRUCT_ARG_START];
+    return true;
 }

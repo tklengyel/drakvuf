@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -108,7 +108,6 @@
 #include <array>
 #include <fstream>
 
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 #define MAX_DRAKVUF_VCPU 16
@@ -154,17 +153,20 @@ struct ipt_vcpu
 
 class ipt: public pluginex
 {
-    int num_vcpus_ = 0;
-    // save drakvuf pointer to make cleanup possible
-    drakvuf_t drakvuf_ = nullptr;
 public:
-    std::array<ipt_vcpu, MAX_DRAKVUF_VCPU> vcpus;
-
     ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output);
     ~ipt();
 
-    static drakvuf_trap_t* reg_cr3_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap);
-    static drakvuf_trap_t* reg_catchall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap);
+    event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t catchall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+private:
+    int num_vcpus_ = 0;
+    drakvuf_t drakvuf_ = nullptr;
+    std::array<ipt_vcpu, MAX_DRAKVUF_VCPU> vcpus;
+
+    std::unique_ptr<libhook::Cr3Hook> cr3_hook;
+    std::unique_ptr<libhook::CatchAllHook> catchall_hook;
 };
 
 #endif

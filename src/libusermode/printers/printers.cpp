@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include "printers.hpp"
+#include "utils.hpp"
 #include <array>
 #include <string>
 #include <sstream>
@@ -110,39 +111,6 @@
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 #include "plugins/plugins.h"
-
-std::string escape_str(const std::string& s)
-{
-    char const* const hexdig = "0123456789ABCDEF";
-    std::stringstream os;
-
-    for (char c : s)
-    {
-        switch (c)
-        {
-            case '\\':
-                os << "\\\\";
-                break;
-            case '\t':
-                os << "\\t";
-                break;
-            case '\r':
-                os << "\\r";
-                break;
-            case '\n':
-                os << "\\n";
-                break;
-            default:
-                if (c < ' ' || c > '~')
-                    os << "\\x" << hexdig[c >> 4] << hexdig[c & 0xF];
-                else
-                    os << c;
-                break;
-        }
-    }
-
-    return os.str();
-}
 
 ArgumentPrinter::ArgumentPrinter(std::string arg_name, PrinterConfig config) :
     config(config), name(arg_name)
@@ -255,6 +223,20 @@ std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint
     auto vmi = vmi_lock_guard(drakvuf);
     uint32_t value;
     if (vmi_read_32(vmi, &ctx, &value) != VMI_SUCCESS)
+        value = 0;
+    return ArgumentPrinter::print(drakvuf, info, value);
+}
+
+std::string UlongLongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = argument
+    );
+    auto vmi = vmi_lock_guard(drakvuf);
+    uint64_t value;
+    if (vmi_read_64(vmi, &ctx, &value) != VMI_SUCCESS)
         value = 0;
     return ArgumentPrinter::print(drakvuf, info, value);
 }

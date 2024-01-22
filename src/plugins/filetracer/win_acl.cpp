@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -109,7 +109,6 @@
 
 #include "private.h"
 #include "win_acl.h"
-#include "plugins/private.h"
 
 using std::hex;
 using std::showbase;
@@ -117,6 +116,7 @@ using std::setfill;
 using std::setw;
 using std::string;
 using std::stringstream;
+using namespace filetracer_ns;
 
 namespace
 {
@@ -543,7 +543,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
             break;
 
         case OUTPUT_KV:
-            fmt << base_name << ':' << ace_count;
+            fmt << base_name << '=' << ace_count;
             break;
 
         case OUTPUT_JSON:
@@ -557,7 +557,8 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
             break;
     }
 
-    while (ace_ptr < aces.get() + aces_size)
+    size_t aces_read = 0;
+    while (ace_ptr < aces.get() + aces_size && aces_read < ace_count)
     {
         auto header = reinterpret_cast<const struct ACE_HEADER*>(ace_ptr);
         auto ace_size = static_cast<size_t>(header->size);
@@ -603,7 +604,10 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
                 break;
 
             case OUTPUT_KV:
-                fmt << ",Type=\"" << type << "\"," << hex << showbase << mask << ",SID=\"" << sid << '"';
+                fmt << ",Type=\"" << type << "\"";
+                if (!mask.empty())
+                    fmt << "," << hex << showbase << mask;
+                fmt << ",SID=\"" << sid << '"';
                 break;
 
             case OUTPUT_JSON:
@@ -625,6 +629,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
         }
 
         ace_ptr += ace_size;
+        aces_read += 1;
     }
 
     // manual work done, may arise issues

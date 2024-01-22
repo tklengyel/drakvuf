@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -115,12 +115,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include<sys/stat.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <glib/gprintf.h>
 
 /* Input event codes */
 #include <linux/input.h>
@@ -197,15 +198,9 @@ int find_event_file(char** file)
     if (pos)
     {
         /* Removes ' \n' from end of line */
-        pos[strlen(pos) - 2] = '\0';
-
-        size_t len = strlen(DEVICE_PATH_STUB) + strlen(pos) + 1;
-        *file = (char*) malloc(sizeof(char) * len);
-        memset(*file, 0, len);
-
-        /* Constructs device path */
-        strcpy(*file, "/dev/input/");
-        snprintf(*file + strlen(*file), len, "%s", pos);
+        if ( strlen(pos) >= 2 )
+            pos[strlen(pos) - 2] = '\0';
+        *file = g_strdup_printf("/dev/input/%s", pos);
         return 0;
     }
     return 1;
@@ -411,7 +406,7 @@ int poll_events(struct pollfd* fds, size_t n, FILE* fout, int seconds, double x_
 
         /* Checks, if capture time is up */
         gettimeofday(&t2, NULL);
-        if (end_t.tv_sec > 0 && timercmp(&t2, &end_t, >))
+        if (end_t.tv_sec > 0 && t2.tv_sec == end_t.tv_sec ? t2.tv_usec > end_t.tv_usec : t2.tv_sec > end_t.tv_sec)
             is_stopping = 1;
     }
     return 0;

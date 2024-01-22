@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -149,12 +149,15 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
     privilege_mode_t* previous_mode);
 
 bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
+GHashTable* win_enum_threads(drakvuf_t drakvuf, addr_t process);
 
 bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
 bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status);
 
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
 bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
+
+addr_t win_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func);
 
 bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
 bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
@@ -172,7 +175,8 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
 
 bool win_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
 bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_drivers(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t driver, void* visitor_ctx), void* visitor_ctx);
+bool win_enumerate_drivers(drakvuf_t drakvuf, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx), void* visitor_ctx);
+bool win_enumerate_object_directory(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx);
 
 bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
@@ -198,6 +202,8 @@ bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callb
 bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
 uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+bool win_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+uint64_t win_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid);
@@ -207,6 +213,16 @@ bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
 bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
 bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
 
+void win_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid, uint32_t* tid, addr_t* rsp);
 bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
+
+addr_t win_get_rspbase(drakvuf_t dravkuf, drakvuf_trap_info_t* info);
+
+bool win_get_kernel_symbol_rva(drakvuf_t drakvuf, const char* function, addr_t* rva);
+
+bool win_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* va);
+
+unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object);
+unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object);
 
 #endif

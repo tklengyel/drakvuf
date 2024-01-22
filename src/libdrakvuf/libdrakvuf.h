@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -122,9 +122,32 @@ extern "C" {
 #include <libvmi/libvmi.h>
 #include <libvmi/libvmi_extra.h>
 #include <libvmi/events.h>
+#include <libvmi/x86.h>
 #include <json-c/json.h>
 
-#define NUMBER_OF(x) ( sizeof(x) / sizeof(x[0]) )
+// Printf helpers for timestamp.
+#define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
+#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - (t/G_USEC_PER_SEC)*G_USEC_PER_SEC)
+
+#define eprint_current_time(...) \
+    do { \
+        gint64 current_time = g_get_real_time(); \
+        fprintf(stderr, FORMAT_TIMEVAL " ", UNPACK_TIMEVAL(current_time)); \
+    } while (0)
+
+#ifdef DRAKVUF_DEBUG
+extern bool verbose;
+#define PRINT_DEBUG(...) \
+    do { \
+        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
+    } while (0)
+#else
+#define PRINT_DEBUG(...) do {} while(0)
+#endif
+
+#define UNUSED(x)       (void)(x)
+#define NUMBER_OF(x)    (sizeof(x) / sizeof(x[0]))
+#define ARRAY_SIZE(arr) NUMBER_OF(arr)
 
 /*---------------------------------------------------------
  * DRAKVUF functions
@@ -135,6 +158,7 @@ extern "C" {
 #define SIGDRAKVUFTIMEOUT -2
 #define SIGDRAKVUFCRASH   -3
 #define SIGDRAKVUFKERNELPANIC -4 // drakvuf loop interrupted by BSOD or KERNEL PANIC
+#define SIGDRAKVUFPOWEROFF -5 // drakvuf loop interrupted by POWER OFF, HALT or REBOOT
 
 typedef enum lookup_type
 {
@@ -163,6 +187,7 @@ typedef enum trap_type
     REGISTER,
     DEBUG,
     CPUID,
+    IO,
     CATCHALL_BREAKPOINT
 } trap_type_t;
 
@@ -173,6 +198,13 @@ typedef enum memaccess_type
     POST
 } memaccess_type_t;
 
+typedef enum proc_type
+{
+    PROC_TYPE_UNKNOWN = 0,
+    PROC_TYPE_32      = 32,
+    PROC_TYPE_64      = 64,
+} proc_type_t;
+
 typedef struct process_data
 {
     const char* name;   /* Process name */
@@ -180,7 +212,8 @@ typedef struct process_data
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
     int64_t userid ;    /* Process SessionID/UID */
-    uint32_t tid ;    /* Thread Id for Linux & Windows*/
+    uint32_t tid ;      /* Thread Id for Linux & Windows*/
+    proc_type_t bitness;/* Process bitness 32/64 */
 } proc_data_t ;
 
 typedef struct drakvuf* drakvuf_t;
@@ -203,6 +236,7 @@ typedef struct drakvuf_trap_info
         const cpuid_event_t* cpuid; /* For CPUID traps */
         const debug_event_t* debug; /* For DEBUG traps */
         const reg_event_t*   reg;   /* For MSR traps */
+        const io_event_t*    io;    /* For I/O traps */
     };
 } drakvuf_trap_info_t;
 
@@ -254,7 +288,11 @@ struct drakvuf_trap
             memaccess_type_t type;
         } memaccess;
 
-        register_t reg;
+        struct
+        {
+            register_t type;
+            uint32_t msr;
+        } regaccess;
     };
 
     // How many times trap can be hit in TRAP_TTL_RESET_INTERVAL_SEC interval,
@@ -325,6 +363,9 @@ void drakvuf_free_symbols(symbols_t* symbols) NOEXCEPT;
 bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
     const char* function,
     addr_t* rva) NOEXCEPT;
+bool drakvuf_get_kernel_symbol_va(drakvuf_t drakvuf,
+    const char* function,
+    addr_t* va) NOEXCEPT;
 bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,
     const char* struct_name,
     size_t* size) NOEXCEPT;
@@ -381,11 +422,13 @@ bool drakvuf_init (drakvuf_t* drakvuf,
     const char* domain,
     const char* json_profile,
     const char* json_wow_profile,
-    const bool verbose,
     const bool libvmi_conf,
     const addr_t kpgd,
     const bool fast_singlestep,
-    uint64_t limited_traps_ttl) NOEXCEPT;
+    uint64_t limited_traps_ttl,
+    GSList* ignored_processes,
+    bool get_userid,
+    bool enable_active_callback_check) NOEXCEPT;
 bool drakvuf_init_os (drakvuf_t drakvuf) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 int drakvuf_send_qemu_monitor_command(drakvuf_t drakvuf, const char* in, char** out);
@@ -399,8 +442,8 @@ void drakvuf_loop (drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), 
 void drakvuf_interrupt (drakvuf_t drakvuf,
     int sig) NOEXCEPT;
 int drakvuf_is_interrupted(drakvuf_t drakvuf) NOEXCEPT;
-void drakvuf_pause (drakvuf_t drakvuf) NOEXCEPT;
-void drakvuf_resume (drakvuf_t drakvuf) NOEXCEPT;
+bool drakvuf_pause (drakvuf_t drakvuf) NOEXCEPT;
+bool drakvuf_resume (drakvuf_t drakvuf) NOEXCEPT;
 
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
     addr_t process,
@@ -409,6 +452,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
 os_t drakvuf_get_os_type(drakvuf_t drakvuf) NOEXCEPT;
 page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf) NOEXCEPT;
 size_t drakvuf_get_address_width(drakvuf_t drakvuf) NOEXCEPT;
+uint64_t drakvuf_get_init_memsize(drakvuf_t drakvuf) NOEXCEPT;
 size_t drakvuf_get_process_address_width(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info) NOEXCEPT;
 int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
@@ -477,6 +521,20 @@ bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
     addr_t process_base,
     addr_t* dtb) NOEXCEPT;
 
+
+bool drakvuf_get_process_group_id( drakvuf_t drakvuf,
+    addr_t process_base,
+    uint32_t* pgid) NOEXCEPT;
+
+
+bool drakvuf_get_current_process_environ(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    GHashTable** environ) NOEXCEPT;
+
+bool drakvuf_get_process_arguments(drakvuf_t drakvuf,
+    addr_t process_base,
+    addr_t* argv) NOEXCEPT;
+
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
     addr_t process_base) NOEXCEPT;
@@ -487,6 +545,8 @@ unicode_string_t* drakvuf_get_process_csdversion(drakvuf_t drakvuf,
 bool drakvuf_get_process_data(drakvuf_t drakvuf,
     addr_t process_base,
     proc_data_t* proc_data) NOEXCEPT;
+
+addr_t drakvuf_get_rspbase(drakvuf_t dravkuf, drakvuf_trap_info_t* info);
 
 typedef struct _mmvad_info
 {
@@ -500,6 +560,7 @@ typedef struct _mmvad_info
     addr_t file_name_ptr;
     uint32_t total_number_of_ptes;
     addr_t prototype_pte;
+    addr_t node_addr;
 } mmvad_info_t;
 
 typedef bool (*mmvad_callback)(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data);
@@ -509,6 +570,8 @@ bool drakvuf_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback c
 bool drakvuf_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
 uint32_t drakvuf_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width) NOEXCEPT;
+bool drakvuf_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
+uint64_t drakvuf_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
 
 addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess) NOEXCEPT;
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx) NOEXCEPT;
@@ -518,6 +581,10 @@ bool drakvuf_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     uint32_t* thread_id) NOEXCEPT;
+
+void drakvuf_set_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    vmi_pid_t* target_pid, uint32_t* target_tid,
+    addr_t* target_rsp) NOEXCEPT;
 
 /*
  * To catch the moment of exiting the currently executing function,
@@ -538,6 +605,8 @@ bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
     const vmi_pid_t pid, const char* proc_name,
     const char* mod_name, addr_t rva) NOEXCEPT;
+
+addr_t drakvuf_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func) NOEXCEPT;
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
     const char* module, const char* sym) NOEXCEPT;
@@ -566,6 +635,11 @@ bool drakvuf_is_process_suspended(drakvuf_t drakvuf,
     addr_t process,
     bool* status) NOEXCEPT;
 
+GHashTable* drakvuf_enum_threads(drakvuf_t drakvuf, addr_t process) NOEXCEPT;
+addr_t drakvuf_get_thread(drakvuf_t drakvuf,
+    addr_t process,
+    uint32_t tid) NOEXCEPT;
+
 bool drakvuf_find_process(drakvuf_t drakvuf,
     vmi_pid_t find_pid,
     const char* find_procname,
@@ -577,11 +651,18 @@ typedef struct _module_info
     addr_t dtb ;                  /* DTB for the process where the module is currently loaded   */
     vmi_pid_t pid ;               /* PID of the process where the module is currently is loaded */
     addr_t base_addr ;            /* Module base address                                        */
+    addr_t size ;                 /* Size of Image                                              */
     unicode_string_t* full_name ; /* Module full name                                           */
     unicode_string_t* base_name ; /* Module base name                                           */
     bool is_wow ;                 /* Is WoW64 module?                                           */
     bool is_wow_process ;         /* Is WoW64 process?                                          */
 } module_info_t ;
+
+typedef struct _object_info
+{
+    addr_t base_addr;
+    unicode_string_t* name;
+} object_info_t;
 
 bool drakvuf_enumerate_processes(drakvuf_t drakvuf,
     void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx),
@@ -593,12 +674,16 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
     void* visitor_ctx) NOEXCEPT;
 
 bool drakvuf_enumerate_drivers(drakvuf_t drakvuf,
-    void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx),
+    bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx),
     void* visitor_ctx) NOEXCEPT;
 
 bool drakvuf_enumerate_process_modules(drakvuf_t drakvuf,
     addr_t eprocess,
     bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx),
+    void* visitor_ctx) NOEXCEPT;
+
+bool drakvuf_enumerate_object_directory(drakvuf_t drakvuf,
+    void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx),
     void* visitor_ctx) NOEXCEPT;
 
 bool drakvuf_is_crashreporter(drakvuf_t drakvuf,
@@ -637,6 +722,10 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
 unicode_string_t* drakvuf_read_unicode32_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
 
+unicode_string_t* drakvuf_get_object_type_name(drakvuf_t drakvuf, addr_t object) NOEXCEPT;
+
+unicode_string_t* drakvuf_get_object_name(drakvuf_t drakvuf, addr_t object) NOEXCEPT;
+
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
     addr_t module_list_head,
     const char* module_name,
@@ -664,6 +753,9 @@ char* drakvuf_get_filename_from_object_attributes( drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     addr_t attrs ) NOEXCEPT;
 
+char* drakvuf_get_filepath_from_dentry(drakvuf_t drakvuf,
+    addr_t dentry_addr) NOEXCEPT;
+
 // Reads 'length' characters from array of UTF_16 charachters into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length) NOEXCEPT;
 
@@ -688,6 +780,23 @@ bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid) NOEXCEPT;
 
 bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* regs) NOEXCEPT;
+void drakvuf_copy_gpr_registers(x86_registers_t* dst, x86_registers_t* src);
+/* This function is used to delay registers modification on injections.
+ * This fixes two issues:
+ * 1. Two plug-ins injects function call or modify registers.
+ * 2. One plug-in injects function call and other one reads modified registers.
+ */
+bool drakvuf_vmi_response_set_gpr_registers(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    x86_registers_t* regs,
+    bool immediate);
+/* The plug-in is called "active" if it injects function call. */
+bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+void drakvuf_insert_injection(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*));
+void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #define DRAKVUF_IPT_BRANCH_EN (1 << 0)
 #define DRAKVUF_IPT_TRACE_OS  (1 << 1)
@@ -708,6 +817,15 @@ typedef enum
 
 void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf);
 void drakvuf_intercept_process_add(drakvuf_t drakvuf, char* process_name, vmi_pid_t pid, context_match_t strict);
+
+typedef struct
+{
+    int major;
+    int minor;
+    int patch;
+} kernel_version_t;
+
+const kernel_version_t* drakvuf_get_kernel_version(drakvuf_t drakvuf, drakvuf_trap_info_t* info) NOEXCEPT;
 
 /*---------------------------------------------------------
  * Event FD functions
@@ -732,16 +850,6 @@ typedef enum
     OUTPUT_KV,
     OUTPUT_JSON,
 } output_format_t;
-
-// Printf helpers for timestamp.
-#define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
-#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - (t/G_USEC_PER_SEC)*G_USEC_PER_SEC)
-
-#define eprint_current_time(...) \
-    do { \
-        gint64 current_time = g_get_real_time(); \
-        fprintf(stderr, FORMAT_TIMEVAL " ", UNPACK_TIMEVAL(current_time)); \
-    } while (0)
 
 #pragma GCC visibility pop
 

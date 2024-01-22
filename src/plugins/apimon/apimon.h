@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,11 +106,13 @@
 #define APIMON_H
 
 #include <vector>
+#include <map>
 #include <memory>
+#include <unordered_map>
+#include <optional>
 
 #include <glib.h>
 #include <libusermode/userhook.hpp>
-#include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
 struct apimon_config
@@ -119,13 +121,31 @@ struct apimon_config
     const bool print_no_addr;
 };
 
+struct apimon_module
+{
+    std::string name;
+    addr_t base;
+    size_t size;
+};
+
 class apimon: public pluginex
 {
 public:
     wanted_hooks_t wanted_hooks;
+    std::unordered_map<vmi_pid_t, std::vector<apimon_module>> procs;
 
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();
+
+    virtual bool stop_impl() override;
+
+    std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t process, addr_t addr, vmi_pid_t pid);
+
+    event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info);
+
+    void usermode_print(drakvuf_trap_info*, std::vector<uint64_t>&, hook_target_entry_t*);
+
+    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 };
 
 #endif

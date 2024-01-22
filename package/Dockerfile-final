@@ -12,17 +12,16 @@ RUN export INSTALL_PATH="/build/usr" && \
     rm /build/usr/lib/libvmi.la && \
     ldconfig
 RUN export INSTALL_PATH="/build/usr" && \
-    cd /build && \
+    export DESTDIR="/build" && \
     export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$INSTALL_PATH/lib" && \
     export C_INCLUDE_PATH="$INSTALL_PATH/include" && \
     export CPLUS_INCLUDE_PATH="$INSTALL_PATH/include" && \
-    export PKG_CONFIG_PATH="$INSTALL_PATH/lib/pkgconfig/" && \
     export LDFLAGS="-L$INSTALL_PATH/lib" && \
     export CFLAGS="-I$INSTALL_PATH/include" && \
-    autoreconf -vif && \
-    ./configure --prefix=$INSTALL_PATH --enable-debug && \
-    make -j$(nproc) && \
-    make install
+    cd /build && \
+    ldconfig && \
+    meson setup build --native-file llvm.ini --prefix "/usr" --pkg-config-path "$INSTALL_PATH/lib/pkgconfig" && \
+    ninja -C build install
 
 WORKDIR /build
 RUN chmod +x package/mkdeb
