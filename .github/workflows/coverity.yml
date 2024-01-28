@@ -1,7 +1,5 @@
 name: coverity-scan
 on:
-  schedule:
-    - cron: '0 18 * * *' # Daily at 18:00 UTC
   push:
     branches: main
 permissions:
@@ -15,7 +13,7 @@ jobs:
       TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -28,7 +26,7 @@ jobs:
           echo XEN_HASH=$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
       - name: Cache Xen debball
         id: cache-xen
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: xen/dist
           key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}
@@ -70,7 +68,7 @@ jobs:
           wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
           echo hash=$(cat coverity_tool.md5) >> $GITHUB_OUTPUT
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache-coverity
         with:
           path: coverity
