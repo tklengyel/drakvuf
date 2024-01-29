@@ -21,7 +21,7 @@ jobs:
           - "ubuntu:focal"
           - "ubuntu:jammy"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Generate variables
@@ -39,7 +39,7 @@ jobs:
           echo "Xen version: $XENVERSION"
           echo "xenversion=$XENVERSION" >> $GITHUB_OUTPUT
       - name: Cache Xen intermediate
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             package/cache
@@ -56,7 +56,7 @@ jobs:
           if [ ! -z $XEN_DEB_PATH ]; then
             cp $XEN_DEB_PATH ${{ github.workspace }}
           fi
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.gen_vars.outputs.container }}-debs
           path: ${{ github.workspace }}/*.deb
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
       - name: Generate variables
         id: gen_vars
         run: |
@@ -74,7 +74,7 @@ jobs:
           echo cur_datetime=$(date '+%Y-%m-%d %H:%M:%S') >> $GITHUB_OUTPUT
 
       - name: Delete old release
-        uses: dev-drprasad/delete-older-releases@653dc03d96473ac9e585c68c8bf5aaccb0dadb61 # pin 0.2.1
+        uses: dev-drprasad/delete-older-releases@5494cd8b61c31b3c7a15f6267901195ec7df64e8 # pin 0.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
@@ -107,14 +107,14 @@ jobs:
     container:
       image: ${{ matrix.container}}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - id: gen_vars
         run: |
           CONTAINER=$(echo ${{ matrix.container }} | tr -d ":")
           echo "container=$CONTAINER" >> $GITHUB_OUTPUT
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ steps.gen_vars.outputs.container }}-debs
           path: ~/debs
@@ -127,18 +127,18 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: debianbullseye-debs
           path: debs
@@ -147,7 +147,7 @@ jobs:
         run: rm debs/*xen*
 
       - name: Build and push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: .
           file: package/Dockerfile-registry
