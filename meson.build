@@ -44,7 +44,7 @@ add_project_arguments('-Wno-reorder-init-list', language : ['cpp'])
 add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
 add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
 add_project_arguments('-Wno-missing-field-initializers', language : ['c', 'cpp'])
-add_project_arguments('-Wno-packed-non-pod', language : ['c', 'cpp'])
+add_project_arguments('-Wno-packed', language : ['c', 'cpp'])
 
 # Declare additional debug flags
 if get_option('buildtype').startswith('debug')
