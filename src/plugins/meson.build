@@ -1,5 +1,4 @@
 incdir = include_directories('..', '../..')
-zlib_dep = dependency('zlib', required: true)
 
 plugin_sources = [
     'plugins.cpp',
@@ -278,7 +277,7 @@ endif
 if get_option('plugin-procdump')
     plugin_sources += 'procdump/procdump.cpp'
     plugin_sources += 'procdump/writer.cpp'
-    deps += zlib_dep
+    deps += dependency('zlib', required: true)
     config_h.set('ENABLE_PLUGIN_PROCDUMP', 1)
 endif
 
