@@ -1,5 +1,4 @@
 incdir = include_directories('..', '../..')
-zlib_dep = dependency('zlib', required: true)
 
 plugin_sources = [
     'plugins.cpp',
@@ -252,17 +251,6 @@ if get_option('plugin-regmon')
 endif
 
 
-if get_option('plugin-procmon')
-    plugin_sources += 'procmon/procmon.cpp'
-    plugin_sources += 'procmon/linux.cpp'
-    plugin_sources += 'procmon/linux_utils.cpp'
-    plugin_sources += 'procmon/privileges.cpp'
-    plugin_sources += 'procmon/win.cpp'
-    plugin_sources += 'procmon/winnt.cpp'
-    config_h.set('ENABLE_PLUGIN_PROCMON', 1)
-endif
-
-
 if get_option('plugin-socketmon')
     plugin_sources += 'socketmon/socketmon.cpp'
     config_h.set('ENABLE_PLUGIN_SOCKETMON', 1)
@@ -278,7 +266,7 @@ endif
 if get_option('plugin-procdump')
     plugin_sources += 'procdump/procdump.cpp'
     plugin_sources += 'procdump/writer.cpp'
-    deps += zlib_dep
+    deps += dependency('zlib', required: true)
     config_h.set('ENABLE_PLUGIN_PROCDUMP', 1)
 endif
 
@@ -324,7 +312,6 @@ summary({
     'objmon': get_option('plugin-objmon'),
     'rootkitmon': get_option('plugin-rootkitmon'),
     'spraymon': get_option('plugin-spraymon'),
-    'procmon': get_option('plugin-procmon'),
     'hidevm': get_option('plugin-hidevm'),
     'ptracemon': get_option('plugin-ptracemon'),
     'ebpfmon': get_option('plugin-ebpfmon'),
