@@ -206,7 +206,7 @@ static char const* tcp_addressfamily_string(int family)
     return (family == AF_INET) ? "TCPv4" : "TCPv6";
 }
 
-static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
+static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int localport, char const* rip, int remoteport)
 {
     fmt::print(s->format, "socketmon", drakvuf, info,
         keyval("Owner", fmt::Qstr(owner_proc_data.name)),
@@ -214,8 +214,10 @@ static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
         keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
         keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
         keyval("Protocol", fmt::Rstr(udp_addressfamily_string(addressfamily))),
+        keyval("RemoteIp", fmt::Rstr(rip ?: "")),
+        keyval("RemotePort", fmt::Nval(remoteport)),
         keyval("LocalIp", fmt::Rstr(lip ?: "")),
-        keyval("LocalPort", fmt::Nval(port))
+        keyval("LocalPort", fmt::Nval(localport))
     );
 }
 
@@ -461,6 +463,30 @@ static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     sockaddr.sin6_port = __bswap_16(sockaddr.sin6_port);
 
+    addr_t saddr{};
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, udp_info + 0x60, 0, &saddr) || !saddr ||
+        VMI_FAILURE == vmi_read_addr_va(vmi, saddr + 0x10,    0, &saddr) || !saddr ||
+        VMI_FAILURE == vmi_read_addr_va(vmi, saddr,           0, &saddr) || !saddr)
+    {
+        PRINT_DEBUG("[SOCKETMON] UdpSendMessages failed to read saddr\n");
+    }
+    // Get source port offset based on win version.
+    //
+    uint16_t poff{};
+    if (s->build.buildnumber == win_7_sp1_ver)
+        poff = 0x80;
+    else if (s->build.buildnumber == win_10_1803_ver)
+        poff = 0x78;
+
+    uint16_t sport{};
+    if (poff)
+    {
+        if (VMI_FAILURE == vmi_read_16_va(vmi, udp_info + poff, 0, &sport))
+            PRINT_DEBUG("[SOCKETMON] UdpSendMessages failed to read sport\n");
+    }
+    sport = __bswap_16(sport);
+
+    char* sip = saddr ? read_ip_string(vmi, ctx, saddr, sockaddr.sin6_family) : nullptr;
     char* rip = nullptr;
     if (sockaddr.sin6_family == AF_INET)
     {
@@ -498,11 +524,12 @@ static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     proc_data_t* data = udp_get_process_data(drakvuf, vmi, udp_info);
     if (data)
     {
-        print_udp_info(drakvuf, info, s, *data, sockaddr.sin6_family, rip, sockaddr.sin6_port);
+        print_udp_info(drakvuf, info, s, *data, sockaddr.sin6_family, sip, sport, rip, sockaddr.sin6_port);
         g_free(const_cast<char*>(data->name));
         delete data;
     }
     g_free(rip);
+    g_free(sip);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
