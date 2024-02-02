@@ -52,7 +52,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 }
 
 delaymon::delaymon(drakvuf_t drakvuf, output_format_t output)
-    : format{output}
+    : drakvuf{drakvuf}, format{output}
 {
     this->pm = drakvuf_get_page_mode(drakvuf);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -62,11 +62,8 @@ delaymon::delaymon(drakvuf_t drakvuf, output_format_t output)
     register_trap(drakvuf, "NtDelayExecution", &trap, trap_NtDelayExecution_cb);
 }
 
-delaymon::~delaymon()
-{
-}
-
 bool delaymon::stop_impl()
 {
+    drakvuf_remove_trap(drakvuf, &trap, nullptr);
     return true;
 }
