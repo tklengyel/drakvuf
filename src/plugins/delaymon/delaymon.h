@@ -6,6 +6,7 @@ class delaymon: public plugin
 {
 public:
     page_mode_t pm;
+    drakvuf_t drakvuf;
     output_format_t format;
     win_ver_t winver;
 
@@ -22,6 +23,6 @@ public:
     };
 
     delaymon(drakvuf_t drakvuf, output_format_t output);
-    ~delaymon();
+    ~delaymon() = default;
     virtual bool stop_impl() override;
 };

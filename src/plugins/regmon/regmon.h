@@ -160,8 +160,7 @@ public:
     unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t type, addr_t data_addr, size_t data_size);
 
     regmon(drakvuf_t drakvuf, output_format_t output);
-    ~regmon();
-    virtual bool stop_impl() override;
+    ~regmon() = default;
 };
 
 #endif
