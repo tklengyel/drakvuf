@@ -283,9 +283,16 @@ if PLUGIN_PROCDUMP2
 sources += procdump2/procdump2.cpp
 sources += procdump2/procdump2.h
 sources += procdump2/private2.h
+sources += procdump2/win.cpp
+sources += procdump2/win.h
+sources += procdump2/win_private.h
+sources += procdump2/win_minidump.h
+sources += procdump2/linux.cpp
+sources += procdump2/linux.h
+sources += procdump2/linux_private.h
+sources += procdump2/linux_coredump.h
 sources += procdump2/writer.cpp
 sources += procdump2/writer.h
-sources += procdump2/minidump2.h
 endif
 
 if PLUGIN_RPCMON

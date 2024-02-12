@@ -102,21 +102,194 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCDUMP2_PRIVATE_H
-#define PROCDUMP2_PRIVATE_H
+#ifndef LINUX_PROCDUMP_PRIVATE_H
+#define LINUX_PROCDUMP_PRIVATE_H
 
-struct procdump2_config
+#include <string>
+#include <set>
+#include "writer.h"
+
+using namespace std::string_literals;
+
+namespace procdump2_ns
 {
-    uint32_t timeout;
-    const char* procdump_dir;
-    bool compress_procdumps;
-    vmi_pid_t dump_process_on_finish;
-    bool dump_new_processes_on_finish;
-    const char* hal_profile;
-    bool disable_kideliverapc_hook;
-    bool disable_kedelayexecutionthread_hook;
-    const char* exclude_file;
-    bool use_maple_tree;
+
+//https://elixir.bootlin.com/linux/v4.8/source/include/linux/mm.h
+#define VM_NONE		    0x00000000
+
+#define VM_READ		    0x00000001	/* currently active flags */
+#define VM_WRITE	    0x00000002
+#define VM_EXEC		    0x00000004
+#define VM_SHARED	    0x00000008
+
+/* mprotect() hardcodes VM_MAYREAD >> 4 == VM_READ, and so for r/w/x bits. */
+#define VM_MAYREAD	    0x00000010	/* limits for mprotect() etc */
+#define VM_MAYWRITE	    0x00000020
+#define VM_MAYEXEC	    0x00000040
+#define VM_MAYSHARE	    0x00000080
+
+#define VM_GROWSDOWN	0x00000100	/* general info on the segment */
+#define VM_UFFD_MISSING	0x00000200	/* missing pages tracking */
+#define VM_PFNMAP	    0x00000400	/* Page-ranges managed without "struct page", just pure PFN */
+#define VM_DENYWRITE	0x00000800	/* ETXTBSY on write attempts.. */
+#define VM_UFFD_WP	    0x00001000	/* wrprotect pages tracking */
+
+#define VM_LOCKED	    0x00002000
+#define VM_IO           0x00004000	/* Memory mapped I/O or similar */
+
+/* Used by sys_madvise() */
+#define VM_SEQ_READ	    0x00008000	/* App will access data sequentially */
+#define VM_RAND_READ	0x00010000	/* App will not benefit from clustered reads */
+
+#define VM_DONTCOPY	    0x00020000      /* Do not copy this vma on fork */
+#define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
+#define VM_LOCKONFAULT	0x00080000	/* Lock the pages covered when they are faulted in */
+#define VM_ACCOUNT	    0x00100000	/* Is a VM accounted object */
+#define VM_NORESERVE	0x00200000	/* should the VM suppress accounting */
+#define VM_HUGETLB	    0x00400000	/* Huge TLB Page VM */
+#define VM_ARCH_1	    0x01000000	/* Architecture-specific flag */
+#define VM_ARCH_2	    0x02000000
+#define VM_DONTDUMP	    0x04000000	/* Do not include in the core dump */
+
+#define NULL_INDEX 0
+#define SHSTRTAB_INDEX 1
+#define NOTE0_INDEX 11
+#define LOAD_INDEX 17
+static const char string_table_section[] = {'\0', '.', 's', 'h', 's', 't', 'r', 't', 'a', 'b', '\0', 'n', 'o', 't', 'e', '0', '\0', 'l', 'o', 'a', 'd', '\0'};
+
+struct linux_procdump_task_t
+{
+    std::string data_file_name;
+    addr_t process_base;
+    const uint64_t idx = 0;
+    bool reason = 0;
+    std::unique_ptr<ProcdumpWriter> writer;
+
+    proc_data_t process_data = {};
+    uint64_t dump_size = 0;
+    uint64_t mapped_files_count = 0;
+    uint64_t note_offset = 0;
+    uint64_t note_size = 0;
+    uint64_t note_aligned = 0;
+    uint64_t note_count = 0;
+
+    linux_procdump_task_t(addr_t process_base,
+        std::string procdump_dir,
+        uint64_t idx,
+        bool use_compression,
+        bool reason)
+        : process_base(process_base)
+        , idx(idx)
+        , reason(reason)
+    {
+        data_file_name = "procdump."s + std::to_string(idx);
+        writer = ProcdumpWriterFactory::build(
+                procdump_dir + "/"s + data_file_name,
+                use_compression);
+    }
 };
 
-#endif // PROCDUMP2_PRIVATE_H
+struct vm_area_info
+{
+    uint32_t segment_flags;
+    uint32_t section_flags;
+    addr_t vm_start;
+    addr_t vm_end;
+    uint32_t vm_pgoff;
+
+    uint64_t size;
+    std::string filename;
+    uint64_t file_offset;
+};
+
+struct dump_offsets
+{
+    uint64_t curr_program_offset;
+    uint64_t curr_section_offset;
+    uint64_t curr_write_offset;
+};
+
+
+//https://elixir.bootlin.com/linux/v6.6.1/source/include/linux/maple_tree.h#L41
+#define MAPLE_NODE_MASK	255UL
+
+#define MAPLE_NODE_TYPE_MASK	0x0F
+#define MAPLE_NODE_TYPE_SHIFT	0x03
+
+enum maple_type
+{
+    MAPLE_DENSE,
+    MAPLE_LEAF_64,
+    MAPLE_RANGE_64,
+    MAPLE_ARANGE_64,
+};
+
+// may differ from version to version
+#define MAPLE_RANGE64_SLOTS	16
+#define MAPLE_ARANGE64_SLOTS 10
+
+enum
+{
+    TASK_STRUCT_MM,
+    TASK_STRUCT_ACTIVE_MM,
+    MM_STRUCT_MAP_COUNT,
+    VM_AREA_STRUCT_VM_START,
+    VM_AREA_STRUCT_VM_END,
+    VM_AREA_STRUCT_VM_FLAGS,
+    VM_AREA_STRUCT_VM_FILE,
+    VM_AREA_STRUCT_VM_PGOFF,
+    _FILE_F_PATH,
+    _PATH_DENTRY,
+    __LINUX_OFFSET_MAX,
+};
+
+// Linux Offsets
+static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
+{
+    [TASK_STRUCT_MM] = {"task_struct", "mm"},
+    [TASK_STRUCT_ACTIVE_MM] = {"task_struct", "active_mm"},
+    [MM_STRUCT_MAP_COUNT] = {"mm_struct", "map_count"},
+    [VM_AREA_STRUCT_VM_START] = {"vm_area_struct", "vm_start"},
+    [VM_AREA_STRUCT_VM_END] = {"vm_area_struct", "vm_end"},
+    [VM_AREA_STRUCT_VM_FLAGS] = {"vm_area_struct", "vm_flags"},
+    [VM_AREA_STRUCT_VM_FILE] = {"vm_area_struct", "vm_file"},
+    [VM_AREA_STRUCT_VM_PGOFF] = {"vm_area_struct", "vm_pgoff"},
+    [_FILE_F_PATH] = {"file", "f_path"},
+    [_PATH_DENTRY] = {"path", "dentry"},
+};
+
+enum
+{
+    MM_STRUCT_MMAP,
+    VM_AREA_STRUCT_VM_NEXT,
+    __LIST_OFFSET_MAX,
+};
+
+// VMA list Offsets
+static const char* list_offset_names[__LIST_OFFSET_MAX][2] =
+{
+    [MM_STRUCT_MMAP] = {"mm_struct", "mmap"},
+    [VM_AREA_STRUCT_VM_NEXT] = {"vm_area_struct", "vm_next"},
+};
+
+// Kernel version 6.2+
+enum
+{
+    MM_STRUCT_MM_MT,
+    MAPLE_TREE_MA_ROOT,
+    MAPLE_ARANGE_SLOT,
+    MAPLE_RANGE_SLOT,
+    __TREE_OFFSET_MAX,
+};
+
+// Maple tree Offsets
+static const char* tree_offset_names[__TREE_OFFSET_MAX][2] =
+{
+    [MM_STRUCT_MM_MT] = {"mm_struct", "mm_mt"},
+    [MAPLE_TREE_MA_ROOT] = {"maple_tree", "ma_root"},
+    [MAPLE_ARANGE_SLOT] = {"maple_arange_64", "slot"},
+    [MAPLE_RANGE_SLOT] = {"maple_range_64", "slot"},
+};
+
+}
+#endif

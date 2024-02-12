@@ -102,21 +102,73 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCDUMP2_PRIVATE_H
-#define PROCDUMP2_PRIVATE_H
+#ifndef LINUX_PROCDUMP_H
+#define LINUX_PROCDUMP_H
 
-struct procdump2_config
+#include "plugins/plugins_ex.h"
+#include "helpers/exclude_matcher.h"
+#include "linux_private.h"
+#include "linux_coredump.h"
+#include "private2.h"
+
+#include <filesystem>
+
+using namespace procdump2_ns;
+
+class linux_procdump: public pluginex
 {
-    uint32_t timeout;
-    const char* procdump_dir;
-    bool compress_procdumps;
-    vmi_pid_t dump_process_on_finish;
-    bool dump_new_processes_on_finish;
-    const char* hal_profile;
-    bool disable_kideliverapc_hook;
-    bool disable_kedelayexecutionthread_hook;
-    const char* exclude_file;
-    bool use_maple_tree;
+public:
+    linux_procdump(drakvuf_t drakvuf, const procdump2_config* config, output_format_t output);
+    ~linux_procdump() = default;
+    virtual bool stop_impl() override;
+
+private:
+    std::array<size_t, procdump2_ns::__LINUX_OFFSET_MAX> offsets;
+    std::array<size_t, procdump2_ns::__LIST_OFFSET_MAX> list_offsets;
+    std::array<size_t, procdump2_ns::__TREE_OFFSET_MAX> tree_offsets;
+
+    std::unique_ptr<libhook::SyscallHook> exit_hook;
+
+    uint64_t procdumps_count{0};
+    std::set<vmi_pid_t> finished;
+
+    uint32_t timeout{0};
+    bool dump_new_processes_on_finish{0};
+    const std::filesystem::path procdump_dir;
+    bool const use_compression{false};
+    bool const use_maple_tree{false};
+    const exclude_matcher exclude;
+    int address_width = drakvuf_get_address_width(drakvuf) * 8;
+    uint32_t begin_stop_at{0};
+
+    void read_vma_info(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t leaf_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    void read_range_node_impl(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list, int count, uint64_t offset);
+    void read_range_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    void read_range_leafes(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    void read_arange_node(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t node_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);
+    std::vector<vm_area_info> get_vmas_from_maple_tree(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data);
+    std::vector<vm_area_info> get_vmas_from_list(drakvuf_t drakvuf, vmi_instance_t vmi, proc_data_t const& process_data);
+
+    void start_copy_memory(drakvuf_t drakvuf, vmi_instance_t vmi, std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
+    void start_dump_process(vmi_pid_t pid, bool reason);
+
+    bool is_process_handled(vmi_pid_t pid);
+    void dump_zero_page(std::shared_ptr<linux_procdump_task_t> task);
+    void read_vm(drakvuf_t drakvuf, vmi_instance_t vmi, vm_area_info vm_area, std::shared_ptr<linux_procdump_task_t> task);
+    void dump_process(drakvuf_t drakvuf, std::shared_ptr<linux_procdump_task_t> task);
+
+    void write_program_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
+    void write_section_headers(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
+    void calc_note_size_and_count(std::vector<vm_area_info> vma_list, uint64_t* note_size, uint64_t* note_count);
+    void write_notes(std::shared_ptr<linux_procdump_task_t> task, std::vector<vm_area_info> vma_list);
+
+    void print_dump_exclusion(drakvuf_trap_info_t* info);
+    void print_dump_failure(addr_t process_base, const std::string& message);
+    void print_dump_info(std::shared_ptr<linux_procdump_task_t> task);
+    void save_file_metadata(std::shared_ptr<linux_procdump_task_t> task);
+    std::vector<vmi_pid_t> get_running_processes();
+
+    event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 };
 
-#endif // PROCDUMP2_PRIVATE_H
+#endif

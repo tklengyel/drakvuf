@@ -341,6 +341,8 @@ static void print_usage()
         "\t                           Disables hook on KeDelayExecutionThread\n"
         "\t --procdump-exclude-list <file name filter>\n"
         "\t                           File with list of process name regexes to exclude from dumping\n"
+        "\t --procdump-use-maple-tree\n"
+        "\t                           Extract VMAs from maple tree (linux kernel 6.1+) \n"
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON
         "\t --codemon-dump-dir <directory>\n"
@@ -495,6 +497,7 @@ int main(int argc, char** argv)
         opt_procdump_timeout,
         opt_procdump_dir,
         opt_compress_procdumps,
+        opt_procdump_use_maple_tree,
         opt_procdump_disable_dump_on_finish,
         opt_procdump_new_processes_on_finish,
         opt_procdump_disable_kideliverapc_hook,
@@ -580,6 +583,7 @@ int main(int argc, char** argv)
         {"procdump-timeout", required_argument, NULL, opt_procdump_timeout},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
+        {"procdump-use-maple-tree", no_argument, NULL, opt_procdump_use_maple_tree},
         {"procdump-disable-dump-on-finish", no_argument, NULL, opt_procdump_disable_dump_on_finish},
         {"procdump-new-processes-on-finish", no_argument, NULL, opt_procdump_new_processes_on_finish},
         {"procdump-disable-kideliverapc-hook", no_argument, NULL, opt_procdump_disable_kideliverapc_hook},
@@ -935,6 +939,8 @@ int main(int argc, char** argv)
             case opt_procdump_disable_kedelayexecutionthread_hook:
                 options.procdump_disable_kedelayexecutionthread_hook = true;
                 break;
+            case opt_procdump_use_maple_tree:
+                options.procdump_use_maple_tree = true;
             case opt_procdump_exclude_list:
                 if (!std::filesystem::exists(optarg))
                 {
