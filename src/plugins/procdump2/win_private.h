@@ -352,7 +352,7 @@ public:
     ~win_procdump2_ctx()
     {
         PRINT_DEBUG("[PROCDUMP] [%d:%d] [%srestored] Destroy task context\n"
-            , target_process_pid, stage(), is_restored() ? "" : "not ");
+            , target_process_pid, to_int(stage()), is_restored() ? "" : "not ");
     }
 
     bool on_target_resuspend()
