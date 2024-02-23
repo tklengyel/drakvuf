@@ -655,10 +655,3 @@ regmon::regmon(drakvuf_t drakvuf, output_format_t output)
     query_multiple_value_key_hook = createSyscallHook("NtQueryMultipleValueKey", &regmon::query_multiple_value_key_cb);
     query_value_key_hook = createSyscallHook("NtQueryValueKey", &regmon::query_value_key_cb);
 }
-
-regmon::~regmon(void) {}
-
-bool regmon::stop_impl()
-{
-    return true;
-}

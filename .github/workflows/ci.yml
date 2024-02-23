@@ -20,7 +20,7 @@ jobs:
           - 'ubuntu-20.04'
           - 'ubuntu-latest'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -36,7 +36,7 @@ jobs:
 
       - name: Cache Xen debball
         id: cache-xen
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: xen/dist
           key: xen-${{ matrix.os }}-${{ steps.get-hash.outputs.XEN_HASH }}
@@ -65,7 +65,7 @@ jobs:
 
       - name: Cache Libvmi files
         id: cache-libvmi
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: libvmi/dist
           key: libvmi-${{ matrix.os }}-${{ steps.get-hash.outputs.LIBVMI_HASH }}
@@ -111,7 +111,7 @@ jobs:
             - '-Dbuildtype=debug -Db_lto=false -Drepl=true'
             - '-Dbuildtype=debug -Db_lto=false -Dthreadsafety=true'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -121,13 +121,13 @@ jobs:
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: xen/dist
           key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: libvmi/dist
           key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -162,7 +162,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -173,13 +173,13 @@ jobs:
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: xen/dist
           key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: libvmi/dist
           key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -226,11 +226,11 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: cpp
         queries: security-and-quality
@@ -243,13 +243,13 @@ jobs:
             liblzo2-dev libglib2.0-dev meson ninja-build
 
     - name: Cache Xen debball
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: xen/dist
         key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
     - name: Cache Libvmi files
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: libvmi/dist
         key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -271,7 +271,7 @@ jobs:
         ninja -C build
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
 
   scan-build:
     runs-on: ubuntu-latest
@@ -280,7 +280,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           # Install packages
@@ -290,13 +290,13 @@ jobs:
             libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: xen/dist
           key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: libvmi/dist
           key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -326,7 +326,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           # Install packages
@@ -336,13 +336,13 @@ jobs:
             libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: xen/dist
           key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: libvmi/dist
           key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -364,7 +364,7 @@ jobs:
           /tmp/complexity.sh
           mv complexity.log /tmp/complexity.log
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: main
 
