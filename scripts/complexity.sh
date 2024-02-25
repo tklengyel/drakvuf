@@ -1,5 +1,5 @@
 #!/bin/bash
-meson _complexity
+meson setup _complexity --native-file llvm.ini
 cd _complexity
 run-clang-tidy-$VERSION -quiet \
     -config="{Checks: 'readability-function-cognitive-complexity', CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: 25}, {key: readability-function-cognitive-complexity.DescribeBasicIncrements, value: False}]}" \
