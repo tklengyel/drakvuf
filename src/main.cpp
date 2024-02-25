@@ -941,6 +941,7 @@ int main(int argc, char** argv)
                 break;
             case opt_procdump_use_maple_tree:
                 options.procdump_use_maple_tree = true;
+                break;
             case opt_procdump_exclude_list:
                 if (!std::filesystem::exists(optarg))
                 {
