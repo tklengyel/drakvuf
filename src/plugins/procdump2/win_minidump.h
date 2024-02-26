@@ -102,8 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCDUMP2_MINIDUMP_H
-#define PROCDUMP2_MINIDUMP_H
+#ifndef WIN_PROCDUMP2_MINIDUMP_H
+#define WIN_PROCDUMP2_MINIDUMP_H
 
 #include <algorithm>
 #include <array>
@@ -689,4 +689,4 @@ struct __attribute__ ((packed, aligned(4))) minidump
 
 }
 
-#endif // PROCDUMP2_MINIDUMP_H
+#endif // WIN_PROCDUMP2_MINIDUMP_H

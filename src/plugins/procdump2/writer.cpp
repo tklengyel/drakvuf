@@ -117,12 +117,29 @@
 
 using namespace procdump2_ns;
 
+uint64_t ProcdumpWriter::data_size() const
+{
+    return m_data_size;
+}
+
+bool ProcdumpWriter::append(uint8_t const* data, size_t size)
+{
+    if (do_append(data, size))
+    {
+        m_data_size += size;
+        return true;
+    }
+    return false;
+}
+
 namespace
 {
 
 static FILE* create_file(char const* path)
 {
     int fd = creat(path, S_IWUSR | S_IRUSR);
+    if (fd < 0)
+        return nullptr;
     return fdopen(fd, "w");
 }
 
@@ -143,7 +160,7 @@ public:
         fclose(file);
     }
 
-    bool append(uint8_t const* data, size_t size) override
+    bool do_append(uint8_t const* data, size_t size) override
     {
         return (size == 0 || fwrite(data, size, 1, file) == 1);
     }
@@ -183,7 +200,7 @@ public:
         deflateEnd(&z_file);
     }
 
-    bool append(uint8_t const* data, size_t size) override
+    bool do_append(uint8_t const* data, size_t size) override
     {
         z_file.avail_in = size;
         z_file.next_in = const_cast<uint8_t*>(data);
@@ -217,7 +234,7 @@ bool GzippedProcdumpWriter::write_impl(int flush)
             return false;
         }
 
-        if (!BaseProcdumpWriter::append(out, sizeof(out) - z_file.avail_out)) return false;
+        if (!BaseProcdumpWriter::do_append(out, sizeof(out) - z_file.avail_out)) return false;
     } while (z_file.avail_out == 0);
     if (z_file.avail_in != 0)
     {

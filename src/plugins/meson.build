@@ -270,6 +270,14 @@ if get_option('plugin-procdump')
     config_h.set('ENABLE_PLUGIN_PROCDUMP', 1)
 endif
 
+if get_option('plugin-procdump2')
+    plugin_sources += 'procdump2/procdump2.cpp'
+    plugin_sources += 'procdump2/linux.cpp'
+    plugin_sources += 'procdump2/win.cpp'
+    plugin_sources += 'procdump2/writer.cpp'
+    deps += dependency('zlib', required: true)
+    config_h.set('ENABLE_PLUGIN_PROCDUMP2', 1)
+endif
 
 if get_option('plugin-rpcmon')
     plugin_sources += 'rpcmon/rpcmon.cpp'
