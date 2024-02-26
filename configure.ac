@@ -403,9 +403,9 @@ fi
 
 AC_ARG_ENABLE([plugin_procdump2],
   [AS_HELP_STRING([--enable-plugin-procdump],
-    [Enable the windows experimental process dumping plugin @<:@no@:>@])],
+    [Enable the windows/linux experimental process dumping plugin @<:@yes@:>@])],
   [plugin_procdump2="$enableval"],
-  [plugin_procdump2="no"])
+  [plugin_procdump2="yes"])
 AM_CONDITIONAL([PLUGIN_PROCDUMP2], [test x$plugin_procdump2 = xyes])
 if test x$plugin_procdump2 = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP2, 1, "")
