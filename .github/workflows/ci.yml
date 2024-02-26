@@ -359,6 +359,9 @@ jobs:
           cd ../..
 
       - name: Calculate cognitive complexity for pr
+        env:
+          CC: clang
+          CXX: clang++
         run: |
           cp scripts/complexity.sh /tmp
           /tmp/complexity.sh
@@ -369,6 +372,9 @@ jobs:
           ref: main
 
       - name: Calculate cognitive complexity for main
+        env:
+          CC: clang
+          CXX: clang++
         run: /tmp/complexity.sh
 
       - name: compare complexity
@@ -379,7 +385,13 @@ jobs:
           CURRENT_FUNCTIONS=$(tail -2 /tmp/complexity.log | head -1 | awk '{ print $2 }')
           COMPLEXITY=$(tail -1 /tmp/complexity.log | awk '{ print $2 }')
 
+          echo "Complexity: $THRESHOLD" >> $GITHUB_STEP_SUMMARY
+          echo "Complex functions: $FUNCTIONS" >> $GITHUB_STEP_SUMMARY
+          echo "Complex functions with PR: $CURRENT_FUNCTIONS" >> $GITHUB_STEP_SUMMARY
+          echo "Total complexity with PR: $COMPLEXITY" >> $GITHUB_STEP_SUMMARY
+
           if [ $CURRENT_FUNCTIONS -gt $FUNCTIONS ] || [ $COMPLEXITY -gt $THRESHOLD ]; then
+            echo "## Complexity reduction in scope" >> $GITHUB_STEP_SUMMARY
             echo "Please don't increase complexity of existing complex functions or introduce new ones"
             echo "Showing diff of main (<) and this PR (>)"
             diff complexity.log /tmp/complexity.log | egrep '>|<'
