@@ -102,12 +102,14 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "plugins/output_format.h"
 #include <libdrakvuf/libdrakvuf.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
 #include "linux.h"
+
+#include "plugins/output_format.h"
+#include "plugins/plugin_utils.h"
 
 using namespace std::string_literals;
 using namespace procdump2_ns;
@@ -150,7 +152,7 @@ void linux_procdump::save_file_metadata(std::shared_ptr<linux_procdump_task_t> t
     json_object_object_add(jobj, "ProcessName", json_object_new_string(task->process_data.name));
     json_object_object_add(jobj, "TargetPID", json_object_new_int(task->process_data.pid));
     json_object_object_add(jobj, "TargetName", json_object_new_string(task->process_data.name));
-    json_object_object_add(jobj, "Compression", json_object_new_string(use_compression ? "gzip" : "none"));
+    json_object_object_add(jobj, "Compression", json_object_new_string(dump_compression_name(dump_compression)));
     json_object_object_add(jobj, "Status", json_object_new_string("Success"));
     json_object_object_add(jobj, "DataFileName", json_object_new_string(task->data_file_name.data()));
     json_object_object_add(jobj, "SequenceNumber", json_object_new_int(task->idx));
@@ -778,7 +780,7 @@ void linux_procdump::start_dump_process(vmi_pid_t pid, bool reason)
     auto task = std::make_shared<linux_procdump_task_t>(
             process_base, procdump_dir.string(),
             procdumps_count++,
-            use_compression,
+            dump_compression,
             reason);
 
     g_free(proc_name);
@@ -803,7 +805,7 @@ linux_procdump::linux_procdump(drakvuf_t drakvuf, const procdump2_config* config
     , timeout{config->timeout}
     , dump_new_processes_on_finish(config->dump_new_processes_on_finish)
     , procdump_dir{config->procdump_dir ?: ""}
-    , use_compression{config->compress_procdumps}
+    , dump_compression{config->dump_compression}
     , use_maple_tree{config->use_maple_tree}
     , exclude{config->exclude_file, "[PROCDUMP]"}
 {

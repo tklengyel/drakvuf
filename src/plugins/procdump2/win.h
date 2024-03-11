@@ -135,7 +135,7 @@ private:
     std::string const                                    procdump_dir;
     vmi_pid_t const                                      dump_process_on_finish;
     bool const                                           dump_new_processes_on_finish;
-    bool const                                           use_compression{false};
+    dump_compression_t const                             dump_compression;
 
     /* Internal data */
     uint64_t                                             procdumps_count{0};

@@ -277,6 +277,12 @@ if get_option('plugin-procdump2')
     plugin_sources += 'procdump2/writer.cpp'
     deps += dependency('zlib', required: true)
     config_h.set('ENABLE_PLUGIN_PROCDUMP2', 1)
+
+    zstd = dependency('libzstd', required: false)
+    if zstd.found()
+        config_h.set('HAVE_ZSTD', 1)
+        deps += zstd
+    endif
 endif
 
 if get_option('plugin-rpcmon')

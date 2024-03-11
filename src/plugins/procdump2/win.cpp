@@ -120,6 +120,7 @@
 #include "win_private.h"
 #include "win_minidump.h"
 #include "plugins/output_format.h"
+#include "plugins/plugin_utils.h"
 
 using namespace procdump2_ns;
 
@@ -133,7 +134,7 @@ win_procdump2::win_procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     , procdump_dir{config->procdump_dir ?: ""}
     , dump_process_on_finish(config->dump_process_on_finish)
     , dump_new_processes_on_finish(config->dump_new_processes_on_finish)
-    , use_compression{config->compress_procdumps}
+    , dump_compression{config->dump_compression}
     , pools(std::make_unique<pool_manager>())
     , exclude{config->exclude_file, "[PROCDUMP]"}
 {
@@ -333,7 +334,7 @@ void win_procdump2::start_dump_process(vmi_pid_t pid)
             pid,
             procdumps_count++,
             procdump_dir,
-            use_compression,
+            dump_compression,
             "FinishAnalysis");
     g_free(proc_name);
     ctx->stage(procdump_stage::need_suspend);
@@ -973,7 +974,7 @@ bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
             target_process_pid,
             procdumps_count++,
             procdump_dir,
-            use_compression,
+            dump_compression,
             "TerminateProcess");
 
     this->active[target_process_pid] = ctx;
@@ -1682,7 +1683,7 @@ void win_procdump2::save_file_metadata(std::shared_ptr<win_procdump2_ctx> ctx, p
     json_object_object_add(jobj, "ProcessName", json_object_new_string(proc_data->name));
     json_object_object_add(jobj, "TargetPID", json_object_new_int(ctx->target_process_pid));
     json_object_object_add(jobj, "TargetName", json_object_new_string(ctx->target_process_name.data()));
-    json_object_object_add(jobj, "Compression", json_object_new_string(use_compression ? "gzip" : "none"));
+    json_object_object_add(jobj, "Compression", json_object_new_string(dump_compression_name(dump_compression)));
     json_object_object_add(jobj, "Status", json_object_new_string(ctx->status()));
     json_object_object_add(jobj, "DataFileName", json_object_new_string(ctx->data_file_name.data()));
     json_object_object_add(jobj, "SequenceNumber", json_object_new_int(ctx->idx));

@@ -327,7 +327,7 @@ public:
         vmi_pid_t pid,
         uint64_t idx_,
         std::string procdump_dir,
-        bool use_compression,
+        dump_compression_t dump_compression,
         const char* dump_reason)
         : is_hosted(is_hosted)
         , target_process_base(base)
@@ -339,7 +339,7 @@ public:
         data_file_name = "procdump."s + std::to_string(idx);
         writer = ProcdumpWriterFactory::build(
                 procdump_dir + "/"s + data_file_name,
-                use_compression);
+                dump_compression);
 
         if (is_hosted)
             /* The hosted target is suspended from it's host... */
