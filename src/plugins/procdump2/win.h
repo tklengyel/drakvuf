@@ -204,6 +204,8 @@ private:
     /* Dispatchers */
     event_response_t dispatcher(drakvuf_trap_info_t*);
     void dispatch_active(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
+    void dispatch_active_get_irql(drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx);
+    void dispatch_active_copy_memory(drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx);
     bool dispatch_new(drakvuf_trap_info_t*);
     bool dispatch_pending(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
     bool dispatch_host_wakeup(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
