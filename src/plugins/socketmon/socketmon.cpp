@@ -140,8 +140,110 @@
 #define IPV4_ADDR_OFFSET 4
 #define IPV6_ADDR_OFFSET 8
 
-static constexpr uint16_t win_7_sp1_ver   = 7601;
-static constexpr uint16_t win_10_1803_ver = 17134;
+struct udp_offsets_t
+{
+    uint64_t family_1;
+    uint64_t family_2;
+    uint64_t local_port;
+    uint64_t remote_port;
+    uint64_t remote_addr;
+};
+
+static constexpr uint16_t win_7_sp1_ver     = 7601;
+static constexpr uint16_t win_8_1_ver       = 9600;
+static constexpr uint16_t win_serv_2016_ver = 14393;
+static constexpr uint16_t win_10_1803_ver   = 17134;
+static constexpr uint16_t win_serv_2019_ver = 17763;
+static constexpr uint16_t win_10_21h2_ver   = 19044;
+static constexpr uint16_t win_10_22h2_ver   = 19045;
+
+static const std::unordered_map<uint16_t, udp_offsets_t> udp_offsets_x86 =
+{
+    {
+        win_7_sp1_ver,
+        {
+            .family_1    = 0x14,
+            .family_2    = 0x0C,
+            .local_port  = 0x48,
+            .remote_port = 0x80,
+            .remote_addr = 0x84
+        }
+    }
+};
+
+static const std::unordered_map<uint16_t, udp_offsets_t> udp_offsets_x64 =
+{
+    {
+        win_7_sp1_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x14,
+            .local_port  = 0x80,
+            .remote_port = 0xE8,
+            .remote_addr = 0xF0
+        }
+    },
+    {
+        win_8_1_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x18,
+            .local_port  = 0x78,
+            .remote_port = 0xE8,
+            .remote_addr = 0xF0
+        }
+    },
+    {
+        win_serv_2016_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x18,
+            .local_port  = 0x78,
+            .remote_port = 0xE8,
+            .remote_addr = 0xF0
+        }
+    },
+    {
+        win_10_1803_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x18,
+            .local_port  = 0x78,
+            .remote_port = 0xE8,
+            .remote_addr = 0xF0
+        }
+    },
+    {
+        win_serv_2019_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x18,
+            .local_port  = 0x78,
+            .remote_port = 0xE8,
+            .remote_addr = 0xF0
+        }
+    },
+    {
+        win_10_21h2_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x18,
+            .local_port  = 0xA0,
+            .remote_port = 0x110,
+            .remote_addr = 0x120
+        }
+    },
+    {
+        win_10_22h2_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x18,
+            .local_port  = 0xA0,
+            .remote_port = 0x110,
+            .remote_addr = 0x120
+        }
+    }
+};
 
 static char* ipv4_to_str(uint8_t ipv4[4])
 {
@@ -150,14 +252,14 @@ static char* ipv4_to_str(uint8_t ipv4[4])
 
 static char* ipv6_to_str(uint8_t ipv6[16])
 {
-    return g_strdup_printf("%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
+    return g_strdup_printf("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
             ipv6[0], ipv6[1], ipv6[2], ipv6[3],
             ipv6[4], ipv6[5], ipv6[6], ipv6[7],
             ipv6[8], ipv6[9], ipv6[10], ipv6[11],
             ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
 }
 
-static char* read_ipv4_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr)
+static char* read_ipv4_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr, uint16_t* addressfamily)
 {
     uint8_t ip[4]  = {0};
 
@@ -171,7 +273,7 @@ static char* read_ipv4_string(vmi_instance_t vmi, access_context_t& ctx, addr_t 
     return ipv4_to_str(ip);
 }
 
-static char* read_ipv6_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr)
+static char* read_ipv6_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr, uint16_t* addressfamily)
 {
     uint8_t ip[16]  = {0};
 
@@ -182,16 +284,30 @@ static char* read_ipv6_string(vmi_instance_t vmi, access_context_t& ctx, addr_t 
             return nullptr;
     }
 
+    // RemoteIp:0000:0000:0000:0000:0000:ffff:0a64:26c1
+    // According to https://www.ibm.com/docs/en/zos/2.1.0?topic=addresses-ipv4-mapped-ipv6
+    // Ipv4 address can be converted to Ipv6 address with the following mask:
+    // |     80 bits    |  16  |   32 bits    |
+    // | 0000------0000 | FFFF | Ipv4 address |
+    //
+    // We want to convert this ipv6 address to ipv4 address because in the end tcpdump will have ipv4 address.
+    //
+    if (!memcmp(ip, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xFF\xFF", 12))
+    {
+        *addressfamily = AF_INET;
+        return ipv4_to_str(&ip[12]);
+    }
+
     return ipv6_to_str(ip);
 }
 
-static char* read_ip_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr, int addressfamily)
+static char* read_ip_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr, uint16_t* addressfamily)
 {
-    if (addressfamily == AF_INET)
-        return read_ipv4_string(vmi, ctx, addr);
+    if (*addressfamily == AF_INET)
+        return read_ipv4_string(vmi, ctx, addr, addressfamily);
 
-    if (addressfamily == AF_INET6)
-        return read_ipv6_string(vmi, ctx, addr);
+    if (*addressfamily == AF_INET6)
+        return read_ipv6_string(vmi, ctx, addr, addressfamily);
 
     return nullptr;
 }
@@ -206,7 +322,7 @@ static char const* tcp_addressfamily_string(int family)
     return (family == AF_INET) ? "TCPv4" : "TCPv6";
 }
 
-static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
+static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int localport, char const* rip, int remoteport)
 {
     fmt::print(s->format, "socketmon", drakvuf, info,
         keyval("Owner", fmt::Qstr(owner_proc_data.name)),
@@ -214,8 +330,10 @@ static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
         keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
         keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
         keyval("Protocol", fmt::Rstr(udp_addressfamily_string(addressfamily))),
+        keyval("RemoteIp", fmt::Rstr(rip ?: "")),
+        keyval("RemotePort", fmt::Nval(remoteport)),
         keyval("LocalIp", fmt::Rstr(lip ?: "")),
-        keyval("LocalPort", fmt::Nval(port))
+        keyval("LocalPort", fmt::Nval(localport))
     );
 }
 
@@ -250,6 +368,7 @@ static event_response_t tcpe_old_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     tcp_endpoint_struct tcpe    = {};
     inetaf_struct inetaf        = {};
     addr_info_struct addrinfo   = {};
+    uint16_t family             = 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -275,16 +394,17 @@ static event_response_t tcpe_old_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(addrinfo), &addrinfo, NULL) )
         goto done;
 
-    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
+    family = inetaf.addressfamily;
+    rip = read_ip_string(vmi, ctx, addrinfo.remote, &family);
     if (!rip) goto done;
 
     if (!drakvuf_get_process_data(drakvuf, tcpe.owner, &owner_proc_data))
         goto done;
 
-    if (inetaf.addressfamily == AF_INET)
-        print_tcpe(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, "127.0.0.1", tcpe.localport, rip, tcpe.remoteport);
+    if (family == AF_INET)
+        print_tcpe(drakvuf, info, s, owner_proc_data, family, "127.0.0.1", tcpe.localport, rip, tcpe.remoteport);
     else
-        print_tcpe(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, "::1", tcpe.localport, rip, tcpe.remoteport);
+        print_tcpe(drakvuf, info, s, owner_proc_data, family, "::1", tcpe.localport, rip, tcpe.remoteport);
 
 done:
     g_free(const_cast<char*>(owner_proc_data.name));
@@ -384,7 +504,7 @@ static char* tcp_get_addr(vmi_instance_t vmi, addr_t rcx, addr_t build, uint16_t
 
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, rcx + offsets[REMOTE_ADDR_OFF0], 0, &ptr))
         return nullptr;
-    return read_ip_string(vmi, ctx, ptr + offsets[REMOTE_ADDR_OFF1], family);
+    return read_ip_string(vmi, ctx, ptr + offsets[REMOTE_ADDR_OFF1], &family);
 }
 
 static event_response_t tcp_tcb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -426,83 +546,119 @@ static proc_data_t* udp_get_process_data(drakvuf_t drakvuf, vmi_instance_t vmi, 
     return data;
 }
 
-static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static bool udp_get_local_info(vmi_lock_guard vmi, const udp_offsets_t& off, addr_t udp_info, uint16_t family, char** lip, uint16_t* lport)
 {
-    socketmon* s = (socketmon*)info->trap->data;
+    if (VMI_FAILURE == vmi_read_16_va(vmi, udp_info + off.local_port, 0, lport))
+    {
+        return false;
+    }
+    *lport = __bswap_16(*lport);
+    *lip   = strdup(family == AF_INET ? "127.0.0.1" : "::1");
+    return true;
+}
+
+static bool udp_get_remote_info(vmi_lock_guard vmi, const udp_offsets_t& off, addr_t udp_info, addr_t message, uint16_t* family, char** rip, uint16_t* rport)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid                 = 0
+    );
+    // This works for win7 sp1 x86/x64.
+    //
+    sockaddr_in6 sockaddr{};
+    // struct sockaddr_in*, tested on Win7 sp1 x64/x86 and Win10 21H1 x64.
+    //
+    addr_t sockaddr_ptr{};
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, message + 4 * vmi_get_address_width(vmi), 0, &sockaddr_ptr))
+    {
+        PRINT_DEBUG("[SOCKETMON] UdpSendMessages failed to read sockaddr ptr\n");
+        return false;
+    }
+
+    if (sockaddr_ptr)
+    {
+        if (VMI_SUCCESS != vmi_read_va(vmi, sockaddr_ptr, 0, sizeof(sockaddr_in6), &sockaddr, NULL))
+            return false;
+        *rport  = __bswap_16(sockaddr.sin6_port);
+        *family = sockaddr.sin6_family;
+        *rip    = sockaddr.sin6_family == AF_INET ?
+            read_ip_string(vmi, ctx, sockaddr_ptr + offsetof(sockaddr_in,  sin_addr), family) :
+            read_ip_string(vmi, ctx, sockaddr_ptr + offsetof(sockaddr_in6, sin6_addr), family);
+
+    }
+    else
+    {
+        addr_t raddr{};
+        addr_t family_addr{};
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, udp_info + off.family_1, 0, &family_addr) ||
+            VMI_SUCCESS != vmi_read_16_va  (vmi, family_addr + off.family_2, 0, family))
+        {
+            return false;
+        }
+        if (VMI_FAILURE == vmi_read_addr_va(vmi, udp_info + off.remote_addr, 0, &raddr) || !raddr)
+            return false;
+        if (VMI_FAILURE == vmi_read_addr_va(vmi, raddr + 2 * vmi_get_address_width(vmi), 0, &raddr) || !raddr)
+            return false;
+        *rip = read_ip_string(vmi, ctx, raddr, family);
+        if (VMI_FAILURE == vmi_read_16_va(vmi, udp_info + off.remote_port, 0, rport))
+            return false;
+        *rport = __bswap_16(*rport);
+    }
+    return true;
+}
+
+static event_response_t udp_send_internal(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, const udp_offsets_t& offsets)
+{
     // Undocumented
     addr_t udp_info = drakvuf_get_function_argument(drakvuf, info, 1);
     // Undocumented
-    addr_t message = drakvuf_get_function_argument(drakvuf, info, 2);
+    addr_t message  = drakvuf_get_function_argument(drakvuf, info, 2);
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = message + 0x20 // struct sockaddr_in*, tested on Win7 sp1 x64 and Win10 21H1 x64
-    );
+    uint16_t family = 0;
+    uint16_t rport  = 0;
+    uint16_t lport  = 0;
+    char* rip       = nullptr;
+    char* lip       = nullptr;
 
-    sockaddr_in6 sockaddr = {};
     vmi_lock_guard vmi(drakvuf);
-    addr_t sockaddr_ptr;
-    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &sockaddr_ptr))
+
+    if (!udp_get_remote_info(vmi, offsets, udp_info, message, &family, &rip, &rport))
     {
-        PRINT_DEBUG("[SOCKETMON] UdpSendMessages failed to read sockaddr ptr\n");
+        PRINT_DEBUG("[SOCKETMON] Failed to get remote ip info\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!sockaddr_ptr)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    ctx.addr = sockaddr_ptr;
-    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(sockaddr_in6), &sockaddr, NULL))
+    if (!udp_get_local_info(vmi, offsets, udp_info, family, &lip, &lport))
     {
-        PRINT_DEBUG("[SOCKETMON] UdpSendMessages failed to read sockaddr\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    sockaddr.sin6_port = __bswap_16(sockaddr.sin6_port);
-
-    char* rip = nullptr;
-    if (sockaddr.sin6_family == AF_INET)
-    {
-        // 0: kd> dt SOCKADDR_IN
-        // ndis!sockaddr_in
-        //    +0x000 sin_family       : Uint2B
-        //    +0x002 sin_port         : Uint2B
-        //    +0x004 sin_addr         : in_addr
-        //    +0x008 sin_zero         : [8] Char
-        rip = read_ip_string(vmi, ctx, sockaddr_ptr + IPV4_ADDR_OFFSET, sockaddr.sin6_family);
-        if (!rip)
-        {
-            PRINT_DEBUG("[SOCKETMON] Failed to read remote ip string\n");
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-    }
-    else if (sockaddr.sin6_family == AF_INET6)
-    {
-        // 0: kd> dt SOCKADDR_IN6
-        // ndis!sockaddr_in6
-        //    +0x000 sin6_family      : Uint2B
-        //    +0x002 sin6_port        : Uint2B
-        //    +0x004 sin6_flowinfo    : Uint4B
-        //    +0x008 sin6_addr        : in6_addr
-        //    +0x018 sin6_scope_id    : Uint4B
-        //    +0x018 sin6_scope_struct : SCOPE_ID
-        rip = read_ip_string(vmi, ctx, sockaddr_ptr + IPV6_ADDR_OFFSET, sockaddr.sin6_family);
-        if (!rip)
-        {
-            PRINT_DEBUG("[SOCKETMON] Failed to read remote ip string\n");
-            return VMI_EVENT_RESPONSE_NONE;
-        }
+        PRINT_DEBUG("[SOCKETMON] Failed to get local ip info\n");
     }
 
     proc_data_t* data = udp_get_process_data(drakvuf, vmi, udp_info);
     if (data)
     {
-        print_udp_info(drakvuf, info, s, *data, sockaddr.sin6_family, rip, sockaddr.sin6_port);
+        print_udp_info(drakvuf, info, s, *data, family, lip, lport, rip, rport);
         g_free(const_cast<char*>(data->name));
         delete data;
     }
     g_free(rip);
+    g_free(lip);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* s = (socketmon*)info->trap->data;
+
+    if (s->pm == VMI_PM_IA32E)
+    {
+        if (udp_offsets_x64.count(s->build.buildnumber))
+            return udp_send_internal(drakvuf, info, s, udp_offsets_x64.at(s->build.buildnumber));
+    }
+    else
+    {
+        if (udp_offsets_x86.count(s->build.buildnumber))
+            return udp_send_internal(drakvuf, info, s, udp_offsets_x86.at(s->build.buildnumber));
+    }
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -511,7 +667,7 @@ static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* sm, const char* dns_name)
 {
     fmt::print(sm->format, "socketmon", drakvuf, info,
-        keyval("DnsName", fmt::Qstr(dns_name ?: ""))
+        keyval("DnsName", fmt::Estr(dns_name ?: ""))
     );
 }
 
@@ -780,8 +936,9 @@ static void register_dnsapi_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
     register_module_trap(drakvuf, trap, "dnsapi.dll", function_name, hook_cb, wow_hook_cb);
 }
 
-socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format_t output)
+socketmon::socketmon(drakvuf_t drakvuf_, const socketmon_config* c, output_format_t output)
     : format{output}
+    , drakvuf{drakvuf_}
 {
     this->pm = drakvuf_get_page_mode(drakvuf);
     {
@@ -860,8 +1017,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
     auto tcp_hook = tcpe_cb == tcp_tcb_cb ? "TcpCreateAndConnectTcbRateLimitComplete" : "TcpCreateAndConnectTcbComplete";
 
     register_tcpip_trap(drakvuf, tcpip_profile_json, tcp_hook, &this->tcpip_trap[0], tcpe_cb);
-    if (this->pm == VMI_PM_IA32E)
-        register_tcpip_trap(drakvuf, tcpip_profile_json, "UdpSendMessages", &this->tcpip_trap[1], udp_send_cb);
+    register_tcpip_trap(drakvuf, tcpip_profile_json, "UdpSendMessages", &this->tcpip_trap[1], udp_send_cb);
 
     json_object_put(tcpip_profile_json);
 }
@@ -872,5 +1028,19 @@ socketmon::~socketmon()
 
 bool socketmon::stop_impl()
 {
+    drakvuf_remove_trap(drakvuf, &this->tcpip_trap[0], nullptr);
+    drakvuf_remove_trap(drakvuf, &this->tcpip_trap[1], nullptr);
+
+    drakvuf_remove_trap(drakvuf, &this->dnsapi_traps[0], nullptr);
+    drakvuf_remove_trap(drakvuf, &this->dnsapi_traps[1], nullptr);
+    drakvuf_remove_trap(drakvuf, &this->dnsapi_traps[2], nullptr);
+    if (this->build.version == VMI_OS_WINDOWS_7)
+    {
+        drakvuf_remove_trap(drakvuf, &this->dnsapi_traps[3], nullptr);
+        drakvuf_remove_trap(drakvuf, &this->dnsapi_traps[4], nullptr);
+    }
+    if (this->build.version >= VMI_OS_WINDOWS_8)
+        drakvuf_remove_trap(drakvuf, &this->dnsapi_traps[5], nullptr);
+
     return true;
 }
