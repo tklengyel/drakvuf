@@ -106,6 +106,9 @@
 #include "drakvuf.h"
 
 #include <zlib.h>
+#ifdef HAVE_ZSTD
+#include <zstd.h>
+#endif
 
 #include <string>
 #include <cstdio>
@@ -230,7 +233,7 @@ bool GzippedProcdumpWriter::write_impl(int flush)
         auto ret = deflate(&z_file, flush);
         if (ret == Z_STREAM_ERROR)
         {
-            PRINT_DEBUG("[PROCDUMP] GZIP fail: deflate return Z_STREAM_ERROR");
+            PRINT_DEBUG("[PROCDUMP] GZIP fail: deflate return Z_STREAM_ERROR\n");
             return false;
         }
 
@@ -238,16 +241,90 @@ bool GzippedProcdumpWriter::write_impl(int flush)
     } while (z_file.avail_out == 0);
     if (z_file.avail_in != 0)
     {
-        PRINT_DEBUG("[PROCDUMP] GZIP fail: z_file.avail_in != 0");
+        PRINT_DEBUG("[PROCDUMP] GZIP fail: z_file.avail_in != 0\n");
         return false;
     }
     return true;
 }
 
+#ifdef HAVE_ZSTD
+class ZstdProcdumpWriter : public BaseProcdumpWriter
+{
+public:
+    explicit ZstdProcdumpWriter(std::string const& path)
+        : BaseProcdumpWriter{path}
+        , cctx{ZSTD_createCCtx()}
+    {
+        if (!cctx) throw -1;
+        ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, 1);
+        ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers, 1);
+    }
+
+    ZstdProcdumpWriter(const ZstdProcdumpWriter&) = delete;
+    ZstdProcdumpWriter& operator=(const ZstdProcdumpWriter&) = delete;
+
+    ~ZstdProcdumpWriter()
+    {
+        ZSTD_freeCCtx(cctx);
+    }
+
+    bool do_append(uint8_t const* data, size_t size) override
+    {
+        ZSTD_inBuffer input{data, size, 0};
+        return write_impl(ZSTD_e_continue, &input);
+    }
+
+    bool finish() override
+    {
+        ZSTD_inBuffer input{nullptr, 0, 0};
+        return write_impl(ZSTD_e_end, &input) && BaseProcdumpWriter::finish();
+    }
+
+private:
+    bool write_impl(ZSTD_EndDirective mode, ZSTD_inBuffer* input);
+
+private:
+    ZSTD_CCtx* cctx;
+};
+
+bool ZstdProcdumpWriter::write_impl(ZSTD_EndDirective mode, ZSTD_inBuffer* input)
+{
+    for (;;)
+    {
+        uint8_t out[16 * 1024];
+        ZSTD_outBuffer output = { out, sizeof(out), 0 };
+        size_t remaining = ZSTD_compressStream2(cctx, &output, input, mode);
+        if (ZSTD_isError(remaining))
+        {
+            PRINT_DEBUG("[PROCDUMP] ZSTD fail: %s\n", ZSTD_getErrorName(remaining));
+            return false;
+        }
+
+        if (!BaseProcdumpWriter::do_append(out, output.pos)) return false;
+
+        if ((mode == ZSTD_e_end && remaining == 0) ||
+            (mode == ZSTD_e_continue && input->pos == input->size))
+            break;
+    }
+
+    return true;
+}
+#endif
+
 }
 
-std::unique_ptr<ProcdumpWriter> ProcdumpWriterFactory::build(std::string const& path, bool use_compression)
+std::unique_ptr<ProcdumpWriter> ProcdumpWriterFactory::build(std::string const& path, dump_compression_t dump_compression)
 {
-    if (use_compression) return std::make_unique<GzippedProcdumpWriter>(path);
-    return std::make_unique<BaseProcdumpWriter>(path);
+    switch (dump_compression)
+    {
+        case DUMP_COMPRESSION_GZIP:
+            return std::make_unique<GzippedProcdumpWriter>(path);
+#ifdef HAVE_ZSTD
+        case DUMP_COMPRESSION_ZSTD:
+            return std::make_unique<ZstdProcdumpWriter>(path);
+#endif
+        case DUMP_COMPRESSION_NONE:
+        default:
+            return std::make_unique<BaseProcdumpWriter>(path);
+    }
 }

@@ -225,3 +225,18 @@ std::string parse_enum(uint64_t value, const flags_str_t& enum_map)
         return it->second;
     return std::to_string(value);
 }
+
+const char* dump_compression_name(dump_compression_t comp)
+{
+    switch (comp)
+    {
+        case DUMP_COMPRESSION_NONE:
+            return "none";
+        case DUMP_COMPRESSION_GZIP:
+            return "gzip";
+        case DUMP_COMPRESSION_ZSTD:
+            return "zstd";
+        default:
+            return "unknown";
+    }
+}

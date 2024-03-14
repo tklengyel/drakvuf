@@ -135,7 +135,7 @@ private:
     uint32_t timeout{0};
     bool dump_new_processes_on_finish{0};
     const std::filesystem::path procdump_dir;
-    bool const use_compression{false};
+    dump_compression_t const dump_compression;
     bool const use_maple_tree{false};
     const exclude_matcher exclude;
     int address_width = drakvuf_get_address_width(drakvuf) * 8;

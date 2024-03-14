@@ -176,7 +176,7 @@ struct linux_procdump_task_t
     linux_procdump_task_t(addr_t process_base,
         std::string procdump_dir,
         uint64_t idx,
-        bool use_compression,
+        dump_compression_t dump_compression,
         bool reason)
         : process_base(process_base)
         , idx(idx)
@@ -185,7 +185,7 @@ struct linux_procdump_task_t
         data_file_name = "procdump."s + std::to_string(idx);
         writer = ProcdumpWriterFactory::build(
                 procdump_dir + "/"s + data_file_name,
-                use_compression);
+                dump_compression);
     }
 };
 

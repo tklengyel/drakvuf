@@ -497,6 +497,7 @@ int main(int argc, char** argv)
         opt_procdump_timeout,
         opt_procdump_dir,
         opt_compress_procdumps,
+        opt_procdump_compression_method,
         opt_procdump_use_maple_tree,
         opt_procdump_disable_dump_on_finish,
         opt_procdump_new_processes_on_finish,
@@ -583,6 +584,7 @@ int main(int argc, char** argv)
         {"procdump-timeout", required_argument, NULL, opt_procdump_timeout},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
+        {"procdump-compression-method",  required_argument, NULL, opt_procdump_compression_method},
         {"procdump-use-maple-tree", no_argument, NULL, opt_procdump_use_maple_tree},
         {"procdump-disable-dump-on-finish", no_argument, NULL, opt_procdump_disable_dump_on_finish},
         {"procdump-new-processes-on-finish", no_argument, NULL, opt_procdump_new_processes_on_finish},
@@ -920,7 +922,7 @@ int main(int argc, char** argv)
                 options.procdump_dir = optarg;
                 break;
             case opt_compress_procdumps:
-                options.compress_procdumps = true;
+                options.procdump_compression_method = DUMP_COMPRESSION_GZIP;
                 break;
             case opt_json_hal:
                 options.hal_profile = optarg;
@@ -948,6 +950,14 @@ int main(int argc, char** argv)
                     fprintf(stderr, "file %s does not exist!\n", optarg);
                 }
                 options.procdump_exclude_file = optarg;
+                break;
+            case opt_procdump_compression_method:
+                if (!strncmp(optarg, "gzip", 4))
+                    options.procdump_compression_method = DUMP_COMPRESSION_GZIP;
+                else if (!strncmp(optarg, "zstd", 4))
+                    options.procdump_compression_method = DUMP_COMPRESSION_ZSTD;
+                else if (!strncmp(optarg, "none", 4))
+                    options.procdump_compression_method = DUMP_COMPRESSION_NONE;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_CODEMON
@@ -1067,6 +1077,14 @@ int main(int argc, char** argv)
         fprintf(stderr, "No kernel JSON profile specified (-r)!\n");
         return drakvuf_exit_code_t::FAIL;
     }
+
+#ifndef HAVE_ZSTD
+    if (options.procdump_compression_method == DUMP_COMPRESSION_ZSTD)
+    {
+        fprintf(stderr, "Drakvuf is compiled without ZSTD compression support!\n");
+        return drakvuf_exit_code_t::FAIL;
+    }
+#endif
 
     /* for a clean exit */
     struct sigaction act;

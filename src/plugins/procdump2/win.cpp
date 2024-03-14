@@ -120,6 +120,7 @@
 #include "win_private.h"
 #include "win_minidump.h"
 #include "plugins/output_format.h"
+#include "plugins/plugin_utils.h"
 
 using namespace procdump2_ns;
 
@@ -133,7 +134,7 @@ win_procdump2::win_procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     , procdump_dir{config->procdump_dir ?: ""}
     , dump_process_on_finish(config->dump_process_on_finish)
     , dump_new_processes_on_finish(config->dump_new_processes_on_finish)
-    , use_compression{config->compress_procdumps}
+    , dump_compression{config->dump_compression}
     , pools(std::make_unique<pool_manager>())
     , exclude{config->exclude_file, "[PROCDUMP]"}
 {
@@ -333,7 +334,7 @@ void win_procdump2::start_dump_process(vmi_pid_t pid)
             pid,
             procdumps_count++,
             procdump_dir,
-            use_compression,
+            dump_compression,
             "FinishAnalysis");
     g_free(proc_name);
     ctx->stage(procdump_stage::need_suspend);
@@ -616,41 +617,8 @@ void win_procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<w
         break;
 
         case procdump_stage::get_irql:
-        {
-            uint8_t irql = info->regs->rax;
-            if (irql >= IRQL_DISPATCH_LEVEL)
-            {
-                /* The current thread's IRQL is high. Search other one. */
-                restore(info, ctx->working);
-                ctx->stage(procdump_stage::pending);
-                /* This trick prevents to fetching the task from active list
-                * while handline KiDeliverApc hook.
-                * TODO Move to function
-                */
-                ctx->working.ret_pid = 0;
-                this->working_threads.erase(info->attached_proc_data.tid);
-            }
-            else
-            {
-                if ( (ctx->pool = this->pools->get()) != 0 )
-                {
-                    if (!start_copy_memory(info, ctx))
-                    {
-                        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                            "Resume target process on dump start fail\n"
-                            , info->event_uid
-                            , info->attached_proc_data.pid
-                            , info->attached_proc_data.tid
-                            , ctx->target_process_pid, to_int(ctx->stage())
-                        );
-                        resume(info, ctx);
-                    }
-                }
-                else
-                    allocate_pool(info, ctx);
-            }
-        }
-        break;
+            dispatch_active_get_irql(info, ctx);
+            break;
 
         case procdump_stage::allocate_pool:
         {
@@ -685,93 +653,8 @@ void win_procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<w
         break;
 
         case procdump_stage::copy_memory:
-        {
-            uint32_t read_bytes = 0;
-            {
-                ACCESS_CONTEXT(vmi_ctx);
-                vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-                vmi_ctx.dtb = info->regs->cr3;
-                vmi_ctx.addr = ctx->current_read_bytes_va;
-
-                vmi_lock_guard vmi(drakvuf);
-                vmi_read_32(vmi, &vmi_ctx, &read_bytes);
-            }
-
-            size_t size = 0;
-            if (read_bytes == ctx->current_dump_size)
-            {
-                read_vm(info->regs->cr3, ctx, read_bytes);
-                size = read_bytes;
-            }
-            else if (read_bytes == 0)
-            {
-                dump_zero_page(ctx);
-                size = VMI_PS_4KB;
-            }
-            else
-            {
-                read_vm(info->regs->cr3, ctx, read_bytes);
-                dump_zero_page(ctx);
-                size = read_bytes + VMI_PS_4KB;
-            }
-
-            // Dump data region (not memory-mapped file) with zeroes
-            if (size < ctx->current_dump_size &&
-                !ctx->is_current_memory_mapped_file)
-            {
-                for (; size < ctx->current_dump_size; size += VMI_PS_4KB)
-                    dump_zero_page(ctx);
-            }
-
-            if (size == ctx->current_dump_size && ctx->vads.empty())
-            {
-                // The last region have been fully dumped so finish task
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Resume target process on dump finish\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                );
-                resume(info, ctx);
-            }
-            else if (size == ctx->current_dump_size)
-            {
-                // The region have been fully dumped so go to next one
-                addr_t base = 0;
-                std::tie(base, size) = get_memory_region(info, ctx);
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Copy memory region [%#lx;%#lx]\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid
-                    , info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                    , base, size
-                );
-                copy_memory(info, ctx, base, size);
-            }
-            else
-            {
-                /* If we have read more any data (assume 4KB at least) then
-                 * after the last read byte the non-accessible page occur.
-                 * So skip this page.
-                 * If zero bytes have been read then the first page is
-                 * non-accessible. So skip this page.
-                 */
-                auto base = ctx->current_dump_base + size;
-                size = ctx->current_dump_size - size;
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "copy_memory: bytes copied %#x before "
-                    "NO_ACCESS page. Continue with [%#lx;%#lx]\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid
-                    , info->attached_proc_data.tid
-                    , ctx->target_process_pid, to_int(ctx->stage())
-                    , read_bytes, base, size
-                );
-                copy_memory(info, ctx, base, size);
-            }
-        }
-        break;
+            dispatch_active_copy_memory(info, ctx);
+            break;
 
         case procdump_stage::target_awaken:
         case procdump_stage::resume:
@@ -813,6 +696,131 @@ void win_procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<w
              */
             ctx->working.ret_pid = 0;
             this->working_threads.erase(info->attached_proc_data.tid);
+            break;
+    }
+}
+
+void win_procdump2::dispatch_active_get_irql(drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    uint8_t irql = info->regs->rax;
+    if (irql >= IRQL_DISPATCH_LEVEL)
+    {
+        /* The current thread's IRQL is high. Search other one. */
+        restore(info, ctx->working);
+        ctx->stage(procdump_stage::pending);
+        /* This trick prevents to fetching the task from active list
+        * while handline KiDeliverApc hook.
+        * TODO Move to function
+        */
+        ctx->working.ret_pid = 0;
+        this->working_threads.erase(info->attached_proc_data.tid);
+    }
+    else
+    {
+        if ( (ctx->pool = this->pools->get()) != 0 )
+        {
+            if (!start_copy_memory(info, ctx))
+            {
+                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "Resume target process on dump start fail\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid
+                    , info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                );
+                resume(info, ctx);
+            }
+        }
+        else
+            allocate_pool(info, ctx);
+    }
+}
+
+void win_procdump2::dispatch_active_copy_memory(drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    uint32_t read_bytes = 0;
+    {
+        ACCESS_CONTEXT(vmi_ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = ctx->current_read_bytes_va
+        );
+
+        vmi_lock_guard vmi(drakvuf);
+        vmi_read_32(vmi, &vmi_ctx, &read_bytes);
+    }
+
+    size_t size = 0;
+    if (read_bytes == ctx->current_dump_size)
+    {
+        read_vm(info->regs->cr3, ctx, read_bytes);
+        size = read_bytes;
+    }
+    else if (read_bytes == 0)
+    {
+        dump_zero_page(ctx);
+        size = VMI_PS_4KB;
+    }
+    else
+    {
+        read_vm(info->regs->cr3, ctx, read_bytes);
+        dump_zero_page(ctx);
+        size = read_bytes + VMI_PS_4KB;
+    }
+
+    // Dump data region (not memory-mapped file) with zeroes
+    if (size < ctx->current_dump_size && !ctx->is_current_memory_mapped_file)
+    {
+        for (; size < ctx->current_dump_size; size += VMI_PS_4KB)
+            dump_zero_page(ctx);
+    }
+
+    if (size == ctx->current_dump_size && ctx->vads.empty())
+    {
+        // The last region have been fully dumped so finish task
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+            "Resume target process on dump finish\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , ctx->target_process_pid, to_int(ctx->stage())
+        );
+        resume(info, ctx);
+    }
+    else if (size == ctx->current_dump_size)
+    {
+        // The region have been fully dumped so go to next one
+        addr_t base = 0;
+        std::tie(base, size) = get_memory_region(info, ctx);
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+            "Copy memory region [%#lx;%#lx]\n"
+            , info->event_uid
+            , info->attached_proc_data.pid
+            , info->attached_proc_data.tid
+            , ctx->target_process_pid, to_int(ctx->stage())
+            , base, size
+        );
+        copy_memory(info, ctx, base, size);
+    }
+    else
+    {
+        /* If we have read more any data (assume 4KB at least) then
+         * after the last read byte the non-accessible page occur.
+         * So skip this page.
+         * If zero bytes have been read then the first page is
+         * non-accessible. So skip this page.
+         */
+        auto base = ctx->current_dump_base + size;
+        size = ctx->current_dump_size - size;
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+            "copy_memory: bytes copied %#x before "
+            "NO_ACCESS page. Continue with [%#lx;%#lx]\n"
+            , info->event_uid
+            , info->attached_proc_data.pid
+            , info->attached_proc_data.tid
+            , ctx->target_process_pid, to_int(ctx->stage())
+            , read_bytes, base, size
+        );
+        copy_memory(info, ctx, base, size);
     }
 }
 
@@ -973,7 +981,7 @@ bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
             target_process_pid,
             procdumps_count++,
             procdump_dir,
-            use_compression,
+            dump_compression,
             "TerminateProcess");
 
     this->active[target_process_pid] = ctx;
@@ -1630,9 +1638,9 @@ void win_procdump2::read_vm(addr_t dtb,
     vmi_ctx.dtb = dtb;
     vmi_ctx.addr = ctx->pool;
     auto num_pages = size / VMI_PS_4KB;
-    auto access_ptrs = new void* [num_pages] { 0 };
+    std::vector<void*> access_ptrs(num_pages, nullptr);
 
-    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, PROT_READ, access_ptrs))
+    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, PROT_READ, access_ptrs.data()))
     {
         for (size_t i = 0; i < num_pages; ++i)
         {
@@ -1651,8 +1659,6 @@ void win_procdump2::read_vm(addr_t dtb,
         for (size_t i = 0; i < num_pages; ++i)
             dump_zero_page(ctx);
     }
-
-    delete[] access_ptrs;
 }
 
 void win_procdump2::restore(drakvuf_trap_info_t* info, return_ctx& ctx)
@@ -1682,7 +1688,7 @@ void win_procdump2::save_file_metadata(std::shared_ptr<win_procdump2_ctx> ctx, p
     json_object_object_add(jobj, "ProcessName", json_object_new_string(proc_data->name));
     json_object_object_add(jobj, "TargetPID", json_object_new_int(ctx->target_process_pid));
     json_object_object_add(jobj, "TargetName", json_object_new_string(ctx->target_process_name.data()));
-    json_object_object_add(jobj, "Compression", json_object_new_string(use_compression ? "gzip" : "none"));
+    json_object_object_add(jobj, "Compression", json_object_new_string(dump_compression_name(dump_compression)));
     json_object_object_add(jobj, "Status", json_object_new_string(ctx->status()));
     json_object_object_add(jobj, "DataFileName", json_object_new_string(ctx->data_file_name.data()));
     json_object_object_add(jobj, "SequenceNumber", json_object_new_int(ctx->idx));

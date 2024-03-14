@@ -127,6 +127,13 @@
 #error You should never include libdrakvuf/private.h in a plugin
 #endif
 
+enum dump_compression_t
+{
+    DUMP_COMPRESSION_NONE,
+    DUMP_COMPRESSION_GZIP,
+    DUMP_COMPRESSION_ZSTD,
+};
+
 struct plugins_options
 {
     const char* dump_folder;            // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
@@ -170,7 +177,7 @@ struct plugins_options
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
     uint32_t procdump_timeout;          // PLUGIN_PROCDUMP
     const char* procdump_dir;           // PLUGIN_PROCDUMP
-    bool compress_procdumps = false;    // PLUGIN_PROCDUMP
+    dump_compression_t procdump_compression_method = DUMP_COMPRESSION_NONE; // PLUGIN_PROCDUMP*
     bool procdump_use_maple_tree = false; // PLUGIN_PROCDUMP2
     vmi_pid_t procdump_on_finish;       // PLUGIN_PROCDUMP2
     bool procdump_new_processes_on_finish; // PLUGIN_PROCDUMP2
