@@ -189,4 +189,6 @@ void dump_registers(const x86_registers_t* regs,
     std::string header = std::string(),
     std::string footer = std::string());
 
+const char* dump_compression_name(dump_compression_t comp);
+
 #endif

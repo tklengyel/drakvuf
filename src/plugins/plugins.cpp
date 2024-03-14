@@ -445,7 +445,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     procdump_config config =
                     {
                         .procdump_dir = options->procdump_dir,
-                        .compress_procdumps = options->compress_procdumps,
+                        .compress_procdumps = options->procdump_compression_method == DUMP_COMPRESSION_GZIP,
                         .terminated_processes = options->terminated_processes
                     };
                     this->plugins[plugin_id] =
@@ -460,7 +460,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     {
                         .timeout = options->procdump_timeout,
                         .procdump_dir = options->procdump_dir,
-                        .compress_procdumps = options->compress_procdumps,
+                        .dump_compression = options->procdump_compression_method,
                         .dump_process_on_finish = options->procdump_on_finish,
                         .dump_new_processes_on_finish = options->procdump_new_processes_on_finish,
                         .hal_profile = options->hal_profile,

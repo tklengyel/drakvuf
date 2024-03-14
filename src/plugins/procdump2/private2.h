@@ -109,7 +109,7 @@ struct procdump2_config
 {
     uint32_t timeout;
     const char* procdump_dir;
-    bool compress_procdumps;
+    dump_compression_t dump_compression;
     vmi_pid_t dump_process_on_finish;
     bool dump_new_processes_on_finish;
     const char* hal_profile;

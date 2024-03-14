@@ -104,6 +104,8 @@
 
 #pragma once
 
+#include "plugins/plugins.h"
+
 #include <memory>
 #include <string>
 namespace procdump2_ns
@@ -127,7 +129,7 @@ private:
 class ProcdumpWriterFactory
 {
 public:
-    static std::unique_ptr<ProcdumpWriter> build(std::string const& path, bool use_compression);
+    static std::unique_ptr<ProcdumpWriter> build(std::string const& path, dump_compression_t compression);
 };
 
 }
