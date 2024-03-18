@@ -1224,7 +1224,7 @@ bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return true;
 
     drakvuf_lock_and_get_vmi(drakvuf);
-    void const * const injection_trap = drakvuf_lookup_injection(drakvuf, info);
+    void const* const injection_trap = drakvuf_lookup_injection(drakvuf, info);
     drakvuf_release_vmi(drakvuf);
 
     bool res = false;
