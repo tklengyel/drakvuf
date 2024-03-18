@@ -576,7 +576,7 @@ struct __attribute__ ((packed, aligned(4))) mdmp_memory_list
 
         if (ranges.size() > MDMP_MAX_MEMORY_RANGES)
             PRINT_DEBUG("[PROCDUMP] Warning: Number of memory ranges exceeds "
-                "defined maximum - not all ranges would be described");
+                "defined maximum - not all ranges would be described\n");
     }
 
     uint32_t size()
@@ -607,9 +607,11 @@ struct __attribute__ ((packed, aligned(4))) mdmp_memory_list
 struct __attribute__ ((packed, aligned(4))) mdmp_thread_list
 {
     uint32_t number_of_threads;
-    array<struct mdmp_thread, MDMP_MAX_THREADS> threads;
+    // Use usual array instead of std::array because of warning:
+    // https://reviews.llvm.org/D149182
+    struct mdmp_thread threads[MDMP_MAX_THREADS];
     // This is not part of original structure but used here for convenience
-    array<union thread_context, MDMP_MAX_THREADS> contexts;
+    union thread_context contexts[MDMP_MAX_THREADS];
 
     mdmp_thread_list(rva64_t rva, bool is32bit,
         vector<struct mdmp_thread> threads_,
@@ -619,7 +621,7 @@ struct __attribute__ ((packed, aligned(4))) mdmp_thread_list
         , threads()
         , contexts()
     {
-        for (size_t i = 0; i < std::min(threads.size(), (size_t)MDMP_MAX_THREADS); ++i)
+        for (size_t i = 0; i < MDMP_MAX_THREADS; ++i)
         {
             threads[i] = threads_[i];
             threads[i].stack.memory = memory.find(threads[i].stack.start_of_memory_range);
