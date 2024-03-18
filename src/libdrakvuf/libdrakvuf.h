@@ -247,6 +247,10 @@ struct drakvuf_trap
 {
     trap_type_t type;
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
+    // Force 'drakvuf_is_active_callback' check bo be true.
+    // This allows to forcefully execute callback for 'bsodmon' and detect
+    // injections faults.
+    bool cb_force;
     void* data;
 
     union
@@ -793,9 +797,7 @@ bool drakvuf_vmi_response_set_gpr_registers(drakvuf_t drakvuf,
 /* The plug-in is called "active" if it injects function call. */
 bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-void drakvuf_insert_injection(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*));
+void drakvuf_insert_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #define DRAKVUF_IPT_BRANCH_EN (1 << 0)

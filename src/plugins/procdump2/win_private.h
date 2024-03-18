@@ -105,12 +105,18 @@
 #ifndef WIN_PROCDUMP2_PRIVATE_H
 #define WIN_PROCDUMP2_PRIVATE_H
 
+#include <map>
+#include <set>
+#include <string>
+#include <unordered_set>
+
 #include "writer.h"
 
 using namespace std::string_literals;
-using namespace procdump2_ns;
-
 using std::string;
+
+namespace procdump2_ns
+{
 
 class pool_manager
 {
@@ -165,38 +171,39 @@ using vads_t = std::map<addr_t, vad_info2>;
 
 enum class procdump_stage
 {
-    need_suspend,     // 0
-    suspend,          // 1
-    pending,          // 2
-    get_irql,         // 3
+    pending,          // 0
+    get_irql,         // 1
+    lookup_process,   // 2
+    suspend,          // 3
     allocate_pool,    // 4
     prepare_minidump, // 5
     copy_memory,      // 6
     resume,           // 7
-    target_awaken,    // 8
+    deref_process,    // 8
+    target_awaken,    // 9
     // TODO Check if the stage is steel needed
-    finished,         // 9
-    target_wakeup,    // 10
-    timeout,          // 11
+    finished,         // 10
+    target_wakeup,    // 11
+    timeout,          // 12
 };
 
-int to_int(procdump_stage stage)
+static inline int to_int(procdump_stage stage)
 {
     return static_cast<int>(stage);
 }
 
-std::string to_str(procdump_stage stage)
+static inline std::string to_str(procdump_stage stage)
 {
     switch (stage)
     {
-        case procdump_stage::need_suspend:
-            return "need_suspend";
-        case procdump_stage::suspend:
-            return "suspend";
         case procdump_stage::pending:
             return "pending";
         case procdump_stage::get_irql:
             return "get_irql";
+        case procdump_stage::lookup_process:
+            return "lookup_process";
+        case procdump_stage::suspend:
+            return "suspend";
         case procdump_stage::allocate_pool:
             return "allocate_pool";
         case procdump_stage::prepare_minidump:
@@ -205,6 +212,8 @@ std::string to_str(procdump_stage stage)
             return "copy_memory";
         case procdump_stage::resume:
             return "resume";
+        case procdump_stage::deref_process:
+            return "deref_process";
         case procdump_stage::target_awaken:
             return "target_awaken";
         case procdump_stage::finished:
@@ -227,8 +236,15 @@ public:
     vmi_pid_t ret_pid{0};
     addr_t    ret_rsp{0};
     uint32_t  ret_tid{0};
+
+    union
+    {
+        addr_t eprocess_va;
+    };
+
     x86_registers_t regs;
-    bool restored{false};
+    // The flag is raised on injection with register state change
+    bool restored{true};
 
     uint64_t stack_marker()
     {
@@ -253,34 +269,36 @@ public:
 struct win_procdump2_ctx
 {
 private:
-    bool m_timeout{false};
     procdump_stage m_stage{procdump_stage::pending};
     procdump_stage m_old_stage{procdump_stage::pending};
+    addr_t    m_target_process_base{0};
 
 public:
     /* Basic context */
+    bool need_suspend{false};
     /* For self-terminating process working thread injects PsSuspendProcess.
      * Thus it should remove task.
      */
     bool is_hosted{false};
-    /* Processes targeted on analysys finish are not self-terminating neither
-     * hosted. So after resuming such a target should be finished.
-     *
-     * TODO Check if to remove because of "return_ctx.restored"
+
+    /*
+     * There can be many host threads for one target.
+     * So we store (and suspend) all of them.
      */
-    bool wait_awaken{true};
-    return_ctx host;
+    std::map<std::pair<vmi_pid_t, uint32_t>, return_ctx> hosts;
     return_ctx target;
     return_ctx working;
 
-    /* Host process info.
+    /* Host processes info.
      *
      * The process which terminates other process is "host" one.
      * One should suspend such a process and target process.
      * After task finishes one should resume host process. The host process
      * would continue terminating target process.
+     * Is used to check if target process is a host process for any other
+     * unfinished task (regardless to TID).
      */
-    addr_t    host_process_base{0};
+    std::unordered_set<addr_t> host_processes_bases;
 
     /* Target process info.
      *
@@ -291,13 +309,13 @@ public:
      * Target process should be suspended to avoid memory modification while
      * processing.
      */
-    addr_t    target_process_base{0};
+    addr_t    referenced_process_base{0};
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
     const char* dump_reason;
 
     const uint8_t TARGET_RESUSPEND_COUNT_MAX{3};
-    uint8_t target_resuspend_count{0};
+    uint8_t target_suspend_count{0};
 
     /* Data */
     // Target process virtual address space size
@@ -329,8 +347,8 @@ public:
         std::string procdump_dir,
         dump_compression_t dump_compression,
         const char* dump_reason)
-        : is_hosted(is_hosted)
-        , target_process_base(base)
+        : m_target_process_base(base)
+        , is_hosted(is_hosted)
         , target_process_name(name)
         , target_process_pid(pid)
         , dump_reason{dump_reason}
@@ -340,13 +358,6 @@ public:
         writer = ProcdumpWriterFactory::build(
                 procdump_dir + "/"s + data_file_name,
                 dump_compression);
-
-        if (is_hosted)
-            /* The hosted target is suspended from it's host... */
-            target.restored = true;
-        else
-            /* The self-terminating target is suspended from it's own context */
-            host.restored = true;
     }
 
     ~win_procdump2_ctx()
@@ -355,9 +366,10 @@ public:
             , target_process_pid, to_int(stage()), is_restored() ? "" : "not ");
     }
 
-    bool on_target_resuspend()
+    bool can_resuspend_target()
     {
-        if (++target_resuspend_count < TARGET_RESUSPEND_COUNT_MAX)
+        // Use "+ 1" because first suspend is not a "re-suspend"
+        if (target_suspend_count < (TARGET_RESUSPEND_COUNT_MAX + 1))
             return true;
         else
             return false;
@@ -365,9 +377,6 @@ public:
 
     const char* status() const
     {
-        if (is_timed_out())
-            return "Timeout";
-
         switch (m_stage)
         {
             case procdump_stage::finished:
@@ -386,11 +395,6 @@ public:
         }
     }
 
-    bool is_timed_out() const
-    {
-        return m_timeout || m_stage == procdump_stage::timeout;
-    }
-
     procdump_stage stage()
     {
         return m_stage;
@@ -400,15 +404,12 @@ public:
     {
         if (new_stage != m_stage)
         {
-            if (new_stage == procdump_stage::timeout)
-                m_timeout = true;
             m_old_stage = m_stage;
             m_stage = new_stage;
-            PRINT_DEBUG("[PROCDUMP] [%d] Stage switch: %s -> %s%s\n"
+            PRINT_DEBUG("[PROCDUMP] [%d] Stage switch: %s -> %s\n"
                 , target_process_pid
                 , to_str(m_old_stage).data()
                 , to_str(m_stage).data()
-                , m_timeout ? "(timeout)" : ""
             );
         }
     }
@@ -420,7 +421,34 @@ public:
 
     bool is_restored()
     {
-        return host.restored && target.restored && working.restored;
+        bool result = target.restored && working.restored;
+        for (auto& it: hosts)
+        {
+            result = result && it.second.restored;
+        }
+
+        PRINT_DEBUG("[PROCDUMP] [%d:%d] [%srestored] Check if task restored\n"
+            , target_process_pid, to_int(stage()), result ? "" : "not ");
+        return result;
+    }
+
+    addr_t target_process_base()
+    {
+        if (referenced_process_base)
+        {
+            return referenced_process_base;
+        }
+        else
+        {
+            PRINT_DEBUG("[PROCDUMP] [%d:%d] Use unreferenced EPROCESS %#lx\n"
+                , target_process_pid, to_int(stage()), m_target_process_base);
+            return m_target_process_base;
+        }
+    }
+
+    void target_process_base(addr_t value)
+    {
+        m_target_process_base = value;
     }
 };
 
@@ -433,5 +461,18 @@ enum inject_status
     INJECT_ERASE,
     INJECT_CONTINUE,
 };
+
+enum offset
+{
+    OBJECT_HEADER_HANDLE_COUNT,
+    __OFFSET_MAX
+};
+
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [OBJECT_HEADER_HANDLE_COUNT] = { "_OBJECT_HEADER", "HandleCount" },
+};
+
+} // namespace procdump2_ns
 
 #endif

@@ -131,6 +131,7 @@ private:
         .breakpoint.addr_type = ADDR_SYMBOL,
         .type = BREAKPOINT,
         .data = (void*)this,
+        .cb_force = true,
     };
 
     void register_trap(drakvuf_t drakvuf, const char* syscall_name,
