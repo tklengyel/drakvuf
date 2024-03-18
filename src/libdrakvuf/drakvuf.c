@@ -1220,44 +1220,67 @@ bool drakvuf_vmi_response_set_gpr_registers(
 
 bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    if (info->trap->cb_force)
+        return true;
+
     drakvuf_lock_and_get_vmi(drakvuf);
-    void* injection_cb = drakvuf_lookup_injection(drakvuf, info);
-    bool res = !drakvuf->enable_active_callback_check
-        || !injection_cb || injection_cb == info->trap->cb;
+    void const * const injection_trap = drakvuf_lookup_injection(drakvuf, info);
     drakvuf_release_vmi(drakvuf);
+
+    bool res = false;
+    if (!drakvuf->enable_active_callback_check)
+        // Active callback check disabled. Run any callback.
+        res = true;
+    else if (injection_trap == NULL)
+        // No callback found for the "info". Thus no injection. Run any callback.
+        res = true;
+    else if ( injection_trap == info->trap )
+        // Callback is found. Thus this is injection. Run only a callback for
+        // the injection.
+        res = true;
+
     return res;
 }
 
 void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    drakvuf_lock_and_get_vmi(drakvuf);
     uint64_t pid = info->attached_proc_data.pid;
     uint64_t tid = info->attached_proc_data.tid;
     gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
+
+    drakvuf_lock_and_get_vmi(drakvuf);
+
     gpointer value = g_hash_table_lookup(drakvuf->injections_in_progress, key);
+
     drakvuf_release_vmi(drakvuf);
+
     return value;
 }
 
-void drakvuf_insert_injection(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*))
+void drakvuf_insert_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    drakvuf_lock_and_get_vmi(drakvuf);
     uint64_t pid = info->attached_proc_data.pid;
     uint64_t tid = info->attached_proc_data.tid;
     gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
-    g_assert(g_hash_table_insert(drakvuf->injections_in_progress, key, cb));
+
+    drakvuf_lock_and_get_vmi(drakvuf);
+
+    g_assert(g_hash_table_insert(drakvuf->injections_in_progress, key, info->trap));
+
     drakvuf_release_vmi(drakvuf);
 }
 
 void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    drakvuf_lock_and_get_vmi(drakvuf);
     uint64_t pid = info->attached_proc_data.pid;
     uint64_t tid = info->attached_proc_data.tid;
     gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
+
+    drakvuf_lock_and_get_vmi(drakvuf);
+
+    g_assert (drakvuf_lookup_injection(drakvuf, info) == info->trap);
     g_assert (g_hash_table_remove(drakvuf->injections_in_progress, key));
+
     drakvuf_release_vmi(drakvuf);
 }
 

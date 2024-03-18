@@ -241,7 +241,6 @@ bool setup_stack_locked(drakvuf_t drakvuf,
 bool inject_function_call(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
     x86_registers_t* regs,
     struct argument args[],
     int nb_args,
