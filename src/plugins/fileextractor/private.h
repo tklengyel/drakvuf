@@ -235,9 +235,6 @@ static const flags_str_t fo_flags_map =
 
 struct task_t
 {
-private:
-    uint64_t m_stack_marker{0};
-
 public:
     enum class stage_t
     {
@@ -269,10 +266,15 @@ public:
         invalid,
     };
 
+private:
+    uint64_t m_stack_marker{0};
+    stage_t m_stage{stage_t::pending};
+    stage_t m_old_stage{stage_t::pending};
+
+public:
     handle_t handle;
     std::string filename;
     const task_reason reason{task_reason::invalid};
-    stage_t stage{stage_t::pending};
 
     return_ctx target;
     addr_t target_process_base{0};
@@ -364,6 +366,55 @@ public:
     uint64_t stack_marker_va()
     {
         return m_stack_marker;
+    }
+
+    stage_t stage()
+    {
+        return m_stage;
+    }
+
+    void stage(const stage_t new_stage)
+    {
+        if (new_stage != m_stage)
+        {
+            m_old_stage = m_stage;
+            m_stage = new_stage;
+            PRINT_DEBUG("[FILEEXTRACTOR] [%lu] Stage switch: %s -> %s\n"
+                , pid
+                , to_str(m_old_stage).data()
+                , to_str(m_stage).data()
+            );
+        }
+    }
+
+    std::string to_str(const stage_t stage)
+    {
+
+        switch (stage)
+        {
+            case stage_t::pending:
+                return "pending";
+            case stage_t::queryvolumeinfo:
+                return "queryvolumeinfo";
+            case stage_t::queryinfo:
+                return "queryinfo";
+            case stage_t::createsection:
+                return "createsection";
+            case stage_t::mapview:
+                return "mapview";
+            case stage_t::allocate_pool:
+                return "allocate_pool";
+            case stage_t::unmapview:
+                return "unmapview";
+            case stage_t::close_handle:
+                return "close_handle";
+            case stage_t::memcpy:
+                return "memcpy";
+            case stage_t::finished:
+                return "finished";
+            default:
+                return "invalid";
+        }
     }
 };
 

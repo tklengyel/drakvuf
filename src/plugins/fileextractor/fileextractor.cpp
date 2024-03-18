@@ -301,6 +301,16 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
 
     if (!task)
     {
+        // Don't start new work on plugin begin stop
+        if (this->is_stopping())
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] Skip on plugin stop\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+            );
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
         addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
         addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
         uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
@@ -414,12 +424,24 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
 
                 auto file = get_data_filename(this->dump_folder, task->idx);
                 if (file.empty())
+                {
+                    print_extraction_failure(info, task->filename, "Failed to get file name");
+                    free_resources(info, *task);
+                    task->extracted = true;
+                    task->error = true;
                     return VMI_EVENT_RESPONSE_NONE;
+                }
 
                 umask(S_IWGRP|S_IWOTH);
                 FILE* fp = fopen(file.data(), "a+");
                 if (!fp)
+                {
+                    print_extraction_failure(info, task->filename, "Failed to open backing file");
+                    free_resources(info, *task);
+                    task->extracted = true;
+                    task->error = true;
                     return VMI_EVENT_RESPONSE_NONE;
+                }
 
                 fseek(fp, 0, SEEK_END);
                 //make bigger file size
@@ -428,29 +450,37 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
                     fclose(fp);
                     fp = fopen(file.data(), "r+");
                     if (!fp)
+                    {
+                        print_extraction_failure(info, task->filename, "Failed to open backing file");
+                        free_resources(info, *task);
+                        task->extracted = true;
+                        task->error = true;
                         return VMI_EVENT_RESPONSE_NONE;
+                    }
                     fseek(fp, task->new_eof - 1, SEEK_SET);
                     fputc('\0', fp);
                 }
                 fclose(fp);
                 save_file_metadata(info, 0, *task);
 
-                task->stage = task_t::stage_t::finished;
+                task->stage(task_t::stage_t::finished);
                 status = error::success;
             }
 
-            if (task_t::stage_t::finished == task->stage)
+            if (task_t::stage_t::finished == task->stage())
             {
                 // free resourses after extraction and first NtWriteFile result from saved data
                 free_resources(info, *task);
                 task->extracted = true;
                 return VMI_EVENT_RESPONSE_NONE;
             }
-
-            return VMI_EVENT_RESPONSE_NONE;
         }
-
     }
+
+    PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtSetInformationFile handled\n"
+        , info->event_uid
+        , info->attached_proc_data.pid, info->attached_proc_data.tid
+    );
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -500,7 +530,13 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
     if (!task && is_handle_valid(handle))
     {
         if (this->is_stopping())
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] Skip on plugin stop\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+            );
             return VMI_EVENT_RESPONSE_NONE;
+        }
 
         auto id = make_task_id(info->attached_proc_data.pid, handle);
         // check that tasks not exist - first NtWriteFile call
@@ -509,6 +545,16 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
         {
             addr_t file = 0;
             auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+            if (!file)
+            {
+                PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
+                    "Skip on fail to get OBJECT_HEADER_BODY\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                );
+                return VMI_EVENT_RESPONSE_NONE;
+            }
 
             if (exclude.match(filename))
             {
@@ -521,11 +567,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
                     filename,
                     task_t::task_reason::write,
                     file);
-            if (!file)
-            {
-                tasks.erase(id);
-                return VMI_EVENT_RESPONSE_NONE;
-            }
+
             // save some process info
             tasks[id]->pid = info->attached_proc_data.pid;
             tasks[id]->ppid = info->attached_proc_data.ppid;
@@ -538,14 +580,22 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
     if (task)
     {
         if (task->error)
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
+                "Skip on task error state\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , task->target.ret_pid, (int)task->stage()
+            );
             return VMI_EVENT_RESPONSE_NONE;
+        }
 
         // file extraction
         if (!task->extracted)
         {
             check_stack_marker(info, vmi, task);
 
-            if (task->stage == task_t::stage_t::pending && is_handle_valid(handle))
+            if (task->stage() == task_t::stage_t::pending && is_handle_valid(handle))
             {
                 // save data needed to complete the first NtWriteFile
                 task->first_len = len;
@@ -564,6 +614,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
                 free_resources(info, *task);
                 task->extracted = true;
                 task->error = true;
+                tasks.erase(make_task_id(*task));
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -576,21 +627,33 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
 
                 auto file = get_data_filename(this->dump_folder, task->idx);
                 if (file.empty())
+                {
+                    print_extraction_failure(info, task->filename, "Failed to get file name");
+                    free_resources(info, *task);
+                    task->extracted = true;
+                    task->error = true;
                     return VMI_EVENT_RESPONSE_NONE;
+                }
 
                 umask(S_IWGRP|S_IWOTH);
                 FILE* fp = fopen(file.data(), "w");
                 if (!fp)
+                {
+                    print_extraction_failure(info, task->filename, "Failed to open backing file");
+                    free_resources(info, *task);
+                    task->extracted = true;
+                    task->error = true;
                     return VMI_EVENT_RESPONSE_NONE;
+                }
 
                 fclose(fp);
                 save_file_metadata(info, 0, *task);
 
-                task->stage = task_t::stage_t::finished;
+                task->stage(task_t::stage_t::finished);
                 status = error::success;
             }
 
-            if (task_t::stage_t::finished == task->stage)
+            if (task_t::stage_t::finished == task->stage())
             {
                 // free resourses after extraction and first NtWriteFile result from saved data
                 free_resources(info, *task);
@@ -604,11 +667,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
                 }
                 else
                     dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->file_size, task->first_len);
-
-                return VMI_EVENT_RESPONSE_NONE;
             }
-
-            return VMI_EVENT_RESPONSE_NONE;
         }
         // file update
         else
@@ -646,6 +705,11 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
         }
     }
 
+    PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtWriteFile handled\n"
+        , info->event_uid
+        , info->attached_proc_data.pid, info->attached_proc_data.tid
+    );
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -671,6 +735,12 @@ event_response_t fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
     dump_mem_to_file(info->regs->cr3, str, idx, byteoffset, len);
     auto hook_id = make_hook_id(info);
     writefile_ret_hooks.erase(hook_id);
+
+    PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtWriteFile return handled\n"
+        , info->event_uid
+        , info->attached_proc_data.pid, info->attached_proc_data.tid
+    );
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -762,7 +832,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (task && timeout && is_stopping() &&
         g_get_real_time() / G_USEC_PER_SEC - begin_stop_at > timeout)
     {
-        task->stage = task_t::stage_t::finished;
+        task->stage(task_t::stage_t::finished);
         print_extraction_failure(info, task->filename, "Timeout");
     }
 
@@ -770,7 +840,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         "\n"
         , info->event_uid
         , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , task->target.ret_pid, (int)task->stage
+        , task->target.ret_pid, (int)task->stage()
     );
 
     // check that the file has not been extracted
@@ -778,7 +848,15 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     {
         // extract file and close task
         if ( task->reason == task_t::task_reason::write)
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
+                "Skip 'write' task on close handle\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , task->target.ret_pid, (int)task->stage()
+            );
             return VMI_EVENT_RESPONSE_NONE;
+        }
 
         check_stack_marker(info, vmi, task);
 
@@ -786,7 +864,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         if (error::error == status || error::none == status)
         {
-            task->stage = task_t::stage_t::finished;
+            task->stage(task_t::stage_t::finished);
             task->error = true;
             status = error::success;
         }
@@ -800,54 +878,78 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
             auto file = get_data_filename(this->dump_folder, task->idx);
             if (file.empty())
+            {
+                print_extraction_failure(info, task->filename, "Failed to get file name");
+                free_resources(info, *task);
+                task->extracted = true;
+                task->error = true;
                 return VMI_EVENT_RESPONSE_NONE;
+            }
 
             umask(S_IWGRP|S_IWOTH);
             FILE* fp = fopen(file.data(), "w");
             if (!fp)
+            {
+                print_extraction_failure(info, task->filename, "Failed to open backing file");
+                free_resources(info, *task);
+                task->extracted = true;
+                task->error = true;
                 return VMI_EVENT_RESPONSE_NONE;
+            }
 
             fclose(fp);
             save_file_metadata(info, 0, *task);
 
-            task->stage = task_t::stage_t::finished;
+            task->stage(task_t::stage_t::finished);
             status = error::success;
         }
 
-        if (task_t::stage_t::finished == task->stage)
+        if (task_t::stage_t::finished == task->stage())
         {
-            free_resources(info, *task);
-
-            if (task->error)
-            {
-                tasks.erase(make_task_id(*task));
-                return VMI_EVENT_RESPONSE_NONE;
-            }
-
-            task->closed = true;
-            free_resources(info, *task);
             calc_checksum(*task);
             print_file_information(info, *task);
+            free_resources(info, *task);
+            task->closed = true;
             tasks.erase(make_task_id(*task));
-            return VMI_EVENT_RESPONSE_NONE;
         }
-
-        return VMI_EVENT_RESPONSE_NONE;
     }
     else
     {
         // close task
         auto handle = drakvuf_get_function_argument(drakvuf, info, 1);
         if (handle != task->handle)
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
+                "Skip on input handle %#lx not equal task handle %#lx\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , handle, task->handle
+            );
             return VMI_EVENT_RESPONSE_NONE;
+        }
+
         /* If there are more then one open handle to the file. So do nothing. */
         uint64_t handle_count = 1;
         if (get_file_object_handle_count(info, task->handle, &handle_count) &&
             handle_count > 1)
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
+                "Skip on handle count %lu\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , handle_count
+            );
             return VMI_EVENT_RESPONSE_NONE;
+        }
 
         if (task->error)
         {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
+                "Skip on task error state\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , task->target.ret_pid, (int)task->stage()
+            );
             tasks.erase(make_task_id(*task));
             return VMI_EVENT_RESPONSE_NONE;
         }
@@ -857,8 +959,14 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         update_file_metadata(nullptr, *task);
         print_file_information(info, *task);
         tasks.erase(make_task_id(*task));
-        return VMI_EVENT_RESPONSE_NONE;
     }
+
+    PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtClose handled\n"
+        , info->event_uid
+        , info->attached_proc_data.pid, info->attached_proc_data.tid
+    );
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 /*****************************************************************************
@@ -871,7 +979,7 @@ fileextractor::error fileextractor::dispatch_task(
     task_t& task)
 {
     error status = error::error;
-    switch (task.stage)
+    switch (task.stage())
     {
         case task_t::stage_t::pending:
             status = dispatch_pending(vmi, info, task);
@@ -971,7 +1079,7 @@ fileextractor::error fileextractor::dispatch_queryvolumeinfo(
                 << dev_info.device_type;
 
             print_extraction_failure(info, task.filename, msg.str());
-            task.stage = task_t::stage_t::finished;
+            task.stage(task_t::stage_t::finished);
             return error::none;
         }
 
@@ -1202,7 +1310,7 @@ fileextractor::error fileextractor::dispatch_close_handle(
     drakvuf_trap_info_t* info,
     task_t& task)
 {
-    task.stage = task_t::stage_t::finished;
+    task.stage(task_t::stage_t::finished);
 
     return error::success;
 }
@@ -1241,7 +1349,7 @@ bool fileextractor::inject_queryvolumeinfo(drakvuf_trap_info_t* info,
     task.target.ret_rsp = regs.rsp;
     task.queryvolumeinfo.out = args[2].data_on_stack;
 
-    task.stage = task_t::stage_t::queryvolumeinfo;
+    task.stage(task_t::stage_t::queryvolumeinfo);
     return true;
 }
 
@@ -1275,7 +1383,7 @@ bool fileextractor::inject_queryinfo(drakvuf_trap_info_t* info,
     task.target.ret_rsp = regs.rsp;
     task.queryinfo.out = args[2].data_on_stack;
 
-    task.stage = task_t::stage_t::queryinfo;
+    task.stage(task_t::stage_t::queryinfo);
     return true;
 }
 
@@ -1308,7 +1416,7 @@ bool fileextractor::inject_createsection(drakvuf_trap_info_t* info,
     task.target.ret_rsp = regs.rsp;
     task.createsection.handle = args[0].data_on_stack;
 
-    task.stage = task_t::stage_t::createsection;
+    task.stage(task_t::stage_t::createsection);
     return true;
 }
 
@@ -1346,7 +1454,7 @@ bool fileextractor::inject_mapview(drakvuf_trap_info_t* info,
     task.mapview.base = args[2].data_on_stack;
     task.mapview.size = args[6].data_on_stack;
 
-    task.stage = task_t::stage_t::mapview;
+    task.stage(task_t::stage_t::mapview);
     return true;
 }
 
@@ -1370,7 +1478,7 @@ bool fileextractor::inject_allocate_pool(drakvuf_trap_info_t* info,
 
     task.target.ret_rsp = regs.rsp;
 
-    task.stage = task_t::stage_t::allocate_pool;
+    task.stage(task_t::stage_t::allocate_pool);
     return true;
 }
 
@@ -1396,7 +1504,7 @@ bool fileextractor::inject_memcpy(drakvuf_trap_info_t* info,
 
     task.target.ret_rsp = regs.rsp;
 
-    task.stage = task_t::stage_t::memcpy;
+    task.stage(task_t::stage_t::memcpy);
     return true;
 }
 
@@ -1420,7 +1528,7 @@ bool fileextractor::inject_unmapview(drakvuf_trap_info_t* info,
 
     task.target.ret_rsp = regs.rsp;
 
-    task.stage = task_t::stage_t::unmapview;
+    task.stage(task_t::stage_t::unmapview);
     return true;
 }
 
@@ -1443,7 +1551,7 @@ bool fileextractor::inject_close_handle(drakvuf_trap_info_t* info,
 
     task.target.ret_rsp = regs.rsp;
 
-    task.stage = task_t::stage_t::close_handle;
+    task.stage(task_t::stage_t::close_handle);
     return true;
 }
 
@@ -1456,8 +1564,8 @@ void fileextractor::check_stack_marker(
     vmi_lock_guard& vmi,
     task_t* task)
 {
-    if (task->stage != task_t::stage_t::pending &&
-        task->stage != task_t::stage_t::finished)
+    if (task->stage() != task_t::stage_t::pending &&
+        task->stage() != task_t::stage_t::finished)
     {
         ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -1473,7 +1581,7 @@ void fileextractor::check_stack_marker(
                 "expected %#lx, result %#lx\n"
                 , info->event_uid
                 , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , task->target.ret_pid, (int)task->stage
+                , task->target.ret_pid, (int)task->stage()
                 , task->stack_marker_va(), task->stack_marker(), stack_marker
             );
         }
@@ -2004,6 +2112,11 @@ addr_t fileextractor::find_pool()
 
 void fileextractor::free_resources(drakvuf_trap_info_t* info, task_t& task)
 {
+    PRINT_DEBUG(
+        "[FILEEXTRACTOR] Free task: "
+        "pid %d, name '''%s''', stage %d\n"
+        , task.target.ret_pid, task.filename.data()
+        , (int)task.stage());
     drakvuf_vmi_response_set_gpr_registers(drakvuf, info, &task.target.regs, true);
     free_pool(task.pool);
 }
@@ -2149,14 +2262,14 @@ bool fileextractor::stop_impl()
         begin_stop_at = g_get_real_time() / G_USEC_PER_SEC;
 
     for (auto& i: tasks)
-        if (i.second->stage != task_t::stage_t::pending && i.second->stage != task_t::stage_t::finished)
+        if (i.second->stage() != task_t::stage_t::pending && i.second->stage() != task_t::stage_t::finished)
         {
             PRINT_DEBUG(
                 "[FILEEXTRACTOR] Pending tasks count: %zu. "
                 "pid %d, name '''%s''', stage %d\n"
                 , tasks.size()
                 , i.second->target.ret_pid, i.second->filename.data()
-                , (int)i.second->stage);
+                , (int)i.second->stage());
             return false;
         }
 
