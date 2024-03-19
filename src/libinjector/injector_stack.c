@@ -768,7 +768,6 @@ bool setup_stack(
 bool inject_function_call(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
     x86_registers_t* regs,
     struct argument args[],
     int nb_args,
@@ -796,7 +795,7 @@ bool inject_function_call(
         return false;
     }
 
-    drakvuf_insert_injection(drakvuf, info, cb);
+    drakvuf_insert_injection(drakvuf, info);
     drakvuf_release_vmi(drakvuf);
     return true;
 }
