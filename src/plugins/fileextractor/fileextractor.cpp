@@ -279,10 +279,6 @@ static std::string get_metadata_filename(std::string dump_folder, int task_idx)
 event_response_t fileextractor::setinformation_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
 {
-    if (this->is_stopping())
-        return VMI_EVENT_RESPONSE_NONE;
-
-
     if (drakvuf_lookup_injection(drakvuf, info))
         drakvuf_remove_injection(drakvuf, info);
 
