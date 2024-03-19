@@ -151,7 +151,7 @@ bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
     init_int_argument(&args[5], 0);
     init_struct_argument(&args[6], read_bytes);
 
-    if (!inject_function_call(drakvuf, info, cb, &regs, args, 7, plugin->copy_virt_mem_va, stack_marker))
+    if (!inject_function_call(drakvuf, info, &regs, args, 7, plugin->copy_virt_mem_va, stack_marker))
     {
         PRINT_DEBUG("[USERHOOK] [%8zu] [%d:%d:%#lx]  "
             "Failed to inject MmCopyVirtualMemory\n"

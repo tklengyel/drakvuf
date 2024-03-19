@@ -1191,7 +1191,7 @@ void win_procdump2::allocate_pool(
     init_int_argument(&args[1], ctx->POOL_SIZE_IN_PAGES * VMI_PS_4KB);
     init_int_argument(&args[2], 0);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), malloc_va, ctx->working.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), malloc_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
             "Failed to inject ExAllocatePoolWithTag\n"
@@ -1224,7 +1224,7 @@ void win_procdump2::copy_memory(drakvuf_trap_info_t* info,
     init_int_argument(&args[5], 0); // UserMode (TODO Is this correct?)
     init_struct_argument(&args[6], read_bytes);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), copy_virt_mem_va, ctx->working.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), copy_virt_mem_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
             "Failed to inject MmCopyVirtualMemory\n"
@@ -1250,7 +1250,7 @@ void win_procdump2::get_irql(drakvuf_trap_info_t* info, std::shared_ptr<win_proc
     memcpy(&regs, info->regs, sizeof(x86_registers_t));
 
     // TODO We should check if CR8 probing would be sufficient and leave comment here.
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, nullptr, 0, current_irql_va, ctx->working.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, nullptr, 0, current_irql_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
             "Failed to inject KeGetCurrentIrql\n"
@@ -1275,7 +1275,7 @@ void win_procdump2::resume(drakvuf_trap_info_t* info, std::shared_ptr<win_procdu
     std::array<argument, 1> args{};
     init_int_argument(&args[0], ctx->target_process_base);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), resume_process_va, ctx->working.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), resume_process_va, ctx->working.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
             "Failed to inject PsResumeProcess\n"
@@ -1307,7 +1307,7 @@ void win_procdump2::suspend(drakvuf_trap_info_t* info, addr_t target_process_bas
     std::array<argument, 1> args{};
     init_int_argument(&args[0], target_process_base);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), suspend_process_va, ctx.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), suspend_process_va, ctx.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
             "Failed to inject PsSuspendProcess\n"
@@ -1336,7 +1336,7 @@ void win_procdump2::delay_execution(drakvuf_trap_info_t* info,
     init_int_argument(&args[1], 1); // Alertable
     init_struct_argument(&args[2], interval);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), delay_execution_va, ctx.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), delay_execution_va, ctx.set_stack_marker()))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
             "Failed to inject KeDelayExecutionThread\n"

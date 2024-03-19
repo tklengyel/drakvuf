@@ -1235,7 +1235,7 @@ bool fileextractor::inject_queryvolumeinfo(drakvuf_trap_info_t* info,
     init_int_argument(&args[3], sizeof(dev_info));
     init_int_argument(&args[4], FileFsDeviceInformation);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->queryvolumeinfo_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->queryvolumeinfo_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
@@ -1269,7 +1269,7 @@ bool fileextractor::inject_queryinfo(drakvuf_trap_info_t* info,
     init_int_argument(&args[3], sizeof(dev_info));
     init_int_argument(&args[4], FileStandardInformation);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->queryinfo_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->queryinfo_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
@@ -1302,7 +1302,7 @@ bool fileextractor::inject_createsection(drakvuf_trap_info_t* info,
     init_int_argument(&args[5], 0x8000000); // AllocationAttributes = SEC_COMMIT
     init_int_argument(&args[6], task.handle); // FileHandle
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->createsection_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->createsection_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
@@ -1339,7 +1339,7 @@ bool fileextractor::inject_mapview(drakvuf_trap_info_t* info,
     init_int_argument   (&args[8], 0); // AllocationType
     init_int_argument   (&args[9], 2); // Win32Protect
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->mapview_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->mapview_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
@@ -1365,7 +1365,7 @@ bool fileextractor::inject_allocate_pool(drakvuf_trap_info_t* info,
     init_int_argument(&args[1], BYTES_TO_READ);
     init_int_argument(&args[2], 0);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->exallocatepool_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->exallocatepool_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
@@ -1391,7 +1391,7 @@ bool fileextractor::inject_memcpy(drakvuf_trap_info_t* info,
     init_int_argument(&args[1], task.view_base);
     init_int_argument(&args[2], task.bytes_to_read);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->memcpy_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->memcpy_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
@@ -1415,7 +1415,7 @@ bool fileextractor::inject_unmapview(drakvuf_trap_info_t* info,
     init_int_argument(&args[0], 0xffffffffffffffff); // current process pseudo handle
     init_int_argument(&args[1], task.view_base);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->unmapview_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->unmapview_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
@@ -1438,7 +1438,7 @@ bool fileextractor::inject_close_handle(drakvuf_trap_info_t* info,
 
     init_int_argument(&args[0], task.section_handle);
 
-    if (!inject_function_call(drakvuf, info, info->trap->cb, &regs, args.data(), args.size(), this->close_handle_va, task.set_stack_marker()))
+    if (!inject_function_call(drakvuf, info, &regs, args.data(), args.size(), this->close_handle_va, task.set_stack_marker()))
         return false;
 
     task.target.ret_rsp = regs.rsp;
