@@ -201,8 +201,7 @@ event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_t
 
     while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
     {
-        page_info_t pinfo;
-        if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, dll_meta->pf_current_addr, &pinfo) == VMI_SUCCESS)
+        if (is_pagetable_loaded(vmi, dll_meta->pf_current_addr, info->regs->cr3))
         {
             PRINT_DEBUG("[USERHOOK] Export info accessible OK %llx\n", (unsigned long long)dll_meta->pf_current_addr);
             dll_meta->pf_current_addr += VMI_PS_4KB;
@@ -225,83 +224,31 @@ event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_t
     }
 
     // export info should be available, try hooking DLLs
+
+    resolve_dll_targets(vmi, dll_meta, info->regs->cr3);
+
+    trap_loaded_dll_targets(drakvuf, dll_meta, info->regs->cr3, proc_data);
+
     for (auto& target : dll_meta->targets)
     {
-        if (target.state == HOOK_FIRST_TRY || target.state == HOOK_PAGEFAULT_RETRY)
+        if (target.state != HOOK_FIRST_TRY) continue;
+
+        addr_t exec_func = target.target_addr;
+        addr_t stack_pointer;
+        if (inject_copy_memory(plugin, drakvuf, info, info->trap->cb, dll_meta->set_stack_marker(), exec_func, &stack_pointer))
         {
-            addr_t exec_func = 0;
-
-            if (target.type == HOOK_BY_NAME)
-            {
-                ACCESS_CONTEXT(ctx,
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = dll_meta->v.real_dll_base
-                );
-
-                if (vmi_translate_sym2v(vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
-                {
-                    target.state = HOOK_FAILED;
-                    PRINT_DEBUG("[USERHOOK] Failed to hook %s: failed to translate symbol to address\n", target.target_name.c_str());
-                    continue;
-                }
-
-                target.offset = exec_func - dll_meta->v.real_dll_base;
-            }
-            else // HOOK_BY_OFFSET
-            {
-                exec_func = dll_meta->v.real_dll_base + target.offset;
-            }
-
-            if (target.state == HOOK_FIRST_TRY)
-            {
-                target.state = HOOK_FAILED;
-
-                if (is_pagetable_loaded(vmi, info, exec_func))
-                {
-                    target.pid = proc_data.pid;
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
-                }
-                else
-                {
-                    addr_t stack_pointer;
-                    if (inject_copy_memory(plugin, drakvuf, info, info->trap->cb, dll_meta->set_stack_marker(), exec_func, &stack_pointer))
-                    {
-                        target.state = HOOK_PAGEFAULT_RETRY;
-                        get_trap_params<call_result_t>(info->trap)->set_result_call_params(info, stack_pointer);
-                        plugin->increment_injection_in_progress_count(proc_data);
-                    }
-                    else
-                    {
-                        PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
-                            (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-                    }
-                    return VMI_EVENT_RESPONSE_NONE;
-                }
-            }
-            else if (target.state == HOOK_PAGEFAULT_RETRY)
-            {
-                target.state = HOOK_FAILED;
-
-                if (is_pagetable_loaded(vmi, info, exec_func))
-                {
-                    target.pid = proc_data.pid;
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
-                }
-            }
-            else
-            {
-                target.state = HOOK_FAILED;
-            }
-
-            PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
-                target.target_name.c_str(),
-                (unsigned long long)exec_func,
-                (unsigned long long)dll_meta->v.real_dll_base,
-                target.state == HOOK_OK ? "OK" : "FAIL");
+            PRINT_DEBUG("[USERHOOK] Target addr not accessible, page fault %llx\n", (unsigned long long)exec_func);
+            target.state = HOOK_PAGEFAULT_RETRY;
+            get_trap_params<call_result_t>(info->trap)->set_result_call_params(info, stack_pointer);
+            plugin->increment_injection_in_progress_count(proc_data);
         }
+        else
+        {
+            PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
+                (unsigned long long)info->regs->cr3, (unsigned long long)exec_func);
+            target.state = HOOK_FAILED;
+        }
+        return VMI_EVENT_RESPONSE_NONE;
     }
 
     PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");

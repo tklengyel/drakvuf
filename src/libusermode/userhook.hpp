@@ -131,6 +131,7 @@ struct hook_target_entry_t
     vmi_pid_t pid = 0;
     target_hook_type type;
     std::string target_name;
+    addr_t target_addr = 0;
     std::string clsid;
     addr_t offset;
     bool no_retval{false};
@@ -182,7 +183,7 @@ struct hook_target_view_t
     target_hook_state state;
 
     hook_target_view_t(std::string target_name, addr_t offset, target_hook_state state)
-        : target_name(target_name), offset(offset), state(state) {}
+        : target_name(std::move(target_name)), offset(offset), state(state) {}
 };
 
 struct dll_view_t
