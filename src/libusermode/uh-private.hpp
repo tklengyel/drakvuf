@@ -293,8 +293,11 @@ private:
 };
 
 proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info);
-bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func);
-bool is_pagetable_loaded(vmi_instance_t vmi, const drakvuf_trap_info* info, addr_t vaddr);
+bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, addr_t process_dtb, hook_target_entry_t* target, addr_t exec_func);
+bool is_pagetable_loaded(vmi_instance_t vmi, addr_t vaddr, addr_t process_dtb);
+void resolve_dll_targets(vmi_instance_t vmi, dll_t* dll_meta, addr_t process_dtb);
+void trap_loaded_dll_targets(drakvuf_t drakvuf, dll_t* dll_meta, addr_t process_dtb, const proc_data_t& proc_data);
+
 
 event_response_t internal_perform_hooking_pf(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
 event_response_t internal_perform_hooking_injection(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta);
