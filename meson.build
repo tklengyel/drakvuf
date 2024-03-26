@@ -73,6 +73,8 @@ if get_option('hardening')
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
     add_project_arguments('--param', language : ['c', 'cpp'])
     add_project_arguments('ssp-buffer-size=1', language : ['c', 'cpp'])
+    add_project_arguments('-ftrivial-auto-var-init=zero', language: ['c', 'cpp'])
+    add_project_arguments('-fzero-call-used-regs=all', language: ['c', 'cpp'])
 
     hardened_link_args += '-Wl,-z,noexecstack'
     hardened_link_args += '-Wl,-z,relro'
