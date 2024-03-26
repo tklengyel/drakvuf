@@ -46,6 +46,8 @@ add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
 add_project_arguments('-Wno-missing-field-initializers', language : ['c', 'cpp'])
 add_project_arguments('-Wno-packed', language : ['c', 'cpp'])
 
+hardened_link_args=[]
+
 # Declare additional debug flags
 if get_option('buildtype').startswith('debug')
     add_project_arguments('-DDRAKVUF_DEBUG', language : ['c', 'cpp'])
@@ -63,11 +65,9 @@ if get_option('buildtype').startswith('debug')
     add_project_arguments('-Wfloat-equal', language : ['cpp'])
     add_project_arguments('-Wundef', language : ['cpp'])
     add_project_arguments('-Wvla', language : ['cpp'])
-endif
-
-# Runtime hardening
-hardened_link_args=[]
-if get_option('hardening')
+    add_project_arguments('-ftrivial-auto-var-init=pattern', language: ['c', 'cpp'])
+elif get_option('hardening')
+    # Runtime hardening for release builds
     add_project_arguments('-Wno-strict-overflow', language : ['c', 'cpp'])
     add_project_arguments('-D_FORTIFY_SOURCE=2', language : ['c', 'cpp'])
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
