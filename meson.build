@@ -16,8 +16,9 @@ project('DRAKVUF (C) Tamas K Lengyel 2014-2024', 'c', 'cpp',
 )
 
 # Check if C++ compiler is suitable
+cpp=meson.get_compiler('cpp')
 code='''int main(void) { bool test[2] = { [1] = 1, [0] = 0 }; return 0; }'''
-if meson.get_compiler('cpp').compiles(code) == false
+if cpp.compiles(code) == false
     error('Unsupported C++ compiler, please install clang')
 endif
 
@@ -73,8 +74,21 @@ elif get_option('hardening')
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
     add_project_arguments('--param', language : ['c', 'cpp'])
     add_project_arguments('ssp-buffer-size=1', language : ['c', 'cpp'])
-    add_project_arguments('-ftrivial-auto-var-init=zero', language: ['c', 'cpp'])
-    add_project_arguments('-fzero-call-used-regs=all', language: ['c', 'cpp'])
+
+    code='''int test(int x) { int y=~x; return x+y; } int main(void) { return test(123); }'''
+    if cpp.compiles(code, name: 'zero-vars', args: ['-ftrivial-auto-var-init=zero'])
+        add_project_arguments('-ftrivial-auto-var-init=zero', language: ['c', 'cpp'])
+    elif cpp.compiles(code, name: 'zero-vars2',
+                      args: ['-ftrivial-auto-var-init=zero',
+                             '-enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang'])
+        add_project_arguments('-ftrivial-auto-var-init=zero', language: ['c', 'cpp'])
+        add_project_arguments('-enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang', language: ['c', 'cpp'])
+    endif
+
+    code='''struct { void (*cb)(void); } s; void f(void) { s.cb(); }'''
+    if cpp.compiles(code, name: '-fzero-call-used-regs=all', args: ['-O2', '-fzero-call-used-regs=all'])
+        add_project_arguments('-fzero-call-used-regs=all', language: ['c', 'cpp'])
+    endif
 
     hardened_link_args += '-Wl,-z,noexecstack'
     hardened_link_args += '-Wl,-z,relro'
