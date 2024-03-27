@@ -79,7 +79,6 @@ elif get_option('hardening')
     add_project_arguments('-fno-strict-aliasing', language : ['c', 'cpp'])
     add_project_arguments('-U_FORTIFY_SOURCE', language : ['c', 'cpp'])
     add_project_arguments('-D_FORTIFY_SOURCE=3', language : ['c', 'cpp'])
-    add_project_arguments('-fstack-clash-protection', language : ['c', 'cpp'])
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
     add_project_arguments('--param', language : ['c', 'cpp'])
     add_project_arguments('ssp-buffer-size=1', language : ['c', 'cpp'])
@@ -99,6 +98,10 @@ elif get_option('hardening')
     code='''struct { void (*cb)(void); } s; void f(void) { s.cb(); }'''
     if cpp.compiles(code, name: '-fzero-call-used-regs=all', args: ['-O2', '-fzero-call-used-regs=all'])
         add_project_arguments('-fzero-call-used-regs=all', language: ['c', 'cpp'])
+    endif
+
+    if cpp.compiles(code, name: '-fstack-clash-protection', args: ['-fstack-clash-protection'])
+        add_project_arguments('-fstack-clash-protection', language : ['c', 'cpp'])
     endif
 
     hardened_link_args += '-Wl,-z,nodlopen'
