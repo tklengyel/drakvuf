@@ -74,6 +74,8 @@ elif get_option('hardening')
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
     add_project_arguments('--param', language : ['c', 'cpp'])
     add_project_arguments('ssp-buffer-size=1', language : ['c', 'cpp'])
+    add_project_arguments('-fno-delete-null-pointer-checks', language : ['c', 'cpp'])
+    add_project_arguments('-fwrapv', language : ['c', 'cpp'])
 
     code='''int test(int x) { int y=~x; return x+y; } int main(void) { return test(123); }'''
     if cpp.compiles(code, name: 'zero-vars', args: ['-ftrivial-auto-var-init=zero'])
