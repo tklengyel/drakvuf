@@ -46,8 +46,11 @@ add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
 add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
 add_project_arguments('-Wno-missing-field-initializers', language : ['c', 'cpp'])
 add_project_arguments('-Wno-packed', language : ['c', 'cpp'])
-add_project_arguments('-fstrict-flex-arrays=2', language : ['c', 'cpp'])
 add_project_arguments('-D_GLIBCXX_ASSERTIONS', language : ['cpp'])
+
+if cpp.compiles(code, name: '-fstrict-flex-arrays=2', args: ['-fstrict-flex-arrays=2'])
+    add_project_arguments('-fstrict-flex-arrays=2', language: ['c', 'cpp'])
+endif
 
 hardened_link_args=[]
 
