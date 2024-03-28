@@ -46,6 +46,11 @@ add_project_arguments('-Wno-unknown-warning-option', language : ['cpp'])
 add_project_arguments('-Wno-unused-parameter', language : ['c', 'cpp'])
 add_project_arguments('-Wno-missing-field-initializers', language : ['c', 'cpp'])
 add_project_arguments('-Wno-packed', language : ['c', 'cpp'])
+add_project_arguments('-D_GLIBCXX_ASSERTIONS', language : ['cpp'])
+
+if cpp.compiles(code, name: '-fstrict-flex-arrays=2', args: ['-fstrict-flex-arrays=2'])
+    add_project_arguments('-fstrict-flex-arrays=2', language: ['c', 'cpp'])
+endif
 
 hardened_link_args=[]
 
@@ -54,6 +59,7 @@ if get_option('buildtype').startswith('debug')
     add_project_arguments('-DDRAKVUF_DEBUG', language : ['c', 'cpp'])
     add_project_arguments('-ggdb3', language : ['c', 'cpp'])
     add_project_arguments('-Wformat', language : ['c', 'cpp'])
+    add_project_arguments('-Wformat=2', language : ['c', 'cpp'])
     add_project_arguments('-Wformat-security', language : ['c', 'cpp'])
     add_project_arguments('-Wferror-limit=0', language : ['cpp'])
     add_project_arguments('-Wcast-qual', language : ['cpp'])
@@ -70,7 +76,9 @@ if get_option('buildtype').startswith('debug')
 elif get_option('hardening')
     # Runtime hardening for release builds
     add_project_arguments('-Wno-strict-overflow', language : ['c', 'cpp'])
-    add_project_arguments('-D_FORTIFY_SOURCE=2', language : ['c', 'cpp'])
+    add_project_arguments('-fno-strict-aliasing', language : ['c', 'cpp'])
+    add_project_arguments('-U_FORTIFY_SOURCE', language : ['c', 'cpp'])
+    add_project_arguments('-D_FORTIFY_SOURCE=3', language : ['c', 'cpp'])
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
     add_project_arguments('--param', language : ['c', 'cpp'])
     add_project_arguments('ssp-buffer-size=1', language : ['c', 'cpp'])
@@ -92,6 +100,11 @@ elif get_option('hardening')
         add_project_arguments('-fzero-call-used-regs=all', language: ['c', 'cpp'])
     endif
 
+    if cpp.compiles(code, name: '-fstack-clash-protection', args: ['-fstack-clash-protection'])
+        add_project_arguments('-fstack-clash-protection', language : ['c', 'cpp'])
+    endif
+
+    hardened_link_args += '-Wl,-z,nodlopen'
     hardened_link_args += '-Wl,-z,noexecstack'
     hardened_link_args += '-Wl,-z,relro'
     hardened_link_args += '-Wl,-z,now'
