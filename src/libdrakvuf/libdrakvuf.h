@@ -137,10 +137,12 @@ extern "C" {
 
 #ifdef DRAKVUF_DEBUG
 extern bool verbose;
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
-    } while (0)
+static inline void __attribute__((format(printf, 1, 2))) PRINT_DEBUG(const char *format, ...)
+{
+    if(!verbose) return;
+    eprint_current_time();
+    fprintf (stderr, format, __VA_ARGS__);
+}
 #else
 #define PRINT_DEBUG(...) do {} while(0)
 #endif
