@@ -122,7 +122,7 @@ addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int* err, const char** err_str);
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 

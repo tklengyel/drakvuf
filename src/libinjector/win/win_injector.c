@@ -743,7 +743,7 @@ injector_status_t injector_start_app_on_win(
 
     rc = injector->rc;
     if (injected_pid)
-        *injected_pid = injector->pid;
+        *injected_pid = (vmi_pid_t)injector->pid;
     PRINT_DEBUG("Finished with injection. Ret: %i.\n", rc);
 
     switch (method)

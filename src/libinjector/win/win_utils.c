@@ -139,7 +139,8 @@ bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     if (!output || !size || !file)
         return false;
 
-    long payload_size = 0;
+    long _payload_size;
+    size_t payload_size = 0;
     unsigned char* data = NULL;
     FILE* fp = fopen(file, "rb");
 
@@ -151,13 +152,14 @@ bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
     // obtain file size:
     fseek (fp, 0, SEEK_END);
-    if ( (payload_size = ftell (fp)) < 0 )
+    if ( (_payload_size = ftell (fp)) < 0 )
     {
         fprintf(stderr, "File length error\n");
         fclose(fp);
         return false;
     }
     rewind (fp);
+    payload_size = (size_t)(_payload_size);
 
     data = g_try_malloc0(payload_size);
     if ( !data )
@@ -167,7 +169,7 @@ bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
         return false;
     }
 
-    if ( (size_t)payload_size != fread(data, 1, payload_size, fp) )
+    if ( payload_size != fread(data, 1, payload_size, fp) )
     {
         fprintf(stderr, "Could not read file\n");
         g_free(data);
@@ -193,7 +195,7 @@ bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* c
         return false;
 
     data->addr = drakvuf_exportsym_to_va(drakvuf, module_info->eprocess_addr, data->lib, data->fun);
-    if (data->addr)
+    if (data->addr != ~0ull)
         return true;
 
     return false;
@@ -304,7 +306,7 @@ void print_win_injection_info(output_format_t format, const char* file, injector
         process_name = (const char*)injector->expanded_target->contents;
 
     print_injection_info(format, injector->method,
-        injector->result, injector->target_pid,
+        injector->result, (uint32_t)injector->target_pid,
         injector->pid, injector->tid, process_name,
         arguments, &injector->error_code);
 

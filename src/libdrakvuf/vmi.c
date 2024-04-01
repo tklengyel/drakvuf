@@ -1830,7 +1830,7 @@ void drakvuf_vmi_event_callback (int fd, void* data)
 {
     UNUSED(fd);
     drakvuf_t drakvuf = (drakvuf_t)data;
-    status_t status = vmi_events_listen(drakvuf->vmi, drakvuf->poll_rc);
+    status_t status = vmi_events_listen(drakvuf->vmi, (uint32_t)drakvuf->poll_rc);
     if (VMI_SUCCESS != status)
     {
         PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
@@ -1838,7 +1838,7 @@ void drakvuf_vmi_event_callback (int fd, void* data)
     }
 }
 
-static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
+static void drakvuf_poll(drakvuf_t drakvuf, int timeout)
 {
     int rc = poll(drakvuf->event_fds, drakvuf->event_fd_cnt, timeout);
     drakvuf->poll_rc = rc;
@@ -1857,7 +1857,7 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
     }
 
     /* check and process each fd if it was raised */
-    for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
+    for (unsigned int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
     {
         if (timeout && !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
             continue;
@@ -1991,7 +1991,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     }
 
     /* domain->max_pages is mostly just an annoyance that we can safely ignore */
-    rc = xen_set_maxmemkb(drakvuf->xen, drakvuf->domID, ~0);
+    rc = xen_set_maxmemkb(drakvuf->xen, drakvuf->domID, ~0ull);
     PRINT_DEBUG("Max mem set? %i\n", rc);
     if (!rc)
         return 0;

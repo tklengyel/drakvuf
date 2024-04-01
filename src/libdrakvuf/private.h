@@ -258,7 +258,7 @@ struct drakvuf
 
     GSList* event_fd_info;     // the list of registered event FDs
     struct pollfd* event_fds;  // auto-generated pollfd for poll()
-    int event_fd_cnt;          // auto-generated for poll()
+    unsigned int event_fd_cnt;          // auto-generated for poll()
     fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
     int poll_rc;
 
@@ -266,7 +266,7 @@ struct drakvuf
 
     ipt_state_t ipt_state[MAX_DRAKVUF_VCPU];
 
-    int64_t limited_traps_ttl;
+    uint64_t limited_traps_ttl;
 
     /* This field is used to delay registers modification on injections.
      * This fixes two issues:

@@ -115,10 +115,10 @@
 #include "linux.h"
 #include "linux-offsets.h"
 
-#define STACK_SIZE_8K  0x1fff
-#define STACK_SIZE_16K 0x3fff
-#define MIN_KERNEL_BOUNDARY 0x80000000
-#define PAGE_OFFSET 0xffff800000000000
+#define STACK_SIZE_8K  0x1fffull
+#define STACK_SIZE_16K 0x3fffull
+#define MIN_KERNEL_BOUNDARY 0x80000000ull
+#define PAGE_OFFSET 0xffff800000000000ull
 #define PF_EXITING		0x00000004	/* Getting shut down */
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 

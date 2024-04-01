@@ -131,7 +131,7 @@ void init_string_argument(struct argument* arg, const char* string)
     init_argument(arg, ARGUMENT_STRING, strlen(string), string);
 }
 
-void init_array_argument(struct argument* arg, struct argument array[], int size)
+void init_array_argument(struct argument* arg, struct argument array[], size_t size)
 {
     init_argument(arg, ARGUMENT_ARRAY, size, array);
 }
@@ -180,7 +180,7 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
 
     addr -= len;
     // Align string address on 32B boundary (for SSE2 instructions).
-    addr &= ~0x1f;
+    addr &= ~0x1ful;
 
     size_t buf_len = orig_addr - addr;
     void* buf = g_try_malloc0(buf_len);
@@ -237,7 +237,7 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
      * > alignment of any individual member.
      */
     addr -= size;
-    addr &= ~0xf; // Align stack
+    addr &= ~0xful; // Align stack
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -398,7 +398,7 @@ addr_t place_array_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct 
             goto err;
     }
 
-    for (int i=arg->size - 1; i>=0; i--)
+    for (size_t i=arg->size - 1; i>=0; i--)
     {
         const struct argument* element = &array[i];
         // put the pointer to data on array_addr
@@ -421,7 +421,7 @@ err:
 addr_t place_array_on_addr_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t* data_addr, addr_t* array_addr)
 {
     // fill bottom up as stack grows towards top
-    int i;
+    size_t i;
     for (i=arg->size - 1; i>=0; i--)
     {
         // put the argument on data_addr
@@ -440,7 +440,7 @@ addr_t place_array_on_addr_32(vmi_instance_t vmi, x86_registers_t* regs, struct 
     return *array_addr;
 err:
     PRINT_DEBUG("Array could not be placed on address specified\n");
-    PRINT_DEBUG("Failure index: %d\n", i);
+    PRINT_DEBUG("Failure index: %lu\n", i);
     PRINT_DEBUG("Data addr: %lx\n", *data_addr);
     PRINT_DEBUG("Array addr: %lx\n", *array_addr);
     return 0;
@@ -450,12 +450,12 @@ static bool setup_stack_32(
     vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args)
+    unsigned int nb_args)
 {
     addr_t addr = regs->rsp;
 
     // make room for strings and structs into guest's stack
-    int i;
+    unsigned int i;
     for (i = 0; i < nb_args; i++)
     {
         switch (args[i].type)
@@ -521,7 +521,7 @@ static bool setup_stack_64(
     vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args)
+    unsigned int nb_args)
 {
     uint64_t nul64 = 0;
 
@@ -550,7 +550,7 @@ static bool setup_stack_64(
          * This padding on the stack only exists if the maximum number of parameters passed
          * to functions is greater than 4 and is an odd number.
          */
-        int effective_nb_args = nb_args > 4 ? nb_args : 4;
+        unsigned int effective_nb_args = nb_args > 4 ? nb_args : 4;
         if (((addr - effective_nb_args * 0x8 - 0x8) & 0xf) != 8)
             addr -= 0x8;
 
@@ -561,7 +561,7 @@ static bool setup_stack_64(
         // 5th parameter onwards (if any) passed via the stack
 
         // write parameters (5th onwards) into guest's stack
-        for (int i = nb_args-1; i > 3; i--)
+        for (unsigned int i = nb_args-1; i > 3; i--)
         {
             addr -= 0x8;
             ctx.addr = addr;
@@ -630,7 +630,7 @@ static bool setup_linux_syscall(
     vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args)
+    unsigned int nb_args)
 {
     addr_t addr = regs->rsp;
 
@@ -707,7 +707,7 @@ static bool setup_stack_marked_locked(
     vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args,
+    unsigned int nb_args,
     uint64_t* stack_marker)
 {
     if (stack_marker)
@@ -736,7 +736,7 @@ static bool setup_stack_marked(
     drakvuf_t drakvuf,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args,
+    unsigned int nb_args,
     uint64_t* stack_marker)
 {
 
@@ -751,7 +751,7 @@ bool setup_stack_locked(
     vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args)
+    unsigned int nb_args)
 {
     return setup_stack_marked_locked(drakvuf, vmi, regs, args, nb_args, NULL);
 }
@@ -760,7 +760,7 @@ bool setup_stack(
     drakvuf_t drakvuf,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args)
+    unsigned int nb_args)
 {
     return setup_stack_marked(drakvuf, regs, args, nb_args, NULL);
 }
@@ -770,7 +770,7 @@ bool inject_function_call(
     drakvuf_trap_info_t* info,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args,
+    unsigned int nb_args,
     addr_t function_addr,
     uint64_t* stack_marker)
 {

@@ -119,8 +119,8 @@
 
 #define MMVAD_MAX_DEPTH (100)
 
-#define POOL_TAG_SIZE_X86 0x4
-#define POOL_TAG_SIZE_X64 0xC
+#define POOL_TAG_SIZE_X86 0x4u
+#define POOL_TAG_SIZE_X64 0xCu
 
 #define POOL_TAG_VAD    (0x20646156) // daV
 #define POOL_TAG_VADL   (0x6c646156) // ldaV
@@ -307,7 +307,7 @@ addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     return win_get_current_process(drakvuf, info);
 }
 
-bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
+bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int* err, const char** err_str)
 {
     if (!err || !err_str)
         return false;
@@ -331,7 +331,7 @@ bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* 
         .addr = teb + drakvuf->offsets[TEB_LASTERRORVALUE]
     );
 
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, err))
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)err))
         return false;
 
     if (*err >= __WIN_ERROR_CODES_MAX)
@@ -575,7 +575,7 @@ static bool win_get_thread_id(drakvuf_t drakvuf, addr_t ethread, uint32_t* threa
             0,
             &p_tid ) == VMI_SUCCESS )
     {
-        *thread_id = p_tid;
+        *thread_id = (uint32_t)p_tid;
 
         return true;
     }
@@ -1374,7 +1374,7 @@ bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_
     }
 
     char* end = NULL;
-    *pid = strtoul(param + 3, &end, 10);
+    *pid = (vmi_pid_t)strtoul(param + 3, &end, 10);
     if (ERANGE == errno)
     {
         PRINT_DEBUG("Error. Failed to parse PID: the value is out of range\n");
@@ -1529,7 +1529,7 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
-    int pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
+    unsigned int pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -1685,7 +1685,7 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
-    int pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
+    unsigned int pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -1859,7 +1859,7 @@ uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_
 uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad)
 {
     int idx = MMVAD_FLAGS_VADTYPE;
-    return win_read_flag(drakvuf, mmvad->flags, idx);
+    return (uint32_t)win_read_flag(drakvuf, mmvad->flags, idx);
 }
 
 bool win_mmvad_private_memory(drakvuf_t drakvuf, mmvad_info_t* mmvad)

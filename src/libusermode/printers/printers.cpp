@@ -249,9 +249,8 @@ std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info*
         .addr = argument
     );
 
-    addr_t value = 0;
-    int ret = drakvuf_read_addr(drakvuf, info, &ctx, &value);
-    if (ret != VMI_SUCCESS)
+    addr_t value;
+    if (!drakvuf_read_addr(drakvuf, info, &ctx, &value))
         value = 0;
 
     return ArgumentPrinter::print(drakvuf, info, value);

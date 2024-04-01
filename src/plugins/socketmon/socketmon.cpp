@@ -801,7 +801,7 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     ctx.addr = query_request_addr + query_name_offset;
 
     addr_t query_name_addr = 0;
-    if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &query_name_addr))
+    if (!drakvuf_read_addr(drakvuf, info, &ctx, &query_name_addr))
     {
         PRINT_DEBUG("[SOCKETMON] Couldn't read query_name_addr in %s(...) trap. Unsupported.\n", info->trap->name);
         return 0;

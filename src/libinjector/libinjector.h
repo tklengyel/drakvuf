@@ -188,7 +188,7 @@ typedef enum
 struct argument
 {
     uint32_t type;
-    uint32_t size;
+    size_t size;
     uint64_t data_on_stack;
     const void* data;
 };
@@ -209,7 +209,7 @@ void init_string_argument(struct argument* arg,
 
 void init_array_argument(struct argument* arg,
     struct argument array[],
-    int size) NOEXCEPT;
+    size_t size) NOEXCEPT;
 
 #define init_struct_argument(arg, sv) \
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
@@ -230,20 +230,20 @@ addr_t place_array_on_addr_32(vmi_instance_t vmi,
 bool setup_stack(drakvuf_t drakvuf,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args) NOEXCEPT;
+    unsigned int nb_args) NOEXCEPT;
 
 bool setup_stack_locked(drakvuf_t drakvuf,
     vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args) NOEXCEPT;
+    unsigned int nb_args) NOEXCEPT;
 
 bool inject_function_call(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     x86_registers_t* regs,
     struct argument args[],
-    int nb_args,
+    unsigned int nb_args,
     addr_t function_addr,
     uint64_t* stack_marker) NOEXCEPT;
 

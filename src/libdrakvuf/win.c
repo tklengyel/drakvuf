@@ -481,7 +481,7 @@ static bool enumerate_directory(drakvuf_t drakvuf, addr_t directory, void (*visi
     //    +0x000 HashBuckets      : [37] Ptr64 _OBJECT_DIRECTORY_ENTRY
     //    +0x128 Lock             : _EX_PUSH_LOCK
     //    ...
-    for (int i = 0; i < 37; i++)
+    for (unsigned int i = 0; i < 37; i++)
     {
         addr_t bucket = 0;
         if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, directory + drakvuf_get_address_width(drakvuf) * i, 0, &bucket) || !bucket)
@@ -563,7 +563,7 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     );
 
     addr_t ret;
-    if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret))
+    if (!drakvuf_read_addr(drakvuf, info, &ctx, &ret))
         return 0;
     return ret;
 }
@@ -577,7 +577,7 @@ addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     );
 
     addr_t ret_addr;
-    if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret_addr))
+    if (!drakvuf_read_addr(drakvuf, info, &ctx, &ret_addr))
     {
         PRINT_DEBUG("Failed to read return address from the stack.\n");
         return 0;

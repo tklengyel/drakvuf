@@ -133,7 +133,7 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
 
     vmi_pid_t pid;
     if (!drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
-        return -1;
+        return 0;
 
     addr_t mm_struct_address;
     ACCESS_CONTEXT(ctx,
@@ -145,13 +145,13 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
     {
         ctx.addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_ACTIVE_MMSTRUCT];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
-            return -1;
+            return 0;
     }
 
     addr_t mmap;
     ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mmap))
-        return -1;
+        return 0;
 
     addr_t vm_next, nullp = 0;
 
@@ -161,16 +161,16 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
         addr_t vm_start;
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_START];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_start))
-            return -1;
+            return 0;
 
         addr_t vm_end;
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_END];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_end))
-            return -1;
+            return 0;
 
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_NEXT];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_next))
-            return -1;
+            return 0;
 
         addr_t file_address;
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_FILE];
@@ -220,24 +220,24 @@ next:
     } while (vm_next != nullp);
 
     if (text_segment_address == 0)
-        return -1;
+        return 0;
 
     // Parsing ELF header
 
     addr_t program_header_offset;
     ctx.addr = text_segment_address + drakvuf->offsets[ELF64HDR_PHOFF];
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &program_header_offset))
-        return -1;
+        return 0;
 
     uint16_t num_of_program_headers;
     ctx.addr = text_segment_address + drakvuf->offsets[ELF64HDR_PHNUM];
     if (VMI_FAILURE == vmi_read_16(vmi, &ctx, &num_of_program_headers))
-        return -1;
+        return 0;
 
     uint16_t size_of_program_headers;
     ctx.addr = text_segment_address + drakvuf->offsets[ELF64HDR_PHENTSIZE];
     if (VMI_FAILURE == vmi_read_16(vmi, &ctx, &size_of_program_headers))
-        return -1;
+        return 0;
 
     // Extracting DYNAMIC SEGMENT offset program headers
 
@@ -248,11 +248,11 @@ next:
     {
         ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_TYPE];
         if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &ph_type))
-            return -1;
+            return 0;
 
         ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_VADDR];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ph_vaddr))
-            return -1;
+            return 0;
 
         if (ph_type == 2)
         {
@@ -275,11 +275,11 @@ next:
     do
     {
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &word))
-            return -1;
+            return 0;
         ctx.addr += 0x8;
 
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ptr))
-            return -1;
+            return 0;
         ctx.addr += 0x8;
 
         if (word == 0x5) // .strtab section offset
@@ -346,7 +346,7 @@ next:
         ctx.addr = dynstr_offset + symbol_offset;
         symbol_name = vmi_read_str(vmi, &ctx);
         if (!symbol_name)
-            return -1;
+            return 0;
         addr_t symbol_size = strlen(symbol_name);
         if (strcmp(symbol_name, sym) == 0)
         {
@@ -359,7 +359,7 @@ next:
     }
 
     if (!sym_found)
-        return -1;
+        return 0;
 
     // Mapping symbol name to address in dynsym table
 
@@ -369,12 +369,12 @@ next:
         uint32_t key;
         ctx.addr =  offset + drakvuf->offsets[ELF64SYM_NAME];
         if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &key))
-            return -1;
+            return 0;
 
         addr_t value = 0;
         ctx.addr =  offset + drakvuf->offsets[ELF64SYM_VALUE];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &value))
-            return -1;
+            return 0;
 
         if (key == symbol_offset)
             return text_segment_address + value;
@@ -389,7 +389,7 @@ addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
 
     vmi_pid_t pid;
     if (!drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
-        return -1;
+        return 0;
 
     addr_t mm_struct_address;
     ACCESS_CONTEXT(ctx,
@@ -399,12 +399,12 @@ addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
     );
 
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
-        return -1;
+        return 0;
 
     addr_t mmap;
     ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mmap))
-        return -1;
+        return 0;
 
     addr_t vm_next, nullp = 0;
     do
@@ -412,16 +412,16 @@ addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
         addr_t vm_start;
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_START];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_start))
-            return -1;
+            return 0;
 
         addr_t vm_end;
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_END];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_end))
-            return -1;
+            return 0;
 
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_NEXT];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_next))
-            return -1;
+            return 0;
 
         addr_t file_address;
         ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_FILE];
@@ -454,5 +454,5 @@ next:
 
     } while (vm_next != nullp);
 
-    return -1;
+    return 0;
 }

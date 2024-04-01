@@ -293,7 +293,7 @@ static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_
     {
         injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
         injector->error_code.valid = true;
-        injector->error_code.code = exit_code;
+        injector->error_code.code = (int)exit_code;
         injector->error_code.string = "PROGRAM_FAILED";
     }
 

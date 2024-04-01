@@ -114,9 +114,9 @@
 #include "win-offsets.h"
 
 /* this should work for both 32 and 64bit */
-#define HANDLE_MASK         3
-#define HANDLE_MULTIPLIER   4
-#define EX_FAST_REF_MASK    7
+#define HANDLE_MASK         3u
+#define HANDLE_MULTIPLIER   4u
+#define EX_FAST_REF_MASK    7u
 
 static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, uint64_t handle)
 {
@@ -152,7 +152,7 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
 
             handle -= i;
-            j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
+            j = (uint32_t)(handle / ((low_count * HANDLE_MULTIPLIER) / psize));
 
             if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
                 VMI_FAILURE == vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj) )
@@ -172,7 +172,7 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
 
             handle -= i;
-            j = handle / (low_count * HANDLE_MULTIPLIER / psize);
+            j = (uint32_t)(handle / (low_count * HANDLE_MULTIPLIER / psize));
             k = j % (mid_count * psize);
             j = (j-k)/mid_count;
 

@@ -197,7 +197,7 @@ addr_t drakvuf_get_current_thread_stackbase(drakvuf_t drakvuf, drakvuf_trap_info
     return ret;
 }
 
-bool drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
+bool drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int* err, const char** err_str)
 {
     bool ret = false;
 
@@ -831,7 +831,7 @@ bool drakvuf_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return ret;
 }
 
-addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
+addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, unsigned int narg)
 {
     addr_t ret = 0;
 

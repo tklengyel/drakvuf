@@ -145,7 +145,7 @@ injector_status_t injector_start_app(
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
         if (!tid)
-            tid = pid;
+            tid = (uint32_t)pid;
 
         return injector_start_app_on_linux(drakvuf,
                 pid,

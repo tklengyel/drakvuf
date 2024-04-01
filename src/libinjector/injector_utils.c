@@ -153,7 +153,7 @@ static gchar* kv_strescape(const gchar* str)
     ret[ret_pos++] = '"';
     for (size_t i = 0; i < len; ++i)
     {
-        unsigned char c = str[i];
+        gchar c = str[i];
         switch (c)
         {
             case '\r':

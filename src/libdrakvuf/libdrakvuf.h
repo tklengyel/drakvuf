@@ -459,7 +459,7 @@ size_t drakvuf_get_address_width(drakvuf_t drakvuf) NOEXCEPT;
 uint64_t drakvuf_get_init_memsize(drakvuf_t drakvuf) NOEXCEPT;
 size_t drakvuf_get_process_address_width(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info) NOEXCEPT;
-int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+bool drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     const access_context_t* ctx, addr_t* addr) NOEXCEPT;
 
 uint16_t drakvuf_get_dom_id(drakvuf_t drakvuf) NOEXCEPT;
@@ -486,7 +486,7 @@ addr_t drakvuf_get_current_thread_stackbase(drakvuf_t drakvuf,
 
 bool drakvuf_get_last_error(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
-    uint32_t* err,
+    int* err,
     const char** err_str) NOEXCEPT;
 
 /* Caller must free the returned string */
@@ -777,7 +777,7 @@ bool drakvuf_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info) NOEXCEPT;
 
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
-    int argument_number) NOEXCEPT;
+    unsigned int argument_number) NOEXCEPT;
 addr_t drakvuf_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info) NOEXCEPT;
 
 bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid) NOEXCEPT;

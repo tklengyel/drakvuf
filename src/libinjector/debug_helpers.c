@@ -124,7 +124,7 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
     PRINT_DEBUG("Stack\n");
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    for (int i=0; i < 16; i++)
+    for (unsigned int i=0; i < 16; i++)
     {
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_PID,

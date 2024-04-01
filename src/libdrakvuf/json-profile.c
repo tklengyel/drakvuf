@@ -181,10 +181,6 @@ symbols_t* json_get_symbols(json_object* json)
         return NULL;
     }
 
-    symbols_t* ret = (symbols_t*)g_try_malloc0(sizeof(symbols_t));
-    if ( !ret )
-        return NULL;
-
     json_object* symbols = NULL;
     if (!json_object_object_get_ex(json, "symbols", &symbols))
     {
@@ -193,14 +189,27 @@ symbols_t* json_get_symbols(json_object* json)
         {
             if (!json_object_object_get_ex(json, "$CONSTANTS", &symbols))
             {
-                g_free(ret);
                 return NULL;
             }
         }
     }
 
-    ret->count = json_object_object_length(symbols);
+    int count = json_object_object_length(symbols);
+    if ( count <= 0 )
+        return NULL;
+
+    symbols_t* ret = (symbols_t*)g_try_malloc0(sizeof(symbols_t));
+    if ( !ret )
+        return NULL;
+
+    ret->count = (uint64_t)count;
     ret->symbols = (symbol_t*)g_try_malloc0(sizeof(symbol_t) * ret->count);
+    if ( !ret->symbols )
+    {
+        g_free(ret);
+        return NULL;
+    }
+
 
     PRINT_DEBUG("JSON defines %lu symbols\n", ret->count);
 
@@ -227,7 +236,7 @@ symbols_t* json_get_symbols(json_object* json)
 #ifdef JSONC5
             ret->symbols[i].rva = json_object_get_uint64(address);
 #else
-            ret->symbols[i].rva = json_object_get_int64(address);
+            ret->symbols[i].rva = (uint64_t)json_object_get_int64(address);
 #endif
         }
         else
@@ -236,7 +245,7 @@ symbols_t* json_get_symbols(json_object* json)
 #ifdef JSONC5
             ret->symbols[i].rva = json_object_get_uint64(json_object_iter_peek_value(&it));
 #else
-            ret->symbols[i].rva = json_object_get_int64(json_object_iter_peek_value(&it));
+            ret->symbols[i].rva = (uint64_t)json_object_get_int64(json_object_iter_peek_value(&it));
 #endif
         }
 

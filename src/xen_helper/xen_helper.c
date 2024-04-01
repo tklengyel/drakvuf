@@ -248,7 +248,7 @@ int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
     char* endptr = NULL;
 
     errno = 0;
-    _domID = strtol(input, &endptr, 10);
+    _domID = (uint32_t)strtoul(input, &endptr, 10);
 
     if (errno || !endptr || (endptr && *endptr))
         _domID = ~0U;
@@ -280,7 +280,7 @@ int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
         }
         else
         {
-            _domID = ~0;
+            _domID = ~0u;
         }
     }
 

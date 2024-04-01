@@ -234,8 +234,7 @@ bool drakvuf_init(
     PRINT_DEBUG("drakvuf_init: adding event_fd done\n");
 
     xen_get_dom_info(drakvuf->xen, domain, &drakvuf->domID, &drakvuf->dom_name);
-    domid_t test = ~0;
-    if ( drakvuf->domID == test )
+    if ( drakvuf->domID == (domid_t)~0u )
         goto err;
 
     xen_pause(drakvuf->xen, drakvuf->domID);
@@ -728,7 +727,7 @@ size_t drakvuf_get_process_address_width(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return drakvuf_process_is32bit(drakvuf, info) ? 4 : 8;
 }
 
-static int _drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
+static bool _drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
 {
     if (value)
         *value = 0;
@@ -736,19 +735,19 @@ static int _drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, cons
     if (is32bit)
     {
         uint32_t value32 = 0;
-        int status = vmi_read_32(drakvuf->vmi, ctx, &value32);
+        status_t status = vmi_read_32(drakvuf->vmi, ctx, &value32);
         if (value)
             *value = value32;
-        return status;
+        return status == VMI_SUCCESS;
     }
     else
-        return vmi_read_64(drakvuf->vmi, ctx, value);
+        return vmi_read_64(drakvuf->vmi, ctx, value) == VMI_SUCCESS;
 }
 
-int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
+bool drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
 {
     drakvuf_lock_and_get_vmi(drakvuf);
-    int ret = _drakvuf_read_addr(drakvuf, info, ctx, value);
+    bool ret = _drakvuf_read_addr(drakvuf, info, ctx, value);
     drakvuf_release_vmi(drakvuf);
     return ret;
 }
@@ -1244,8 +1243,8 @@ bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    uint64_t pid = info->attached_proc_data.pid;
-    uint64_t tid = info->attached_proc_data.tid;
+    uint64_t pid = (uint64_t)info->attached_proc_data.pid;
+    uint64_t tid = (uint64_t)info->attached_proc_data.tid;
     gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
 
     drakvuf_lock_and_get_vmi(drakvuf);
@@ -1259,8 +1258,8 @@ void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 void drakvuf_insert_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    uint64_t pid = info->attached_proc_data.pid;
-    uint64_t tid = info->attached_proc_data.tid;
+    uint64_t pid = (uint64_t)info->attached_proc_data.pid;
+    uint64_t tid = (uint64_t)info->attached_proc_data.tid;
     gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
 
     drakvuf_lock_and_get_vmi(drakvuf);
@@ -1272,8 +1271,8 @@ void drakvuf_insert_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    uint64_t pid = info->attached_proc_data.pid;
-    uint64_t tid = info->attached_proc_data.tid;
+    uint64_t pid = (uint64_t)info->attached_proc_data.pid;
+    uint64_t tid = (uint64_t)info->attached_proc_data.tid;
     gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
 
     drakvuf_lock_and_get_vmi(drakvuf);

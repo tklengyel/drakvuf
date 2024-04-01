@@ -127,7 +127,7 @@ typedef enum
 typedef struct
 {
     bool valid;
-    uint32_t code;
+    int code;
     const char* string;
 } injection_error_t;
 

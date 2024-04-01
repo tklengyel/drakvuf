@@ -131,7 +131,7 @@ typedef struct os_interface
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool (*get_last_error)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, int* err, const char** err_str);
 
     addr_t (*export_lib_address)
     (drakvuf_t drakvuf, addr_t process_addr, const char* lib);
