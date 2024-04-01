@@ -146,30 +146,30 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 void print_registers(drakvuf_trap_info_t* info)
 {
 #ifdef DRAKVUF_DEBUG
-    const char* fmt = "%s:\t%016lx\n";
-    PRINT_DEBUG(fmt, "rax",    info->regs->rax);
-    PRINT_DEBUG(fmt, "rcx",    info->regs->rcx);
-    PRINT_DEBUG(fmt, "rdx",    info->regs->rdx);
-    PRINT_DEBUG(fmt, "rbx",    info->regs->rbx);
-    PRINT_DEBUG(fmt, "rsp",    info->regs->rsp);
-    PRINT_DEBUG(fmt, "rbp",    info->regs->rbp);
-    PRINT_DEBUG(fmt, "rsi",    info->regs->rsi);
-    PRINT_DEBUG(fmt, "rdi",    info->regs->rdi);
-    PRINT_DEBUG(fmt, "r8",     info->regs->r8);
-    PRINT_DEBUG(fmt, "r9",     info->regs->r9);
-    PRINT_DEBUG(fmt, "r10",    info->regs->r10);
-    PRINT_DEBUG(fmt, "r11",    info->regs->r11);
-    PRINT_DEBUG(fmt, "r12",    info->regs->r12);
-    PRINT_DEBUG(fmt, "r13",    info->regs->r13);
-    PRINT_DEBUG(fmt, "r14",    info->regs->r14);
-    PRINT_DEBUG(fmt, "r15",    info->regs->r15);
-    PRINT_DEBUG(fmt, "rflags", info->regs->rflags);
-    PRINT_DEBUG(fmt, "dr6",    info->regs->dr6);
-    PRINT_DEBUG(fmt, "dr7",    info->regs->dr7);
-    PRINT_DEBUG(fmt, "rip",    info->regs->rip);
-    PRINT_DEBUG(fmt, "cr0",    info->regs->cr0);
-    PRINT_DEBUG(fmt, "cr2",    info->regs->cr2);
-    PRINT_DEBUG(fmt, "cr3",    info->regs->cr3);
-    PRINT_DEBUG(fmt, "cr4",    info->regs->cr4);
+#define FORMAT "%s:\t%016lx\n"
+    PRINT_DEBUG(FORMAT, "rax",    info->regs->rax);
+    PRINT_DEBUG(FORMAT, "rcx",    info->regs->rcx);
+    PRINT_DEBUG(FORMAT, "rdx",    info->regs->rdx);
+    PRINT_DEBUG(FORMAT, "rbx",    info->regs->rbx);
+    PRINT_DEBUG(FORMAT, "rsp",    info->regs->rsp);
+    PRINT_DEBUG(FORMAT, "rbp",    info->regs->rbp);
+    PRINT_DEBUG(FORMAT, "rsi",    info->regs->rsi);
+    PRINT_DEBUG(FORMAT, "rdi",    info->regs->rdi);
+    PRINT_DEBUG(FORMAT, "r8",     info->regs->r8);
+    PRINT_DEBUG(FORMAT, "r9",     info->regs->r9);
+    PRINT_DEBUG(FORMAT, "r10",    info->regs->r10);
+    PRINT_DEBUG(FORMAT, "r11",    info->regs->r11);
+    PRINT_DEBUG(FORMAT, "r12",    info->regs->r12);
+    PRINT_DEBUG(FORMAT, "r13",    info->regs->r13);
+    PRINT_DEBUG(FORMAT, "r14",    info->regs->r14);
+    PRINT_DEBUG(FORMAT, "r15",    info->regs->r15);
+    PRINT_DEBUG(FORMAT, "rflags", info->regs->rflags);
+    PRINT_DEBUG(FORMAT, "dr6",    info->regs->dr6);
+    PRINT_DEBUG(FORMAT, "dr7",    info->regs->dr7);
+    PRINT_DEBUG(FORMAT, "rip",    info->regs->rip);
+    PRINT_DEBUG(FORMAT, "cr0",    info->regs->cr0);
+    PRINT_DEBUG(FORMAT, "cr2",    info->regs->cr2);
+    PRINT_DEBUG(FORMAT, "cr3",    info->regs->cr3);
+    PRINT_DEBUG(FORMAT, "cr4",    info->regs->cr4);
 #endif
 }
