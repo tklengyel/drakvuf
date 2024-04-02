@@ -651,12 +651,14 @@ event_response_t linux_procmon::execve_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     params->setResultCallParams(drakvuf, info);
     params->bprm = drakvuf_get_function_argument(drakvuf, info, 1);
     params->process_name = info->proc_data.name;
-    params->thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
+    char* thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
+    params->thread_name = thread_name ?: "";
     params->old_creds = get_current_credentials(drakvuf, info);
 
     uint64_t hookID = make_hook_id(info);
     this->ret_hooks[hookID] = std::move(hook);
 
+    g_free(thread_name);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
