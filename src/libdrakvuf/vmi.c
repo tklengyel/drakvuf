@@ -869,6 +869,8 @@ static event_response_t _cr3_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
             process = process->next;
         }
+
+        g_free(process_name);
     }
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
