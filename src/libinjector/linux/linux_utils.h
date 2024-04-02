@@ -151,7 +151,7 @@ struct linux_injector
     addr_t target_process;
     const char* target_file;
     const char* host_file;
-    int args_count;
+    unsigned int args_count;
     // A NULL-terminated array of arguments
     const char** args;
 

@@ -25,7 +25,7 @@ static bool setup_open_process_stack(injector_t injector, x86_registers_t* regs)
         PROCESS_QUERY_INFORMATION);
 
     init_int_argument(&args[1], 0);
-    init_int_argument(&args[2], injector->terminate_pid);
+    init_int_argument(&args[2], (uint64_t)injector->terminate_pid);
 
     if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
     {

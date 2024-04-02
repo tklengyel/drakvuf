@@ -270,8 +270,8 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             else
             {
                 injector->rc = INJECTOR_SUCCEEDED;
-                injector->pid = injector->child_data.pid;
-                injector->tid = injector->child_data.tid;
+                injector->pid = (uint32_t)injector->child_data.pid;
+                injector->tid = (uint32_t)injector->child_data.tid;
             }
 
             return VMI_EVENT_RESPONSE_NONE;

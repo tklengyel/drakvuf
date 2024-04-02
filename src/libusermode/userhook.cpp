@@ -287,13 +287,13 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         return nullptr;
     }
 
-    dll_meta.pf_current_addr = vad_start + export_header_rva & ~(VMI_PS_4KB - 1);
+    dll_meta.pf_current_addr = vad_start + export_header_rva & ~VMI_BIT_MASK(0,11);
     dll_meta.pf_max_addr = vad_start + export_header_rva + export_header_size;
 
     if (dll_meta.pf_max_addr & VMI_PS_4KB)
     {
         dll_meta.pf_max_addr += VMI_PS_4KB;
-        dll_meta.pf_max_addr = dll_meta.pf_max_addr & ~(VMI_PS_4KB - 1);
+        dll_meta.pf_max_addr = dll_meta.pf_max_addr & ~VMI_BIT_MASK(0,11);
     }
 
     auto it = plugin->loaded_dlls.emplace(proc_data.pid, std::vector<dll_t>()).first;

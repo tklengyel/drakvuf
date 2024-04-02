@@ -121,7 +121,7 @@ injector_status_t injector_start_app(
     injector_t* injector_to_be_freed,
     bool global_search,
     bool wait_for_exit,
-    int args_count,
+    unsigned int args_count,
     const char* args[],
     vmi_pid_t* injected_pid)
 {

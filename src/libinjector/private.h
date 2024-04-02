@@ -138,7 +138,7 @@ injector_status_t injector_start_app_on_linux(drakvuf_t drakvuf,
     injection_method_t method,
     output_format_t format,
     const char* binary_path,
-    int args_count,
+    unsigned int args_count,
     const char* args[],
     vmi_pid_t* injected_pid);
 

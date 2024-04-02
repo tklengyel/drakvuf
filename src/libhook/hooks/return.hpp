@@ -119,7 +119,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
+    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, unsigned int ttl)
     -> std::unique_ptr<ReturnHook>;
 
     /**
@@ -164,7 +164,7 @@ protected:
 };
 
 template<typename Params>
-auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
+auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, unsigned int ttl)
 -> std::unique_ptr<ReturnHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");

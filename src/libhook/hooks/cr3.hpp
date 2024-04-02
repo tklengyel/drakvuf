@@ -118,7 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, cb_wrapper_t cb, int ttl)
+    static auto create(drakvuf_t, cb_wrapper_t cb, unsigned int ttl)
     -> std::unique_ptr<Cr3Hook>;
 
     /**
@@ -162,7 +162,7 @@ protected:
 };
 
 template<typename Params>
-auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
+auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, unsigned int ttl)
 -> std::unique_ptr<Cr3Hook>
 {
     PRINT_DEBUG("[LIBHOOK] creating cr3 hook\n");

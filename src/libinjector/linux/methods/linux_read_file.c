@@ -114,7 +114,7 @@
 #include "linux_private.h"
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
-static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int amount);
+static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, size_t size);
 
 bool init_read_file_method(linux_injector_t injector, const char* file)
 {
@@ -292,7 +292,7 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bo
     return override_step(base_injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }
 
-static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int size)
+static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, size_t size)
 {
     linux_injector_t injector = (linux_injector_t)info->trap->data;
 

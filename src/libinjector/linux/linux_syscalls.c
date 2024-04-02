@@ -129,7 +129,7 @@ bool setup_mmap_syscall(linux_injector_t injector, x86_registers_t* regs, size_t
     init_int_argument(&args[1], size);
     init_int_argument(&args[2], PROT_EXEC|PROT_WRITE|PROT_READ);
     init_int_argument(&args[3], MAP_SHARED|MAP_ANONYMOUS|MAP_POPULATE);
-    init_int_argument(&args[4], -1);
+    init_int_argument(&args[4], (uint64_t)-1);
     init_int_argument(&args[5], 0);
 
     regs->rax = sys_mmap;
@@ -145,7 +145,7 @@ bool setup_mmap_syscall(linux_injector_t injector, x86_registers_t* regs, size_t
 
 }
 
-bool setup_open_syscall(linux_injector_t injector, x86_registers_t* regs, const char* target_file, int flags, int mode)
+bool setup_open_syscall(linux_injector_t injector, x86_registers_t* regs, const char* target_file, uint64_t flags, uint64_t mode)
 {
     // open(const char* file, int flags, int mode)
     struct argument args[3] = { {0} };
@@ -165,10 +165,10 @@ bool setup_open_syscall(linux_injector_t injector, x86_registers_t* regs, const 
     return true;
 }
 
-bool setup_close_syscall(linux_injector_t injector, x86_registers_t* regs, int fd)
+bool setup_close_syscall(linux_injector_t injector, x86_registers_t* regs, long fd)
 {
     struct argument args[1] = { {0} };
-    init_int_argument(&args[0], fd);
+    init_int_argument(&args[0], (uint64_t)fd);
 
     regs->rax = sys_close;
     regs->rip = injector->syscall_addr;
@@ -181,11 +181,11 @@ bool setup_close_syscall(linux_injector_t injector, x86_registers_t* regs, int f
     return true;
 }
 
-bool setup_write_syscall(linux_injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
+bool setup_write_syscall(linux_injector_t injector, x86_registers_t* regs, long fd, addr_t buffer_addr, size_t amount)
 {
     // write(unsigned int fd, const char *buf, size_t count);
     struct argument args[3] = { {0} };
-    init_int_argument(&args[0], fd);
+    init_int_argument(&args[0], (uint64_t)fd);
     init_int_argument(&args[1], buffer_addr);
     init_int_argument(&args[2], amount);
 
@@ -200,11 +200,11 @@ bool setup_write_syscall(linux_injector_t injector, x86_registers_t* regs, int f
     return true;
 }
 
-bool setup_read_syscall(linux_injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
+bool setup_read_syscall(linux_injector_t injector, x86_registers_t* regs, long fd, addr_t buffer_addr, size_t amount)
 {
     // read(unsigned int fd, char *buf, size_t count);
     struct argument args[3] = { {0} };
-    init_int_argument(&args[0], fd);
+    init_int_argument(&args[0], (uint64_t)fd);
     init_int_argument(&args[1], buffer_addr);
     init_int_argument(&args[2], amount);
 
@@ -260,7 +260,7 @@ static addr_t place_argv(linux_injector_t injector, x86_registers_t* regs, addr_
     init_string_argument(&argv[0], injector->host_file);
     PRINT_DEBUG("Args 0: %s\n", injector->host_file);
 
-    for (int i=0; i<injector->args_count; i++)
+    for (unsigned int i=0; i<injector->args_count; i++)
     {
         init_string_argument(&argv[i+1], injector->args[i]);
         PRINT_DEBUG("Args %d: %s\n", i+1, injector->args[i]);
@@ -403,7 +403,7 @@ bool call_open_syscall_cb(linux_injector_t injector, x86_registers_t* regs)
     if (is_syscall_error(regs->rax, "Could not open file in guest"))
         return false;
 
-    injector->fd = regs->rax;
+    injector->fd = (long)regs->rax;
     PRINT_DEBUG("File descriptor: %ld\n", injector->fd);
 
     return true;

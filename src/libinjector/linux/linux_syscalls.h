@@ -115,12 +115,12 @@ bool init_syscalls(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 bool setup_mmap_syscall(linux_injector_t injector, x86_registers_t* regs, size_t size);
 bool setup_open_syscall(linux_injector_t injector, x86_registers_t* regs,
-    const char* target_file, int flags, int mode);
-bool setup_close_syscall(linux_injector_t injector, x86_registers_t* regs, int fd);
+    const char* target_file, uint64_t flags, uint64_t mode);
+bool setup_close_syscall(linux_injector_t injector, x86_registers_t* regs, long fd);
 bool setup_write_syscall(linux_injector_t injector, x86_registers_t* regs,
-    int fd, addr_t buffer_addr, size_t amount);
+    long fd, addr_t buffer_addr, size_t amount);
 bool setup_read_syscall(linux_injector_t injector, x86_registers_t* regs,
-    int fd, addr_t buffer_addr, size_t amount);
+    long fd, addr_t buffer_addr, size_t amount);
 bool setup_exit_syscall(linux_injector_t injector, x86_registers_t* regs, uint64_t rc);
 // note: void return type for vfork syscall
 void setup_vfork_syscall(linux_injector_t injector, x86_registers_t* regs, char* proc_name, vmi_pid_t parent_pid);

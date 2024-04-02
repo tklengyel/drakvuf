@@ -318,12 +318,14 @@ bool load_shellcode_from_file(linux_injector_t injector, const char* file)
     }
 
     fseek(fp, 0, SEEK_END);
-    if ( (long int)(injector->buffer.len = ftell (fp)) < 0 )
+    long len = ftell (fp);
+    if ( len < 0 )
     {
         fprintf(stderr, "ftell returned -1\n");
         fclose(fp);
         return false;
     }
+    injector->buffer.len = (size_t)len;
     rewind(fp);
 
     // we are adding +1 as we will append ret instruction for restoring the state of the VM

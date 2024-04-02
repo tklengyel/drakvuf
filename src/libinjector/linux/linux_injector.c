@@ -474,7 +474,7 @@ injector_status_t injector_start_app_on_linux(
     injection_method_t method,
     output_format_t format,
     const char* binary_path,
-    int args_count,
+    unsigned int args_count,
     const char** args,
     vmi_pid_t* injected_pid
 )
@@ -497,12 +497,12 @@ injector_status_t injector_start_app_on_linux(
         injector->target_file = NULL;
     }
     if (!injector->target_tid)
-        injector->target_tid = pid;
+        injector->target_tid = (uint32_t)pid;
     injector->args_count = args_count;
 
     injector->args = (const char**)g_new0(const char*, args_count + 1);
 
-    for ( int i = 0; i<args_count; i++ )
+    for ( unsigned int i = 0; i<args_count; i++ )
         injector->args[i] = args[i];
     injector->method = method;
     base_injector->step = STEP1;
@@ -538,7 +538,7 @@ injector_status_t injector_start_app_on_linux(
 
     injector_status_t rc = injector->rc;
     if (injected_pid)
-        *injected_pid = injector->pid;
+        *injected_pid = (vmi_pid_t)injector->pid;
     PRINT_DEBUG("Finished with injection. Ret: %i.\n", rc);
 
     injector_free_linux(injector);

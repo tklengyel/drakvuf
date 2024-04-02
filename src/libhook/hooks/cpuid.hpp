@@ -118,7 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, cb_wrapper_t cb, int ttl)
+    static auto create(drakvuf_t, cb_wrapper_t cb, unsigned int ttl)
     -> std::unique_ptr<CpuidHook>;
 
     /**
@@ -162,7 +162,7 @@ protected:
 };
 
 template<typename Params>
-auto CpuidHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
+auto CpuidHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, unsigned int ttl)
 -> std::unique_ptr<CpuidHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating cpuid hook\n");

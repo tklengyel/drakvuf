@@ -127,12 +127,15 @@ bool init_write_file_method(linux_injector_t injector, const char* file)
     }
 
     fseek (fp, 0, SEEK_END);
-    if ( (long int)(injector->buffer.total_len = ftell(fp)) < 0 )
+    long len = ftell(fp);
+    if ( len < 0 )
     {
         PRINT_DEBUG("File size < 0\n");
         fclose(fp);
         return false;
     }
+    injector->buffer.total_len = (size_t)len;
+
     rewind(fp);
 
     injector->buffer.data = g_malloc0(FILE_BUF_SIZE);

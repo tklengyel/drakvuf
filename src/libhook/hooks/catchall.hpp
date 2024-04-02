@@ -118,7 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, cb_wrapper_t cb, int ttl)
+    static auto create(drakvuf_t, cb_wrapper_t cb, unsigned int ttl)
     -> std::unique_ptr<CatchAllHook>;
 
     /**
@@ -162,7 +162,7 @@ protected:
 };
 
 template<typename Params>
-auto CatchAllHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
+auto CatchAllHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, unsigned int ttl)
 -> std::unique_ptr<CatchAllHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating CatchAll hook\n");

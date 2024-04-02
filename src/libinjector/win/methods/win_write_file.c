@@ -184,7 +184,7 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (is_fun_error(drakvuf, info, "Couldn't open guest file"))
                 return cleanup(drakvuf, info);
 
-            injector->file_handle = info->regs->rax;
+            injector->file_handle = (uint32_t)info->regs->rax;
 
             if (!open_host_file(injector, "rb"))
                 return cleanup(drakvuf, info);

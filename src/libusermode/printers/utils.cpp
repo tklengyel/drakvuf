@@ -112,7 +112,7 @@ std::string escape_str(const std::string& s)
     char const* const hexdig = "0123456789ABCDEF";
     std::stringstream os;
 
-    for (unsigned char c : s)
+    for (char c : s)
     {
         switch (c)
         {

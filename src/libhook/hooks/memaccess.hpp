@@ -118,7 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+    static auto create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, unsigned int ttl)
     -> std::unique_ptr<MemAccessHook>;
 
     /**
@@ -162,7 +162,7 @@ protected:
 };
 
 template<typename Params>
-auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, unsigned int ttl)
 -> std::unique_ptr<MemAccessHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating MemAccessHook hook\n");

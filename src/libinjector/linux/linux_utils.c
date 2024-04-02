@@ -209,9 +209,9 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
         g_free(vdso_memory);
         return 0;
     }
-    syscall_offset = syscall_substring_address - vdso_memory;
+    syscall_offset = (int)(syscall_substring_address - vdso_memory);
     linux_injector_t injector = info->trap->data;
-    injector->syscall_addr = vdso + syscall_offset;
+    injector->syscall_addr = (addr_t)((long)vdso + syscall_offset);
 
     PRINT_DEBUG("syscall offset: %d\n", syscall_offset);
     PRINT_DEBUG("syscall addr: %lx\n", injector->syscall_addr);
@@ -314,7 +314,7 @@ void print_linux_injection_info(output_format_t format, linux_injector_t injecto
     gchar* arguments = g_strjoinv(" ", (gchar**)injector->args);
 
     print_injection_info(format, injector->method,
-        injector->result, injector->target_pid,
+        injector->result, (uint32_t)injector->target_pid,
         injector->pid, injector->tid, process_name,
         arguments, &injector->error_code);
 

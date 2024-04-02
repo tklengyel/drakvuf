@@ -476,27 +476,27 @@ public:
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name = nullptr, int ttl = UNLIMITED_TTL);
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name = nullptr, unsigned int ttl = UNLIMITED_TTL);
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name = {}, int ttl = UNLIMITED_TTL);
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name = {}, unsigned int ttl = UNLIMITED_TTL);
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::Cr3Hook> createCr3Hook(Callback cb, int ttl = UNLIMITED_TTL);
+    std::unique_ptr<libhook::Cr3Hook> createCr3Hook(Callback cb, unsigned int ttl = UNLIMITED_TTL);
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::CpuidHook> createCpuidHook(Callback cb, int ttl = UNLIMITED_TTL);
+    std::unique_ptr<libhook::CpuidHook> createCpuidHook(Callback cb, unsigned int ttl = UNLIMITED_TTL);
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::CatchAllHook> createCatchAllHook(Callback cb, int ttl = UNLIMITED_TTL);
+    std::unique_ptr<libhook::CatchAllHook> createCatchAllHook(Callback cb, unsigned int ttl = UNLIMITED_TTL);
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::MemAccessHook> createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl = UNLIMITED_TTL);
+    std::unique_ptr<libhook::MemAccessHook> createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, unsigned int ttl = UNLIMITED_TTL);
 
 private:
     template<typename Callback>
@@ -514,7 +514,7 @@ public:
         hook_cb_t hook_cb,
         IB init_breakpoint,
         const char* trap_name,
-        int64_t ttl,
+        uint64_t ttl,
         ah_cb_t ah_cb = nullptr);
 
     // Params property is optional
@@ -591,7 +591,7 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name, int ttl)
+std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name, unsigned int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -608,7 +608,7 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name, int ttl)
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name, unsigned int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -621,7 +621,7 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, int ttl)
+std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, unsigned int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -634,7 +634,7 @@ std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, int ttl)
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, int ttl)
+std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, unsigned int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -647,7 +647,7 @@ std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, int t
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb, int ttl)
+std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb, unsigned int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -660,7 +660,7 @@ std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb,
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::MemAccessHook> pluginex::createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, int ttl)
+std::unique_ptr<libhook::MemAccessHook> pluginex::createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, unsigned int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -697,7 +697,7 @@ drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,
     hook_cb_t hook_cb,
     IB init_breakpoint,
     const char* trap_name,
-    int64_t ttl,
+    uint64_t ttl,
     ah_cb_t ah_cb)
 {
     auto trap = new drakvuf_trap_t();
@@ -735,7 +735,7 @@ drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,
     IB init_breakpoint,
     const char* trap_name)
 {
-    int64_t limited_traps_ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    uint64_t limited_traps_ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, limited_traps_ttl, nullptr);
 }
 
