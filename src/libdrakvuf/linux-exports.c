@@ -350,10 +350,12 @@ next:
         addr_t symbol_size = strlen(symbol_name);
         if (strcmp(symbol_name, sym) == 0)
         {
+            g_free(symbol_name);
             sym_found = true;
             break;
         }
         symbol_offset += symbol_size+1;
+        g_free(symbol_name);
     }
 
     if (!sym_found)
