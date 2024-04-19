@@ -588,43 +588,7 @@ event_response_t fileextractor::createsection_cb(drakvuf_t,
 //
 event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    vmi_lock_guard vmi(drakvuf);
-
-    if (drakvuf_lookup_injection(drakvuf, info))
-        drakvuf_remove_injection(drakvuf, info);
-
-    task_t* task = nullptr;
-    for (auto& i: tasks)
-        if (drakvuf_check_return_context(drakvuf,
-                info,
-                i.second->target.ret_pid,
-                i.second->target.ret_tid,
-                i.second->target.ret_rsp))
-        {
-            task = i.second.get();
-            break;
-        }
-
-    if (!task && !is_stopping())
-    {
-        auto handle = drakvuf_get_function_argument(drakvuf, info, 1);
-        /* If there are more then one open handle to the file. So do nothing. */
-        uint64_t handle_count = 1;
-        if (get_file_object_handle_count(info, handle, &handle_count) &&
-            handle_count > 1)
-            return VMI_EVENT_RESPONSE_NONE;
-        auto id = make_task_id(info->attached_proc_data.pid, handle);
-        auto task_it = tasks.find(id);
-
-        /* The system closes handle to untracked resource. So do nothing. */
-        if ( tasks.end() == task_it)
-        {
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        task = task_it->second.get();
-    }
-
+    auto task = close_cb_get_task(info);
     if (!task)
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -635,124 +599,11 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         print_extraction_failure(info, task->filename, "Timeout");
     }
 
-    PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d] "
-        "\n"
-        , info->event_uid
-        , info->attached_proc_data.pid, info->attached_proc_data.tid
-        , task->target.ret_pid, (int)task->stage()
-    );
-
     // check that the file has not been extracted
     if (!task->extracted)
-    {
-        // extract file and close task
-        if ( task->reason == task_t::task_reason::write)
-        {
-            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
-                "Skip 'write' task on close handle\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , task->target.ret_pid, (int)task->stage()
-            );
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        check_stack_marker(info, vmi, task);
-
-        auto status = dispatch_task(vmi, info, *task);
-
-        if (error::error == status || error::none == status)
-        {
-            task->stage(task_t::stage_t::finished);
-            task->error = true;
-            status = error::success;
-        }
-
-        if (error::zero_size == status)
-        {
-            // create new file for later updates
-            // save metadata
-            if (!task->idx)
-                task->idx = ++this->sequence_number;
-
-            auto file = get_data_filename(this->dump_folder, task->idx);
-            if (file.empty())
-            {
-                print_error_and_free_resources(info, task, "Failed to get file name");
-                return VMI_EVENT_RESPONSE_NONE;
-            }
-
-            umask(S_IWGRP|S_IWOTH);
-            FILE* fp = fopen(file.data(), "w");
-            if (!fp)
-            {
-                print_error_and_free_resources(info, task, "Failed to open backing file");
-                return VMI_EVENT_RESPONSE_NONE;
-            }
-
-            fclose(fp);
-            save_file_metadata(info, 0, *task);
-
-            task->stage(task_t::stage_t::finished);
-            status = error::success;
-        }
-
-        if (task_t::stage_t::finished == task->stage())
-        {
-            calc_checksum(*task);
-            print_file_information(info, *task);
-            free_resources(info, *task);
-            task->closed = true;
-            tasks.erase(make_task_id(*task));
-        }
-    }
+        close_cb_handle_unextracted(info, task);
     else
-    {
-        // close task
-        auto handle = drakvuf_get_function_argument(drakvuf, info, 1);
-        if (handle != task->handle)
-        {
-            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
-                "Skip on input handle %#lx not equal task handle %#lx\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , handle, task->handle
-            );
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        /* If there are more then one open handle to the file. So do nothing. */
-        uint64_t handle_count = 1;
-        if (get_file_object_handle_count(info, task->handle, &handle_count) &&
-            handle_count > 1)
-        {
-            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
-                "Skip on handle count %lu\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , handle_count
-            );
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        if (task->error)
-        {
-            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
-                "Skip on task error state\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , task->target.ret_pid, (int)task->stage()
-            );
-            tasks.erase(make_task_id(*task));
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        task->closed = true;
-        calc_checksum(*task);
-        update_file_metadata(nullptr, *task);
-        print_file_information(info, *task);
-        tasks.erase(make_task_id(*task));
-    }
+        close_cb_handle_extracted(info, task);
 
     PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtClose handled\n"
         , info->event_uid
@@ -1962,6 +1813,162 @@ void fileextractor::read_vm(vmi_instance_t vmi,
 bool fileextractor::is_handle_valid(handle_t handle)
 {
     return handle && !VMI_GET_BIT(handle, 31);
+}
+
+task_t* fileextractor::close_cb_get_task(drakvuf_trap_info_t* info)
+{
+    if (drakvuf_lookup_injection(drakvuf, info))
+        drakvuf_remove_injection(drakvuf, info);
+
+    task_t* task = nullptr;
+    for (auto& i: tasks)
+        if (drakvuf_check_return_context(drakvuf,
+                info,
+                i.second->target.ret_pid,
+                i.second->target.ret_tid,
+                i.second->target.ret_rsp))
+        {
+            task = i.second.get();
+            break;
+        }
+
+    if (!task && !is_stopping())
+    {
+        auto handle = drakvuf_get_function_argument(drakvuf, info, 1);
+        /* If there are more then one open handle to the file. So do nothing. */
+        uint64_t handle_count = 1;
+        if (get_file_object_handle_count(info, handle, &handle_count) &&
+            handle_count > 1)
+            return VMI_EVENT_RESPONSE_NONE;
+        auto id = make_task_id(info->attached_proc_data.pid, handle);
+        auto task_it = tasks.find(id);
+
+        /* The system closes handle to untracked resource. So do nothing. */
+        if ( tasks.end() == task_it)
+        {
+            return nullptr;
+        }
+
+        task = task_it->second.get();
+    }
+
+    return task;
+}
+
+void fileextractor::close_cb_handle_unextracted(drakvuf_trap_info_t* info,
+    task_t* task)
+{
+    vmi_lock_guard vmi(drakvuf);
+
+    // extract file and close task
+    if ( task->reason == task_t::task_reason::write)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
+            "Skip 'write' task on close handle\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , task->target.ret_pid, (int)task->stage()
+        );
+        return;
+    }
+
+    check_stack_marker(info, vmi, task);
+
+    auto status = dispatch_task(vmi, info, *task);
+
+    if (error::error == status || error::none == status)
+    {
+        task->stage(task_t::stage_t::finished);
+        task->error = true;
+        status = error::success;
+    }
+
+    if (error::zero_size == status)
+    {
+        // create new file for later updates
+        // save metadata
+        if (!task->idx)
+            task->idx = ++this->sequence_number;
+
+        auto file = get_data_filename(this->dump_folder, task->idx);
+        if (file.empty())
+        {
+            print_error_and_free_resources(info, task, "Failed to get file name");
+            return;
+        }
+
+        umask(S_IWGRP|S_IWOTH);
+        FILE* fp = fopen(file.data(), "w");
+        if (!fp)
+        {
+            print_error_and_free_resources(info, task, "Failed to open backing file");
+            return;
+        }
+
+        fclose(fp);
+        save_file_metadata(info, 0, *task);
+
+        task->stage(task_t::stage_t::finished);
+        status = error::success;
+    }
+
+    if (task_t::stage_t::finished == task->stage())
+    {
+        calc_checksum(*task);
+        print_file_information(info, *task);
+        free_resources(info, *task);
+        task->closed = true;
+        tasks.erase(make_task_id(*task));
+    }
+}
+
+void fileextractor::close_cb_handle_extracted(drakvuf_trap_info_t* info,
+    task_t* task)
+{
+    // close task
+    auto handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    if (handle != task->handle)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
+            "Skip on input handle %#lx not equal task handle %#lx\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , handle, task->handle
+        );
+        return;
+    }
+
+    /* If there are more then one open handle to the file. So do nothing. */
+    uint64_t handle_count = 1;
+    if (get_file_object_handle_count(info, task->handle, &handle_count) &&
+        handle_count > 1)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
+            "Skip on handle count %lu\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , handle_count
+        );
+        return;
+    }
+
+    if (task->error)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
+            "Skip on task error state\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , task->target.ret_pid, (int)task->stage()
+        );
+        tasks.erase(make_task_id(*task));
+        return;
+    }
+
+    task->closed = true;
+    calc_checksum(*task);
+    update_file_metadata(nullptr, *task);
+    print_file_information(info, *task);
+    tasks.erase(make_task_id(*task));
 }
 
 task_t* fileextractor::setinformation_cb_get_task(drakvuf_trap_info_t* info)

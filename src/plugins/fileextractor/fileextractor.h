@@ -267,8 +267,12 @@ private:
     void print_extraction_exclusion(drakvuf_trap_info_t* info, const std::string& filename);
     void print_error_and_free_resources(drakvuf_trap_info_t*, task_t*, const char* msg = nullptr);
 
+    task_t* close_cb_get_task(drakvuf_trap_info_t*);
     task_t* setinformation_cb_get_task(drakvuf_trap_info_t*);
     task_t* writefile_cb_get_task(drakvuf_trap_info_t*);
+
+    void close_cb_handle_unextracted(drakvuf_trap_info_t*, task_t*);
+    void close_cb_handle_extracted(drakvuf_trap_info_t*, task_t*);
 };
 
 #endif
