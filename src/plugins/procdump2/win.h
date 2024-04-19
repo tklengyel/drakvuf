@@ -249,6 +249,7 @@ private:
     void start_dump_process(vmi_pid_t);
     std::vector<vmi_pid_t> get_running_processes();
     bool is_host_for_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_wakeup(drakvuf_trap_info_t* info, std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>& tasks_list);
 };
 
 #endif

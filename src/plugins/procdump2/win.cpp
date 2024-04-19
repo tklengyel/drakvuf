@@ -423,6 +423,30 @@ event_response_t win_procdump2::deliver_apc_cb(drakvuf_t, drakvuf_trap_info_t* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+bool win_procdump2::dispatch_wakeup(drakvuf_trap_info_t* info,
+    std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>& tasks_list)
+{
+    bool handled = false;
+    for (auto it = tasks_list.cbegin(), next_it = it; it != tasks_list.cend(); it = next_it)
+    {
+        ++next_it;
+        auto ctx = it->second;
+
+        bool is_target = drakvuf_check_return_context(drakvuf, info,
+                ctx->target.ret_pid,
+                ctx->target.ret_tid,
+                ctx->target.ret_rsp);
+        bool is_host = is_host_for_task(info, ctx);
+
+        if (is_target && dispatch_target_wakeup(info, ctx))
+            handled = true;
+        if (is_host && dispatch_host_wakeup(info, ctx))
+            handled = true;
+    }
+
+    return handled;
+}
+
 /* TODO Protect working threads from termination with return injection.
  *
  * We should store the std::pair<vmi_pid_t, uint32_t> for monitoring working
@@ -445,33 +469,12 @@ event_response_t win_procdump2::terminate_process_cb(drakvuf_t,
         drakvuf_remove_injection(drakvuf, info);
 
     /* Check if current thread is a active one. */
-    for (auto it = this->active.cbegin(), next_it = it; it != this->active.cend(); it = next_it)
-    {
-        ++next_it;
-        auto ctx = it->second;
-        bool is_target = drakvuf_check_return_context(drakvuf, info,
-                ctx->target.ret_pid,
-                ctx->target.ret_tid,
-                ctx->target.ret_rsp);
+    if (dispatch_wakeup(info, this->active))
+        return VMI_EVENT_RESPONSE_NONE;
 
-        bool is_host = is_host_for_task(info, ctx);
-
-        if (is_target && dispatch_target_wakeup(info, ctx))
-            return VMI_EVENT_RESPONSE_NONE;
-        else if (is_host && dispatch_host_wakeup(info, ctx))
-            return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    /* Check if current thread is a host, but task is still pending */
-    for (auto it = this->pending.cbegin(), next_it = it; it != this->pending.cend(); it = next_it)
-    {
-        ++next_it;
-        auto ctx = it->second;
-
-        bool is_host = is_host_for_task(info, ctx);
-        if (is_host && dispatch_host_wakeup(info, ctx))
-            return VMI_EVENT_RESPONSE_NONE;
-    }
+    /* Check if current thread is a pending one */
+    if (dispatch_wakeup(info, this->pending))
+        return VMI_EVENT_RESPONSE_NONE;
 
     /* The host process could become a target one. So dispatch wake up first. */
     if (is_handled_process(info->attached_proc_data.pid))
@@ -706,13 +709,14 @@ void win_procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<w
                 }
                 else
                 {
+                    uint64_t unreferenced_eprocess = ctx->target_process_base();
                     PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
                         "PsLookupProcessByProcessId returned %#lx"
                         " (unreferenced is %#lx)\n"
                         , info->event_uid
                         , info->attached_proc_data.pid, info->attached_proc_data.tid
                         , ctx->target_process_pid, to_int(ctx->stage())
-                        , ctx->referenced_process_base, ctx->target_process_base()
+                        , ctx->referenced_process_base, unreferenced_eprocess
                     );
                     if (!is_timeout)
                     {
@@ -1193,8 +1197,10 @@ bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
         return false;
 
     std::shared_ptr<win_procdump2_ctx> ctx;
+    bool new_task = false;
     if (!this->is_pending_process(target_process_pid))
     {
+        new_task = true;
         ctx = std::make_shared<win_procdump2_ctx>(
                 is_hosted,
                 target_process_base,
@@ -1218,7 +1224,6 @@ bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
     else
     {
         ctx = this->pending[target_process_pid];
-        ctx->need_suspend = false;
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
             "Dispatch pending process on terminate: %s\n"
             , info->event_uid
@@ -1245,8 +1250,12 @@ bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
             , ctx->target_process_pid, to_int(ctx->stage())
         );
 
-        ctx->target.restored = true;
-        ctx->need_suspend = true;
+        if (new_task)
+        {
+            ctx->need_suspend = true;
+            ctx->target.restored = true;
+        }
+
         ctx->host_processes_bases.emplace(info->attached_proc_data.base_addr);
 
         auto added_pair = ctx->hosts.emplace(std::piecewise_construct,
@@ -1268,6 +1277,7 @@ bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
             , ctx->target_process_pid, to_int(ctx->stage())
         );
         memcpy(&ctx->target.regs, info->regs, sizeof(x86_registers_t));
+        ctx->need_suspend = false;
         suspend(info, ctx, ctx->target);
         ctx->stage(procdump_stage::suspend);
     }
