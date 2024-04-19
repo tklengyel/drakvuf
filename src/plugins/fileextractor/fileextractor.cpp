@@ -288,88 +288,70 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
 
     vmi_lock_guard vmi(drakvuf);
 
-    // file extraction
-    if (!task->extracted)
+    check_stack_marker(info, vmi, task);
+
+    auto status = dispatch_task(vmi, info, *task);
+
+    if (error::none == status || error::error == status)
     {
-        check_stack_marker(info, vmi, task);
+        print_error_and_free_resources(info, task);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
 
-        auto status = dispatch_task(vmi, info, *task);
-
-        if (error::none == status || error::error == status)
+    if (error::zero_size == status)
+    {
+        if (this->extract_size && ( task->new_eof > this->extract_size ))
         {
-            free_resources(info, *task);
-            task->extracted = true;
-            task->error = true;
+            print_error_and_free_resources(info, task, "Too big file");
             return VMI_EVENT_RESPONSE_NONE;
         }
 
-        if (error::zero_size == status)
+        // create new file for later updates
+        // save metadata
+        if (!task->idx)
+            task->idx = ++this->sequence_number;
+
+        auto file = get_data_filename(this->dump_folder, task->idx);
+        if (file.empty())
         {
-            if (this->extract_size && ( task->new_eof > this->extract_size ))
-            {
-                print_extraction_failure(info, task->filename, "Too big file");
-                free_resources(info, *task);
-                task->extracted = true;
-                task->error = true;
-                return VMI_EVENT_RESPONSE_NONE;
-            }
+            print_error_and_free_resources(info, task, "Failed to get file name");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
 
-            // create new file for later updates
-            // save metadata
-            if (!task->idx)
-                task->idx = ++this->sequence_number;
+        umask(S_IWGRP|S_IWOTH);
+        FILE* fp = fopen(file.data(), "a+");
+        if (!fp)
+        {
+            print_error_and_free_resources(info, task, "Failed to open backing file");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
 
-            auto file = get_data_filename(this->dump_folder, task->idx);
-            if (file.empty())
-            {
-                print_extraction_failure(info, task->filename, "Failed to get file name");
-                free_resources(info, *task);
-                task->extracted = true;
-                task->error = true;
-                return VMI_EVENT_RESPONSE_NONE;
-            }
-
-            umask(S_IWGRP|S_IWOTH);
-            FILE* fp = fopen(file.data(), "a+");
+        fseek(fp, 0, SEEK_END);
+        //make bigger file size
+        if ((uint64_t)ftell(fp) < task->new_eof)
+        {
+            fclose(fp);
+            fp = fopen(file.data(), "r+");
             if (!fp)
             {
-                print_extraction_failure(info, task->filename, "Failed to open backing file");
-                free_resources(info, *task);
-                task->extracted = true;
-                task->error = true;
+                print_error_and_free_resources(info, task, "Failed to open backing file");
                 return VMI_EVENT_RESPONSE_NONE;
             }
-
-            fseek(fp, 0, SEEK_END);
-            //make bigger file size
-            if ((uint64_t)ftell(fp) < task->new_eof)
-            {
-                fclose(fp);
-                fp = fopen(file.data(), "r+");
-                if (!fp)
-                {
-                    print_extraction_failure(info, task->filename, "Failed to open backing file");
-                    free_resources(info, *task);
-                    task->extracted = true;
-                    task->error = true;
-                    return VMI_EVENT_RESPONSE_NONE;
-                }
-                fseek(fp, task->new_eof - 1, SEEK_SET);
-                fputc('\0', fp);
-            }
-            fclose(fp);
-            save_file_metadata(info, 0, *task);
-
-            task->stage(task_t::stage_t::finished);
-            status = error::success;
+            fseek(fp, task->new_eof - 1, SEEK_SET);
+            fputc('\0', fp);
         }
+        fclose(fp);
+        save_file_metadata(info, 0, *task);
 
-        if (task_t::stage_t::finished == task->stage())
-        {
-            // free resourses after extraction and first NtWriteFile result from saved data
-            free_resources(info, *task);
-            task->extracted = true;
-        }
+        task->stage(task_t::stage_t::finished);
+        status = error::success;
+    }
+
+    if (task_t::stage_t::finished == task->stage())
+    {
+        // free resourses after extraction and first NtWriteFile result from saved data
+        free_resources(info, *task);
+        task->extracted = true;
     }
 
     PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtSetInformationFile handled\n"
@@ -452,10 +434,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
             auto file = get_data_filename(this->dump_folder, task->idx);
             if (file.empty())
             {
-                print_extraction_failure(info, task->filename, "Failed to get file name");
-                free_resources(info, *task);
-                task->extracted = true;
-                task->error = true;
+                print_error_and_free_resources(info, task, "Failed to get file name");
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -463,10 +442,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
             FILE* fp = fopen(file.data(), "w");
             if (!fp)
             {
-                print_extraction_failure(info, task->filename, "Failed to open backing file");
-                free_resources(info, *task);
-                task->extracted = true;
-                task->error = true;
+                print_error_and_free_resources(info, task, "Failed to open backing file");
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -702,10 +678,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             auto file = get_data_filename(this->dump_folder, task->idx);
             if (file.empty())
             {
-                print_extraction_failure(info, task->filename, "Failed to get file name");
-                free_resources(info, *task);
-                task->extracted = true;
-                task->error = true;
+                print_error_and_free_resources(info, task, "Failed to get file name");
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -713,10 +686,7 @@ event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             FILE* fp = fopen(file.data(), "w");
             if (!fp)
             {
-                print_extraction_failure(info, task->filename, "Failed to open backing file");
-                free_resources(info, *task);
-                task->extracted = true;
-                task->error = true;
+                print_error_and_free_resources(info, task, "Failed to open backing file");
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -1944,6 +1914,18 @@ void fileextractor::free_resources(drakvuf_trap_info_t* info, task_t& task)
     free_pool(task.pool);
 }
 
+void fileextractor::print_error_and_free_resources(drakvuf_trap_info_t* info,
+    task_t* task, const char* msg)
+{
+    if (msg)
+        print_extraction_failure(info, task->filename, msg);
+
+    free_resources(info, *task);
+    task->extracted = true;
+    task->error = true;
+
+}
+
 void fileextractor::read_vm(vmi_instance_t vmi,
     drakvuf_trap_info_t* info,
     task_t& task)
@@ -2091,6 +2073,9 @@ task_t* fileextractor::setinformation_cb_get_task(drakvuf_trap_info_t* info)
         }
     }
 
+    if (task && task->extracted)
+        return nullptr;
+
     return task;
 }
 
@@ -2164,7 +2149,7 @@ task_t* fileextractor::writefile_cb_get_task(drakvuf_trap_info_t* info)
         task = tasks.find(id)->second.get();
     }
 
-    if (task->error)
+    if (task && task->error)
     {
         PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
             "Skip on task error state\n"
