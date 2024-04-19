@@ -400,204 +400,132 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
     if (drakvuf_lookup_injection(drakvuf, info))
         drakvuf_remove_injection(drakvuf, info);
 
-    vmi_lock_guard vmi(drakvuf);
-
     // checking the call context
     // if returned from the injected call, then we continue extracting file
     // else we make a new task, or update extracted file
-    task_t* task = nullptr;
-    for (auto& i: tasks)
-        if (drakvuf_check_return_context(drakvuf,
-                info,
-                i.second->target.ret_pid,
-                i.second->target.ret_tid,
-                i.second->target.ret_rsp))
-        {
-            task = i.second.get();
-            break;
-        }
+    task_t* task = writefile_cb_get_task(info);
+    if (!task)
+        return VMI_EVENT_RESPONSE_NONE;
 
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t str = drakvuf_get_function_argument(drakvuf, info, 6);
     uint32_t len = drakvuf_get_function_argument(drakvuf, info, 7);
     addr_t offset = drakvuf_get_function_argument(drakvuf, info, 8);
 
-    if (!task && is_handle_valid(handle))
+    vmi_lock_guard vmi(drakvuf);
+
+    // file extraction
+    if (!task->extracted)
     {
-        if (this->is_stopping())
+        check_stack_marker(info, vmi, task);
+
+        if (task->stage() == task_t::stage_t::pending && is_handle_valid(handle))
         {
-            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] Skip on plugin stop\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-            );
+            // save data needed to complete the first NtWriteFile
+            task->first_len = len;
+            task->first_offset = offset;
+            task->first_str = str;
+            task->first_cr3 = info->regs->cr3;
+            get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
+            if (offset)
+                get_write_offset(vmi, info, offset, &task->write_offset);
+        }
+
+        auto status = dispatch_task(vmi, info, *task);
+
+        if (error::none == status || error::error == status)
+        {
+            free_resources(info, *task);
+            task->extracted = true;
+            task->error = true;
+            tasks.erase(make_task_id(*task));
             return VMI_EVENT_RESPONSE_NONE;
         }
 
-        auto id = make_task_id(info->attached_proc_data.pid, handle);
-        // check that tasks not exist - first NtWriteFile call
-        // else just get required task from map. Second the following NtWriteFile calls
-        if (tasks.find(id) == tasks.end())
+        if (error::zero_size == status)
         {
-            addr_t file = 0;
-            auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+            // create new file for later updates
+            // save metadata
+            if (!task->idx)
+                task->idx = ++this->sequence_number;
 
-            if (!file)
+            auto file = get_data_filename(this->dump_folder, task->idx);
+            if (file.empty())
             {
-                PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
-                    "Skip on fail to get OBJECT_HEADER_BODY\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
-                );
-                return VMI_EVENT_RESPONSE_NONE;
-            }
-
-            if (exclude.match(filename))
-            {
-                print_extraction_exclusion(info, filename);
-                return VMI_EVENT_RESPONSE_NONE;
-            }
-
-            // create new task
-            tasks[id] = std::make_unique<task_t>(handle,
-                    filename,
-                    task_t::task_reason::write,
-                    file);
-
-            // save some process info
-            tasks[id]->pid = info->attached_proc_data.pid;
-            tasks[id]->ppid = info->attached_proc_data.ppid;
-            tasks[id]->process_name = info->proc_data.name;
-        }
-        task = tasks.find(id)->second.get();
-    }
-
-
-    if (task)
-    {
-        if (task->error)
-        {
-            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
-                "Skip on task error state\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , task->target.ret_pid, (int)task->stage()
-            );
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        // file extraction
-        if (!task->extracted)
-        {
-            check_stack_marker(info, vmi, task);
-
-            if (task->stage() == task_t::stage_t::pending && is_handle_valid(handle))
-            {
-                // save data needed to complete the first NtWriteFile
-                task->first_len = len;
-                task->first_offset = offset;
-                task->first_str = str;
-                task->first_cr3 = info->regs->cr3;
-                get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
-                if (offset)
-                    get_write_offset(vmi, info, offset, &task->write_offset);
-            }
-
-            auto status = dispatch_task(vmi, info, *task);
-
-            if (error::none == status || error::error == status)
-            {
+                print_extraction_failure(info, task->filename, "Failed to get file name");
                 free_resources(info, *task);
                 task->extracted = true;
                 task->error = true;
-                tasks.erase(make_task_id(*task));
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
-            if (error::zero_size == status)
+            umask(S_IWGRP|S_IWOTH);
+            FILE* fp = fopen(file.data(), "w");
+            if (!fp)
             {
-                // create new file for later updates
-                // save metadata
-                if (!task->idx)
-                    task->idx = ++this->sequence_number;
-
-                auto file = get_data_filename(this->dump_folder, task->idx);
-                if (file.empty())
-                {
-                    print_extraction_failure(info, task->filename, "Failed to get file name");
-                    free_resources(info, *task);
-                    task->extracted = true;
-                    task->error = true;
-                    return VMI_EVENT_RESPONSE_NONE;
-                }
-
-                umask(S_IWGRP|S_IWOTH);
-                FILE* fp = fopen(file.data(), "w");
-                if (!fp)
-                {
-                    print_extraction_failure(info, task->filename, "Failed to open backing file");
-                    free_resources(info, *task);
-                    task->extracted = true;
-                    task->error = true;
-                    return VMI_EVENT_RESPONSE_NONE;
-                }
-
-                fclose(fp);
-                save_file_metadata(info, 0, *task);
-
-                task->stage(task_t::stage_t::finished);
-                status = error::success;
-            }
-
-            if (task_t::stage_t::finished == task->stage())
-            {
-                // free resourses after extraction and first NtWriteFile result from saved data
+                print_extraction_failure(info, task->filename, "Failed to open backing file");
                 free_resources(info, *task);
                 task->extracted = true;
-                if (!task->append)
-                {
-                    if (task->write_offset)
-                        dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->write_offset, task->first_len);
-                    else
-                        dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->currentbyteoffset, task->first_len);
-                }
-                else
-                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->file_size, task->first_len);
+                task->error = true;
+                return VMI_EVENT_RESPONSE_NONE;
             }
-        }
-        // file update
-        else
-        {
-            // return hook setup
-            if (task->append)
-                offset = 0;
-            auto hook_id = make_hook_id(info);
-            auto hook = createReturnHook<writefile_result_t>(info,
-                    &fileextractor::writefile_ret_cb);
-            auto params = libhook::GetTrapParams<writefile_result_t>(hook->trap_);
-            params->len = len;
-            params->str = str;
-            params->idx = task->idx;
 
-            if (offset)
+            fclose(fp);
+            save_file_metadata(info, 0, *task);
+
+            task->stage(task_t::stage_t::finished);
+            status = error::success;
+        }
+
+        if (task_t::stage_t::finished == task->stage())
+        {
+            // free resourses after extraction and first NtWriteFile result from saved data
+            free_resources(info, *task);
+            task->extracted = true;
+            if (!task->append)
             {
-                get_write_offset(vmi, info, offset, &task->write_offset);
-                // check for special offset
-                if (!((task->write_offset & 0xffffffff) ^ FILE_USE_FILE_POINTER_POSITION))
-                {
-                    get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
-                    params->byteoffset = task->currentbyteoffset;
-                }
+                if (task->write_offset)
+                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->write_offset, task->first_len);
                 else
-                    params->byteoffset = task->write_offset;
+                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->currentbyteoffset, task->first_len);
             }
             else
+                dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->file_size, task->first_len);
+        }
+    }
+    // file update
+    else
+    {
+        // return hook setup
+        if (task->append)
+            offset = 0;
+        auto hook_id = make_hook_id(info);
+        auto hook = createReturnHook<writefile_result_t>(info,
+                &fileextractor::writefile_ret_cb);
+        auto params = libhook::GetTrapParams<writefile_result_t>(hook->trap_);
+        params->len = len;
+        params->str = str;
+        params->idx = task->idx;
+
+        if (offset)
+        {
+            get_write_offset(vmi, info, offset, &task->write_offset);
+            // check for special offset
+            if (!((task->write_offset & 0xffffffff) ^ FILE_USE_FILE_POINTER_POSITION))
             {
                 get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
                 params->byteoffset = task->currentbyteoffset;
             }
-            writefile_ret_hooks[hook_id] = std::move(hook);
-
+            else
+                params->byteoffset = task->write_offset;
         }
+        else
+        {
+            get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
+            params->byteoffset = task->currentbyteoffset;
+        }
+        writefile_ret_hooks[hook_id] = std::move(hook);
+
     }
 
     PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtWriteFile handled\n"
@@ -2166,6 +2094,89 @@ task_t* fileextractor::setinformation_cb_get_task(drakvuf_trap_info_t* info)
     return task;
 }
 
+task_t* fileextractor::writefile_cb_get_task(drakvuf_trap_info_t* info)
+{
+    vmi_lock_guard vmi(drakvuf);
+
+    // checking the call context
+    // if returned from the injected call, then we continue extracting file
+    // else we make a new task, or update extracted file
+    task_t* task = nullptr;
+    for (auto& i: tasks)
+        if (drakvuf_check_return_context(drakvuf,
+                info,
+                i.second->target.ret_pid,
+                i.second->target.ret_tid,
+                i.second->target.ret_rsp))
+        {
+            task = i.second.get();
+            break;
+        }
+
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    if (!task && is_handle_valid(handle))
+    {
+        if (this->is_stopping())
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] Skip on plugin stop\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+            );
+            return nullptr;
+        }
+
+        auto id = make_task_id(info->attached_proc_data.pid, handle);
+        // check that tasks not exist - first NtWriteFile call
+        // else just get required task from map. Second the following NtWriteFile calls
+        if (tasks.find(id) == tasks.end())
+        {
+            addr_t file = 0;
+            auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+            if (!file)
+            {
+                PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
+                    "Skip on fail to get OBJECT_HEADER_BODY\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                );
+                return nullptr;
+            }
+
+            if (exclude.match(filename))
+            {
+                print_extraction_exclusion(info, filename);
+                return nullptr;
+            }
+
+            // create new task
+            tasks[id] = std::make_unique<task_t>(handle,
+                    filename,
+                    task_t::task_reason::write,
+                    file);
+
+            // save some process info
+            tasks[id]->pid = info->attached_proc_data.pid;
+            tasks[id]->ppid = info->attached_proc_data.ppid;
+            tasks[id]->process_name = info->proc_data.name;
+        }
+        task = tasks.find(id)->second.get();
+    }
+
+    if (task->error)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
+            "Skip on task error state\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , task->target.ret_pid, (int)task->stage()
+        );
+        return nullptr;
+    }
+
+    return task;
+}
 /*****************************************************************************
  *                             Public interface                              *
  *****************************************************************************/
