@@ -265,6 +265,7 @@ private:
     void print_plugin_close_information(drakvuf_trap_info_t*, task_t&);
     void print_extraction_failure(drakvuf_trap_info_t* info, const std::string& filename, const std::string& message);
     void print_extraction_exclusion(drakvuf_trap_info_t* info, const std::string& filename);
+    task_t* setinformation_cb_get_task(drakvuf_trap_info_t*);
 };
 
 #endif
