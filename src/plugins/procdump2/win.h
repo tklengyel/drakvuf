@@ -213,6 +213,32 @@ private:
 
     void handle_workig_finish(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
 
+    /* Dispatchers helpers */
+    void dispatch_active_invalid(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_suspend(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_get_irql(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_lookup_process(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_allocate_pool(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_copy_memory(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_resume(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_deref_process(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_target_awaken(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_target_wakeup(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_pending(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_suspend(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+
     /* Injection helpers */
     void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     void allocate_pool_or_start_copy(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
@@ -249,7 +275,8 @@ private:
     void start_dump_process(vmi_pid_t);
     std::vector<vmi_pid_t> get_running_processes();
     bool is_host_for_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
-    bool dispatch_wakeup(drakvuf_trap_info_t* info, std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>& tasks_list);
+    bool dispatch_wakeup(drakvuf_trap_info_t*, std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>& tasks_list);
+    bool is_timeouted();
 };
 
 #endif
