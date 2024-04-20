@@ -896,11 +896,11 @@ void win_procdump2::dispatch_active_copy_memory_continue_cur_region(
     size_t size, uint32_t read_bytes)
 {
     /* If we have read more any data (assume 4KB at least) then
-        * after the last read byte the non-accessible page occur.
-        * So skip this page.
-        * If zero bytes have been read then the first page is
-        * non-accessible. So skip this page.
-        */
+     * after the last read byte the non-accessible page occur.
+     * So skip this page.
+     * If zero bytes have been read then the first page is
+     * non-accessible. So skip this page.
+     */
     auto base = ctx->current_dump_base + size;
     size = ctx->current_dump_size - size;
     PROCDUMP2_DEBUG_CTX(info, ctx,
