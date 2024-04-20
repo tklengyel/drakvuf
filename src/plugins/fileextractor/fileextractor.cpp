@@ -585,6 +585,9 @@ event_response_t fileextractor::createsection_cb(drakvuf_t,
 //
 event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    if (drakvuf_lookup_injection(drakvuf, info))
+        drakvuf_remove_injection(drakvuf, info);
+
     auto task = close_cb_get_task(info);
     if (!task)
         return VMI_EVENT_RESPONSE_NONE;
@@ -1820,9 +1823,6 @@ bool fileextractor::is_handle_valid(handle_t handle)
 
 task_t* fileextractor::close_cb_get_task(drakvuf_trap_info_t* info)
 {
-    if (drakvuf_lookup_injection(drakvuf, info))
-        drakvuf_remove_injection(drakvuf, info);
-
     task_t* task = nullptr;
     for (auto& i: tasks)
         if (drakvuf_check_return_context(drakvuf,
