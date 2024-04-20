@@ -284,6 +284,7 @@ private:
     void print_dump_exclusion(drakvuf_trap_info_t*);
     std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     bool is_active_process(vmi_pid_t);
+    std::shared_ptr<procdump2_ns::win_procdump2_ctx> get_active_task(drakvuf_trap_info_t*);
     bool is_pending_process(vmi_pid_t);
     bool is_handled_process(vmi_pid_t);
     bool is_host_process(addr_t process);

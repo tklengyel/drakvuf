@@ -363,27 +363,22 @@ event_response_t win_procdump2::terminate_process_cb(drakvuf_t,
 event_response_t win_procdump2::clean_process_memory_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
 {
-    /* Check if current thread is a active one. */
-    for (auto& [pid, ctx]: this->active)
+    std::shared_ptr<win_procdump2_ctx> ctx = get_active_task(info);
+    if (ctx)
     {
-        if (info->attached_proc_data.pid == ctx->target_process_pid)
+        // TODO Move working thread check into function
+        if (this->working_threads.find(ctx->working.ret_tid) !=
+            this->working_threads.end())
         {
-            // The working thread is active - keep alive
-            PROCDUMP2_DEBUG_CTX(info, ctx, "Target process destroyed.");
-            // TODO Move working thread check into function
-            if (this->working_threads.find(ctx->working.ret_tid) !=
-                this->working_threads.end())
-            {
-                if (ctx->stage() == procdump_stage::copy_memory)
-                    PROCDUMP2_DEBUG_CTX(info, ctx, "\t> Working thread still active. "
-                        "BSOD on locked pages could occur"
-                    );
-            }
-            else
-            {
-                // The working thread is not active - finish task
-                PROCDUMP2_DEBUG_CTX(info, ctx, "\t> Working thread finished.");
-            }
+            if (ctx->stage() == procdump_stage::copy_memory)
+                PROCDUMP2_DEBUG_CTX(info, ctx, "\t> Working thread still active. "
+                    "BSOD on locked pages could occur"
+                );
+        }
+        else
+        {
+            // The working thread is not active - finish task
+            PROCDUMP2_DEBUG_CTX(info, ctx, "\t> Working thread finished.");
         }
     }
 
@@ -1625,6 +1620,21 @@ bool win_procdump2::is_active_process(vmi_pid_t pid)
 bool win_procdump2::is_pending_process(vmi_pid_t pid)
 {
     return this->pending.find(pid) != this->pending.end();
+}
+
+std::shared_ptr<procdump2_ns::win_procdump2_ctx> win_procdump2::get_active_task(drakvuf_trap_info_t* info)
+{
+    for (auto& [pid, ctx]: this->active)
+    {
+        if (info->attached_proc_data.pid == ctx->target_process_pid)
+        {
+            // The working thread is active - keep alive
+            PROCDUMP2_DEBUG_CTX(info, ctx, "Target process destroyed.");
+            return ctx;
+        }
+    }
+
+    return nullptr;
 }
 
 bool win_procdump2::is_handled_process(vmi_pid_t pid)
