@@ -256,6 +256,8 @@ private:
     void free_pool(addr_t va);
     addr_t find_pool();
     void free_resources(drakvuf_trap_info_t*, task_t&);
+    void remove_task(drakvuf_trap_info_t*, task_t&,
+        const char* fail_msg = nullptr, bool restore_registers = true);
     void read_vm(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
 
     bool is_handle_valid(handle_t);
@@ -265,7 +267,6 @@ private:
     void print_plugin_close_information(drakvuf_trap_info_t*, task_t&);
     void print_extraction_failure(drakvuf_trap_info_t* info, const std::string& filename, const std::string& message);
     void print_extraction_exclusion(drakvuf_trap_info_t* info, const std::string& filename);
-    void print_error_and_free_resources(drakvuf_trap_info_t*, task_t*, const char* msg = nullptr);
 
     task_t* close_cb_get_task(drakvuf_trap_info_t*);
     task_t* setinformation_cb_get_task(drakvuf_trap_info_t*);

@@ -294,7 +294,7 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
 
     if (error::none == status || error::error == status)
     {
-        print_error_and_free_resources(info, task);
+        remove_task(info, *task);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -302,7 +302,7 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
     {
         if (this->extract_size && ( task->new_eof > this->extract_size ))
         {
-            print_error_and_free_resources(info, task, "Too big file");
+            remove_task(info, *task, "Too big file");
             return VMI_EVENT_RESPONSE_NONE;
         }
 
@@ -314,7 +314,7 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
         auto file = get_data_filename(this->dump_folder, task->idx);
         if (file.empty())
         {
-            print_error_and_free_resources(info, task, "Failed to get file name");
+            remove_task(info, *task, "Failed to get file name");
             return VMI_EVENT_RESPONSE_NONE;
         }
 
@@ -322,7 +322,7 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
         FILE* fp = fopen(file.data(), "a+");
         if (!fp)
         {
-            print_error_and_free_resources(info, task, "Failed to open backing file");
+            remove_task(info, *task, "Failed to open backing file");
             return VMI_EVENT_RESPONSE_NONE;
         }
 
@@ -334,7 +334,7 @@ event_response_t fileextractor::setinformation_cb(drakvuf_t,
             fp = fopen(file.data(), "r+");
             if (!fp)
             {
-                print_error_and_free_resources(info, task, "Failed to open backing file");
+                remove_task(info, *task, "Failed to open backing file");
                 return VMI_EVENT_RESPONSE_NONE;
             }
             fseek(fp, task->new_eof - 1, SEEK_SET);
@@ -417,10 +417,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
 
         if (error::none == status || error::error == status)
         {
-            free_resources(info, *task);
-            task->extracted = true;
-            task->error = true;
-            tasks.erase(make_task_id(*task));
+            remove_task(info, *task);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
@@ -434,7 +431,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
             auto file = get_data_filename(this->dump_folder, task->idx);
             if (file.empty())
             {
-                print_error_and_free_resources(info, task, "Failed to get file name");
+                remove_task(info, *task, "Failed to get file name");
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -442,7 +439,7 @@ event_response_t fileextractor::writefile_cb(drakvuf_t,
             FILE* fp = fopen(file.data(), "w");
             if (!fp)
             {
-                print_error_and_free_resources(info, task, "Failed to open backing file");
+                remove_task(info, *task, "Failed to open backing file");
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -1765,16 +1762,22 @@ void fileextractor::free_resources(drakvuf_trap_info_t* info, task_t& task)
     free_pool(task.pool);
 }
 
-void fileextractor::print_error_and_free_resources(drakvuf_trap_info_t* info,
-    task_t* task, const char* msg)
+void fileextractor::remove_task(drakvuf_trap_info_t* info, task_t& task,
+    const char* fail_msg, bool restore_registers)
 {
-    if (msg)
-        print_extraction_failure(info, task->filename, msg);
+    if (fail_msg)
+        print_extraction_failure(info, task.filename, fail_msg);
 
-    free_resources(info, *task);
-    task->extracted = true;
-    task->error = true;
+    PRINT_DEBUG(
+        "[FILEEXTRACTOR] Remove task: "
+        "pid %lu, handle %#lx, name '''%s''', stage %d\n"
+        , task.pid, task.handle, task.filename.data()
+        , (int)task.stage());
 
+    if (restore_registers)
+        free_resources(info, task);
+
+    tasks.erase(make_task_id(task));
 }
 
 void fileextractor::read_vm(vmi_instance_t vmi,
@@ -1893,7 +1896,7 @@ void fileextractor::close_cb_handle_unextracted(drakvuf_trap_info_t* info,
         auto file = get_data_filename(this->dump_folder, task->idx);
         if (file.empty())
         {
-            print_error_and_free_resources(info, task, "Failed to get file name");
+            remove_task(info, *task, "Failed to get file name");
             return;
         }
 
@@ -1901,7 +1904,7 @@ void fileextractor::close_cb_handle_unextracted(drakvuf_trap_info_t* info,
         FILE* fp = fopen(file.data(), "w");
         if (!fp)
         {
-            print_error_and_free_resources(info, task, "Failed to open backing file");
+            remove_task(info, *task, "Failed to open backing file");
             return;
         }
 
@@ -1916,9 +1919,7 @@ void fileextractor::close_cb_handle_unextracted(drakvuf_trap_info_t* info,
     {
         calc_checksum(*task);
         print_file_information(info, *task);
-        free_resources(info, *task);
-        task->closed = true;
-        tasks.erase(make_task_id(*task));
+        remove_task(info, *task);
     }
 }
 
@@ -1960,7 +1961,8 @@ void fileextractor::close_cb_handle_extracted(drakvuf_trap_info_t* info,
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , task->target.ret_pid, (int)task->stage()
         );
-        tasks.erase(make_task_id(*task));
+        // No need to restore registsers because not in return from injection
+        remove_task(info, *task, nullptr, false);
         return;
     }
 
@@ -1968,7 +1970,8 @@ void fileextractor::close_cb_handle_extracted(drakvuf_trap_info_t* info,
     calc_checksum(*task);
     update_file_metadata(nullptr, *task);
     print_file_information(info, *task);
-    tasks.erase(make_task_id(*task));
+    // No need to restore registsers because not in return from injection
+    remove_task(info, *task, nullptr, false);
 }
 
 task_t* fileextractor::setinformation_cb_get_task(drakvuf_trap_info_t* info)
