@@ -728,6 +728,7 @@ bool win_procdump2::dispatch_host_wakeup(
     auto pidtid = std::pair(info->proc_data.pid, info->proc_data.tid);
 
     check_stack_marker(info, ctx, ctx->hosts[pidtid]);
+
     switch (ctx->stage())
     {
         case procdump_stage::resume:
@@ -755,6 +756,7 @@ bool win_procdump2::dispatch_host_wakeup(
             delay_execution(info, ctx->hosts[pidtid], 500);
             return true;
     }
+
     return true;
 }
 
@@ -763,7 +765,9 @@ bool win_procdump2::dispatch_target_wakeup(
     std::shared_ptr<win_procdump2_ctx> ctx)
 {
     check_stack_marker(info, ctx, ctx->target);
+
     PROCDUMP2_DEBUG_CTX(info, ctx, "Suspended target process wake up");
+
     switch (ctx->stage())
     {
         case procdump_stage::target_awaken:
@@ -791,6 +795,8 @@ bool win_procdump2::dispatch_target_wakeup(
         case procdump_stage::copy_memory:
             return dispatch_target_wakeup_default(info, ctx);
     }
+
+    return true;
 }
 
 /*
@@ -889,56 +895,52 @@ void win_procdump2::dispatch_active_get_irql(drakvuf_trap_info_t* info,
 void win_procdump2::dispatch_active_lookup_process(drakvuf_trap_info_t* info,
     std::shared_ptr<win_procdump2_ctx> ctx)
 {
-    if (!info->regs->rax)
-    {
-        vmi_lock_guard vmi(drakvuf);
-        ACCESS_CONTEXT(vmi_ctx);
-        vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-        vmi_ctx.dtb = info->regs->cr3;
-        vmi_ctx.addr = ctx->working.eprocess_va;
-
-        if ( VMI_SUCCESS != vmi_read_addr(vmi, &vmi_ctx, &ctx->referenced_process_base))
-        {
-            PROCDUMP2_DEBUG_CTX(info, ctx,
-                "Resume target process on PsLookupProcessByProcessId "
-                "read EPROCESS address fail"
-            );
-            resume(info, ctx);
-        }
-        else
-        {
-            PROCDUMP2_DEBUG_CTX(info, ctx,
-                "PsLookupProcessByProcessId returned %#lx"
-                " (unreferenced is %#lx)"
-                , ctx->referenced_process_base
-                , ctx->target_process_base()
-            );
-            if (!is_timeouted())
-            {
-                if (ctx->need_suspend)
-                {
-                    PROCDUMP2_DEBUG_CTX(info, ctx, "Suspend target process");
-                    suspend(info, ctx, ctx->working);
-                    ctx->stage(procdump_stage::suspend);
-                    ctx->need_suspend = false;
-                }
-                else
-                {
-                    allocate_pool_or_start_copy(info, ctx);
-                }
-            }
-            else
-            {
-                resume(info, ctx);
-            }
-        }
-    }
-    else
+    if (info->regs->rax)
     {
         PROCDUMP2_DEBUG_CTX(info, ctx,
             "Resume target process on PsLookupProcessByProcessId fail"
         );
         resume(info, ctx);
+        return;
+    }
+
+    vmi_lock_guard vmi(drakvuf);
+    ACCESS_CONTEXT(vmi_ctx);
+    vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    vmi_ctx.dtb = info->regs->cr3;
+    vmi_ctx.addr = ctx->working.eprocess_va;
+
+    if ( VMI_SUCCESS != vmi_read_addr(vmi, &vmi_ctx, &ctx->referenced_process_base))
+    {
+        PROCDUMP2_DEBUG_CTX(info, ctx,
+            "Resume target process on PsLookupProcessByProcessId "
+            "read EPROCESS address fail"
+        );
+        resume(info, ctx);
+        return;
+    }
+
+    PROCDUMP2_DEBUG_CTX(info, ctx,
+        "PsLookupProcessByProcessId returned %#lx"
+        " (unreferenced is %#lx)"
+        , ctx->referenced_process_base
+        , ctx->target_process_base()
+    );
+
+    if (is_timeouted())
+    {
+        resume(info, ctx);
+    }
+    else if (ctx->need_suspend)
+    {
+        PROCDUMP2_DEBUG_CTX(info, ctx, "Suspend target process");
+        suspend(info, ctx, ctx->working);
+        ctx->stage(procdump_stage::suspend);
+        ctx->need_suspend = false;
+    }
+    else
+    {
+        allocate_pool_or_start_copy(info, ctx);
     }
 }
 
