@@ -813,20 +813,40 @@ void win_procdump2::dispatch_active_allocate_pool(drakvuf_trap_info_t* info,
 void win_procdump2::dispatch_active_copy_memory(drakvuf_trap_info_t* info,
     std::shared_ptr<win_procdump2_ctx> ctx)
 {
-    bool is_timeout = is_timeouted();
     uint32_t read_bytes = 0;
-    {
-        ACCESS_CONTEXT(vmi_ctx);
-        vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-        vmi_ctx.dtb = info->regs->cr3;
-        vmi_ctx.addr = ctx->current_read_bytes_va;
+    size_t size = dispatch_active_copy_memory_get_size(info, ctx, read_bytes);
 
-        vmi_lock_guard vmi(drakvuf);
-        // skip bad block
-        (void)vmi_read_32(vmi, &vmi_ctx, &read_bytes);
+    // Dump data region (not memory-mapped file) with zeroes
+    if (size < ctx->current_dump_size &&
+        !ctx->is_current_memory_mapped_file)
+    {
+        for (; size < ctx->current_dump_size; size += VMI_PS_4KB)
+            dump_zero_page(ctx);
     }
 
+    if ((size == ctx->current_dump_size && ctx->vads.empty()) || is_timeouted())
+        dispatch_active_copy_memory_finish(info, ctx);
+    else if (size == ctx->current_dump_size)
+        dispatch_active_copy_memory_dump_next_region(info, ctx);
+    else
+        dispatch_active_copy_memory_continue_cur_region(info, ctx, size, read_bytes);
+}
+
+size_t win_procdump2::dispatch_active_copy_memory_get_size(
+    drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx,
+    uint32_t& read_bytes)
+{
     size_t size = 0;
+
+    ACCESS_CONTEXT(vmi_ctx);
+    vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    vmi_ctx.dtb = info->regs->cr3;
+    vmi_ctx.addr = ctx->current_read_bytes_va;
+
+    vmi_lock_guard vmi(drakvuf);
+    // skip bad block
+    (void)vmi_read_32(vmi, &vmi_ctx, &read_bytes);
+
     if (read_bytes == ctx->current_dump_size)
     {
         read_vm(info->regs->cr3, ctx, read_bytes);
@@ -844,49 +864,51 @@ void win_procdump2::dispatch_active_copy_memory(drakvuf_trap_info_t* info,
         size = read_bytes + VMI_PS_4KB;
     }
 
-    // Dump data region (not memory-mapped file) with zeroes
-    if (size < ctx->current_dump_size &&
-        !ctx->is_current_memory_mapped_file)
-    {
-        for (; size < ctx->current_dump_size; size += VMI_PS_4KB)
-            dump_zero_page(ctx);
-    }
+    return size;
+}
 
-    if ((size == ctx->current_dump_size && ctx->vads.empty()) ||
-        is_timeout)
-    {
-        // The last region have been fully dumped so finish task
-        PROCDUMP2_DEBUG_CTX(info, ctx, "Resume target process on %s",
-            is_timeout ? "timeout" : "dump finish"
-        );
-        resume(info, ctx);
-    }
-    else if (size == ctx->current_dump_size)
-    {
-        // The region have been fully dumped so go to next one
-        auto [region_base, region_size] = get_memory_region(info, ctx);
-        PROCDUMP2_DEBUG_CTX(info, ctx, "Copy memory region [%#lx;%#lx]",
-            region_base, region_size
-        );
-        copy_memory(info, ctx, region_base, region_size);
-    }
-    else
-    {
-        /* If we have read more any data (assume 4KB at least) then
-            * after the last read byte the non-accessible page occur.
-            * So skip this page.
-            * If zero bytes have been read then the first page is
-            * non-accessible. So skip this page.
-            */
-        auto base = ctx->current_dump_base + size;
-        size = ctx->current_dump_size - size;
-        PROCDUMP2_DEBUG_CTX(info, ctx,
-            "copy_memory: bytes copied %#x before "
-            "NO_ACCESS page. Continue with [%#lx;%#lx]",
-            read_bytes, base, size
-        );
-        copy_memory(info, ctx, base, size);
-    }
+void win_procdump2::dispatch_active_copy_memory_finish(
+    drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    // The last region have been fully dumped so finish task
+    PROCDUMP2_DEBUG_CTX(info, ctx, "Resume target process on %s",
+        is_timeouted() ? "timeout" : "dump finish"
+    );
+    resume(info, ctx);
+
+}
+
+void win_procdump2::dispatch_active_copy_memory_dump_next_region(
+    drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    // The region have been fully dumped so go to next one
+    auto [region_base, region_size] = get_memory_region(info, ctx);
+    PROCDUMP2_DEBUG_CTX(info, ctx, "Copy memory region [%#lx;%#lx]",
+        region_base, region_size
+    );
+    copy_memory(info, ctx, region_base, region_size);
+}
+
+void win_procdump2::dispatch_active_copy_memory_continue_cur_region(
+    drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx,
+    size_t size, uint32_t read_bytes)
+{
+    /* If we have read more any data (assume 4KB at least) then
+        * after the last read byte the non-accessible page occur.
+        * So skip this page.
+        * If zero bytes have been read then the first page is
+        * non-accessible. So skip this page.
+        */
+    auto base = ctx->current_dump_base + size;
+    size = ctx->current_dump_size - size;
+    PROCDUMP2_DEBUG_CTX(info, ctx,
+        "copy_memory: bytes copied %#x before "
+        "NO_ACCESS page. Continue with [%#lx;%#lx]",
+        read_bytes, base, size
+    );
+    copy_memory(info, ctx, base, size);
 }
 
 void win_procdump2::dispatch_active_resume(drakvuf_trap_info_t* info,

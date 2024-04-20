@@ -226,6 +226,14 @@ private:
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     void dispatch_active_copy_memory(drakvuf_trap_info_t*,
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    size_t dispatch_active_copy_memory_get_size(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>, uint32_t&);
+    void dispatch_active_copy_memory_finish(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_copy_memory_dump_next_region(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_copy_memory_continue_cur_region(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>, size_t, uint32_t);
     void dispatch_active_resume(drakvuf_trap_info_t*,
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     void dispatch_active_deref_process(drakvuf_trap_info_t*,
