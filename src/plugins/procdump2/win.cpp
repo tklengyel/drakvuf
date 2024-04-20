@@ -1633,40 +1633,41 @@ void win_procdump2::delay_execution(drakvuf_trap_info_t* info,
 
 std::shared_ptr<win_procdump2_ctx> win_procdump2::continues_task(drakvuf_trap_info_t* info)
 {
-    /* If current thread is working one then search for task to continue. */
-    if (this->working_threads.find(info->attached_proc_data.tid) !=
-        this->working_threads.end())
-    {
-        PROCDUMP2_DEBUG(info, "Search task to continue");
+    auto is_working = working_threads.find(info->attached_proc_data.tid) != working_threads.end();
+    if (!is_working)
+        return nullptr;
 
-        for (auto& [pid, ctx]: this->active)
+    /* If current thread is working one then search for task to continue. */
+    PROCDUMP2_DEBUG(info, "Search task to continue");
+
+    for (auto& [pid, ctx]: this->active)
+    {
+        PROCDUMP2_DEBUG_CTX(info, ctx, "Check task if to continue");
+
+        if (ctx->stage() == procdump_stage::finished)
         {
-            PROCDUMP2_DEBUG_CTX(info, ctx, "Check task if to continue");
-            if (ctx->stage() == procdump_stage::finished)
-            {
-                PROCDUMP2_DEBUG_CTX(info, ctx, "The task is finished");
-                continue;
-            }
-            else if (drakvuf_check_return_context(drakvuf, info,
-                    ctx->working.ret_pid,
-                    ctx->working.ret_tid,
-                    ctx->working.ret_rsp))
-            {
-                PROCDUMP2_DEBUG_CTX(info, ctx, "Found task to continue");
-                ctx->working.ret_rsp = 0;
-                /* Restore stack pointer after injection.
-                 *
-                 * This is crucial because lots of injections could exhaust the
-                 * kernel stack.
-                 */
-                info->regs->rsp = ctx->working.regs.rsp;
-                return ctx;
-            }
+            PROCDUMP2_DEBUG_CTX(info, ctx, "The task is finished");
+            continue;
         }
 
-        PROCDUMP2_DEBUG(info, "Working thread failed to get task to continue.");
+        if (drakvuf_check_return_context(drakvuf, info,
+                ctx->working.ret_pid,
+                ctx->working.ret_tid,
+                ctx->working.ret_rsp))
+        {
+            PROCDUMP2_DEBUG_CTX(info, ctx, "Found task to continue");
+            ctx->working.ret_rsp = 0;
+            /* Restore stack pointer after injection.
+                *
+                * This is crucial because lots of injections could exhaust the
+                * kernel stack.
+                */
+            info->regs->rsp = ctx->working.regs.rsp;
+            return ctx;
+        }
     }
 
+    PROCDUMP2_DEBUG(info, "Working thread failed to get task to continue.");
     return nullptr;
 }
 
