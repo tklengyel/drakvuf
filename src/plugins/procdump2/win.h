@@ -236,7 +236,13 @@ private:
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     bool dispatch_pending_pending(drakvuf_trap_info_t*,
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
-    bool dispatch_pending_pending_on_run(drakvuf_trap_info_t*,
+    bool dispatch_pending_on_run(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_on_timeout(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_pending_on_timeout_finish(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_on_timeout_resume(drakvuf_trap_info_t*,
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     bool dispatch_pending_pending_on_timeout(drakvuf_trap_info_t*,
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);

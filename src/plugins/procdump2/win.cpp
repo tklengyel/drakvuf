@@ -934,12 +934,12 @@ bool win_procdump2::dispatch_pending_pending(drakvuf_trap_info_t* info,
     std::shared_ptr<win_procdump2_ctx> ctx)
 {
     if (!is_timeouted())
-        return dispatch_pending_pending_on_run(info, ctx);
+        return dispatch_pending_on_run(info, ctx);
     else
-        return dispatch_pending_pending_on_timeout(info, ctx);
+        return dispatch_pending_on_timeout(info, ctx);
 }
 
-bool win_procdump2::dispatch_pending_pending_on_run(drakvuf_trap_info_t* info,
+bool win_procdump2::dispatch_pending_on_run(drakvuf_trap_info_t* info,
     std::shared_ptr<win_procdump2_ctx> ctx)
 {
     bool result = false;
@@ -971,40 +971,50 @@ bool win_procdump2::dispatch_pending_pending_on_run(drakvuf_trap_info_t* info,
     return result;
 }
 
-bool win_procdump2::dispatch_pending_pending_on_timeout(drakvuf_trap_info_t* info,
+bool win_procdump2::dispatch_pending_on_timeout(drakvuf_trap_info_t* info,
     std::shared_ptr<win_procdump2_ctx> ctx)
 {
     bool result = false;
 
     if (!ctx->target_suspend_count)
-    {
-        PROCDUMP2_DEBUG_CTX(info, ctx, "Skip target process on timeout");
-
-        ctx->stage(procdump_stage::timeout);
-        if (ctx->is_restored())
-        {
-            ctx->stage(procdump_stage::finished);
-            finish_task(info, ctx);
-        }
-    }
+        dispatch_pending_on_timeout_finish(info, ctx);
     else
+        result = dispatch_pending_on_timeout_resume(info, ctx);
+
+    return result;
+}
+
+void win_procdump2::dispatch_pending_on_timeout_finish(drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    PROCDUMP2_DEBUG_CTX(info, ctx, "Skip target process on timeout");
+
+    ctx->stage(procdump_stage::timeout);
+    if (ctx->is_restored())
     {
-        bool is_suspended = false;
-        if ( !drakvuf_is_process_suspended(drakvuf, ctx->target_process_base(), &is_suspended) )
-        {
-            PROCDUMP2_DEBUG_CTX(info, ctx, "Failed to check if process suspended");
-        }
+        ctx->stage(procdump_stage::finished);
+        finish_task(info, ctx);
+    }
+}
 
-        if (is_suspended)
-        {
-            store_worker(info, ctx);
-
-            PROCDUMP2_DEBUG_CTX(info, ctx, "Resume target process on timeout");
-            resume(info, ctx);
-            result = true;
-        }
+bool win_procdump2::dispatch_pending_on_timeout_resume(drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    bool result = false;
+    bool is_suspended = false;
+    if ( !drakvuf_is_process_suspended(drakvuf, ctx->target_process_base(), &is_suspended) )
+    {
+        PROCDUMP2_DEBUG_CTX(info, ctx, "Failed to check if process suspended");
     }
 
+    if (is_suspended)
+    {
+        store_worker(info, ctx);
+
+        PROCDUMP2_DEBUG_CTX(info, ctx, "Resume target process on timeout");
+        resume(info, ctx);
+        result = true;
+    }
     return result;
 }
 
