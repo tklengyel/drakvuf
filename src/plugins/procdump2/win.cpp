@@ -188,60 +188,12 @@ bool win_procdump2::stop_impl()
         begin_stop_at = g_get_real_time() / G_USEC_PER_SEC;
 
     if (is_plugin_enabled && !is_stopping())
-    {
-        // On first stop call we collect PIDs for dump
-
-        std::vector<vmi_pid_t> pids;
-        if (dump_process_on_finish)
-            pids.push_back(dump_process_on_finish);
-        if (dump_new_processes_on_finish)
-        {
-            auto running_processes_on_finish = get_running_processes();
-            for (auto pid : running_processes_on_finish)
-            {
-                auto it = std::find(running_processes_on_start.begin(), running_processes_on_start.end(), pid);
-                if (it == running_processes_on_start.end())
-                    pids.push_back(pid); // pid is a new process
-            }
-        }
-
-        // Filter out dead or 'dump already in progress' PIDs
-        auto new_end = std::remove_if(pids.begin(), pids.end(), [this](vmi_pid_t pid)
-        {
-            return is_pending_process(pid) ||
-                is_active_process(pid) ||
-                is_handled_process(pid);
-        });
-        pids.erase(new_end, pids.end());
-
-        for (auto pid : pids)
-            this->start_dump_process(pid);
-    }
+        start_dump_processes_on_stop();
 
     if (!is_plugin_active())
-    {
         return pluginex::stop_impl();
-    }
 
-    static size_t counter = 0;
-    if (counter++ % 100 == 0)
-    {
-        for (auto const& task: this->pending)
-        {
-            auto ctx = task.second;
-            PRINT_DEBUG("[PROCDUMP] Pending task on stop: PID=%d, stage %s\n"
-                , ctx->target_process_pid, to_str(ctx->stage()).data()
-            );
-        }
-
-        for (auto const& task: this->active)
-        {
-            auto ctx = task.second;
-            PRINT_DEBUG("[PROCDUMP] Active task on stop: PID=%d, stage %s\n"
-                , ctx->target_process_pid, to_str(ctx->stage()).data()
-            );
-        }
-    }
+    print_pending_on_stop();
 
     return false;
 }
@@ -2094,4 +2046,58 @@ void win_procdump2::init_hooks(bool disable_kedelayexecutionthread_hook,
         this->deliver_apc_hook = createSyscallHook("KiDeliverApc", &win_procdump2::deliver_apc_cb);
         is_plugin_enabled = true;
     }
+}
+
+void win_procdump2::print_pending_on_stop()
+{
+    static size_t counter = 0;
+    if (counter++ % 100 == 0)
+    {
+        for (auto const& task: this->pending)
+        {
+            auto ctx = task.second;
+            PRINT_DEBUG("[PROCDUMP] Pending task on stop: PID=%d, stage %s\n"
+                , ctx->target_process_pid, to_str(ctx->stage()).data()
+            );
+        }
+
+        for (auto const& task: this->active)
+        {
+            auto ctx = task.second;
+            PRINT_DEBUG("[PROCDUMP] Active task on stop: PID=%d, stage %s\n"
+                , ctx->target_process_pid, to_str(ctx->stage()).data()
+            );
+        }
+    }
+}
+
+void win_procdump2::start_dump_processes_on_stop()
+{
+    // On first stop call we collect PIDs for dump
+
+    std::vector<vmi_pid_t> pids;
+    if (dump_process_on_finish)
+        pids.push_back(dump_process_on_finish);
+    if (dump_new_processes_on_finish)
+    {
+        auto running_processes_on_finish = get_running_processes();
+        for (auto pid : running_processes_on_finish)
+        {
+            auto it = std::find(running_processes_on_start.begin(), running_processes_on_start.end(), pid);
+            if (it == running_processes_on_start.end())
+                pids.push_back(pid); // pid is a new process
+        }
+    }
+
+    // Filter out dead or 'dump already in progress' PIDs
+    auto new_end = std::remove_if(pids.begin(), pids.end(), [this](vmi_pid_t pid)
+    {
+        return is_pending_process(pid) ||
+            is_active_process(pid) ||
+            is_handled_process(pid);
+    });
+    pids.erase(new_end, pids.end());
+
+    for (auto pid : pids)
+        this->start_dump_process(pid);
 }

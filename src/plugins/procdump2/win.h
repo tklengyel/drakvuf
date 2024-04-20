@@ -298,6 +298,8 @@ private:
     void init_symbols(const char*);
     void init_sys_info();
     void init_hooks(bool, bool);
+    void print_pending_on_stop();
+    void start_dump_processes_on_stop();
 };
 
 #endif
