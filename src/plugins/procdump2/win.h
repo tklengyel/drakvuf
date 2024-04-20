@@ -296,6 +296,7 @@ private:
     bool dispatch_wakeup(drakvuf_trap_info_t*, std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>& tasks_list);
     bool is_timeouted();
     void init_symbols(const char*);
+    void init_symbol_current_irql_win7x86(const char*);
     void init_sys_info();
     void init_hooks(bool, bool);
     void print_pending_on_stop();

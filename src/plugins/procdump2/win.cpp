@@ -1925,11 +1925,14 @@ bool win_procdump2::is_timeouted()
 
 void win_procdump2::init_symbols(const char* hal_profile_path)
 {
-    vmi_lock_guard vmi(drakvuf);
-
     size_t quad_size = 0;
-    win_ver_t winver = vmi_get_winver(vmi);
+    win_ver_t winver;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+
+    {
+        vmi_lock_guard vmi(drakvuf);
+        winver = vmi_get_winver(vmi);
+    }
 
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
             offset_names, this->offsets.size(), this->offsets.data()) ||
@@ -1971,45 +1974,47 @@ void win_procdump2::init_symbols(const char* hal_profile_path)
     }
 
     if (is32bit && VMI_OS_WINDOWS_7 == winver)
-    {
-        json_object* hal_profile = json_object_from_file(hal_profile_path);
-        if (!hal_profile)
-        {
-            PRINT_DEBUG("Procdump plugin fails to load JSON debug info for hal.dll\n");
-            throw -1;
-        }
-
-        addr_t func_rva = 0;
-        if ( !json_get_symbol_rva(drakvuf, hal_profile, "KeGetCurrentIrql", &func_rva) )
-        {
-            PRINT_DEBUG("[PROCDUMP] Failed to get RVA of hal!KeGetCurrentIrql\n");
-            throw -1;
-        }
-
-        addr_t modlist;
-        if ( VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &modlist) )
-        {
-            PRINT_DEBUG("[PROCDUMP] Couldn't read PsLoadedModuleList\n");
-            throw -1;
-        }
-
-        addr_t hal_base = 0;
-        if ( !drakvuf_get_module_base_addr(drakvuf, modlist, "hal.dll", &hal_base) )
-        {
-            PRINT_DEBUG("[PROCDUMP] Couldn't find hal.dll\n");
-            throw -1;
-        }
-
-        this->current_irql_va = hal_base + func_rva;
-
-        json_object_put(hal_profile);
-    }
+        init_symbol_current_irql_win7x86(hal_profile_path);
     else
-    {
         this->current_irql_va =
             drakvuf_kernel_symbol_to_va(drakvuf, "KeGetCurrentIrql");
+}
+
+void win_procdump2::init_symbol_current_irql_win7x86(const char* hal_profile_path)
+{
+    vmi_lock_guard vmi(drakvuf);
+
+    json_object* hal_profile = json_object_from_file(hal_profile_path);
+    if (!hal_profile)
+    {
+        PRINT_DEBUG("Procdump plugin fails to load JSON debug info for hal.dll\n");
+        throw -1;
     }
 
+    addr_t func_rva = 0;
+    if ( !json_get_symbol_rva(drakvuf, hal_profile, "KeGetCurrentIrql", &func_rva) )
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to get RVA of hal!KeGetCurrentIrql\n");
+        throw -1;
+    }
+
+    addr_t modlist;
+    if ( VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &modlist) )
+    {
+        PRINT_DEBUG("[PROCDUMP] Couldn't read PsLoadedModuleList\n");
+        throw -1;
+    }
+
+    addr_t hal_base = 0;
+    if ( !drakvuf_get_module_base_addr(drakvuf, modlist, "hal.dll", &hal_base) )
+    {
+        PRINT_DEBUG("[PROCDUMP] Couldn't find hal.dll\n");
+        throw -1;
+    }
+
+    this->current_irql_va = hal_base + func_rva;
+
+    json_object_put(hal_profile);
 }
 
 void win_procdump2::init_sys_info()
