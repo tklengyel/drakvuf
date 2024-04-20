@@ -678,87 +678,17 @@ bool win_procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<
 
 bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
 {
-    uint64_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t target_process_base = 0;
     std::string target_process_name;
     vmi_pid_t target_process_pid = 0;
     bool is_hosted = false;
-    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    bool new_task = false;
 
-    if (0 == handle || (!is32bit && (0xffffffffffffffff == handle)) || (is32bit && (0xffffffff == handle)))
-    {
-        target_process_base = info->attached_proc_data.base_addr;
-        target_process_name = std::string(info->attached_proc_data.name);
-        target_process_pid = info->attached_proc_data.pid;
-    }
-    else
-    {
-        is_hosted = true;
-        /* Delay suspend target process.
-         *
-         * This is not optimal to delay suspend. But we reuse code path
-         * with stop method which implements this logic. Thus we reduce
-         * code complexity.
-         */
-        addr_t dtb = 0;
-        if ( !drakvuf_get_process_by_handle(drakvuf, info, handle, &target_process_base, &dtb) )
-            return false;
-
-        if ( !drakvuf_get_process_pid(drakvuf, target_process_base, &target_process_pid) )
-            return false;
-
-        // TODO Possibly move after getting correct process base
-        char* name = drakvuf_get_process_name(drakvuf, target_process_base, true);
-        target_process_name = std::string(name ?: "");
-        g_free(name);
-    }
-
-    /* Don't process known tasks.
-     *
-     * Withing job main process could terminate every process and then
-     * terminate whole job with TerminateJobObject API.
-     *
-     * On first NtTerminateProcess we add target process into the list.
-     * On job termination the target process would NtTerminateProcess(-1).
-     *
-     * And kernel32!ExitProcess calls NtTerminateProcess twice with handle 0
-     * and -1. Thus we should avoid to dumping process's memory on
-     * second call.
-     *
-     * If this true:
-     * - Don't create new task.
-     * - Return VMI_EVENT_RESPONSE_NONE.
-     * - Current process continue execution of NtTerminateProcess.
-     * - Target process would resume.
-     * - Target process would be suspended with the plug-in.
-     */
-    // TODO Check that target process would be suspended.
-    // TODO Hook process creation and remove from finished list reused PIDs.
-    if (is_active_process(target_process_pid) ||
-        is_handled_process(target_process_pid))
-    {
-        PROCDUMP2_DEBUG(info, "Skip active or finished process %d (%s)",
-            target_process_pid, target_process_name.data()
-        );
-        return false;
-    }
-
-    if (exclude.match(target_process_name))
-    {
-        // TODO: Print target process name, not current
-        print_dump_exclusion(info);
-        return false;
-    }
-
-    /* Don't handle new processes while stopping to avoid infinite loop.
-     *
-     * If pending process terminates then handle it as usual.
-     */
-    if ( is_stopping() && !this->is_pending_process(target_process_pid))
+    if (!dispatch_new_get_target_info(info, target_process_base,
+            target_process_name, target_process_pid, is_hosted))
         return false;
 
     std::shared_ptr<win_procdump2_ctx> ctx;
-    bool new_task = false;
     if (!this->is_pending_process(target_process_pid))
     {
         new_task = true;
@@ -786,44 +716,7 @@ bool win_procdump2::dispatch_new(drakvuf_trap_info_t* info)
         );
     }
 
-    /* Suspend target and/or host processes.
-     *
-     * If process is self-terminating than inject suspend call here.
-     * Otherwise delay suspend of target process and suspend host process here.
-     *
-     * If later suspended process would be resumed beforehand than it would be
-     * suspended once more.
-     */
-    if (is_hosted)
-    {
-        PROCDUMP2_DEBUG_CTX(info, ctx, "Delay host suspend");
-
-        if (new_task)
-        {
-            ctx->need_suspend = true;
-            ctx->target.restored = true;
-        }
-
-        ctx->host_processes_bases.emplace(info->attached_proc_data.base_addr);
-
-        auto added_pair = ctx->hosts.emplace(std::piecewise_construct,
-                std::forward_as_tuple(std::pair(info->proc_data.pid, info->proc_data.tid)),
-                std::forward_as_tuple());
-        auto host_context = added_pair.first;
-
-        memcpy(&host_context->second.regs, info->regs, sizeof(x86_registers_t));
-        delay_execution(info, host_context->second, 500);
-    }
-    else
-    {
-        g_assert(target_process_base);
-        ctx->target_process_base(target_process_base);
-        PROCDUMP2_DEBUG_CTX(info, ctx, "Suspend self-terminating");
-        memcpy(&ctx->target.regs, info->regs, sizeof(x86_registers_t));
-        ctx->need_suspend = false;
-        suspend(info, ctx, ctx->target);
-        ctx->stage(procdump_stage::suspend);
-    }
+    dispatch_new_do_suspend(info, ctx, target_process_base, is_hosted, new_task);
 
     return true;
 }
@@ -1337,6 +1230,133 @@ bool win_procdump2::dispatch_pending_suspend(drakvuf_trap_info_t* info,
     }
 
     return result;
+}
+
+bool win_procdump2::dispatch_new_get_target_info(drakvuf_trap_info_t* info,
+    addr_t& target_process_base, std::string& target_process_name,
+    vmi_pid_t& target_process_pid, bool& is_hosted)
+{
+    uint64_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+
+    if (0 == handle || (!is32bit && (0xffffffffffffffff == handle)) || (is32bit && (0xffffffff == handle)))
+    {
+        is_hosted = false;
+        target_process_base = info->attached_proc_data.base_addr;
+        target_process_name = std::string(info->attached_proc_data.name);
+        target_process_pid = info->attached_proc_data.pid;
+    }
+    else
+    {
+        is_hosted = true;
+        /* Delay suspend target process.
+         *
+         * This is not optimal to delay suspend. But we reuse code path
+         * with stop method which implements this logic. Thus we reduce
+         * code complexity.
+         */
+        addr_t dtb = 0;
+        if ( !drakvuf_get_process_by_handle(drakvuf, info, handle, &target_process_base, &dtb) )
+            return false;
+
+        if ( !drakvuf_get_process_pid(drakvuf, target_process_base, &target_process_pid) )
+            return false;
+
+        // TODO Possibly move after getting correct process base
+        char* name = drakvuf_get_process_name(drakvuf, target_process_base, true);
+        target_process_name = std::string(name ?: "");
+        g_free(name);
+    }
+
+    /* Don't process known tasks.
+     *
+     * Withing job main process could terminate every process and then
+     * terminate whole job with TerminateJobObject API.
+     *
+     * On first NtTerminateProcess we add target process into the list.
+     * On job termination the target process would NtTerminateProcess(-1).
+     *
+     * And kernel32!ExitProcess calls NtTerminateProcess twice with handle 0
+     * and -1. Thus we should avoid to dumping process's memory on
+     * second call.
+     *
+     * If this true:
+     * - Don't create new task.
+     * - Return VMI_EVENT_RESPONSE_NONE.
+     * - Current process continue execution of NtTerminateProcess.
+     * - Target process would resume.
+     * - Target process would be suspended with the plug-in.
+     */
+    // TODO Check that target process would be suspended.
+    // TODO Hook process creation and remove from finished list reused PIDs.
+    if (is_active_process(target_process_pid) ||
+        is_handled_process(target_process_pid))
+    {
+        PROCDUMP2_DEBUG(info, "Skip active or finished process %d (%s)",
+            target_process_pid, target_process_name.data()
+        );
+        return false;
+    }
+
+    if (exclude.match(target_process_name))
+    {
+        // TODO: Print target process name, not current
+        print_dump_exclusion(info);
+        return false;
+    }
+
+    /* Don't handle new processes while stopping to avoid infinite loop.
+     *
+     * If pending process terminates then handle it as usual.
+     */
+    if ( is_stopping() && !this->is_pending_process(target_process_pid))
+        return false;
+
+    return true;
+}
+
+void win_procdump2::dispatch_new_do_suspend(drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx, addr_t target_process_base,
+    bool is_hosted, bool new_task)
+{
+    /* Suspend target and/or host processes.
+     *
+     * If process is self-terminating than inject suspend call here.
+     * Otherwise delay suspend of target process and suspend host process here.
+     *
+     * If later suspended process would be resumed beforehand than it would be
+     * suspended once more.
+     */
+    if (is_hosted)
+    {
+        PROCDUMP2_DEBUG_CTX(info, ctx, "Delay host suspend");
+
+        if (new_task)
+        {
+            ctx->need_suspend = true;
+            ctx->target.restored = true;
+        }
+
+        ctx->host_processes_bases.emplace(info->attached_proc_data.base_addr);
+
+        auto added_pair = ctx->hosts.emplace(std::piecewise_construct,
+                std::forward_as_tuple(std::pair(info->proc_data.pid, info->proc_data.tid)),
+                std::forward_as_tuple());
+        auto host_context = added_pair.first;
+
+        memcpy(&host_context->second.regs, info->regs, sizeof(x86_registers_t));
+        delay_execution(info, host_context->second, 500);
+    }
+    else
+    {
+        g_assert(target_process_base);
+        ctx->target_process_base(target_process_base);
+        PROCDUMP2_DEBUG_CTX(info, ctx, "Suspend self-terminating");
+        memcpy(&ctx->target.regs, info->regs, sizeof(x86_registers_t));
+        ctx->need_suspend = false;
+        suspend(info, ctx, ctx->target);
+        ctx->stage(procdump_stage::suspend);
+    }
 }
 
 /*****************************************************************************

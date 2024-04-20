@@ -238,6 +238,12 @@ private:
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     bool dispatch_pending_suspend(drakvuf_trap_info_t*,
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_new_get_target_info(drakvuf_trap_info_t*,
+        addr_t& target_process_base, std::string& target_process_name,
+        vmi_pid_t& target_process_pid, bool& is_hosted);
+    void dispatch_new_do_suspend(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>,
+        addr_t target_process_base, bool is_hosted, bool new_task);
 
     /* Injection helpers */
     void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
