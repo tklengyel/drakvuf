@@ -169,116 +169,10 @@ win_procdump2::win_procdump2(drakvuf_t drakvuf, const procdump2_config* config,
         return;
     }
 
-    vmi_lock_guard vmi(drakvuf);
-    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    win_ver_t winver = vmi_get_winver(vmi);
-    size_t quad_size = 0;
-
-    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
-            offset_names, this->offsets.size(), this->offsets.data()) ||
-        !drakvuf_get_kernel_struct_size(drakvuf, "_OBJECT_HEADER", &this->object_header_size) ||
-        !drakvuf_get_kernel_struct_size(drakvuf, "_QUAD", &quad_size))
-    {
-        PRINT_DEBUG("[PROCDUMP] Failed to get kernel structs\n");
-        throw -1;
-    }
-    // The last member of `nt!_OBJECT_HEADER` is part of `nt!_EPROCESS`. So
-    // one should exclude it from `sizeof(struct _OBJECT_HEADER)`.
-    this->object_header_size -= quad_size;
-
-    this->malloc_va =
-        drakvuf_kernel_symbol_to_va(drakvuf, "ExAllocatePoolWithTag");
-    this->suspend_process_va =
-        drakvuf_kernel_symbol_to_va(drakvuf, "PsSuspendProcess");
-    this->resume_process_va =
-        drakvuf_kernel_symbol_to_va(drakvuf, "PsResumeProcess");
-    this->copy_virt_mem_va =
-        drakvuf_kernel_symbol_to_va(drakvuf, "MmCopyVirtualMemory");
-    this->delay_execution_va =
-        drakvuf_kernel_symbol_to_va(drakvuf, "KeDelayExecutionThread");
-    this->lookup_process_va =
-        drakvuf_kernel_symbol_to_va(drakvuf, "PsLookupProcessByProcessId");
-    this->deref_object_va =
-        drakvuf_kernel_symbol_to_va(drakvuf, "ObDereferenceObject");
-
-    if (!this->malloc_va ||
-        !this->suspend_process_va ||
-        !this->resume_process_va ||
-        !this->copy_virt_mem_va ||
-        !this->delay_execution_va ||
-        !this->lookup_process_va ||
-        !this->deref_object_va)
-    {
-        PRINT_DEBUG("[PROCDUMP] Failed to get function address\n");
-        throw -1;
-    }
-
-    if (is32bit && VMI_OS_WINDOWS_7 == winver)
-    {
-        json_object* hal_profile = json_object_from_file(config->hal_profile);
-        if (!hal_profile)
-        {
-            PRINT_DEBUG("Procdump plugin fails to load JSON debug info for hal.dll\n");
-            throw -1;
-        }
-
-        addr_t func_rva = 0;
-        if ( !json_get_symbol_rva(drakvuf, hal_profile, "KeGetCurrentIrql", &func_rva) )
-        {
-            PRINT_DEBUG("[PROCDUMP] Failed to get RVA of hal!KeGetCurrentIrql\n");
-            throw -1;
-        }
-
-        addr_t modlist;
-        if ( VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &modlist) )
-        {
-            PRINT_DEBUG("[PROCDUMP] Couldn't read PsLoadedModuleList\n");
-            throw -1;
-        }
-
-        addr_t hal_base = 0;
-        if ( !drakvuf_get_module_base_addr(drakvuf, modlist, "hal.dll", &hal_base) )
-        {
-            PRINT_DEBUG("[PROCDUMP] Couldn't find hal.dll\n");
-            throw -1;
-        }
-
-        this->current_irql_va = hal_base + func_rva;
-
-        json_object_put(hal_profile);
-    }
-    else
-    {
-        this->current_irql_va =
-            drakvuf_kernel_symbol_to_va(drakvuf, "KeGetCurrentIrql");
-    }
-
-    num_cpus = vmi_get_num_vcpus(vmi);
-    win_build_info_t build_info;
-    if (!vmi_get_windows_build_info(vmi, &build_info))
-        throw -1;
-
-    win_build_number = build_info.buildnumber;
-    win_major = build_info.major;
-    win_minor = build_info.minor;
-
-    uint32_t r0, r1, r2;
-    __cpuid(0, r0, vendor[0], vendor[2], vendor[1]);
-    __cpuid(1, version_information, r0, r1, feature_information);
-    __cpuid(0x80000001, r0, amd_extended_cpu_features, r1, r2);
-
-    this->terminate_process_hook = createSyscallHook("NtTerminateProcess", &win_procdump2::terminate_process_cb);
-    this->clean_process_memory_hook = createSyscallHook("MmCleanProcessAddressSpace", &win_procdump2::clean_process_memory_cb);
-    if (!config->disable_kedelayexecutionthread_hook)
-    {
-        this->delay_execution_hook = createSyscallHook("KeDelayExecutionThread", &win_procdump2::delay_execution_cb);
-        is_plugin_enabled = true;
-    }
-    if (!config->disable_kideliverapc_hook)
-    {
-        this->deliver_apc_hook = createSyscallHook("KiDeliverApc", &win_procdump2::deliver_apc_cb);
-        is_plugin_enabled = true;
-    }
+    init_symbols(config->hal_profile);
+    init_sys_info();
+    init_hooks(config->disable_kedelayexecutionthread_hook,
+        config->disable_kideliverapc_hook);
 
     if (config->dump_new_processes_on_finish)
         running_processes_on_start = get_running_processes();
@@ -2075,4 +1969,129 @@ bool win_procdump2::is_timeouted()
     }
 
     return false;
+}
+
+void win_procdump2::init_symbols(const char* hal_profile_path)
+{
+    vmi_lock_guard vmi(drakvuf);
+
+    size_t quad_size = 0;
+    win_ver_t winver = vmi_get_winver(vmi);
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+
+    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
+            offset_names, this->offsets.size(), this->offsets.data()) ||
+        !drakvuf_get_kernel_struct_size(drakvuf, "_OBJECT_HEADER", &this->object_header_size) ||
+        !drakvuf_get_kernel_struct_size(drakvuf, "_QUAD", &quad_size))
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to get kernel structs\n");
+        throw -1;
+    }
+    // The last member of `nt!_OBJECT_HEADER` is part of `nt!_EPROCESS`. So
+    // one should exclude it from `sizeof(struct _OBJECT_HEADER)`.
+    this->object_header_size -= quad_size;
+
+    this->malloc_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "ExAllocatePoolWithTag");
+    this->suspend_process_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "PsSuspendProcess");
+    this->resume_process_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "PsResumeProcess");
+    this->copy_virt_mem_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "MmCopyVirtualMemory");
+    this->delay_execution_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "KeDelayExecutionThread");
+    this->lookup_process_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "PsLookupProcessByProcessId");
+    this->deref_object_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "ObDereferenceObject");
+
+    if (!this->malloc_va ||
+        !this->suspend_process_va ||
+        !this->resume_process_va ||
+        !this->copy_virt_mem_va ||
+        !this->delay_execution_va ||
+        !this->lookup_process_va ||
+        !this->deref_object_va)
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to get function address\n");
+        throw -1;
+    }
+
+    if (is32bit && VMI_OS_WINDOWS_7 == winver)
+    {
+        json_object* hal_profile = json_object_from_file(hal_profile_path);
+        if (!hal_profile)
+        {
+            PRINT_DEBUG("Procdump plugin fails to load JSON debug info for hal.dll\n");
+            throw -1;
+        }
+
+        addr_t func_rva = 0;
+        if ( !json_get_symbol_rva(drakvuf, hal_profile, "KeGetCurrentIrql", &func_rva) )
+        {
+            PRINT_DEBUG("[PROCDUMP] Failed to get RVA of hal!KeGetCurrentIrql\n");
+            throw -1;
+        }
+
+        addr_t modlist;
+        if ( VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &modlist) )
+        {
+            PRINT_DEBUG("[PROCDUMP] Couldn't read PsLoadedModuleList\n");
+            throw -1;
+        }
+
+        addr_t hal_base = 0;
+        if ( !drakvuf_get_module_base_addr(drakvuf, modlist, "hal.dll", &hal_base) )
+        {
+            PRINT_DEBUG("[PROCDUMP] Couldn't find hal.dll\n");
+            throw -1;
+        }
+
+        this->current_irql_va = hal_base + func_rva;
+
+        json_object_put(hal_profile);
+    }
+    else
+    {
+        this->current_irql_va =
+            drakvuf_kernel_symbol_to_va(drakvuf, "KeGetCurrentIrql");
+    }
+
+}
+
+void win_procdump2::init_sys_info()
+{
+    vmi_lock_guard vmi(drakvuf);
+
+    num_cpus = vmi_get_num_vcpus(vmi);
+    win_build_info_t build_info;
+    if (!vmi_get_windows_build_info(vmi, &build_info))
+        throw -1;
+
+    win_build_number = build_info.buildnumber;
+    win_major = build_info.major;
+    win_minor = build_info.minor;
+
+    uint32_t r0, r1, r2;
+    __cpuid(0, r0, vendor[0], vendor[2], vendor[1]);
+    __cpuid(1, version_information, r0, r1, feature_information);
+    __cpuid(0x80000001, r0, amd_extended_cpu_features, r1, r2);
+}
+
+void win_procdump2::init_hooks(bool disable_kedelayexecutionthread_hook,
+    bool disable_kideliverapc_hook)
+{
+    this->terminate_process_hook = createSyscallHook("NtTerminateProcess", &win_procdump2::terminate_process_cb);
+    this->clean_process_memory_hook = createSyscallHook("MmCleanProcessAddressSpace", &win_procdump2::clean_process_memory_cb);
+    if (!disable_kedelayexecutionthread_hook)
+    {
+        this->delay_execution_hook = createSyscallHook("KeDelayExecutionThread", &win_procdump2::delay_execution_cb);
+        is_plugin_enabled = true;
+    }
+    if (!disable_kideliverapc_hook)
+    {
+        this->deliver_apc_hook = createSyscallHook("KiDeliverApc", &win_procdump2::deliver_apc_cb);
+        is_plugin_enabled = true;
+    }
 }
