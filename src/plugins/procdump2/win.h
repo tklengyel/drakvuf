@@ -248,6 +248,14 @@ private:
     void dispatch_new_do_suspend(drakvuf_trap_info_t*,
         std::shared_ptr<procdump2_ns::win_procdump2_ctx>,
         addr_t target_process_base, bool is_hosted, bool new_task);
+    bool dispatch_target_wakeup_finish_task(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_target_wakeup_finish_target(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_target_wakeup_target_wakeup(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_target_wakeup_default(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
 
     /* Injection helpers */
     void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);

@@ -767,54 +767,17 @@ bool win_procdump2::dispatch_target_wakeup(
     switch (ctx->stage())
     {
         case procdump_stage::target_awaken:
-            if (ctx->is_restored())
-            {
-                ctx->stage(procdump_stage::finished);
-                finish_task(info, ctx);
-            }
-            return false;
+            return dispatch_target_wakeup_finish_task(info, ctx);
+
         case procdump_stage::resume:
         case procdump_stage::deref_process:
         case procdump_stage::finished:
         case procdump_stage::timeout:
-            restore(info, ctx->target);
-            if (ctx->stage() == procdump_stage::resume)
-                ctx->stage(procdump_stage::target_awaken);
+            return dispatch_target_wakeup_finish_target(info, ctx);
 
-            if (ctx->is_restored())
-            {
-                ctx->stage(procdump_stage::finished);
-                finish_task(info, ctx);
-            }
-            return true;
         case procdump_stage::target_wakeup:
-            // TODO Move working thread check into function
-            if (this->working_threads.find(ctx->working.ret_tid) !=
-                this->working_threads.end())
-            {
-                // The working thread is active - keep alive
-                PROCDUMP2_DEBUG_CTX(info, ctx,
-                    "Suspended target process wake up while not finished but "
-                    "working thread still active - keep alive"
-                );
-                delay_execution(info, ctx->target, 100);
-            }
-            else
-            {
-                // The working thread is not active - finish task
-                PROCDUMP2_DEBUG_CTX(info, ctx,
-                    "Suspended target process wake up while not finished and "
-                    "working thread finished - finish the task"
-                );
+            return dispatch_target_wakeup_target_wakeup(info, ctx);
 
-                restore(info, ctx->target);
-                ctx->stage(procdump_stage::finished);
-                if (ctx->is_restored())
-                {
-                    finish_task(info, ctx);
-                }
-            }
-            return true;
         case procdump_stage::prepare_minidump:
             PROCDUMP2_DEBUG_CTX(info, ctx,
                 "WARNING! Taraget wakeup don't handle this stage"
@@ -826,23 +789,8 @@ bool win_procdump2::dispatch_target_wakeup(
         case procdump_stage::lookup_process:
         case procdump_stage::allocate_pool:
         case procdump_stage::copy_memory:
-            if (ctx->can_resuspend_target())
-            {
-                PROCDUMP2_DEBUG_CTX(info, ctx,
-                    "Suspended target process wake up while not finished "
-                    "(retries %d)"
-                    , ctx->target_suspend_count
-                );
-                suspend(info, ctx, ctx->target);
-            }
-            else
-            {
-                ctx->stage(procdump_stage::target_wakeup);
-                dispatch_target_wakeup(info, ctx);
-            }
-            return true;
+            return dispatch_target_wakeup_default(info, ctx);
     }
-    return true;
 }
 
 /*
@@ -1369,6 +1317,84 @@ void win_procdump2::dispatch_new_do_suspend(drakvuf_trap_info_t* info,
         suspend(info, ctx, ctx->target);
         ctx->stage(procdump_stage::suspend);
     }
+}
+
+bool win_procdump2::dispatch_target_wakeup_finish_task(drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    if (ctx->is_restored())
+    {
+        ctx->stage(procdump_stage::finished);
+        finish_task(info, ctx);
+    }
+    return false;
+}
+
+bool win_procdump2::dispatch_target_wakeup_finish_target(drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    restore(info, ctx->target);
+    if (ctx->stage() == procdump_stage::resume)
+        ctx->stage(procdump_stage::target_awaken);
+
+    if (ctx->is_restored())
+    {
+        ctx->stage(procdump_stage::finished);
+        finish_task(info, ctx);
+    }
+    return true;
+}
+
+bool win_procdump2::dispatch_target_wakeup_target_wakeup(drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    // TODO Move working thread check into function
+    if (this->working_threads.find(ctx->working.ret_tid) !=
+        this->working_threads.end())
+    {
+        // The working thread is active - keep alive
+        PROCDUMP2_DEBUG_CTX(info, ctx,
+            "Suspended target process wake up while not finished but "
+            "working thread still active - keep alive"
+        );
+        delay_execution(info, ctx->target, 100);
+    }
+    else
+    {
+        // The working thread is not active - finish task
+        PROCDUMP2_DEBUG_CTX(info, ctx,
+            "Suspended target process wake up while not finished and "
+            "working thread finished - finish the task"
+        );
+
+        restore(info, ctx->target);
+        ctx->stage(procdump_stage::finished);
+        if (ctx->is_restored())
+        {
+            finish_task(info, ctx);
+        }
+    }
+    return true;
+}
+
+bool win_procdump2::dispatch_target_wakeup_default(drakvuf_trap_info_t* info,
+    std::shared_ptr<win_procdump2_ctx> ctx)
+{
+    if (ctx->can_resuspend_target())
+    {
+        PROCDUMP2_DEBUG_CTX(info, ctx,
+            "Suspended target process wake up while not finished "
+            "(retries %d)"
+            , ctx->target_suspend_count
+        );
+        suspend(info, ctx, ctx->target);
+    }
+    else
+    {
+        ctx->stage(procdump_stage::target_wakeup);
+        dispatch_target_wakeup(info, ctx);
+    }
+    return true;
 }
 
 /*****************************************************************************
