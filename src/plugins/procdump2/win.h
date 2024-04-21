@@ -106,7 +106,6 @@
 #define WIN_PROCDUMP2_H
 
 #include <map>
-#include <unordered_map>
 #include <set>
 #include <string>
 
@@ -114,12 +113,8 @@
 
 #include "plugins/plugins_ex.h"
 #include "helpers/exclude_matcher.h"
-
 #include "private2.h"
-
-struct win_procdump2_ctx;
-class pool_manager;
-struct return_ctx;
+#include "win_private.h"
 
 class win_procdump2 : public pluginex
 {
@@ -139,8 +134,9 @@ private:
 
     /* Internal data */
     uint64_t                                             procdumps_count{0};
-    std::unique_ptr<pool_manager>                        pools;
-    std::map<vmi_pid_t, std::shared_ptr<win_procdump2_ctx>>  active;
+    std::unique_ptr<procdump2_ns::pool_manager>          pools;
+    std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>  pending;
+    std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>  active;
     uint32_t                                             begin_stop_at{0};
     /* Set of finished tasks.
      *
@@ -170,7 +166,8 @@ private:
     std::vector<vmi_pid_t> running_processes_on_start;
     const exclude_matcher exclude;
 
-    /* Hooks */
+    bool is_plugin_enabled = false;
+
     std::unique_ptr<libhook::SyscallHook> terminate_process_hook;
     std::unique_ptr<libhook::SyscallHook> deliver_apc_hook;
     std::unique_ptr<libhook::SyscallHook> delay_execution_hook;
@@ -183,6 +180,11 @@ private:
     addr_t copy_virt_mem_va{0};
     addr_t current_irql_va{0};
     addr_t delay_execution_va{0};
+    addr_t lookup_process_va{0};
+    addr_t deref_object_va{0};
+
+    size_t object_header_size{0};
+    std::array<size_t, procdump2_ns::__OFFSET_MAX> offsets{};
 
     /* Minidump info */
     // TODO Move to function
@@ -203,42 +205,117 @@ private:
 
     /* Dispatchers */
     event_response_t dispatcher(drakvuf_trap_info_t*);
-    void dispatch_active(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    void dispatch_active_get_irql(drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx);
-    void dispatch_active_copy_memory(drakvuf_trap_info_t* info, std::shared_ptr<win_procdump2_ctx> ctx);
+    void dispatch_active(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     bool dispatch_new(drakvuf_trap_info_t*);
-    bool dispatch_pending(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    bool dispatch_host_wakeup(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    bool dispatch_target_wakeup(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
+    bool dispatch_pending(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_host_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_target_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+
+    void handle_workig_finish(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+
+    /* Dispatchers helpers */
+    void dispatch_active_invalid(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_suspend(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_get_irql(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_lookup_process(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_allocate_pool(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_copy_memory(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    size_t dispatch_active_copy_memory_get_size(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>, uint32_t&);
+    void dispatch_active_copy_memory_finish(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_copy_memory_dump_next_region(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_copy_memory_continue_cur_region(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>, size_t, uint32_t);
+    void dispatch_active_resume(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_deref_process(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_target_awaken(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_active_target_wakeup(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_pending(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_on_run(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_on_timeout(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dispatch_pending_on_timeout_finish(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_on_timeout_resume(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_pending_on_timeout(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_pending_suspend(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_new_get_target_info(drakvuf_trap_info_t*,
+        addr_t& target_process_base, std::string& target_process_name,
+        vmi_pid_t& target_process_pid, bool& is_hosted);
+    void dispatch_new_do_suspend(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>,
+        addr_t target_process_base, bool is_hosted, bool new_task);
+    bool dispatch_target_wakeup_finish_task(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_target_wakeup_finish_target(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_target_wakeup_target_wakeup(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_target_wakeup_default(drakvuf_trap_info_t*,
+        std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
 
     /* Injection helpers */
-    void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    void copy_memory(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>, addr_t, size_t);
-    void get_irql(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    void resume(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    void suspend(drakvuf_trap_info_t*, addr_t, return_ctx&);
-    void delay_execution(drakvuf_trap_info_t*, return_ctx&, uint16_t msec = 100);
+    void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void allocate_pool_or_start_copy(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>, addr_t, size_t);
+    void get_irql(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void lookup_process(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void deref_process(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void resume(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void suspend(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>, procdump2_ns::return_ctx&);
+    void delay_execution(drakvuf_trap_info_t*, procdump2_ns::return_ctx&, uint16_t msec = 100);
 
     /* Routines */
-    void check_stack_marker(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>, return_ctx&);
-    std::shared_ptr<win_procdump2_ctx> continues_task(drakvuf_trap_info_t*);
+    void check_stack_marker(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>, procdump2_ns::return_ctx&);
+    std::shared_ptr<procdump2_ns::win_procdump2_ctx> continues_task(drakvuf_trap_info_t*);
     /* The function erases task context from "this->active".
      * So be carefull while iterating over it.
      */
-    void finish_task(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
+    void finish_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
     void print_dump_exclusion(drakvuf_trap_info_t*);
-    std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    bool is_active_process(vmi_pid_t pid);
-    bool is_process_handled(vmi_pid_t pid);
+    std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool is_active_process(vmi_pid_t);
+    std::shared_ptr<procdump2_ns::win_procdump2_ctx> get_active_task(drakvuf_trap_info_t*);
+    bool is_pending_process(vmi_pid_t);
+    bool is_handled_process(vmi_pid_t);
+    bool is_host_process(addr_t process);
     bool is_plugin_active();
-    bool prepare_minidump(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    void dump_zero_page(std::shared_ptr<win_procdump2_ctx>);
-    void read_vm(addr_t, std::shared_ptr<win_procdump2_ctx>, size_t);
-    void restore(drakvuf_trap_info_t*, return_ctx&);
-    void save_file_metadata(std::shared_ptr<win_procdump2_ctx>, proc_data_t*);
-    bool start_copy_memory(drakvuf_trap_info_t*, std::shared_ptr<win_procdump2_ctx>);
-    void start_dump_process(vmi_pid_t pid);
+    bool prepare_minidump(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void dump_zero_page(std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void read_vm(addr_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>, size_t);
+    void restore(drakvuf_trap_info_t*, procdump2_ns::return_ctx&);
+    void restore_worker(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void store_worker(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void save_file_metadata(std::shared_ptr<procdump2_ns::win_procdump2_ctx>, proc_data_t*);
+    bool start_copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    void start_dump_process(vmi_pid_t);
     std::vector<vmi_pid_t> get_running_processes();
+    bool is_host_for_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ns::win_procdump2_ctx>);
+    bool dispatch_wakeup(drakvuf_trap_info_t*, std::map<vmi_pid_t, std::shared_ptr<procdump2_ns::win_procdump2_ctx>>& tasks_list);
+    bool is_timeouted();
+    void init_symbols(const char*);
+    void init_symbol_current_irql_win7x86(const char*);
+    void init_sys_info();
+    void init_hooks(bool, bool);
+    void print_pending_on_stop();
+    void start_dump_processes_on_stop();
 };
 
 #endif
