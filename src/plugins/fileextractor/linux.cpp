@@ -217,7 +217,7 @@ void linux_fileextractor::save_file_metadata(const std::string& file, drakvuf_tr
 std::string linux_fileextractor::get_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t file_addr)
 {
     if (!file_addr)
-        return nullptr;
+        return {};
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -228,7 +228,7 @@ std::string linux_fileextractor::get_filename(drakvuf_t drakvuf, drakvuf_trap_in
 
     addr_t dentry_addr = 0;
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &dentry_addr))
-        return nullptr;
+        return {};
 
     char* tmp = drakvuf_get_filepath_from_dentry(drakvuf, dentry_addr);
     if (!tmp)
