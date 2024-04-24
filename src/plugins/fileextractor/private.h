@@ -105,7 +105,10 @@
 #ifndef FILEDELETE_PRIVATE_H
 #define FILEDELETE_PRIVATE_H
 
-#include "../plugin_utils.h"
+#include <optional>
+
+#include "plugins/plugin_utils.h"
+#include "plugins/plugins_ex.h"
 
 struct fileextractor_config
 {
@@ -501,5 +504,72 @@ struct FILE_FS_DEVICE_INFORMATION
 
 // TODO Move into "task_t" as "MAX_READ_BYTES"
 static const uint64_t BYTES_TO_READ = 0x10000;
+
+
+/* Linux part for filextractor */
+#define FLAG_O_DSYNC     00010000
+#define FLAG_O_SYNC      04000000
+#define FLAG_O_PATH     010000000
+enum
+{
+    _INODE_I_MODE,
+    _INODE_I_UID,
+    _INODE_I_GID,
+    _INODE_I_INO,
+    _INODE_I_SIZE,
+    _INODE_I_ATIME,
+    _INODE_I_MTIME,
+    _INODE_I_CTIME,
+    _DENTRY_D_INODE,
+    _FILE_F_INODE,
+    _FILE_F_PATH,
+    _PATH_DENTRY,
+    _OPEN_HOW_FLAGS,
+    _EXT4_INODE_INFO_VFS_INODE,
+    _EXT4_INODE_INFO_I_ES_TREE,
+    _VM_AREA_STRUCT_VM_FILE,
+    _VM_AREA_STRUCT_FLAGS,
+    _VM_FAULT_VMA,
+    _KIOCB_KI_FILP,
+    __LINUX_OFFSET_MAX,
+};
+
+static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
+{
+    [_INODE_I_MODE]                  = {"inode", "i_mode"},
+    [_INODE_I_UID]                   = {"inode", "i_uid"},
+    [_INODE_I_GID]                   = {"inode", "i_gid"},
+    [_INODE_I_INO]                   = {"inode", "i_ino"},
+    [_INODE_I_SIZE]                  = {"inode", "i_size"},
+    [_INODE_I_ATIME]                 = {"inode", "i_atime"},
+    [_INODE_I_MTIME]                 = {"inode", "i_mtime"},
+    [_INODE_I_CTIME]                 = {"inode", "i_ctime"},
+    [_DENTRY_D_INODE]                = {"dentry", "d_inode"},
+    [_FILE_F_INODE]                  = {"file", "f_inode"},
+    [_FILE_F_PATH]                   = {"file", "f_path"},
+    [_PATH_DENTRY]                   = {"path", "dentry"},
+    [_OPEN_HOW_FLAGS]                = {"open_how", "flags"},
+    [_EXT4_INODE_INFO_VFS_INODE]     = {"ext4_inode_info", "vfs_inode"},
+    [_EXT4_INODE_INFO_I_ES_TREE]     = {"ext4_inode_info", "i_es_tree"},
+    [_VM_AREA_STRUCT_VM_FILE]        = {"vm_area_struct", "vm_file"},
+    [_VM_AREA_STRUCT_FLAGS]          = {"vm_area_struct", "vm_flags"},
+    [_VM_FAULT_VMA]                  = {"vm_fault", "vma"},
+    [_KIOCB_KI_FILP]                 = {"kiocb", "ki_filp"},
+};
+
+struct linux_task_t
+{
+    uint64_t inode;
+    std::string filename;
+
+    bool extracted{false}; // indicates whether the file has been extracted from the guest system.
+
+    linux_task_t(uint64_t inode_,
+        std::string filename_)
+        : inode(inode_)
+        , filename(filename_)
+    {}
+};
+
 };
 #endif // FILEDELETE_PRIVATE_H

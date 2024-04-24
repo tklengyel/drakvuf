@@ -102,84 +102,253 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LINUX_OFFSETS_MAP_H
-#define LINUX_OFFSETS_MAP_H
+#pragma once
 
-/*
- * Map offset enums to actual structure+member or global variable/function names.
- */
-static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
+#include <libdrakvuf/libdrakvuf.h>
+#include <libdrakvuf/private.h>
+#include <libdrakvuf/linux-offsets.h>
+#include <plugins/helpers/vmi_lock_guard.h>
+
+#include <cstring>
+#include <cstdlib>
+#include <vector>
+#include <memory>
+#include <functional>
+#include <string>
+
+namespace libfs
 {
-    [_TEXT] = {"_text", NULL},
-    [INIT_TASK] = {"init_task", NULL},
-    [CURRENT_TASK] = {"current_task", NULL},
-    [PCPU_HOT] = {"pcpu_hot", NULL},
-    [PCPU_HOT_CURRENT_TASK] = {"pcpu_hot", "current_task"},
-    [TASK_STRUCT_FLAGS] = {"task_struct", "flags"},
-    [TASK_STRUCT_COMM] = {"task_struct", "comm"},
-    [TASK_STRUCT_CRED] = {"task_struct", "cred"},
-    [TASK_STRUCT_PID] = {"task_struct", "pid"},
-    [TASK_STRUCT_TGID] = {"task_struct", "tgid"},
-    [TASK_STRUCT_REALPARENT] = {"task_struct", "real_parent"},
-    [TASK_STRUCT_PARENT] = {"task_struct", "parent"},
-    [TASK_STRUCT_TASKS] = {"task_struct", "tasks"},
-    [TASK_STRUCT_FS] = {"task_struct", "fs"},
-    [TASK_STRUCT_NAMEIDATA] = {"task_struct", "nameidata"},
-    [TASK_STRUCT_NSPROXY] = {"task_struct", "nsproxy"},
-    [TASK_STRUCT_MMSTRUCT] = {"task_struct", "mm"},
-    [TASK_STRUCT_ACTIVE_MMSTRUCT] = {"task_struct", "active_mm"},
-    [TASK_STRUCT_THREAD_PID] = {"task_struct", "thread_pid"},
-    [TASK_STRUCT_SIGNAL] = {"task_struct", "signal"},
-    [SIGNAL_STRUCT_PIDS] = {"signal_struct", "pids"},
-    [PID_LEVEL] = {"pid", "level"},
-    [PID_NUMBERS] = {"pid", "numbers"},
-    [PID_NAMESPACE_LEVEL] = {"pid_namespace", "level"},
-    [UPID_NS] = {"upid", "ns"},
-    [UPID_NR] = {"upid", "nr"},
-    [MM_STRUCT_MMAP] = {"mm_struct", "mmap"},
-    [MM_STRUCT_PGD] = {"mm_struct", "pgd"},
-    [MM_STRUCT_ARG_START] = {"mm_struct", "arg_start"},
-    [MM_STRUCT_ENV_START] = {"mm_struct", "env_start"},
-    [MM_STRUCT_ENV_END] = {"mm_struct", "env_end"},
-    [MM_STRUCT_EXE_FILE] = {"mm_struct", "exe_file"},
-    [VM_AREA_STRUCT_FILE] = {"vm_area_struct", "vm_file"},
-    [VM_AREA_STRUCT_START] = {"vm_area_struct", "vm_start"},
-    [VM_AREA_STRUCT_END] = {"vm_area_struct", "vm_end"},
-    [VM_AREA_STRUCT_NEXT] = {"vm_area_struct", "vm_next"},
-    [VM_AREA_STRUCT_PGOFF] = {"vm_area_struct", "vm_pgoff"},
-    [VM_AREA_STRUCT_FLAGS] = {"vm_area_struct", "vm_flags"},
-    [VFSMOUNT_MNT_ROOT] = {"vfsmount", "mnt_root"},
-    [FILE_F_PATH] = {"file", "f_path"},
-    [PATH_DENTRY] = {"path", "dentry"},
-    [PATH_MNT] = {"path", "mnt"},
-    [DENTRY_D_NAME] = {"dentry", "d_name"},
-    [DENTRY_D_PARENT] = {"dentry", "d_parent"},
-    [QSTR_NAME] = {"qstr", "name"},
-    [QSTR_LEN] = {"qstr", "len"},
-    [FS_STRUCT_ROOT] = {"fs_struct", "root"},
-    [CRED_UID] = {"cred", "uid"},
-    [ELF64HDR_PHNUM] = {"elf64_hdr", "e_phnum"},
-    [ELF64HDR_PHENTSIZE] = {"elf64_hdr", "e_phentsize"},
-    [ELF64HDR_PHOFF] = {"elf64_hdr", "e_phoff"},
-    [ELF64PHDR_TYPE] = {"elf64_phdr", "p_type"},
-    [ELF64PHDR_OFFSET] = {"elf64_phdr", "p_offset"},
-    [ELF64PHDR_VADDR] = {"elf64_phdr", "p_vaddr"},
-    [ELF64SYM_NAME] = {"elf64_sym", "st_name"},
-    [ELF64SYM_VALUE] = {"elf64_sym", "st_value"},
-    [ELF64RELA_ADDEND] = {"elf64_rela", "r_addend"},
-    [ELF64RELA_INFO] = {"elf64_rela", "r_info"},
-    [ELF64RELA_OFFSET] = {"elf64_rela", "r_offset"},
-    [NSPROXY_UTS_NS] = {"nsproxy", "uts_ns"},
-    [UTS_NAMESPACE_NAME] = {"uts_namespace", "name"},
-    [NEW_UTSNAME_RELEASE] = {"new_utsname", "release"},
-    [EXTENT_STATUS_RB_NODE] = {"extent_status", "rb_node"},
-    [EXTENT_STATUS_ES_LBLK] = {"extent_status", "es_lblk"},
-    [EXTENT_STATUS_ES_LEN] = {"extent_status", "es_len"},
-    [EXTENT_STATUS_ES_PBLK] = {"extent_status", "es_pblk"},
-    [RB_NODE___RB_PARENT_COLOR] = {"rb_node", "__rb_parent_color"},
-    [RB_NODE_RB_RIGHT] = {"rb_node", "rb_right"},
-    [RB_NODE_RB_LEFT] = {"rb_node", "rb_left"},
-    [RB_ROOT_RB_NODE] = {"rb_root", "rb_node"},
+
+#define ZERO_OFFSET 0
+#define SECTOR_SIZE 512
+#define LBA_SIZE SECTOR_SIZE
+
+/* MBR related */
+#define MBR_TYPE_UNUSED           0x00
+#define MBR_TYPE_EXTENDED_DOS     0x05
+#define MBR_TYPE_NTFS             0x07
+#define MBR_TYPE_EXTENDED_WINDOWS 0x0F
+#define MBR_TYPE_LINUX_SWAP       0x82
+#define MBR_TYPE_LINUX            0x83
+#define MBR_TYPE_EFI_GPT          0xEE
+
+#define MBR_BOOT_SIGNATURE        0xAA55
+
+// 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+const uint8_t GPT_GUID_LINUX_FILESYSTEM_DATA[16] = {0xAF, 0x3D, 0xC6, 0x0F, 0x83, 0x84, 0x72, 0x47, 0x8E, 0x79, 0x3D, 0x69, 0xD8, 0x47, 0x7D, 0xE4};
+
+#pragma pack(push, 1)
+typedef struct
+{
+    uint8_t   status;
+    struct
+    {
+        uint8_t h;
+        uint16_t cs;
+    } start_chs;
+    uint8_t type;
+    struct
+    {
+        uint8_t h;
+        uint16_t cs;
+    } end_chs;
+    uint32_t starting_lba;
+    uint32_t number_of_sectors;
+} mbr_partition_t;
+
+typedef struct
+{
+    uint8_t         bootstrap_code[440];
+    uint32_t        disk_signature;
+    uint16_t        copy_protected;
+    mbr_partition_t partition_table[4];
+    uint16_t        boot_signature;
+} mbr_t;
+#pragma pack(pop)
+
+/* GPT related */
+#pragma pack(push, 1)
+typedef struct
+{
+    char     signature[8];
+    uint32_t revision;
+    uint32_t header_size;
+    uint32_t crc32_header;
+    uint32_t reserved;
+    uint64_t current_lba;
+    uint64_t backup_lba;
+    uint64_t first_use_lba_for_partitions;
+    uint64_t last_use_lba_for_partitions;
+    uint8_t  disk_guid[16];
+    uint64_t partition_start_lba;
+    uint32_t number_of_partitions;
+    uint32_t size_of_partition;
+    uint32_t crc32_of_partitions_array;
+    uint8_t  zeroes[420];
+} gpt_t;
+
+typedef struct
+{
+    uint8_t  type_guid[16];
+    uint8_t  unique_guid[16];
+    uint64_t first_lba;
+    uint64_t last_lba;
+    uint64_t attributes;
+    uint8_t  partition_name[72];
+} gpt_partition_t;
+#pragma pack(pop)
+
+// file information taken from inode
+struct file_info
+{
+    uint64_t inode_number;
+    uint32_t uid;
+    uint32_t gid;
+    uint64_t filesize;
+    uint32_t access_time;
+    uint32_t modify_time;
+    uint32_t change_time;
+    uint16_t mode;
+
+    file_info(
+        uint64_t inode_number,
+        uint32_t uid,
+        uint32_t gid,
+        uint64_t filesize,
+        uint32_t access_time,
+        uint32_t modify_time,
+        uint32_t change_time,
+        uint16_t mode
+    ) : inode_number(inode_number),
+        uid(uid),
+        gid(gid),
+        filesize(filesize),
+        access_time(access_time),
+        modify_time(modify_time),
+        change_time(change_time),
+        mode(mode)
+    {}
 };
 
-#endif
+class BaseFilesystem
+{
+public:
+    virtual ~BaseFilesystem() = 0;
+
+    BaseFilesystem(const BaseFilesystem&) = delete;
+
+    BaseFilesystem(BaseFilesystem&&) noexcept;
+
+    BaseFilesystem& operator=(const BaseFilesystem&) = delete;
+
+    BaseFilesystem& operator=(BaseFilesystem&&) noexcept;
+
+protected:
+    explicit BaseFilesystem(drakvuf_t);
+
+    drakvuf_t drakvuf_ = nullptr;
+
+    uint64_t filesystem_start = 0;
+
+    /* working disk */
+    std::string device_id;
+
+    /* disk initialization */
+    void init_disk();
+
+    /*
+     * Read raw data in buffer
+     *
+     * @param offset absolute offset on disk
+     * @param count amount of bytes
+     * @param buffer destination
+     * @return status
+     */
+    status_t get_raw_from_disk(size_t offset, size_t count, void* buffer)
+    {
+        auto vmi = vmi_lock_guard(drakvuf_);
+        return vmi_read_disk(vmi, device_id.c_str(), offset, count, buffer);
+    }
+
+    /*
+     * Read raw data in buffer
+     *
+     * @param offset absolute offset on disk
+     * @param count amount of bytes
+     * @param buffer destination
+     * @return status
+     */
+    status_t get_raw_from_fs(size_t offset, size_t count, void* buffer)
+    {
+        return get_raw_from_disk(filesystem_start + offset, count, buffer);
+    }
+
+    /*
+     * Returns the specified structure at the specified offset
+     *
+     * @param offset absolute offset on disk
+     * @return specifed structure
+     */
+    template <typename T>
+    std::unique_ptr<T> get_struct_from_disk(size_t offset)
+    {
+        std::vector<uint8_t> buffer(sizeof(T));
+
+        if (VMI_FAILURE == get_raw_from_disk(offset, sizeof(T), buffer.data()))
+        {
+            PRINT_ERROR("[FILEEXTRACTOR] failed to read struct from disk\n");
+            throw -1;
+        }
+
+        return std::make_unique<T>(*reinterpret_cast<T*>(buffer.data()));
+    }
+
+    /*
+     * Returns the specified structure with an offset within the file system
+     *
+     * @param offset relative to the beginning of the file system
+     * @return specifed structure
+     */
+    template <typename T>
+    std::unique_ptr<T> get_struct_from_fs(size_t offset)
+    {
+        return get_struct_from_disk<T>(filesystem_start + offset);
+    }
+
+    /*
+     * Returns the vector of specified structures
+     *
+     * @param offset absolute offset on disk
+     * @param count of structures
+     * @return vector of structures
+     */
+    template <typename T>
+    std::vector<T> get_array_of_structs_from_disk(size_t offset, size_t count)
+    {
+        std::vector<T> buffer(count);
+        if (VMI_FAILURE == get_raw_from_disk(offset, sizeof(T) * count, buffer.data()))
+        {
+            throw -1;
+        }
+        return buffer;
+    }
+
+    /*
+     * Returns the vector of specified structures
+     *
+     * @param offset relative to the beginning of the file system
+     * @param count of structures
+     * @return vector of structures
+     */
+    template <typename T>
+    std::vector<T> get_array_of_structs_from_fs(size_t offset, size_t count)
+    {
+        return get_array_of_structs_from_disk<T>(filesystem_start + offset, count);
+    }
+
+private:
+    bool detect_filesystem_start();
+    bool detect_filesystem_start_gpt();
+};
+
+}; // end namespace

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2023 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2024 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -106,6 +106,7 @@
 #include <assert.h>
 
 #include "fileextractor.h"
+#include "linux.h"
 #include "win.h"
 
 fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output) : pluginex(drakvuf, output)
@@ -114,10 +115,7 @@ fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* conf
     if (os == VMI_OS_WINDOWS)
         this->wf = std::make_unique<win_fileextractor>(drakvuf, config, output);
     else
-    {
-        PRINT_DEBUG("[FILEEXTRACTOR] Other platforms no supported yet\n");
-        throw -1;
-    }
+        this->lf = std::make_unique<linux_fileextractor>(drakvuf, config, output);
 }
 
 bool fileextractor::stop_impl()
@@ -126,8 +124,5 @@ bool fileextractor::stop_impl()
     if (os == VMI_OS_WINDOWS)
         return this->wf->stop();
     else
-    {
-        PRINT_DEBUG("[FILEEXTRACTOR] Other platforms no supported yet\n");
-        return true;
-    }
+        return this->lf->stop();
 }

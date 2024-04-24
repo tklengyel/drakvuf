@@ -102,84 +102,67 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LINUX_OFFSETS_MAP_H
-#define LINUX_OFFSETS_MAP_H
+#ifndef LIBFS_EXT4
+#define LIBFS_EXT4
 
-/*
- * Map offset enums to actual structure+member or global variable/function names.
- */
-static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
+#include <libfs/base.hpp>
+#include <libfs/ext4/private.hpp>
+
+#include <stddef.h>
+#include <stdint.h>
+#include <variant>
+#include <fstream>
+#include <tuple>
+
+namespace libfs
 {
-    [_TEXT] = {"_text", NULL},
-    [INIT_TASK] = {"init_task", NULL},
-    [CURRENT_TASK] = {"current_task", NULL},
-    [PCPU_HOT] = {"pcpu_hot", NULL},
-    [PCPU_HOT_CURRENT_TASK] = {"pcpu_hot", "current_task"},
-    [TASK_STRUCT_FLAGS] = {"task_struct", "flags"},
-    [TASK_STRUCT_COMM] = {"task_struct", "comm"},
-    [TASK_STRUCT_CRED] = {"task_struct", "cred"},
-    [TASK_STRUCT_PID] = {"task_struct", "pid"},
-    [TASK_STRUCT_TGID] = {"task_struct", "tgid"},
-    [TASK_STRUCT_REALPARENT] = {"task_struct", "real_parent"},
-    [TASK_STRUCT_PARENT] = {"task_struct", "parent"},
-    [TASK_STRUCT_TASKS] = {"task_struct", "tasks"},
-    [TASK_STRUCT_FS] = {"task_struct", "fs"},
-    [TASK_STRUCT_NAMEIDATA] = {"task_struct", "nameidata"},
-    [TASK_STRUCT_NSPROXY] = {"task_struct", "nsproxy"},
-    [TASK_STRUCT_MMSTRUCT] = {"task_struct", "mm"},
-    [TASK_STRUCT_ACTIVE_MMSTRUCT] = {"task_struct", "active_mm"},
-    [TASK_STRUCT_THREAD_PID] = {"task_struct", "thread_pid"},
-    [TASK_STRUCT_SIGNAL] = {"task_struct", "signal"},
-    [SIGNAL_STRUCT_PIDS] = {"signal_struct", "pids"},
-    [PID_LEVEL] = {"pid", "level"},
-    [PID_NUMBERS] = {"pid", "numbers"},
-    [PID_NAMESPACE_LEVEL] = {"pid_namespace", "level"},
-    [UPID_NS] = {"upid", "ns"},
-    [UPID_NR] = {"upid", "nr"},
-    [MM_STRUCT_MMAP] = {"mm_struct", "mmap"},
-    [MM_STRUCT_PGD] = {"mm_struct", "pgd"},
-    [MM_STRUCT_ARG_START] = {"mm_struct", "arg_start"},
-    [MM_STRUCT_ENV_START] = {"mm_struct", "env_start"},
-    [MM_STRUCT_ENV_END] = {"mm_struct", "env_end"},
-    [MM_STRUCT_EXE_FILE] = {"mm_struct", "exe_file"},
-    [VM_AREA_STRUCT_FILE] = {"vm_area_struct", "vm_file"},
-    [VM_AREA_STRUCT_START] = {"vm_area_struct", "vm_start"},
-    [VM_AREA_STRUCT_END] = {"vm_area_struct", "vm_end"},
-    [VM_AREA_STRUCT_NEXT] = {"vm_area_struct", "vm_next"},
-    [VM_AREA_STRUCT_PGOFF] = {"vm_area_struct", "vm_pgoff"},
-    [VM_AREA_STRUCT_FLAGS] = {"vm_area_struct", "vm_flags"},
-    [VFSMOUNT_MNT_ROOT] = {"vfsmount", "mnt_root"},
-    [FILE_F_PATH] = {"file", "f_path"},
-    [PATH_DENTRY] = {"path", "dentry"},
-    [PATH_MNT] = {"path", "mnt"},
-    [DENTRY_D_NAME] = {"dentry", "d_name"},
-    [DENTRY_D_PARENT] = {"dentry", "d_parent"},
-    [QSTR_NAME] = {"qstr", "name"},
-    [QSTR_LEN] = {"qstr", "len"},
-    [FS_STRUCT_ROOT] = {"fs_struct", "root"},
-    [CRED_UID] = {"cred", "uid"},
-    [ELF64HDR_PHNUM] = {"elf64_hdr", "e_phnum"},
-    [ELF64HDR_PHENTSIZE] = {"elf64_hdr", "e_phentsize"},
-    [ELF64HDR_PHOFF] = {"elf64_hdr", "e_phoff"},
-    [ELF64PHDR_TYPE] = {"elf64_phdr", "p_type"},
-    [ELF64PHDR_OFFSET] = {"elf64_phdr", "p_offset"},
-    [ELF64PHDR_VADDR] = {"elf64_phdr", "p_vaddr"},
-    [ELF64SYM_NAME] = {"elf64_sym", "st_name"},
-    [ELF64SYM_VALUE] = {"elf64_sym", "st_value"},
-    [ELF64RELA_ADDEND] = {"elf64_rela", "r_addend"},
-    [ELF64RELA_INFO] = {"elf64_rela", "r_info"},
-    [ELF64RELA_OFFSET] = {"elf64_rela", "r_offset"},
-    [NSPROXY_UTS_NS] = {"nsproxy", "uts_ns"},
-    [UTS_NAMESPACE_NAME] = {"uts_namespace", "name"},
-    [NEW_UTSNAME_RELEASE] = {"new_utsname", "release"},
-    [EXTENT_STATUS_RB_NODE] = {"extent_status", "rb_node"},
-    [EXTENT_STATUS_ES_LBLK] = {"extent_status", "es_lblk"},
-    [EXTENT_STATUS_ES_LEN] = {"extent_status", "es_len"},
-    [EXTENT_STATUS_ES_PBLK] = {"extent_status", "es_pblk"},
-    [RB_NODE___RB_PARENT_COLOR] = {"rb_node", "__rb_parent_color"},
-    [RB_NODE_RB_RIGHT] = {"rb_node", "rb_right"},
-    [RB_NODE_RB_LEFT] = {"rb_node", "rb_left"},
-    [RB_ROOT_RB_NODE] = {"rb_root", "rb_node"},
+
+class Ext4Filesystem : public BaseFilesystem
+{
+private:
+    /* config provided */
+    uint64_t extract_size;
+
+    /* fs specific variables */
+    std::unique_ptr<ext4_super_block> super_block;
+
+    /* fs initialization */
+    void init_super_block();
+
+    /* save file helpers */
+    struct write_file_data
+    {
+        std::ofstream outfile;
+        uint64_t filesize;
+        uint64_t offset = 0;
+    };
+
+    /* work with inode */
+    std::unique_ptr<ext4_inode> get_inode(uint64_t inode_number);
+    std::unique_ptr<ext4_inode> read_inode_from_disk(uint64_t inode_number);
+
+    /* work with extents */
+    std::vector<uint8_t> get_data_from_extent(std::unique_ptr<write_file_data>& config, ext4_extent& extent);
+    void save_data_from_leaf(std::unique_ptr<write_file_data>& outfile, std::unique_ptr<ext4_extent_header>& extent_header, std::vector<ext4_extent_union>& extents);
+    void traverse_extents(std::unique_ptr<write_file_data>& config, std::unique_ptr<ext4_extent_header>& extent_header, std::vector<ext4_extent_union>& extents);
+
+    // todo
+    std::vector<ext4_dir_entry_generic_t> get_inode_dir_entries(std::unique_ptr<ext4_inode>& inode);
+
+    /* helper functions */
+    bool save_file_by_inode(const std::string& output_file, uint64_t inode_number, std::unique_ptr<ext4_inode>& inode, uint64_t inode_size, std::unique_ptr<ext4_extent_header>& extent_header, std::vector<ext4_extent_union>& extents);
+
+    /* rb helpers */
+    addr_t rb_first(addr_t root);
+    addr_t rb_next(addr_t node);
+    std::vector<ext4_extent> get_extents_from_tree(addr_t i_es_tree);
+public:
+    Ext4Filesystem(drakvuf_t drakvuf, uint64_t extract_size);
+
+    bool save_file_by_inode(const std::string& output_file, uint64_t inode_number);
+    bool save_file_by_tree(const std::string& output_file, uint64_t i_size, addr_t i_es_tree);
 };
+
+}; // end namespace
 
 #endif
