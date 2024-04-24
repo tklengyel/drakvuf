@@ -247,7 +247,7 @@ std::vector<uint8_t> Ext4Filesystem::get_data_from_extent(std::unique_ptr<write_
         return {};
 
     uint64_t offset = extent.get_start() * super_block->get_block_size();
-    uint64_t length = extent.ee_len * super_block->get_block_size();
+    uint64_t length = (uint64_t)extent.ee_len * (uint64_t)super_block->get_block_size();
 
     uint64_t rest = config->filesize - config->offset;
     /* truncate last extent by actual filesize */
