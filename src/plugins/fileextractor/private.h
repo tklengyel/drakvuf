@@ -107,6 +107,15 @@
 
 #include "../plugin_utils.h"
 
+struct fileextractor_config
+{
+    uint32_t timeout;
+    const char* dump_folder;
+    uint64_t hash_size;
+    uint64_t extract_size;
+    const char* exclude_file;
+};
+
 namespace fileextractor_ns
 {
 #define FILE_DISPOSITION_INFORMATION 13
