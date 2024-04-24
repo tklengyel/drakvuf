@@ -126,7 +126,8 @@ addr_t Ext4Filesystem::rb_first(addr_t root)
         return 0;
 
     ctx.addr = n + this->offsets[RB_NODE_RB_LEFT];
-    addr_t rb_left, tmp = 0;
+    addr_t rb_left = 0;
+    addr_t tmp = 0;
     while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &tmp) && tmp)
     {
         rb_left = tmp;
@@ -168,7 +169,8 @@ addr_t Ext4Filesystem::rb_next(addr_t node)
         return node;
     }
 
-    addr_t parent, tmp = 0;
+    addr_t tmp = 0;
+    addr_t parent = 0;
     ctx.addr = node + this->offsets[RB_NODE___RB_PARENT_COLOR];
     while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &tmp))
     {
