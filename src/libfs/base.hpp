@@ -104,9 +104,6 @@
 
 #pragma once
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <libdrakvuf/private.h>
-#include <libdrakvuf/linux-offsets.h>
 #include <plugins/helpers/vmi_lock_guard.h>
 
 #include <cstring>

@@ -172,14 +172,6 @@ static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
     [NSPROXY_UTS_NS] = {"nsproxy", "uts_ns"},
     [UTS_NAMESPACE_NAME] = {"uts_namespace", "name"},
     [NEW_UTSNAME_RELEASE] = {"new_utsname", "release"},
-    [EXTENT_STATUS_RB_NODE] = {"extent_status", "rb_node"},
-    [EXTENT_STATUS_ES_LBLK] = {"extent_status", "es_lblk"},
-    [EXTENT_STATUS_ES_LEN] = {"extent_status", "es_len"},
-    [EXTENT_STATUS_ES_PBLK] = {"extent_status", "es_pblk"},
-    [RB_NODE___RB_PARENT_COLOR] = {"rb_node", "__rb_parent_color"},
-    [RB_NODE_RB_RIGHT] = {"rb_node", "rb_right"},
-    [RB_NODE_RB_LEFT] = {"rb_node", "rb_left"},
-    [RB_ROOT_RB_NODE] = {"rb_root", "rb_node"},
 };
 
 #endif

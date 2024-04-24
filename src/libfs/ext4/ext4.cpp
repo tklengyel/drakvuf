@@ -116,20 +116,21 @@ addr_t Ext4Filesystem::rb_first(addr_t root)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf_->kpgd,
-        .addr = root + drakvuf_->offsets[RB_ROOT_RB_NODE]
+        .dtb = this->dtb_,
+        .addr = root + this->offsets[RB_ROOT_RB_NODE]
     );
 
+    auto vmi = vmi_lock_guard(drakvuf_);
     addr_t n;
-    if (VMI_FAILURE == vmi_read_addr(drakvuf_->vmi, &ctx, &n) || !n)
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &n) || !n)
         return 0;
 
-    ctx.addr = n + drakvuf_->offsets[RB_NODE_RB_LEFT];
+    ctx.addr = n + this->offsets[RB_NODE_RB_LEFT];
     addr_t rb_left, tmp = 0;
-    while (VMI_SUCCESS == vmi_read_addr(drakvuf_->vmi, &ctx, &tmp) && tmp)
+    while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &tmp) && tmp)
     {
         rb_left = tmp;
-        ctx.addr = rb_left + drakvuf_->offsets[RB_NODE_RB_LEFT];
+        ctx.addr = rb_left + this->offsets[RB_NODE_RB_LEFT];
     }
 
     return rb_left;
@@ -139,47 +140,48 @@ addr_t Ext4Filesystem::rb_next(addr_t node)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf_->kpgd,
-        .addr = node + drakvuf_->offsets[RB_NODE___RB_PARENT_COLOR]
+        .dtb = this->dtb_,
+        .addr = node + this->offsets[RB_NODE___RB_PARENT_COLOR]
     );
 
+    auto vmi = vmi_lock_guard(drakvuf_);
     addr_t empty_node = 0;
-    if (VMI_FAILURE == vmi_read_addr(drakvuf_->vmi, &ctx, &empty_node) || empty_node == node)
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &empty_node) || empty_node == node)
         return 0;
 
     /* If we have a right-hand child, go down and then left as far as we can. */
     addr_t rb_right = 0;
-    ctx.addr = node + drakvuf_->offsets[RB_NODE_RB_RIGHT];
-    if (VMI_SUCCESS == vmi_read_addr(drakvuf_->vmi, &ctx, &rb_right) && rb_right)
+    ctx.addr = node + this->offsets[RB_NODE_RB_RIGHT];
+    if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rb_right) && rb_right)
     {
         node = rb_right;
 
         addr_t rb_left = 0;
-        ctx.addr = node + drakvuf_->offsets[RB_NODE_RB_LEFT];
-        while (VMI_SUCCESS == vmi_read_addr(drakvuf_->vmi, &ctx, &rb_left) && rb_left)
+        ctx.addr = node + this->offsets[RB_NODE_RB_LEFT];
+        while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rb_left) && rb_left)
         {
             // important: don't place assignment in loop it's break logic
             node = rb_left;
-            ctx.addr = node + drakvuf_->offsets[RB_NODE_RB_LEFT];
+            ctx.addr = node + this->offsets[RB_NODE_RB_LEFT];
         }
 
         return node;
     }
 
     addr_t parent, tmp = 0;
-    ctx.addr = node + drakvuf_->offsets[RB_NODE___RB_PARENT_COLOR];
-    while (VMI_SUCCESS == vmi_read_addr(drakvuf_->vmi, &ctx, &tmp))
+    ctx.addr = node + this->offsets[RB_NODE___RB_PARENT_COLOR];
+    while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &tmp))
     {
         parent = tmp & ~3;
         if (!parent)
             break;
 
-        ctx.addr = parent + drakvuf_->offsets[RB_NODE_RB_RIGHT];
-        if (VMI_FAILURE == vmi_read_addr(drakvuf_->vmi, &ctx, &rb_right) || node != rb_right)
+        ctx.addr = parent + this->offsets[RB_NODE_RB_RIGHT];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &rb_right) || node != rb_right)
             break;
 
         node = parent;
-        ctx.addr = node + drakvuf_->offsets[RB_NODE___RB_PARENT_COLOR];
+        ctx.addr = node + this->offsets[RB_NODE___RB_PARENT_COLOR];
     }
 
     return parent;
@@ -189,8 +191,9 @@ std::vector<ext4_extent> Ext4Filesystem::get_extents_from_tree(addr_t i_es_tree)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf_->kpgd
+        .dtb = this->dtb_,
     );
+    auto vmi = vmi_lock_guard(drakvuf_);
 
     addr_t node = rb_first(i_es_tree);
 
@@ -200,21 +203,21 @@ std::vector<ext4_extent> Ext4Filesystem::get_extents_from_tree(addr_t i_es_tree)
 
     while (node)
     {
-        addr_t es = node - drakvuf_->offsets[EXTENT_STATUS_RB_NODE];
+        addr_t es = node - this->offsets[EXTENT_STATUS_RB_NODE];
 
         uint32_t es_lblk, es_len = 0;
         uint64_t es_pblk = 0;
 
-        ctx.addr = es + drakvuf_->offsets[EXTENT_STATUS_ES_LBLK];
-        if (VMI_FAILURE == vmi_read_32(drakvuf_->vmi, &ctx, &es_lblk))
+        ctx.addr = es + this->offsets[EXTENT_STATUS_ES_LBLK];
+        if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &es_lblk))
             goto out;
 
-        ctx.addr = es + drakvuf_->offsets[EXTENT_STATUS_ES_LEN];
-        if (VMI_FAILURE == vmi_read_32(drakvuf_->vmi, &ctx, &es_len))
+        ctx.addr = es + this->offsets[EXTENT_STATUS_ES_LEN];
+        if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &es_len))
             goto out;
 
-        ctx.addr = es + drakvuf_->offsets[EXTENT_STATUS_ES_PBLK];
-        if (VMI_FAILURE == vmi_read_64(drakvuf_->vmi, &ctx, &es_pblk))
+        ctx.addr = es + this->offsets[EXTENT_STATUS_ES_PBLK];
+        if (VMI_FAILURE == vmi_read_64(vmi, &ctx, &es_pblk))
             goto out;
 
         ext4_extent extent =
@@ -410,8 +413,10 @@ bool Ext4Filesystem::save_file_by_inode(const std::string& output_filename, uint
  * @param inode_number inode in filesystem
  * @return if the file is saved successfully, then true is returned, otherwise false
  */
-bool Ext4Filesystem::save_file_by_inode(const std::string& output_file, uint64_t inode_number)
+bool Ext4Filesystem::save_file_by_inode(const std::string& output_file, uint64_t inode_number, addr_t dtb)
 {
+    this->dtb_ = dtb;
+
     auto inode = get_inode(inode_number);
     if (nullptr == inode)
         return {};
@@ -439,8 +444,10 @@ bool Ext4Filesystem::save_file_by_inode(const std::string& output_file, uint64_t
  * @param i_es_tree red black tree (https://elixir.bootlin.com/linux/v6.4/source/fs/ext4/ext4.h#L1040)
  * @return if the file is saved successfully, then true is returned, otherwise false
  */
-bool Ext4Filesystem::save_file_by_tree(const std::string& output_file, uint64_t i_size, addr_t i_es_tree)
+bool Ext4Filesystem::save_file_by_tree(const std::string& output_file, uint64_t i_size, addr_t i_es_tree, addr_t dtb)
 {
+    this->dtb_ = dtb;
+
     /* prepare config for writing file */
     auto config = std::make_unique<write_file_data>();
 
@@ -507,6 +514,11 @@ void Ext4Filesystem::init_super_block()
 Ext4Filesystem::Ext4Filesystem(drakvuf_t drakvuf, uint64_t extract_size) : BaseFilesystem(drakvuf),
     extract_size(extract_size)
 {
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_offset_names, this->offsets.size(), this->offsets.data()))
+    {
+        PRINT_ERROR("[ext4] failed to get some offsets\n");
+        return;
+    }
     init_super_block();
 }
 

@@ -349,7 +349,7 @@ std::unique_ptr<linux_fileextractor::extract_result> linux_fileextractor::extrac
     umask(S_IWGRP|S_IWOTH);
     try
     {
-        if (!ext4->save_file_by_tree(output_filename, result->file_info->filesize, i_es_tree))
+        if (!ext4->save_file_by_tree(output_filename, result->file_info->filesize, i_es_tree, info->regs->cr3))
             result->file_info = {};
     }
     catch (int)

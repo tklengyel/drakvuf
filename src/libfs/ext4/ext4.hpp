@@ -117,9 +117,40 @@
 namespace libfs
 {
 
+enum
+{
+    EXTENT_STATUS_RB_NODE,
+    EXTENT_STATUS_ES_LBLK,
+    EXTENT_STATUS_ES_LEN,
+    EXTENT_STATUS_ES_PBLK,
+    RB_ROOT_RB_NODE,
+    RB_NODE_RB_LEFT,
+    RB_NODE_RB_RIGHT,
+    RB_NODE___RB_PARENT_COLOR,
+    __LINUX_EXT4_OFFSET_MAX,
+};
+
+static const char* linux_offset_names[__LINUX_EXT4_OFFSET_MAX][2] =
+{
+    [EXTENT_STATUS_RB_NODE] = {"extent_status", "rb_node"},
+    [EXTENT_STATUS_ES_LBLK] = {"extent_status", "es_lblk"},
+    [EXTENT_STATUS_ES_LEN] = {"extent_status", "es_len"},
+    [EXTENT_STATUS_ES_PBLK] = {"extent_status", "es_pblk"},
+    [RB_NODE___RB_PARENT_COLOR] = {"rb_node", "__rb_parent_color"},
+    [RB_NODE_RB_RIGHT] = {"rb_node", "rb_right"},
+    [RB_NODE_RB_LEFT] = {"rb_node", "rb_left"},
+    [RB_ROOT_RB_NODE] = {"rb_root", "rb_node"},
+};
+
 class Ext4Filesystem : public BaseFilesystem
 {
 private:
+    /* offsets for parsing kernel structures */
+    std::array<size_t, __LINUX_EXT4_OFFSET_MAX> offsets;
+
+    /* because we can't use directly drakvuf_->kpgd store in this variable */
+    addr_t dtb_;
+
     /* config provided */
     uint64_t extract_size;
 
@@ -159,8 +190,8 @@ private:
 public:
     Ext4Filesystem(drakvuf_t drakvuf, uint64_t extract_size);
 
-    bool save_file_by_inode(const std::string& output_file, uint64_t inode_number);
-    bool save_file_by_tree(const std::string& output_file, uint64_t i_size, addr_t i_es_tree);
+    bool save_file_by_inode(const std::string& output_file, uint64_t inode_number, addr_t dtb);
+    bool save_file_by_tree(const std::string& output_file, uint64_t i_size, addr_t i_es_tree, addr_t dtb);
 };
 
 }; // end namespace
