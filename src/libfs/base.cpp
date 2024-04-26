@@ -183,15 +183,9 @@ void BaseFilesystem::init_disk()
 
     /* by default use first device_id */
     device_id = std::string(devices_ids[0]);
-    for (uint32_t i = 0; i < number_of_disks; i++) {
-        /* TODO: just for testing on ci, remove */
-        PRINT_ERROR("[FILEEXTRACTOR] devices_ids[%d]=%s\n", i, devices_ids[i]);
+    for (uint32_t i = 0; i < number_of_disks; i++)
         free(devices_ids[i]);
-    }
     free(devices_ids);
-
-    /* TODO: just for testing on ci, remove */
-    PRINT_ERROR("[FILEEXTRACTOR] device_id: %s\n", device_id.c_str());
 }
 
 BaseFilesystem::BaseFilesystem(drakvuf_t drakvuf)
