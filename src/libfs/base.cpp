@@ -203,7 +203,7 @@ BaseFilesystem::BaseFilesystem(drakvuf_t drakvuf)
         PRINT_ERROR("[FILEEXTRACTOR] can't find filesystem start offset\n");
         throw -1;
     }
-};
+}
 
 BaseFilesystem::BaseFilesystem(BaseFilesystem&& rhs) noexcept
 {
@@ -219,4 +219,4 @@ BaseFilesystem& BaseFilesystem::operator=(BaseFilesystem&& rhs) noexcept
 BaseFilesystem::~BaseFilesystem()
 {}
 
-}; // namespace libfs
+} // namespace libfs

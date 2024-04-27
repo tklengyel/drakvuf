@@ -524,4 +524,4 @@ Ext4Filesystem::Ext4Filesystem(drakvuf_t drakvuf, uint64_t extract_size) : BaseF
     init_super_block();
 }
 
-}; // namespace libfs
+} // namespace libfs

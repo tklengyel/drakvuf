@@ -194,6 +194,6 @@ public:
     bool save_file_by_tree(const std::string& output_file, uint64_t i_size, addr_t i_es_tree, addr_t dtb);
 };
 
-}; // end namespace
+} // end namespace
 
 #endif

@@ -356,7 +356,7 @@ struct ext4_super_block
     uint32_t get_block_size()
     {
         return 1 << (10 + s_log_block_size);
-    };
+    }
 
     uint64_t get_groups_per_flex()
     {
@@ -505,7 +505,7 @@ struct ext4_group_desc
     uint64_t get_inode_table()
     {
         return (uint64_t)(bg_inode_table_lo) | ((uint64_t)bg_inode_table_hi << 32);
-    };
+    }
 };
 #pragma pack(pop)
 typedef struct ext4_group_desc* ext4_group_desc_t;
@@ -814,7 +814,7 @@ struct ext4_xattr_entry
     char        e_name[];        /* attribute name */
 };
 
-}; // end namespace
+} // end namespace
 
 
 #endif

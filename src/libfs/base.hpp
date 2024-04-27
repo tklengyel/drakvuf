@@ -348,4 +348,4 @@ private:
     bool detect_filesystem_start_gpt();
 };
 
-}; // end namespace
+} // end namespace
