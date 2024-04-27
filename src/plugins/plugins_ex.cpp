@@ -124,12 +124,12 @@ char ERROR_MSG_ADDING_TRAP[] = "Failed to add a trap";
 
 pluginex::pluginex(drakvuf_t drakvuf, output_format_t output)
     : m_output_format(output), drakvuf(drakvuf)
-{};
+{}
 
 pluginex::~pluginex()
 {
     stop();
-};
+}
 
 bool pluginex::stop_impl()
 {

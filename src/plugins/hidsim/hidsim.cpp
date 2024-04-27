@@ -209,7 +209,7 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config) :
 hidsim::~hidsim()
 {
     this->stop();
-};
+}
 
 bool hidsim::stop_impl()
 {

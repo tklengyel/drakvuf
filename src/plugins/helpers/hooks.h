@@ -130,7 +130,7 @@ class PluginResult : public libhook::CallResult
 public:
     PluginResult()
         : libhook::CallResult()
-    {};
+    {}
 
     class pluginex* plugin_ = nullptr;
 };

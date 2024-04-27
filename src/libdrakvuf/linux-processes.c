@@ -622,7 +622,7 @@ int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base)
         return -1;
 
     return uid;
-};
+}
 
 int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {

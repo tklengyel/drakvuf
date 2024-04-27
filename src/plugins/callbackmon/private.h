@@ -375,4 +375,4 @@ static const char* offset_miniport_names[__OFFSET_MINIPORT_MAX][2] =
     [NDIS_MINIPORT_BLOCK_SYNCHRONOUSRETURNPACKETHANDLER]           = { "_NDIS_MINIPORT_BLOCK", "SynchronousReturnPacketHandler"           },
     [NDIS_MINIPORT_BLOCK_TOPNDIS5PACKETINDICATEHANDLER]            = { "_NDIS_MINIPORT_BLOCK", "TopNdis5PacketIndicateHandler"            }
 };
-};
+}

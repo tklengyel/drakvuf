@@ -506,6 +506,7 @@ struct FILE_FS_DEVICE_INFORMATION
 static const uint64_t BYTES_TO_READ = 0x10000;
 
 
+
 /* Linux part for filextractor */
 #define FLAG_O_DSYNC     00010000
 #define FLAG_O_SYNC      04000000
@@ -572,4 +573,7 @@ struct linux_task_t
 };
 
 };
+
+}
+
 #endif // FILEDELETE_PRIVATE_H
