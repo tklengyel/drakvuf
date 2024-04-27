@@ -142,7 +142,7 @@ public:
     virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val)
     {
         return NULL;
-    };
+    }
 
     syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     syscalls_base(const syscalls_base&) = delete;

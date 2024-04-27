@@ -72,6 +72,7 @@ if get_option('buildtype').startswith('debug')
     add_project_arguments('-Wfloat-equal', language : ['cpp'])
     add_project_arguments('-Wundef', language : ['cpp'])
     add_project_arguments('-Wvla', language : ['cpp'])
+    add_project_arguments('-Wextra-semi', language : ['c', 'cpp'])
     add_project_arguments('-ftrivial-auto-var-init=pattern', language: ['c', 'cpp'])
 elif get_option('hardening')
     # Runtime hardening for release builds

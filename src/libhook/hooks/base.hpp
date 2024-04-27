@@ -163,4 +163,4 @@ protected:
     drakvuf_t drakvuf_ = nullptr;
 };
 
-};  // namespace libhook
+}  // namespace libhook

@@ -529,7 +529,7 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
         PRINT_DEBUG("The process at 0x%" PRIx64 " has a userid larger then INT_MAX!\n", eprocess_base);
 
     return (int64_t)userid;
-};
+}
 
 unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_base)
 {
@@ -554,7 +554,7 @@ unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_
         return NULL;
 
     return drakvuf_read_unicode_va(drakvuf, csdversion_va, 0);
-};
+}
 
 int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {

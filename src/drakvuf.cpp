@@ -428,7 +428,7 @@ static bool is_terminated(drakvuf_t drakvuf, void* data)
     return drakvuf_is_interrupted(drakvuf) ||
         (info->proc->find(info->pid) != info->proc->end() &&
             info->proc->at(info->pid));
-};
+}
 
 void drakvuf_c::terminate(vmi_pid_t injection_pid,
     uint32_t injection_tid,

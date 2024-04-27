@@ -171,4 +171,4 @@ protected:
 
 };
 
-};  // namespace libhook
+}  // namespace libhook

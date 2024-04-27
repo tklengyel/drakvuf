@@ -528,7 +528,7 @@ static bool inject_trap_io(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
     drakvuf->io = g_slist_prepend(drakvuf->io, trap);
     return 1;
-};
+}
 
 static bool _drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {

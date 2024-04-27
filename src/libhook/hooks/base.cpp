@@ -108,7 +108,7 @@ namespace libhook
 
 BaseHook::BaseHook(drakvuf_t drakvuf)
     : drakvuf_(drakvuf)
-{};
+{}
 
 BaseHook::BaseHook(BaseHook&& rhs) noexcept
 {
