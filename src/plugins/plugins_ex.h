@@ -415,7 +415,7 @@ struct call_result_t
     {}
 
     virtual ~call_result_t()
-    {};
+    {}
 
     void set_result_call_params(const drakvuf_trap_info_t* info)
     {
@@ -448,12 +448,12 @@ struct plugin_data
 
     plugin_data(pluginex* plugin, call_result_t* params)
         : plugin(plugin), params(params)
-    {};
+    {}
 
     virtual ~plugin_data()
     {
         delete params;
-    };
+    }
 };
 
 class pluginex : public plugin

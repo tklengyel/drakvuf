@@ -501,5 +501,5 @@ struct FILE_FS_DEVICE_INFORMATION
 
 // TODO Move into "task_t" as "MAX_READ_BYTES"
 static const uint64_t BYTES_TO_READ = 0x10000;
-};
+}
 #endif // FILEDELETE_PRIVATE_H

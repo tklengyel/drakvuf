@@ -302,6 +302,6 @@ static inline const char* ptrace_request_to_str(ptrace_request_t request)
     }
     return NULL;
 }
-}; // ptracemon_ns
+} // ptracemon_ns
 
 #endif

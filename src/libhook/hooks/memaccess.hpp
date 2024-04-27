@@ -204,4 +204,4 @@ auto MemAccessHook::create(drakvuf_t drakvuf, cb_wrapper_t cb, addr_t gfn, memac
     return hook;
 }
 
-};  // namespace libhook
+}  // namespace libhook

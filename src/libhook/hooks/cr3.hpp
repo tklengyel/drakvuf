@@ -202,4 +202,4 @@ auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
     return hook;
 }
 
-};  // namespace libhook
+}  // namespace libhook

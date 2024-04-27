@@ -122,7 +122,7 @@ public:
     ~wmimon()
     {
         delete[] m_offsets;
-    };
+    }
 
     const size_t* Offsets() const
     {
