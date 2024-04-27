@@ -121,7 +121,7 @@ struct ApimonReturnHookData : PluginResult
     hook_target_entry_t* target = nullptr;
 };
 
-};
+}
 
 static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
 {

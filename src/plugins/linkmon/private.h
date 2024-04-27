@@ -167,5 +167,5 @@ static const char* offset_names_2[__OFFSET_MAX][2] =
     [REPARSE_DATA_BUFFER_SUBSTITUTENAMELENGTH_SYMLINK] = {"_REPARSE_DATA_BUFFER::<anonymous-tag>::<unnamed-type-SymbolicLinkReparseBuffer>", "SubstituteNameLength"},
     [REPARSE_DATA_BUFFER_PATHBUFFER_SYMLINK] = {"_REPARSE_DATA_BUFFER::<anonymous-tag>::<unnamed-type-SymbolicLinkReparseBuffer>", "PathBuffer"},
 };
-};
+}
 #endif // LINKMON_PRIVATE_H

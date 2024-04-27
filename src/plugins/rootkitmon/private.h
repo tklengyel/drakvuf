@@ -347,6 +347,6 @@ struct filter_cb_t
         return base_addr < other.base_addr;
     }
 };
-};
+}
 
 #endif
