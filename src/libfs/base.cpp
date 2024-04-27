@@ -134,10 +134,12 @@ bool BaseFilesystem::detect_filesystem_start_gpt()
  */
 bool BaseFilesystem::detect_filesystem_start()
 {
+    PRINT_ERROR("[libfs] detect filesystem start\n");
     if (drakvuf_get_os_type(drakvuf_) != VMI_OS_LINUX)
         return false;
 
     auto mbr = get_struct_from_disk<mbr_t>(ZERO_OFFSET);
+    PRINT_ERROR("[libfs] read mbr from disk successfully\n");
 
     if (mbr->boot_signature != MBR_BOOT_SIGNATURE)
     {
@@ -184,7 +186,10 @@ void BaseFilesystem::init_disk()
     /* by default use first device_id */
     device_id = std::string(devices_ids[0]);
     for (uint32_t i = 0; i < number_of_disks; i++)
+    {
+        PRINT_ERROR("[libfs] devices_ids[%d]=%s\n", i, devices_ids[i]);
         free(devices_ids[i]);
+    }
     free(devices_ids);
 }
 

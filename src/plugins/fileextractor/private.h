@@ -572,8 +572,6 @@ struct linux_task_t
     {}
 };
 
-};
-
 }
 
 #endif // FILEDELETE_PRIVATE_H
