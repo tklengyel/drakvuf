@@ -115,7 +115,7 @@ inline void unputc(std::ostream& os)
 {
     constexpr int char_size = sizeof(std::ostream::char_type);
 
-    size_t pos = os.tellp();
+    long pos = os.tellp();
     if (pos > char_size)
     {
         os.seekp(pos - char_size);

@@ -147,7 +147,7 @@ protected:
 
         for (auto size = pptr() - pbase(); size > 0; )
         {
-            auto written = write(STDOUT_FILENO, pbase(), size);
+            auto written = write(STDOUT_FILENO, pbase(), (size_t)size);
             if (written < 0)
                 return -1;
             size -= written;

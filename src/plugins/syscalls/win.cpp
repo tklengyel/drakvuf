@@ -353,8 +353,8 @@ static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<st
         if (module.has_value())
         {
             auto resolved_lib = module.value();
-            for (auto& c : resolved_lib)
-                c = std::tolower(c);
+            for (char& c : resolved_lib)
+                c = (char)std::tolower(c);
             for (const auto& lib : whitelisted_libraries)
             {
                 if (resolved_lib.length() >= lib.length() &&

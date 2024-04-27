@@ -209,7 +209,7 @@ struct DataPrinter
     {
         char const* const hexdig = "0123456789ABCDEF";
         os << '"';
-        for (unsigned char c: value)
+        for (const char c: value)
             switch (c)
             {
                 case '\r':

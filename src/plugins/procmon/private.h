@@ -113,9 +113,9 @@ namespace procmon_ns
 
 struct task_creds
 {
-    uint32_t uid = -1;
-    uint32_t suid = -1;
-    uint32_t euid = -1;
+    uint32_t uid = ~0u;
+    uint32_t suid = ~0u;
+    uint32_t euid = ~0u;
 };
 
 struct execve_data : PluginResult

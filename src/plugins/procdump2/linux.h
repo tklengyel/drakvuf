@@ -138,7 +138,7 @@ private:
     dump_compression_t const dump_compression;
     bool const use_maple_tree{false};
     const exclude_matcher exclude;
-    int address_width = drakvuf_get_address_width(drakvuf) * 8;
+    size_t address_width = drakvuf_get_address_width(drakvuf) * 8;
     uint32_t begin_stop_at{0};
 
     void read_vma_info(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t leaf_addr, proc_data_t const& process_data, std::vector<vm_area_info>& vma_list);

@@ -115,8 +115,8 @@ using namespace syscalls_ns;
 
 static uint64_t make_hook_id(drakvuf_trap_info_t* info)
 {
-    uint64_t u64_pid = info->proc_data.pid;
-    uint64_t u64_tid = info->proc_data.tid;
+    uint64_t u64_pid = info->proc_data.pid >= 0 ?: ~0u;
+    uint64_t u64_tid = info->proc_data.tid >= 0 ?: ~0u;
     return (u64_pid << 32) | u64_tid;
 }
 
@@ -150,7 +150,7 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
         return arguments;
 
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
-    int nargs = params->sc->num_args;
+    unsigned int nargs = params->sc->num_args;
 
     // get arguments only if we know how many to get
     if (!nargs)
@@ -298,7 +298,7 @@ event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t pt_regs_addr = 0;
-    addr_t nr = ~0;
+    addr_t nr = ~0ul;
 
     if (!get_pt_regs_addr(drakvuf, info, &pt_regs_addr, &nr))
     {
@@ -333,7 +333,7 @@ bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, 
 
     // Populate params to hook
     auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
-    params->num = syscall_number;
+    params->num = (uint16_t)syscall_number;
     params->type = is_x64 ? SYSCALL_TYPE_LINUX_X64 : SYSCALL_TYPE_LINUX_X32;
     params->sc = syscall_definition;
 

@@ -171,7 +171,7 @@ public:
         const char* target_process,
         int timeout,
         bool global_search,
-        int args_count,
+        unsigned int args_count,
         const char* args[],
         vmi_pid_t* injected_pid);
     void exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid);

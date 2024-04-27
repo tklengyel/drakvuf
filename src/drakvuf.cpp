@@ -376,7 +376,7 @@ injector_status_t drakvuf_c::inject_cmd(
     const char* target_process,
     int _timeout,
     bool global_search,
-    int args_count,
+    unsigned int args_count,
     const char* args[],
     vmi_pid_t* injected_pid)
 {

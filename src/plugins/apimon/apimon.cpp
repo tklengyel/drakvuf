@@ -125,8 +125,8 @@ struct ApimonReturnHookData : PluginResult
 
 static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
 {
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
+    uint64_t u64_pid = info->attached_proc_data.pid >= 0 ?: ~0u;
+    uint64_t u64_tid = info->attached_proc_data.tid >= 0 ?: ~0u;
     return (u64_pid << 32) | u64_tid;
 }
 
@@ -239,7 +239,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
     std::vector<uint64_t> arguments;
     arguments.reserve(target->argument_printers.size());
-    for (size_t i = 1; i <= target->argument_printers.size(); i++)
+    for (unsigned int i = 1; i <= target->argument_printers.size(); i++)
     {
         uint64_t argument = drakvuf_get_function_argument(drakvuf, info, i);
         arguments.push_back(argument);
