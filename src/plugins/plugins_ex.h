@@ -591,7 +591,7 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name, uint64_t)
+std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name, uint64_t ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -608,7 +608,7 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name, uint64_t)
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb, const std::optional<std::string>& display_name, uint64_t ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -621,7 +621,7 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, uint64_t)
+std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, uint64_t ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -634,7 +634,7 @@ std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, uint64_t)
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, uint64_t)
+std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, uint64_t ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -647,7 +647,7 @@ std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, uint6
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb, uint64_t)
+std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb, uint64_t ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
@@ -660,7 +660,7 @@ std::unique_ptr<libhook::CatchAllHook> pluginex::createCatchAllHook(Callback cb,
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::MemAccessHook> pluginex::createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, uint64_t)
+std::unique_ptr<libhook::MemAccessHook> pluginex::createMemAccessHook(Callback cb, addr_t gfn, memaccess_type_t mem_access_type, vmi_mem_access_t mem_access, uint64_t ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 

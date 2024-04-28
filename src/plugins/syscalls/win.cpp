@@ -452,10 +452,10 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
              * Must be signed long because the offset may be negative.
              */
             offset = table[syscall_num] >> 4;
-            syscall_va = _sst[0] + offset;
+            syscall_va = (addr_t)((long long)_sst[0] + offset);
         }
         else
-            syscall_va = table[syscall_num];
+            syscall_va = (addr_t)table[syscall_num];
 
         addr_t rva = syscall_va - base;
         if ( this->is32bit )
