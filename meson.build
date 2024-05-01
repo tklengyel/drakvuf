@@ -52,6 +52,7 @@ if cpp.compiles(code, name: '-fstrict-flex-arrays=2', args: ['-fstrict-flex-arra
     add_project_arguments('-fstrict-flex-arrays=2', language: ['c', 'cpp'])
 endif
 
+coverage_link_args=[]
 hardened_link_args=[]
 
 # Declare additional debug flags
@@ -112,6 +113,13 @@ elif get_option('hardening')
     config_h.set('HARDENING', 1)
 endif
 
+if get_option('coverage')
+    add_project_arguments('-fprofile-instr-generate', language: ['c', 'cpp'])
+    add_project_arguments('-fcoverage-mapping', language: ['c', 'cpp'])
+    coverage_link_args += '-fprofile-instr-generate'
+    coverage_link_args += '-fcoverage-mapping'
+endif
+
 if get_option('threadsafety')
     config_h.set('ENABLE_THREADSAFETY', 1)
 endif
@@ -148,7 +156,7 @@ executable('drakvuf',
     dependencies : deps,
     link_language : 'cpp',
     link_with : [libdrakvuf, drakvuf_plugins, libinjector],
-    link_args : hardened_link_args,
+    link_args : [hardened_link_args, coverage_link_args],
     install : true,
 )
 
@@ -159,7 +167,7 @@ executable('injector',
     dependencies : deps,
     link_language : 'cpp',
     link_with : [libdrakvuf, libinjector],
-    link_args : hardened_link_args,
+    link_args : [hardened_link_args, coverage_link_args],
     install : true,
 )
 
@@ -170,7 +178,7 @@ executable('proc_stat',
     dependencies : deps,
     link_language : 'cpp',
     link_with : libdrakvuf,
-    link_args : hardened_link_args
+    link_args : [hardened_link_args, coverage_link_args]
 )
 
 if get_option('xtf')
