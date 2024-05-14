@@ -696,17 +696,15 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
             VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(struct TOKEN_PRIVILEGES), newstate, nullptr) ||
             !newstate->privilege_count)
             goto done;
-        if (newstate->privilege_count > 1)
-        {
-            auto count = newstate->privilege_count;
-            auto size = sizeof(struct TOKEN_PRIVILEGES) + sizeof(struct LUID_AND_ATTRIBUTES) * count;
-            g_free(newstate);
-            newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(size);
-            if (!newstate ||
-                VMI_SUCCESS != vmi_read(vmi, &ctx, size, newstate, nullptr) ||
-                !newstate->privilege_count)
-                goto done;
-        }
+
+        auto count = newstate->privilege_count;
+        auto size = sizeof(struct TOKEN_PRIVILEGES) + sizeof(struct LUID_AND_ATTRIBUTES) * count;
+        g_free(newstate);
+        newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(size);
+
+        if (!newstate || VMI_SUCCESS != vmi_read(vmi, &ctx, size, newstate, nullptr) ||
+            !newstate->privilege_count)
+            goto done;
 
         for (size_t i = 0; i < newstate->privilege_count; ++i)
             privileges.push_back(stringify_privilege(newstate->privileges[i]));
