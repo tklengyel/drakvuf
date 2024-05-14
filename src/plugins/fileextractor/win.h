@@ -185,6 +185,7 @@ private:
     event_response_t setinformation_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t writefile_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t writefile_ret_cb(drakvuf_t, drakvuf_trap_info_t*);
+    void writefile_cb_impl(drakvuf_t, drakvuf_trap_info_t*, task_t&, uint64_t, uint64_t);
     event_response_t close_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t createsection_cb (drakvuf_t, drakvuf_trap_info_t*);
     event_response_t createfile_cb (drakvuf_t, drakvuf_trap_info_t*);
