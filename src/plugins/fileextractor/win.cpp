@@ -406,7 +406,6 @@ event_response_t win_fileextractor::writefile_cb(drakvuf_t,
             task->first_len = len;
             task->first_offset = offset;
             task->first_str = str;
-            task->first_cr3 = info->regs->cr3;
             get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
             if (offset)
                 get_write_offset(vmi, info, offset, &task->write_offset);
@@ -454,50 +453,17 @@ event_response_t win_fileextractor::writefile_cb(drakvuf_t,
             // free resourses after extraction and first NtWriteFile result from saved data
             free_resources(info, *task);
             task->extracted = true;
-            if (!task->append)
-            {
-                if (task->write_offset)
-                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->write_offset, task->first_len);
-                else
-                    dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->currentbyteoffset, task->first_len);
-            }
-            else
-                dump_mem_to_file(task->first_cr3, task->first_str, task->idx, task->file_size, task->first_len);
+            task->currentbyteoffset = task->file_size;
+            writefile_cb_impl(drakvuf, info, *task, task->first_str, task->first_len);
         }
     }
     // file update
     else
     {
-        // return hook setup
-        if (task->append)
-            offset = 0;
-        auto hook_id = make_hook_id(info);
-        auto hook = createReturnHook<writefile_result_t>(info,
-                &win_fileextractor::writefile_ret_cb);
-        auto params = libhook::GetTrapParams<writefile_result_t>(hook->trap_);
-        params->len = len;
-        params->str = str;
-        params->idx = task->idx;
-
         if (offset)
-        {
             get_write_offset(vmi, info, offset, &task->write_offset);
-            // check for special offset
-            if (!((task->write_offset & 0xffffffff) ^ FILE_USE_FILE_POINTER_POSITION))
-            {
-                get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
-                params->byteoffset = task->currentbyteoffset;
-            }
-            else
-                params->byteoffset = task->write_offset;
-        }
-        else
-        {
-            get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
-            params->byteoffset = task->currentbyteoffset;
-        }
-        writefile_ret_hooks[hook_id] = std::move(hook);
-
+        get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
+        writefile_cb_impl(drakvuf, info, *task, str, len);
     }
 
     PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtWriteFile handled\n"
@@ -508,28 +474,63 @@ event_response_t win_fileextractor::writefile_cb(drakvuf_t,
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+void win_fileextractor::writefile_cb_impl(drakvuf_t,
+    drakvuf_trap_info_t* info,
+    task_t& task, uint64_t str, uint64_t len)
+{
+    // return hook setup
+    auto hook_id = make_hook_id(info);
+    auto hook = createReturnHook<writefile_result_t>(info,
+            &win_fileextractor::writefile_ret_cb);
+    auto params = libhook::GetTrapParams<writefile_result_t>(hook->trap_);
+
+    params->len = len;
+    params->str = str;
+    params->idx = task.idx;
+
+    if (!task.append)
+    {
+        // check for special offset
+        if (!((task.write_offset & 0xffffffff) ^ FILE_USE_FILE_POINTER_POSITION))
+            params->byteoffset = task.currentbyteoffset;
+        else
+            params->byteoffset = task.write_offset;
+    }
+    else
+        params->byteoffset = task.currentbyteoffset;
+
+    writefile_ret_hooks[hook_id] = std::move(hook);
+}
+
+bool FAILED(unsigned long rax)
+{
+    return (rax & 0x80000000) != 0;
+}
+
 event_response_t win_fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info)
 {
     // get data from NtWriteFile Buffer and write it to a file with given offset
-    auto params = libhook::GetTrapParams<writefile_result_t>(info);
-    if (!params->verifyResultCallParams(drakvuf, info))
+    auto params_copy = *libhook::GetTrapParams<writefile_result_t>(info);
+    if (!params_copy.verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    // Return if NtWriteFile failed
-    // TODO: check rax errors
-    // if (info->regs->rax)
-    //     return VMI_EVENT_RESPONSE_NONE;
-
-    uint64_t str = params->str;
-    uint64_t len = params->len;
-    uint64_t byteoffset = params->byteoffset;
-
-    int idx = params->idx;
-
-    dump_mem_to_file(info->regs->cr3, str, idx, byteoffset, len);
     auto hook_id = make_hook_id(info);
     writefile_ret_hooks.erase(hook_id);
+
+    // Return if NtWriteFile failed
+    // False if NT_SUCCESS or NT_INFORMATION returned
+    // https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/using-ntstatus-values
+
+    if (FAILED(info->regs->rax))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    uint64_t str = params_copy.str;
+    uint64_t len = params_copy.len;
+    uint64_t byteoffset = params_copy.byteoffset;
+    int idx = params_copy.idx;
+
+    dump_mem_to_file(info->regs->cr3, str, idx, byteoffset, len);
 
     PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] On NtWriteFile return handled\n"
         , info->event_uid
@@ -538,6 +539,7 @@ event_response_t win_fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
 
     return VMI_EVENT_RESPONSE_NONE;
 }
+
 
 event_response_t win_fileextractor::createsection_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
