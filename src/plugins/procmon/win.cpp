@@ -702,11 +702,13 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
         g_free(newstate);
         newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(size);
 
-        if (!newstate || VMI_SUCCESS != vmi_read(vmi, &ctx, size, newstate, nullptr) ||
-            !newstate->privilege_count)
+        if (!newstate || VMI_SUCCESS != vmi_read(vmi, &ctx, size, newstate, nullptr) )
             goto done;
 
-        for (size_t i = 0; i < newstate->privilege_count; ++i)
+        if ( count != newstate->privilege_count )
+            fprintf(stderr, "[PROCMON] TOCTOU detected with TOKEN_PRIVILEGES privilege count!\n");
+
+        for (size_t i = 0; i < count; ++i)
             privileges.push_back(stringify_privilege(newstate->privileges[i]));
     }
 
