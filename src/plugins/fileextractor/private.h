@@ -306,7 +306,6 @@ public:
     addr_t first_len{0};
     addr_t first_offset{0};
     addr_t first_str{0};
-    uint64_t first_cr3{0};
 
     uint64_t new_eof{0};
 
