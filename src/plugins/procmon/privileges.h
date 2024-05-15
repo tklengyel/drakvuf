@@ -164,7 +164,7 @@ struct LUID_AND_ATTRIBUTES
 struct TOKEN_PRIVILEGES
 {
     uint32_t privilege_count;
-    struct LUID_AND_ATTRIBUTES privileges[1];
+    struct LUID_AND_ATTRIBUTES privileges[];
 } __attribute__((packed));
 
 std::pair<std::string, fmt::Aarg> stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege);
