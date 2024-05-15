@@ -199,6 +199,7 @@ wmi_logger_t::wmi_logger_t(etwmon* plugin, vmi_instance_t vmi, addr_t base) : ba
         }
     }
 
+    this->cb_ctx = 0;
     this->name.assign("Unknown");
     auto unicode_name = drakvuf_read_unicode_va(plugin->drakvuf, base + plugin->offsets[WMI_LOGGER_CONTEXT_LOGGERNAME], 0);
     if (unicode_name && unicode_name->contents)
