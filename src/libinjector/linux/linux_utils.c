@@ -177,6 +177,8 @@ find_vdso_failure:
 addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    // skip the syscall we are currently on
+    addr_t skip_addr = info->regs->rip - 2;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -202,6 +204,11 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
 
     char syscall[] = { 0xf, 0x5 };
     void* syscall_substring_address = memmem(vdso_memory, size, (void*)syscall, 2);
+    if (syscall_substring_address && (vdso + (syscall_substring_address - vdso_memory)) == skip_addr)
+    {
+        PRINT_DEBUG("Skip syscall offset, as it overlaps with current trap\n");
+        syscall_substring_address = memmem(syscall_substring_address + 1, size, (void*)syscall, 2);
+    }
     int syscall_offset = 0;
     if (!syscall_substring_address)
     {
