@@ -529,7 +529,7 @@ void win_syscalls::trap_syscalls(addr_t syscall_num, addr_t syscall_va, addr_t c
     }
 }
 
-bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, addr_t _sst[2], json_object* json)
+bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, std::array<addr_t, 2> _sst, json_object* json)
 {
     symbols_t* symbols = json ? json_get_symbols(json) : NULL;
 
