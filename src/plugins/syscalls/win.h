@@ -140,6 +140,9 @@ public:
 
     win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~win_syscalls();
+    
+    std::vector<std::pair<const syscalls_ns::syscall_t*, const char*>> get_symbols_for_rva(addr_t rva, addr_t syscall_va, addr_t cr3, symbols_t* symbols, bool ntos);
+    void trap_syscalls(addr_t syscall_num, addr_t syscall_va, addr_t cr3, std::vector<std::pair<const syscalls_ns::syscall_t*, const char*>>& matching_symbols, bool ntos);
 };
 
 namespace syscalls_ns
