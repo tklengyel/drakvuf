@@ -461,15 +461,17 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
         if ( this->is32bit )
             rva = static_cast<uint32_t>(rva);
 
-        const struct symbol* symbol = nullptr;
-        const syscall_t* definition = nullptr;
+        // Find all symbols for this RVA
+        auto matching_symbols = std::vector<std::pair<const syscall_t*, const char*>>();
         if ( symbols )
         {
             for (unsigned int z=0; z < symbols->count; z++)
             {
                 if ( symbols->symbols[z].rva == rva )
                 {
-                    symbol = &symbols->symbols[z];
+                    const char* symbol_name = nullptr;
+                    const syscall_t* definition = nullptr;
+                    struct symbol* symbol = &symbols->symbols[z];
 
                     for (unsigned int d=0; d < syscall_count; d++)
                     {
@@ -479,57 +481,97 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
                             break;
                         }
                     }
-                    break;
+
+                    if ( !definition )
+                    {
+                        gchar* tmp = g_strdup(symbol->name);
+                        this->strings_to_free = g_slist_prepend(this->strings_to_free, tmp);
+                        symbol_name = (const char*)tmp;
+                        PRINT_DEBUG("\t Syscall %s:%s has no internal definition. New syscall?\n",
+                            ntos ? "nt" : "wink32k", symbol_name);
+                    }
+                    else
+                    {
+                        symbol_name = definition->name;
+                    }
+                    matching_symbols.emplace_back(definition, symbol_name);
+                    // One rva can match with multiple symbols, so continue the search
                 }
             }
         }
 
-        const char* symbol_name = nullptr;
-
-        if ( !symbol )
+        if (matching_symbols.empty())
+        {
             PRINT_DEBUG("\t Syscall %lu @ 0x%lx has no debug information matching it with RVA 0x%lx. Table: 0x%lx Offset: 0x%lx\n", syscall_num, syscall_va, rva, _sst[0], offset);
-        else if ( !definition )
-        {
-            gchar* tmp = g_strdup(symbol->name);
-            this->strings_to_free = g_slist_prepend(this->strings_to_free, tmp);
-            symbol_name = (const char*)tmp;
-            PRINT_DEBUG("\t Syscall %s:%s has no internal definition. New syscall?\n",
-                ntos ? "nt" : "wink32k", symbol_name);
-        }
-        else
-            symbol_name = definition->name;
-
-        if ( !this->filter.empty() && ( !symbol_name || (this->filter.find(symbol_name) == this->filter.end())))
-        {
-            PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol_name ? symbol_name : "<unknown>");
             continue;
         }
 
-        breakpoint_by_dtb_searcher bp;
-        auto trap = this->register_trap<wrapper_t>(
-                nullptr,
-                syscall_cb,
-                bp.for_virt_addr(syscall_va).for_dtb(cr3),
-                symbol_name);
-
-        if (!trap)
+        if (!this->filter.empty())
         {
-            PRINT_DEBUG("Failed to trap syscall %lu @ 0x%lx\n", syscall_num, syscall_va);
-            continue;
+            bool no_traps = true;
+
+            // Try to trap all requested symbols
+            while (true)
+            {
+                const char* symbol_name = nullptr;
+                const syscall_t* definition = nullptr;
+                bool found = false;
+
+                for (auto it = matching_symbols.begin(); it != matching_symbols.end();)
+                {
+                    symbol_name = it->second;
+                    if (this->filter.find(symbol_name) != this->filter.end())
+                    {
+                        // If symbol must be trapped - process it and remove from vector
+                        found = true;
+                        definition = it->first;
+                        matching_symbols.erase(it);
+                        break;
+                    }
+                    else
+                    {
+                        it++;
+                    }
+                }
+
+                if (!found)
+                {
+                    if (no_traps)
+                    {
+                        PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol_name ? symbol_name : "<unknown>");
+                    }
+                    break;
+                }
+
+                no_traps = false;
+
+                breakpoint_by_dtb_searcher bp;
+                auto trap = this->register_trap<wrapper_t>(
+                        nullptr,
+                        syscall_cb,
+                        bp.for_virt_addr(syscall_va).for_dtb(cr3),
+                        symbol_name);
+
+                if (!trap)
+                {
+                    PRINT_DEBUG("Failed to trap syscall %lu @ 0x%lx\n", syscall_num, syscall_va);
+                    continue;
+                }
+
+                //After the trap got constructed, enrich its details already with some information we already (and just) know here (at this point).
+
+                //wrapper extends from call_result_t which extends from plugin_params
+                //get_trap_params reinterprets the pointer of trap->data as a pointer to wrapper
+                //Load the information that is saved by hitting the first trap.
+                //With params we can preset the params that the newly risen second breakpoint will receive.
+                auto w = get_trap_params<wrapper_t>(trap);
+
+                //enrich the params of the new/next trap. This information is used later.
+                w->num = syscall_num;
+                w->type = ntos ? "nt" : "win32k";
+                w->sc = definition;
+            }
         }
-
-        //After the trap got constructed, enrich its details already with some information we already (and just) know here (at this point).
-
-        //wrapper extends from call_result_t which extends from plugin_params
-        //get_trap_params reinterprets the pointer of trap->data as a pointer to wrapper
-        //Load the information that is saved by hitting the first trap.
-        //With params we can preset the params that the newly risen second breakpoint will receive.
-        auto w = get_trap_params<wrapper_t>(trap);
-
-        //enrich the params of the new/next trap. This information is used later.
-        w->num = syscall_num;
-        w->type = ntos ? "nt" : "win32k";
-        w->sc = definition;
     }
 
     drakvuf_free_symbols(symbols);
