@@ -102,27 +102,250 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <inttypes.h>
-#include <assert.h>
+#pragma once
 
-#include "fileextractor.h"
-#include "linux.h"
-#include "win.h"
+#include <plugins/helpers/vmi_lock_guard.h>
 
-fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output) : pluginex(drakvuf, output)
+#include <cstring>
+#include <cstdlib>
+#include <vector>
+#include <memory>
+#include <functional>
+#include <string>
+
+namespace libfs
 {
-    auto os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->wf = std::make_unique<win_fileextractor>(drakvuf, config, output);
-    else
-        this->lf = std::make_unique<linux_fileextractor>(drakvuf, config, output);
-}
 
-bool fileextractor::stop_impl()
+#define ZERO_OFFSET 0
+#define SECTOR_SIZE 512
+#define LBA_SIZE SECTOR_SIZE
+
+/* MBR related */
+#define MBR_TYPE_UNUSED           0x00
+#define MBR_TYPE_EXTENDED_DOS     0x05
+#define MBR_TYPE_NTFS             0x07
+#define MBR_TYPE_EXTENDED_WINDOWS 0x0F
+#define MBR_TYPE_LINUX_SWAP       0x82
+#define MBR_TYPE_LINUX            0x83
+#define MBR_TYPE_EFI_GPT          0xEE
+
+#define MBR_BOOT_SIGNATURE        0xAA55
+
+// 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+const uint8_t GPT_GUID_LINUX_FILESYSTEM_DATA[16] = {0xAF, 0x3D, 0xC6, 0x0F, 0x83, 0x84, 0x72, 0x47, 0x8E, 0x79, 0x3D, 0x69, 0xD8, 0x47, 0x7D, 0xE4};
+
+#pragma pack(push, 1)
+typedef struct
 {
-    auto os = drakvuf_get_os_type(this->drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        return this->wf->stop();
-    else
-        return this->lf->stop();
-}
+    uint8_t   status;
+    struct
+    {
+        uint8_t h;
+        uint16_t cs;
+    } start_chs;
+    uint8_t type;
+    struct
+    {
+        uint8_t h;
+        uint16_t cs;
+    } end_chs;
+    uint32_t starting_lba;
+    uint32_t number_of_sectors;
+} mbr_partition_t;
+
+typedef struct
+{
+    uint8_t         bootstrap_code[440];
+    uint32_t        disk_signature;
+    uint16_t        copy_protected;
+    mbr_partition_t partition_table[4];
+    uint16_t        boot_signature;
+} mbr_t;
+#pragma pack(pop)
+
+/* GPT related */
+#pragma pack(push, 1)
+typedef struct
+{
+    char     signature[8];
+    uint32_t revision;
+    uint32_t header_size;
+    uint32_t crc32_header;
+    uint32_t reserved;
+    uint64_t current_lba;
+    uint64_t backup_lba;
+    uint64_t first_use_lba_for_partitions;
+    uint64_t last_use_lba_for_partitions;
+    uint8_t  disk_guid[16];
+    uint64_t partition_start_lba;
+    uint32_t number_of_partitions;
+    uint32_t size_of_partition;
+    uint32_t crc32_of_partitions_array;
+    uint8_t  zeroes[420];
+} gpt_t;
+
+typedef struct
+{
+    uint8_t  type_guid[16];
+    uint8_t  unique_guid[16];
+    uint64_t first_lba;
+    uint64_t last_lba;
+    uint64_t attributes;
+    uint8_t  partition_name[72];
+} gpt_partition_t;
+#pragma pack(pop)
+
+// file information taken from inode
+struct file_info
+{
+    uint64_t inode_number;
+    uint32_t uid;
+    uint32_t gid;
+    uint64_t filesize;
+    uint32_t access_time;
+    uint32_t modify_time;
+    uint32_t change_time;
+    uint16_t mode;
+
+    file_info(
+        uint64_t inode_number,
+        uint32_t uid,
+        uint32_t gid,
+        uint64_t filesize,
+        uint32_t access_time,
+        uint32_t modify_time,
+        uint32_t change_time,
+        uint16_t mode
+    ) : inode_number(inode_number),
+        uid(uid),
+        gid(gid),
+        filesize(filesize),
+        access_time(access_time),
+        modify_time(modify_time),
+        change_time(change_time),
+        mode(mode)
+    {}
+};
+
+class BaseFilesystem
+{
+public:
+    virtual ~BaseFilesystem() = 0;
+
+    BaseFilesystem(const BaseFilesystem&) = delete;
+
+    BaseFilesystem(BaseFilesystem&&) noexcept;
+
+    BaseFilesystem& operator=(const BaseFilesystem&) = delete;
+
+    BaseFilesystem& operator=(BaseFilesystem&&) noexcept;
+
+protected:
+    explicit BaseFilesystem(drakvuf_t);
+
+    drakvuf_t drakvuf_ = nullptr;
+
+    uint64_t filesystem_start = 0;
+
+    /* working disk */
+    std::string device_id;
+
+    /* disk initialization */
+    void init_disk();
+
+    /*
+     * Read raw data in buffer
+     *
+     * @param offset absolute offset on disk
+     * @param count amount of bytes
+     * @param buffer destination
+     * @return status
+     */
+    status_t get_raw_from_disk(size_t offset, size_t count, void* buffer)
+    {
+        auto vmi = vmi_lock_guard(drakvuf_);
+        return vmi_read_disk(vmi, device_id.c_str(), offset, count, buffer);
+    }
+
+    /*
+     * Read raw data in buffer
+     *
+     * @param offset absolute offset on disk
+     * @param count amount of bytes
+     * @param buffer destination
+     * @return status
+     */
+    status_t get_raw_from_fs(size_t offset, size_t count, void* buffer)
+    {
+        return get_raw_from_disk(filesystem_start + offset, count, buffer);
+    }
+
+    /*
+     * Returns the specified structure at the specified offset
+     *
+     * @param offset absolute offset on disk
+     * @return specifed structure
+     */
+    template <typename T>
+    std::unique_ptr<T> get_struct_from_disk(size_t offset)
+    {
+        std::vector<uint8_t> buffer(sizeof(T));
+
+        if (VMI_FAILURE == get_raw_from_disk(offset, sizeof(T), buffer.data()))
+        {
+            PRINT_ERROR("[FILEEXTRACTOR] failed to read struct from disk\n");
+            throw -1;
+        }
+
+        return std::make_unique<T>(*reinterpret_cast<T*>(buffer.data()));
+    }
+
+    /*
+     * Returns the specified structure with an offset within the file system
+     *
+     * @param offset relative to the beginning of the file system
+     * @return specifed structure
+     */
+    template <typename T>
+    std::unique_ptr<T> get_struct_from_fs(size_t offset)
+    {
+        return get_struct_from_disk<T>(filesystem_start + offset);
+    }
+
+    /*
+     * Returns the vector of specified structures
+     *
+     * @param offset absolute offset on disk
+     * @param count of structures
+     * @return vector of structures
+     */
+    template <typename T>
+    std::vector<T> get_array_of_structs_from_disk(size_t offset, size_t count)
+    {
+        std::vector<T> buffer(count);
+        if (VMI_FAILURE == get_raw_from_disk(offset, sizeof(T) * count, buffer.data()))
+        {
+            throw -1;
+        }
+        return buffer;
+    }
+
+    /*
+     * Returns the vector of specified structures
+     *
+     * @param offset relative to the beginning of the file system
+     * @param count of structures
+     * @return vector of structures
+     */
+    template <typename T>
+    std::vector<T> get_array_of_structs_from_fs(size_t offset, size_t count)
+    {
+        return get_array_of_structs_from_disk<T>(filesystem_start + offset, count);
+    }
+
+private:
+    bool detect_filesystem_start();
+    bool detect_filesystem_start_gpt();
+};
+
+} // end namespace
