@@ -480,7 +480,8 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-bool is_kernel_addr(drakvuf_t drakvuf, addr_t addr) {
+bool is_kernel_addr(drakvuf_t drakvuf, addr_t addr)
+{
     bool const is_os_64bit = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
     return is_os_64bit ? VMI_GET_BIT(addr, 47) : VMI_GET_BIT(addr, 31);
 }
@@ -491,7 +492,7 @@ bool dump_from_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plug
     addr_t stack_ptr;
     addr_t frame_ptr;
 
-    if(is_kernel_addr(drakvuf, info->regs->rsp) || is_kernel_addr(drakvuf, info->regs->rip))
+    if (is_kernel_addr(drakvuf, info->regs->rsp) || is_kernel_addr(drakvuf, info->regs->rip))
     {
         // We're in kernel context, we need to get stack from trap frame (syscall hook)
         bool result = false;
@@ -503,12 +504,14 @@ bool dump_from_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plug
         {
             result = drakvuf_get_user_stack64(drakvuf, info, &stack_ptr);
         }
-        if(!result)
+        if (!result)
         {
             PRINT_DEBUG("[MEMDUMP] Failed to get stack pointer\n");
             return VMI_EVENT_RESPONSE_NONE;
         }
-    } else {
+    }
+    else
+    {
         // We're in user context, so we can get stack directly from registers (usermode hook)
         stack_ptr = info->regs->rsp;
     }
