@@ -492,7 +492,7 @@ bool dump_from_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plug
     addr_t stack_ptr;
     addr_t frame_ptr;
 
-    if (is_kernel_addr(drakvuf, info->regs->rsp) || is_kernel_addr(drakvuf, info->regs->rip))
+    if (is_kernel_addr(drakvuf, info->regs->rip))
     {
         // We're in kernel context, we need to get stack from trap frame (syscall hook)
         bool result = false;
