@@ -134,6 +134,7 @@ subdir('src/libdrakvuf')
 subdir('src/libinjector')
 subdir('src/libusermode')
 subdir('src/libhook')
+subdir('src/libfs')
 subdir('src/librepl')
 subdir('src/plugins')
 

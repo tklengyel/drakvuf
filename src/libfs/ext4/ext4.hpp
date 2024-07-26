@@ -102,27 +102,98 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <inttypes.h>
-#include <assert.h>
+#ifndef LIBFS_EXT4
+#define LIBFS_EXT4
 
-#include "fileextractor.h"
-#include "linux.h"
-#include "win.h"
+#include <libfs/base.hpp>
+#include <libfs/ext4/private.hpp>
 
-fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output) : pluginex(drakvuf, output)
+#include <stddef.h>
+#include <stdint.h>
+#include <variant>
+#include <fstream>
+#include <tuple>
+
+namespace libfs
 {
-    auto os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->wf = std::make_unique<win_fileextractor>(drakvuf, config, output);
-    else
-        this->lf = std::make_unique<linux_fileextractor>(drakvuf, config, output);
-}
 
-bool fileextractor::stop_impl()
+enum
 {
-    auto os = drakvuf_get_os_type(this->drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        return this->wf->stop();
-    else
-        return this->lf->stop();
-}
+    EXTENT_STATUS_RB_NODE,
+    EXTENT_STATUS_ES_LBLK,
+    EXTENT_STATUS_ES_LEN,
+    EXTENT_STATUS_ES_PBLK,
+    RB_ROOT_RB_NODE,
+    RB_NODE_RB_LEFT,
+    RB_NODE_RB_RIGHT,
+    RB_NODE___RB_PARENT_COLOR,
+    __LINUX_EXT4_OFFSET_MAX,
+};
+
+static const char* linux_offset_names[__LINUX_EXT4_OFFSET_MAX][2] =
+{
+    [EXTENT_STATUS_RB_NODE] = {"extent_status", "rb_node"},
+    [EXTENT_STATUS_ES_LBLK] = {"extent_status", "es_lblk"},
+    [EXTENT_STATUS_ES_LEN] = {"extent_status", "es_len"},
+    [EXTENT_STATUS_ES_PBLK] = {"extent_status", "es_pblk"},
+    [RB_NODE___RB_PARENT_COLOR] = {"rb_node", "__rb_parent_color"},
+    [RB_NODE_RB_RIGHT] = {"rb_node", "rb_right"},
+    [RB_NODE_RB_LEFT] = {"rb_node", "rb_left"},
+    [RB_ROOT_RB_NODE] = {"rb_root", "rb_node"},
+};
+
+class Ext4Filesystem : public BaseFilesystem
+{
+private:
+    /* offsets for parsing kernel structures */
+    std::array<size_t, __LINUX_EXT4_OFFSET_MAX> offsets;
+
+    /* because we can't use directly drakvuf_->kpgd store in this variable */
+    addr_t dtb_;
+
+    /* config provided */
+    uint64_t extract_size;
+
+    /* fs specific variables */
+    std::unique_ptr<ext4_super_block> super_block;
+
+    /* fs initialization */
+    void init_super_block();
+
+    /* save file helpers */
+    struct write_file_data
+    {
+        std::ofstream outfile;
+        uint64_t filesize;
+        uint64_t offset = 0;
+    };
+
+    /* work with inode */
+    std::unique_ptr<ext4_inode> get_inode(uint64_t inode_number);
+    std::unique_ptr<ext4_inode> read_inode_from_disk(uint64_t inode_number);
+
+    /* work with extents */
+    std::vector<uint8_t> get_data_from_extent(std::unique_ptr<write_file_data>& config, ext4_extent& extent);
+    void save_data_from_leaf(std::unique_ptr<write_file_data>& outfile, std::unique_ptr<ext4_extent_header>& extent_header, std::vector<ext4_extent_union>& extents);
+    void traverse_extents(std::unique_ptr<write_file_data>& config, std::unique_ptr<ext4_extent_header>& extent_header, std::vector<ext4_extent_union>& extents);
+
+    // todo
+    std::vector<ext4_dir_entry_generic_t> get_inode_dir_entries(std::unique_ptr<ext4_inode>& inode);
+
+    /* helper functions */
+    bool save_file_by_inode(const std::string& output_file, uint64_t inode_number, std::unique_ptr<ext4_inode>& inode, uint64_t inode_size, std::unique_ptr<ext4_extent_header>& extent_header, std::vector<ext4_extent_union>& extents);
+
+    /* rb helpers */
+    addr_t rb_first(addr_t root);
+    addr_t rb_next(addr_t node);
+    std::vector<ext4_extent> get_extents_from_tree(addr_t i_es_tree);
+public:
+    Ext4Filesystem(drakvuf_t drakvuf, uint64_t extract_size);
+
+    bool save_file_by_inode(const std::string& output_file, uint64_t inode_number, addr_t dtb);
+    bool save_file_by_tree(const std::string& output_file, uint64_t i_size, addr_t i_es_tree, addr_t dtb);
+};
+
+} // end namespace
+
+#endif

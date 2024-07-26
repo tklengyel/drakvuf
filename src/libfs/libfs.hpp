@@ -102,27 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <inttypes.h>
-#include <assert.h>
+#pragma once
 
-#include "fileextractor.h"
-#include "linux.h"
-#include "win.h"
-
-fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output) : pluginex(drakvuf, output)
-{
-    auto os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->wf = std::make_unique<win_fileextractor>(drakvuf, config, output);
-    else
-        this->lf = std::make_unique<linux_fileextractor>(drakvuf, config, output);
-}
-
-bool fileextractor::stop_impl()
-{
-    auto os = drakvuf_get_os_type(this->drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        return this->wf->stop();
-    else
-        return this->lf->stop();
-}
+#include <libfs/ext4/ext4.hpp>
