@@ -1146,6 +1146,8 @@ bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* re
     ctx.x64.user_regs.rdx = regs->x86.rdx;
     ctx.x64.user_regs.rbp = regs->x86.rbp;
     ctx.x64.user_regs.rsp = regs->x86.rsp;
+    ctx.x64.user_regs.rsi = regs->x86.rsi;
+    ctx.x64.user_regs.rdi = regs->x86.rdi;
     ctx.x64.user_regs.r8 = regs->x86.r8;
     ctx.x64.user_regs.r9 = regs->x86.r9;
     ctx.x64.user_regs.r10 = regs->x86.r10;
