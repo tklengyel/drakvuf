@@ -336,4 +336,24 @@ static const uint16_t win10_1803_tcp_offsets[__TCP_ARRAY_MAX] =
     [REMOTE_ADDR_OFF1]  = 0xf0,
 };
 
+static const uint16_t winserv_2019_tcp_offsets[__TCP_ARRAY_MAX] =
+{
+    [IP_FAMILY_OFF0]    = 0x10,
+    [IP_FAMILY_OFF1]    = 0x18,
+    [LOCAL_PORT]        = 0xC0,
+    [REMOTE_PORT]       = 0xC4,
+    [REMOTE_ADDR_OFF0]  = 0x18,
+    [REMOTE_ADDR_OFF1]  = 0xC0,
+};
+
+static const uint16_t win10_21h2_23h2_tcp_offsets[__TCP_ARRAY_MAX] =
+{
+    [IP_FAMILY_OFF0]    = 0x10,
+    [IP_FAMILY_OFF1]    = 0x18,
+    [LOCAL_PORT]        = 0x70,
+    [REMOTE_PORT]       = 0x72,
+    [REMOTE_ADDR_OFF0]  = 0x18,
+    [REMOTE_ADDR_OFF1]  = 0xC0,
+};
+
 #endif
