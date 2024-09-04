@@ -23,68 +23,72 @@ jobs:
       image: ${{ matrix.container }}
 
     steps:
-    - name: Install dependencies
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        apt-get update -q
-        apt-get install -y \
-            autoconf-archive flex bison libjson-c-dev clang build-essential \
-            git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev \
-            clang llvm lld meson ninja-build
-        apt-get clean
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        with:
+          config: ${{ vars.PERMISSIONS_CONFIG }}
 
-    - name: Configure safe dirs
-      run: git config --global --add safe.directory $PWD
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update -q
+          apt-get install -y \
+              autoconf-archive flex bison libjson-c-dev clang build-essential \
+              git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev \
+              clang llvm lld meson ninja-build
+          apt-get clean
 
-    - uses: actions/checkout@v4
+      - name: Configure safe dirs
+        run: git config --global --add safe.directory $PWD
 
-    - name: Get Xen version
-      id: get-xen-hash
-      run: |
-        echo XEN_HASH=${{ matrix.container }}_$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
 
-    - name: Cache Xen debball
-      id: cache-xen
-      uses: actions/cache@v4
-      with:
-        path: xen/dist
-        key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}
+      - name: Get Xen version
+        id: get-xen-hash
+        run: |
+          echo XEN_HASH=${{ matrix.container }}_$(git submodule | grep xen | awk '{ print $1 }') >> $GITHUB_OUTPUT
 
-    - name: Create Xen debball
-      if: steps.cache-xen.outputs.cache-hit != 'true'
-      run: |
-        apt-get install -y \
-            wget git bcc bin86 gawk bridge-utils iproute2 \
-            libcurl4-openssl-dev bzip2 libpci-dev build-essential \
-            libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev \
-            patch libvncserver-dev libssl-dev iasl libbz2-dev \
-            e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison \
-            flex ocaml-findlib xz-utils gettext libpixman-1-dev \
-            libaio-dev libfdt-dev cabextract libfuse-dev \
-            liblzma-dev autoconf-archive kpartx python3-dev \
-            python3-pip golang libsystemd-dev
-        git submodule update --init xen
-        cd xen
-        ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs --disable-werror --with-extra-qemuu-configure-args="--disable-werror"
-        make -j4 debball
-        cd ..
+      - name: Cache Xen debball
+        id: cache-xen
+        uses: actions/cache@v4
+        with:
+          path: xen/dist
+          key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}
 
-    - name: Install Xen debball
-      run: |
-        dpkg -i xen/dist/xen-*.deb
+      - name: Create Xen debball
+        if: steps.cache-xen.outputs.cache-hit != 'true'
+        run: |
+          apt-get install -y \
+              wget git bcc bin86 gawk bridge-utils iproute2 \
+              libcurl4-openssl-dev bzip2 libpci-dev build-essential \
+              libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev \
+              patch libvncserver-dev libssl-dev iasl libbz2-dev \
+              e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison \
+              flex ocaml-findlib xz-utils gettext libpixman-1-dev \
+              libaio-dev libfdt-dev cabextract libfuse-dev \
+              liblzma-dev autoconf-archive kpartx python3-dev \
+              python3-pip golang libsystemd-dev
+          git submodule update --init xen
+          cd xen
+          ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs --disable-werror --with-extra-qemuu-configure-args="--disable-werror"
+          make -j4 debball
+          cd ..
 
-    - name: Install LibVMI
-      run: |
-        git submodule update --init libvmi
-        cd libvmi
-        autoreconf -vif
-        ./configure --disable-kvm --disable-bareflank --disable-file --disable-examples
-        make
-        make install
-        cd ..
+      - name: Install Xen debball
+        run: |
+          dpkg -i xen/dist/xen-*.deb
 
-    - name: Compile
-      run: |
-        meson setup build --native-file llvm.ini
-        ninja -C build
+      - name: Install LibVMI
+        run: |
+          git submodule update --init libvmi
+          cd libvmi
+          autoreconf -vif
+          ./configure --disable-kvm --disable-bareflank --disable-file --disable-examples
+          make
+          make install
+          cd ..
+
+      - name: Compile
+        run: |
+          meson setup build --native-file llvm.ini
+          ninja -C build
