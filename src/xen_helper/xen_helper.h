@@ -133,7 +133,7 @@ typedef struct ipt_state
 bool xen_init_interface(xen_interface_t** xen);
 void xen_free_interface(xen_interface_t* xen);
 
-int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID, char** name);
+bool xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID, char** name);
 xc_evtchn* xen_get_evtchn(xen_interface_t* xen);
 int xen_get_evtchn_fd(xen_interface_t* xen);
 
