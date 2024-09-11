@@ -233,10 +233,11 @@ bool drakvuf_init(
     drakvuf_event_fd_add(drakvuf, xen_get_evtchn_fd(drakvuf->xen), drakvuf_vmi_event_callback, drakvuf);
     PRINT_DEBUG("drakvuf_init: adding event_fd done\n");
 
-    xen_get_dom_info(drakvuf->xen, domain, &drakvuf->domID, &drakvuf->dom_name);
-    domid_t test = ~0;
-    if ( drakvuf->domID == test )
+    if ( !xen_get_dom_info(drakvuf->xen, domain, &drakvuf->domID, &drakvuf->dom_name) )
+    {
+        fprintf(stderr, "Failed to get domain info\n");
         goto err;
+    }
 
     xen_pause(drakvuf->xen, drakvuf->domID);
 

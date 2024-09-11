@@ -192,7 +192,7 @@ bool xen_init_interface(xen_interface_t** xen)
 #endif
 
     *xen = _xen;
-    return 1;
+    return true;
 
 err:
     if ( _xen && _xen->xlw.xc_handle ) dlclose(_xen->xlw.xc_handle);
@@ -200,7 +200,7 @@ err:
     if ( _xen && _xen->xlw.xl_handle ) dlclose(_xen->xlw.xl_handle);
     xen_free_interface(_xen);
     *xen = NULL;
-    return 0;
+    return false;
 }
 
 void xen_free_interface(xen_interface_t* xen)
@@ -240,7 +240,7 @@ int xen_get_evtchn_fd(xen_interface_t* xen)
     return xen->evtchn_fd;
 }
 
-int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
+bool xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
     char** name)
 {
     uint32_t _domID;
@@ -255,25 +255,20 @@ int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
 
     if (_domID == ~0U)
     {
-        _name = strdup(input);
-        xen->xlw.libxl_name_to_domid(xen->xl_ctx, input, &_domID);
-        if (!_domID || _domID == ~0U)
+        int rc = xen->xlw.libxl_name_to_domid(xen->xl_ctx, input, &_domID);
+        if (rc < 0)
         {
             printf("Domain is not running, failed to get domID from name!\n");
-            free(_name);
-            return -1;
+            return false;
         }
-        else
-        {
-            //printf("Got domID from name: %u\n", _domID);
-        }
+
+        _name = strdup(input);
     }
     else
     {
-
         xc_domaininfo_t info = { 0 };
 
-        if ( 1 == xen->xlw.xc_domain_getinfolist(xen->xc, _domID, 1, &info)
+        if (1 == xen->xlw.xc_domain_getinfolist(xen->xc, _domID, 1, &info)
             && info.domain == _domID)
         {
             _name = xen->xlw.libxl_domid_to_name(xen->xl_ctx, _domID);
@@ -287,14 +282,14 @@ int xen_get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
     *name = _name;
     *domID = (domid_t)_domID;
 
-    return 1;
+    return true;
 }
 
 uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID)
 {
     xc_domaininfo_t info = { 0 };
 
-    if ( 1 == xen->xlw.xc_domain_getinfolist(xen->xc, domID, 1, &info) && info.domain == domID)
+    if (1 == xen->xlw.xc_domain_getinfolist(xen->xc, domID, 1, &info) && info.domain == domID)
         return info.max_pages << (XC_PAGE_SHIFT-10);
 
     return 0;
@@ -309,10 +304,10 @@ bool xen_set_maxmemkb(xen_interface_t* xen, domid_t domID, uint64_t mem)
 bool xen_pause(xen_interface_t* xen, domid_t domID)
 {
     int rc = xen->xlw.xc_domain_pause(xen->xc, domID);
-    if ( rc < 0 )
-        return 0;
+    if (rc < 0)
+        return false;
 
-    return 1;
+    return true;
 }
 
 /* Decrements Xen's pause count and only resumes when it reaches 0 */
@@ -357,7 +352,7 @@ bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID)
     if (rc < 0)
     {
         fprintf(stderr, "Failed to get HVM_PARAM_ALTP2M, RC: %i\n", rc);
-        return 0;
+        return false;
     }
 
     if (param_altp2m != XEN_ALTP2M_external)
@@ -366,11 +361,11 @@ bool xen_set_altp2m_params(xen_interface_t* xen, domid_t domID)
         if (rc < 0)
         {
             fprintf(stderr, "Failed to set HVM_PARAM_ALTP2M, RC: %i\n", rc);
-            return 0;
+            return false;
         }
     }
 
-    return 1;
+    return true;
 }
 
 int xen_version(void)
@@ -382,7 +377,7 @@ int xen_version(void)
 
     if (fp)
     {
-        if ( getline(&line, &len, fp) != -1 && line && len)
+        if (getline(&line, &len, fp) != -1 && line && len)
             version = atoi(line);
         fclose(fp);
     }
