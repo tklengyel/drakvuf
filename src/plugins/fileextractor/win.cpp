@@ -140,7 +140,7 @@ event_response_t win_fileextractor::openfile_cb(drakvuf_t drakvuf,
     addr_t desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t create_options = drakvuf_get_function_argument(drakvuf, info, 6);
 
-    bool append = (desired_access & FILE_APPEND_DATA ) && !(desired_access & FILE_WRITE_DATA );
+    bool append = (desired_access & FILE_APPEND_DATA ) && !(desired_access & WRITE_ACCESS );
     bool del = create_options & FILE_DELETE_ON_CLOSE;
 
     if (del || append)
@@ -158,7 +158,7 @@ event_response_t win_fileextractor::createfile_cb(drakvuf_t drakvuf,
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t create_options = drakvuf_get_function_argument(drakvuf, info, 9);
-    bool append = (desired_access & FILE_APPEND_DATA ) && !(desired_access & FILE_WRITE_DATA );
+    bool append = (desired_access & FILE_APPEND_DATA ) && !(desired_access & WRITE_ACCESS );
     bool del = create_options & FILE_DELETE_ON_CLOSE;
 
     if (del || append)
@@ -404,11 +404,11 @@ event_response_t win_fileextractor::writefile_cb(drakvuf_t,
         {
             // save data needed to complete the first NtWriteFile
             task->first_len = len;
-            task->first_offset = offset;
             task->first_str = str;
+            task->write_offset_addr = offset;
             get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
-            if (offset)
-                get_write_offset(vmi, info, offset, &task->write_offset);
+            if (task->write_offset_addr)
+                get_write_offset(vmi, info, task->write_offset_addr, &task->write_offset);
         }
 
         auto status = dispatch_task(vmi, info, *task);
@@ -453,15 +453,15 @@ event_response_t win_fileextractor::writefile_cb(drakvuf_t,
             // free resourses after extraction and first NtWriteFile result from saved data
             free_resources(info, *task);
             task->extracted = true;
-            task->currentbyteoffset = task->file_size;
             writefile_cb_impl(drakvuf, info, *task, task->first_str, task->first_len);
         }
     }
     // file update
     else
     {
-        if (offset)
-            get_write_offset(vmi, info, offset, &task->write_offset);
+        task->write_offset_addr = offset;
+        if (task->write_offset_addr)
+            get_write_offset(vmi, info, task->write_offset_addr, &task->write_offset);
         get_file_object_currentbyteoffset(vmi, info, handle, &task->currentbyteoffset);
         writefile_cb_impl(drakvuf, info, *task, str, len);
     }
@@ -491,13 +491,13 @@ void win_fileextractor::writefile_cb_impl(drakvuf_t,
     if (!task.append)
     {
         // check for special offset
-        if (!((task.write_offset & 0xffffffff) ^ FILE_USE_FILE_POINTER_POSITION))
+        if (!task.write_offset_addr || !((task.write_offset & 0xffffffff) ^ FILE_USE_FILE_POINTER_POSITION))
             params->byteoffset = task.currentbyteoffset;
         else
             params->byteoffset = task.write_offset;
     }
     else
-        params->byteoffset = task.currentbyteoffset;
+        params->byteoffset = FILE_WRITE_TO_END_OF_FILE;
 
     writefile_ret_hooks[hook_id] = std::move(hook);
 }

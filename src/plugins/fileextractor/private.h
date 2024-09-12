@@ -123,6 +123,9 @@ namespace fileextractor_ns
 #define FILE_DELETE_ON_CLOSE 0x1000
 #define FILE_WRITE_DATA 2
 #define FILE_APPEND_DATA 4
+#define GENERIC_ALL 0x10000000
+#define GENERIC_WRITE 0x40000000
+#define WRITE_ACCESS ( FILE_WRITE_DATA | GENERIC_ALL | GENERIC_WRITE )
 #define FILE_WRITE_TO_END_OF_FILE 0xffffffff
 #define FILE_USE_FILE_POINTER_POSITION 0xfffffffe
 
@@ -293,6 +296,7 @@ public:
     uint64_t file_size{0};
     std::string file_sha256{""};
     uint64_t file_offset{0};
+    addr_t write_offset_addr{0};
     uint64_t write_offset{0};
     uint64_t bytes_to_read{0};
     handle_t section_handle{0};
@@ -304,7 +308,6 @@ public:
 
     // information that is used after extracting the file to complete first NtWriteFile.
     addr_t first_len{0};
-    addr_t first_offset{0};
     addr_t first_str{0};
 
     uint64_t new_eof{0};
