@@ -309,7 +309,7 @@ typedef enum
     ARG_SIZE_8,
     ARG_SIZE_16,
     ARG_SIZE_32,
-    ARG_SIZE_INT,
+    ARG_SIZE_NATIVE,
 } arg_size_t;
 
 typedef struct
@@ -324,10 +324,10 @@ typedef struct
 #define ARG_TYPE_8(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_8, .is_ptr = false, .ptr_for_type = VOID}}
 #define ARG_TYPE_16(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_16, .is_ptr = false, .ptr_for_type = VOID}}
 #define ARG_TYPE_32(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_32, .is_ptr = false, .ptr_for_type = VOID}}
-#define ARG_TYPE_INT(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_INT, .is_ptr = false, .ptr_for_type = VOID}}
+#define ARG_TYPE_NATIVE(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = false, .ptr_for_type = VOID}}
 
-#define ARG_TYPE_PTR_TO_TYPE(PTR_TYPE, TO_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_INT, .is_ptr = true, .ptr_for_type = TO_TYPE}}
-#define ARG_TYPE_PTR(PTR_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_INT, .is_ptr = true, .ptr_for_type = VOID}}
+#define ARG_TYPE_PTR_TO_TYPE(PTR_TYPE, TO_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = true, .ptr_for_type = TO_TYPE}}
+#define ARG_TYPE_PTR(PTR_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = true, .ptr_for_type = VOID}}
 
 static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
 {
@@ -336,9 +336,9 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_PTR_TO_TYPE(PVOID, VOID),
     ARG_TYPE_PTR_TO_TYPE(PPVOID, PVOID),
     // base types
-    ARG_TYPE_INT(ULONG_PTR),
+    ARG_TYPE_NATIVE(ULONG_PTR),
     ARG_TYPE_PTR_TO_TYPE(PULONG_PTR, ULONG_PTR),
-    ARG_TYPE_INT(SIZE_T),
+    ARG_TYPE_NATIVE(SIZE_T),
     ARG_TYPE_PTR_TO_TYPE(PSIZE_T, SIZE_T),
     ARG_TYPE_8(BYTE),
     ARG_TYPE_8(BOOLEAN),
@@ -363,13 +363,13 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_32(NTSTATUS),
     ARG_TYPE_PTR_TO_TYPE(PNTSTATUS, NTSTATUS),
     // handles
-    ARG_TYPE_INT(HANDLE),
+    ARG_TYPE_NATIVE(HANDLE),
     ARG_TYPE_PTR_TO_TYPE(PHANDLE, HANDLE),
-    ARG_TYPE_INT(ALPC_HANDLE),
+    ARG_TYPE_NATIVE(ALPC_HANDLE),
     ARG_TYPE_PTR_TO_TYPE(PALPC_HANDLE, ALPC_HANDLE),
-    ARG_TYPE_INT(HINSTANCE),
-    ARG_TYPE_INT(HWND),
-    ARG_TYPE_INT(HHOOK),
+    ARG_TYPE_NATIVE(HINSTANCE),
+    ARG_TYPE_NATIVE(HWND),
+    ARG_TYPE_NATIVE(HHOOK),
     // pointers to functions
     ARG_TYPE_PTR(HOOKPROC),
     // classes
@@ -437,9 +437,9 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_32(TOKEN_TYPE),
     ARG_TYPE_32(WAIT_TYPE),
     ARG_TYPE_32(WIN32_PROTECTION_MASK),
-    ARG_TYPE_INT(KAFFINITY),
-    ARG_TYPE_INT(LPARAM),
-    ARG_TYPE_INT(WPARAM),
+    ARG_TYPE_NATIVE(KAFFINITY),
+    ARG_TYPE_NATIVE(LPARAM),
+    ARG_TYPE_NATIVE(WPARAM),
     // incomplete types, only pointers
     ARG_TYPE_PTR(LPGUID),
     ARG_TYPE_PTR(PLUID),
