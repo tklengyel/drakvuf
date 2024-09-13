@@ -494,6 +494,11 @@ plugin_utils_check_SOURCES = plugin_utils_check.cpp
 plugin_utils_check_CFLAGS = $(CHECK_CFLAGS)
 plugin_utils_check_LDADD = $(CHECK_LIBS) plugin_utils.lo
 
+check_PROGRAMS += syscalls/check
+syscalls_check_SOURCES = syscalls/check.cpp
+syscalls_check_CFLAGS = $(CHECK_CFLAGS)
+syscalls_check_LDADD = $(CHECK_LIBS)
+
 if PLUGIN_PROCMON
 check_PROGRAMS += procmon/check
 procmon_check_SOURCES = procmon/check.cpp

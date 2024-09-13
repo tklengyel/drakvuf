@@ -102,164 +102,45 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <glib.h>
-#include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <assert.h>
-#include <string>
-#include <variant>
-#include <fstream>
-#include <iostream>
+#include <check.h>
 
-#include "syscalls.h"
+#include "../../libdrakvuf/libdrakvuf.h"
 #include "private.h"
 
-using namespace syscalls_ns;
-
-void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info)
+START_TEST(test_syscall_arg_type_parameters)
 {
-    fmt::print(this->m_output_format, "sysret", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("Ret", fmt::Xval(info->regs->rax)),
-        keyval("Info", fmt::Rstr(extra_info ?: ""))
-    );
+    ck_assert(syscalls_ns::arg_type_t::__ARG_TYPE_MAX == syscalls_ns::arg_types.size());
 }
+END_TEST
 
-std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+Suite* syscall_parameters_suite(void)
 {
-    char* cstr = nullptr;
+    Suite* s;
+    TCase* tc_core;
 
-    if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
-    {
-        switch (arg.type)
-        {
-            case PUNICODE_STRING:
-            {
-                unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-                if ( us )
-                {
-                    cstr = (char*)us->contents;
-                    us->contents = nullptr;
-                    vmi_free_unicode_str(us);
-                }
-                break;
-            }
-            case PCHAR:
-                cstr = drakvuf_read_ascii_str(drakvuf, info, val);
-                break;
-            case MMAP_PROT:
-                // PROT_NONE == 0, so incorrect for parsing flags
-                return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
-            case PRCTL_OPTION:
-                return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
-            case ARCH_PRCTL_CODE:
-                return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
-            default:
-                if (this->os == VMI_OS_WINDOWS)
-                    cstr = win_extract_string(drakvuf, info, arg, val);
-                break;
-        }
-    }
+    s = suite_create("Check known syscall argument parameters");
 
-    if (cstr)
-    {
-        std::string str = std::string(cstr);
-        g_free(cstr);
-        return str;
-    }
-    return {};
-}
+    /* Core test case */
+    tc_core = tcase_create("Core");
 
-uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
-{
-    switch (arg_types.at(arg.type).size)
-    {
-        case ARG_SIZE_8:
-            return val & 0xff;
-        case ARG_SIZE_16:
-            return val & 0xffff;
-        case ARG_SIZE_32:
-            return val & 0xffffffff;
-        case ARG_SIZE_INT:
-            return val;
-        default:
-            assert(false && "Unknown size for type");
-            return val;
-    }
-}
+    tcase_add_test(tc_core, test_syscall_arg_type_parameters);
+    suite_add_tcase(s, tc_core);
 
-uint64_t syscalls_base::transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
-{
-    if ((arg.type == PPVOID) && val)
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = val
-        );
-
-        uint64_t _val;
-
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &_val))
-        {
-            fprintf(stderr, "Failed to read address (%p)\n", (void*) val);
-            _val = 0;
-        }
-
-        val = _val;
-    }
-    return mask_value(arg, val);
-}
-
-static std::string rstrip(std::string s)
-{
-    while (!s.empty() && isspace(s.back()))
-        s.pop_back();
     return s;
 }
 
-bool syscalls_base::read_syscalls_filter(const char* filter_file)
+int main(void)
 {
-    std::ifstream file(filter_file);
-    if (!file.is_open())
-    {
-        fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?\n");
-        return false;
-    }
+    int number_failed;
+    Suite* s;
+    SRunner* sr;
 
-    std::string line;
-    while (std::getline(file, line))
-    {
-        line = rstrip(std::move(line));
-        if (!line.empty())
-            this->filter.insert(line);
-    }
+    s = syscall_parameters_suite();
+    sr = srunner_create(s);
+    srunner_add_suite(sr, syscall_parameters_suite());
 
-    return true;
-}
-
-
-syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
-{
-    this->os = drakvuf_get_os_type(drakvuf);
-    this->kernel_base = drakvuf_get_kernel_base(drakvuf);
-    this->register_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
-    this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    this->disable_sysret = config->disable_sysret;
-
-    if (config->syscalls_filter_file && !this->read_syscalls_filter(config->syscalls_filter_file))
-        throw -1;
-}
-
-syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
-{
-    os_t os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->_win_syscalls = std::make_unique<win_syscalls>(drakvuf, config, output);
-    else
-        this->_linux_syscalls = std::make_unique<linux_syscalls>(drakvuf, config, output);
+    srunner_run_all(sr, CK_NORMAL);
+    number_failed = srunner_ntests_failed(sr);
+    srunner_free(sr);
+    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
