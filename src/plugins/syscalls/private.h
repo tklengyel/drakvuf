@@ -140,6 +140,7 @@ static const char* arg_direction_names[]
 // All types for Windows and Linux
 typedef enum
 {
+    // Windows
     ACCESS_MASK,
     ALPC_HANDLE,
     ALPC_MESSAGE_INFORMATION_CLASS,
@@ -296,10 +297,75 @@ typedef enum
     WORD,
     WORKERFACTORYINFOCLASS,
     WPARAM,
-    // Linux special types for parsing values
-    MMAP_PROT,
-    PRCTL_OPTION,
-    ARCH_PRCTL_CODE,
+    // Linux, with original (lower)case
+    linux_bpf_attr_ptr,
+    linux_caddr_t,
+    linux_char_ptr,
+    linux_clock_t,
+    linux_dev_t,
+    linux_dirent_ptr,
+    linux_fd_set_ptr,
+    linux_file_handle_ptr,
+    linux_gid_t,
+    linux_int,
+    linux_int_ptr,
+    linux_intmask_map_,
+    linux_intmask_prot_,
+    linux_intopt_arch_,
+    linux_intopt_pr_,
+    linux_iovec_ptr,
+    linux_itimerspec_ptr,
+    linux_key_serial_t,
+    linux_key_t,
+    linux_linux_dirent64_ptr,
+    linux_loff_t,
+    linux_long,
+    linux_mmsghdr_ptr,
+    linux_mode_t,
+    linux_module_ptr,
+    linux_msghdr_ptr,
+    linux_nfds_t,
+    linux_nfsctl_arg_ptr,
+    linux_nfsctl_res_ptr,
+    linux_off64_t,
+    linux_off_t,
+    linux_off_t_ptr,
+    linux_pid_t,
+    linux_pollfd_ptr,
+    linux_ptrace_request,
+    linux_rlimit_ptr,
+    linux_rusage_ptr,
+    linux_sched_attr_ptr,
+    linux_sched_param_ptr,
+    linux_sembuf_ptr,
+    linux_shmid_ds_ptr,
+    linux_sigaction_ptr,
+    linux_sigset_t_ptr,
+    linux_size_t,
+    linux_size_t_ptr,
+    linux_sockaddr_ptr,
+    linux_socklen_t,
+    linux_socklen_t_ptr,
+    linux_ssize_t,
+    linux_stat_ptr,
+    linux_statfs_ptr,
+    linux_statx_ptr,
+    linux_sysctl_args_ptr,
+    linux_timespec_ptr,
+    linux_timeval_ptr,
+    linux_timex_ptr,
+    linux_uchar_ptr,
+    linux_uid_t,
+    linux_uint32_t,
+    linux_uint64_t,
+    linux_unsigned,
+    linux_unsigned_int,
+    linux_unsigned_long,
+    linux_unsigned_long_ptr,
+    linux_utimbuf_ptr,
+    linux_void,
+    linux_void_ptr,
+
     __ARG_TYPE_MAX,
 } arg_type_t;
 
@@ -309,6 +375,7 @@ typedef enum
     ARG_SIZE_8,
     ARG_SIZE_16,
     ARG_SIZE_32,
+    ARG_SIZE_64,
     ARG_SIZE_NATIVE,
 } arg_size_t;
 
@@ -324,6 +391,7 @@ typedef struct
 #define ARG_TYPE_8(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_8, .is_ptr = false, .ptr_for_type = VOID}}
 #define ARG_TYPE_16(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_16, .is_ptr = false, .ptr_for_type = VOID}}
 #define ARG_TYPE_32(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_32, .is_ptr = false, .ptr_for_type = VOID}}
+#define ARG_TYPE_64(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_64, .is_ptr = false, .ptr_for_type = VOID}}
 #define ARG_TYPE_NATIVE(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = false, .ptr_for_type = VOID}}
 
 #define ARG_TYPE_PTR_TO_TYPE(PTR_TYPE, TO_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = true, .ptr_for_type = TO_TYPE}}
@@ -331,6 +399,7 @@ typedef struct
 
 static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
 {
+    // Windows //
     // void-related types
     ARG_TYPE_VOID(VOID),
     ARG_TYPE_PTR_TO_TYPE(PVOID, VOID),
@@ -495,10 +564,79 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_PTR(PTOKEN_SOURCE),
     ARG_TYPE_PTR(PTOKEN_USER),
     ARG_TYPE_PTR(PTRANSACTION_NOTIFICATION),
-    // Linux
-    ARG_TYPE_32(MMAP_PROT),
-    ARG_TYPE_32(PRCTL_OPTION),
-    ARG_TYPE_32(ARCH_PRCTL_CODE),
+
+    // Linux //
+    // void-related types
+    ARG_TYPE_VOID(linux_void),
+    ARG_TYPE_PTR_TO_TYPE(linux_void_ptr, linux_void),
+    // base types
+    ARG_TYPE_NATIVE(linux_size_t),
+    ARG_TYPE_PTR_TO_TYPE(linux_size_t_ptr, linux_size_t),
+    ARG_TYPE_NATIVE(linux_unsigned_long),
+    ARG_TYPE_PTR_TO_TYPE(linux_unsigned_long_ptr, linux_unsigned_long),
+    ARG_TYPE_NATIVE(linux_unsigned),
+    ARG_TYPE_NATIVE(linux_int),
+    ARG_TYPE_PTR_TO_TYPE(linux_int_ptr, linux_int),
+    ARG_TYPE_NATIVE(linux_unsigned_int),
+    ARG_TYPE_NATIVE(linux_long),
+    ARG_TYPE_PTR(linux_uchar_ptr),
+    ARG_TYPE_32(linux_uint32_t),
+    ARG_TYPE_64(linux_uint64_t),
+    ARG_TYPE_PTR(linux_char_ptr),
+    // special masks and options
+    ARG_TYPE_32(linux_intmask_prot_), // int prot, PROT_* flags
+    ARG_TYPE_32(linux_intmask_map_), // int flags, MAP_* flags
+    ARG_TYPE_32(linux_intopt_pr_), // int option, PR_* values
+    ARG_TYPE_32(linux_intopt_arch_), // int code, ARCH_* values
+    // other types
+    ARG_TYPE_NATIVE(linux_pid_t),
+    ARG_TYPE_NATIVE(linux_uid_t),
+    ARG_TYPE_NATIVE(linux_gid_t),
+    ARG_TYPE_NATIVE(linux_mode_t),
+    ARG_TYPE_NATIVE(linux_dev_t),
+    ARG_TYPE_NATIVE(linux_key_t),
+    ARG_TYPE_NATIVE(linux_nfds_t),
+    ARG_TYPE_NATIVE(linux_off_t),
+    ARG_TYPE_NATIVE(linux_off_t_ptr),
+    ARG_TYPE_64(linux_off64_t),
+    ARG_TYPE_NATIVE(linux_loff_t),
+    ARG_TYPE_NATIVE(linux_clock_t),
+    ARG_TYPE_NATIVE(linux_caddr_t),
+    ARG_TYPE_NATIVE(linux_key_serial_t),
+    ARG_TYPE_NATIVE(linux_socklen_t),
+    ARG_TYPE_PTR_TO_TYPE(linux_socklen_t_ptr, linux_socklen_t),
+    // incomplete types, only pointers
+    ARG_TYPE_PTR(linux_nfsctl_arg_ptr), // struct nfsctl_arg *
+    ARG_TYPE_PTR(linux_nfsctl_res_ptr), // union nfsctl_res *
+    ARG_TYPE_PTR(linux_file_handle_ptr), // struct file_handle *
+    ARG_TYPE_PTR(linux_fd_set_ptr), // fd_set *
+    ARG_TYPE_PTR(linux_stat_ptr),  // struct stat *
+    ARG_TYPE_PTR(linux_statfs_ptr),  // struct statfs *
+    ARG_TYPE_PTR(linux_pollfd_ptr), // struct pollfd *
+    ARG_TYPE_PTR(linux_sigaction_ptr), // struct sigaction *
+    ARG_TYPE_PTR(linux_sigset_t_ptr), // sigset_t *
+    ARG_TYPE_PTR(linux_sched_param_ptr), // struct sched_param *
+    ARG_TYPE_PTR(linux_iovec_ptr), // struct iovec *
+    ARG_TYPE_PTR(linux_timeval_ptr), // struct timeval *
+    ARG_TYPE_PTR(linux_shmid_ds_ptr), // struct shmid_ds *
+    ARG_TYPE_PTR(linux_rusage_ptr), // struct rusage *
+    ARG_TYPE_PTR(linux_sembuf_ptr), // struct sembuf *
+    ARG_TYPE_PTR(linux_dirent_ptr), // struct dirent *
+    ARG_TYPE_PTR(linux_ptrace_request), // enum __ptrace_request
+    ARG_TYPE_PTR(linux_timespec_ptr), // struct timespec *
+    ARG_TYPE_PTR(linux_itimerspec_ptr), // struct itimerspec *
+    ARG_TYPE_PTR(linux_utimbuf_ptr), // struct utimbuf *
+    ARG_TYPE_PTR(linux_sysctl_args_ptr), // struct __sysctl_args *
+    ARG_TYPE_PTR(linux_timex_ptr), // struct timex *
+    ARG_TYPE_PTR(linux_rlimit_ptr), // struct rlimit *
+    ARG_TYPE_PTR(linux_module_ptr), // struct module *
+    ARG_TYPE_PTR(linux_sched_attr_ptr), // struct sched_attr *
+    ARG_TYPE_PTR(linux_bpf_attr_ptr), // union bpf_attr *
+    ARG_TYPE_PTR(linux_statx_ptr), // struct statx *
+    ARG_TYPE_PTR(linux_linux_dirent64_ptr), // struct linux_dirent64 *
+    ARG_TYPE_PTR(linux_sockaddr_ptr), // struct sockaddr *
+    ARG_TYPE_PTR(linux_msghdr_ptr), // struct msghdr *
+    ARG_TYPE_PTR(linux_mmsghdr_ptr), // struct mmsghdr *
 };
 
 typedef struct
