@@ -328,6 +328,7 @@ typedef enum
     linux_nfsctl_arg_ptr,
     linux_nfsctl_res_ptr,
     linux_off64_t,
+    linux_off64_t_ptr,
     linux_off_t,
     linux_off_t_ptr,
     linux_pid_t,
@@ -572,13 +573,13 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     // base types
     ARG_TYPE_NATIVE(linux_size_t),
     ARG_TYPE_PTR_TO_TYPE(linux_size_t_ptr, linux_size_t),
+    ARG_TYPE_NATIVE(linux_long),
     ARG_TYPE_NATIVE(linux_unsigned_long),
     ARG_TYPE_PTR_TO_TYPE(linux_unsigned_long_ptr, linux_unsigned_long),
-    ARG_TYPE_NATIVE(linux_unsigned),
-    ARG_TYPE_NATIVE(linux_int),
+    ARG_TYPE_32(linux_unsigned),
+    ARG_TYPE_32(linux_int),
     ARG_TYPE_PTR_TO_TYPE(linux_int_ptr, linux_int),
-    ARG_TYPE_NATIVE(linux_unsigned_int),
-    ARG_TYPE_NATIVE(linux_long),
+    ARG_TYPE_32(linux_unsigned_int),
     ARG_TYPE_PTR(linux_uchar_ptr),
     ARG_TYPE_32(linux_uint32_t),
     ARG_TYPE_64(linux_uint64_t),
@@ -589,28 +590,29 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_32(linux_intopt_pr_), // int option, PR_* values
     ARG_TYPE_32(linux_intopt_arch_), // int code, ARCH_* values
     // other types
-    ARG_TYPE_NATIVE(linux_pid_t),
-    ARG_TYPE_NATIVE(linux_uid_t),
-    ARG_TYPE_NATIVE(linux_gid_t),
-    ARG_TYPE_NATIVE(linux_mode_t),
-    ARG_TYPE_NATIVE(linux_dev_t),
-    ARG_TYPE_NATIVE(linux_key_t),
-    ARG_TYPE_NATIVE(linux_nfds_t),
-    ARG_TYPE_NATIVE(linux_off_t),
-    ARG_TYPE_NATIVE(linux_off_t_ptr),
-    ARG_TYPE_64(linux_off64_t),
-    ARG_TYPE_NATIVE(linux_loff_t),
+    ARG_TYPE_32(linux_pid_t),
+    ARG_TYPE_32(linux_uid_t),
+    ARG_TYPE_32(linux_gid_t),
+    ARG_TYPE_32(linux_mode_t),
+    ARG_TYPE_32(linux_key_t),
+    ARG_TYPE_32(linux_key_serial_t),
+    ARG_TYPE_32(linux_socklen_t),
+    ARG_TYPE_PTR_TO_TYPE(linux_socklen_t_ptr, linux_socklen_t),
+    ARG_TYPE_64(linux_dev_t),
     ARG_TYPE_NATIVE(linux_clock_t),
     ARG_TYPE_NATIVE(linux_caddr_t),
-    ARG_TYPE_NATIVE(linux_key_serial_t),
-    ARG_TYPE_NATIVE(linux_socklen_t),
-    ARG_TYPE_PTR_TO_TYPE(linux_socklen_t_ptr, linux_socklen_t),
+    ARG_TYPE_NATIVE(linux_nfds_t),
+    ARG_TYPE_NATIVE(linux_off_t),
+    ARG_TYPE_PTR_TO_TYPE(linux_off_t_ptr, linux_off_t),
+    ARG_TYPE_64(linux_off64_t),
+    ARG_TYPE_PTR_TO_TYPE(linux_off64_t_ptr, linux_off64_t),
+    ARG_TYPE_64(linux_loff_t),
     // incomplete types, only pointers
     ARG_TYPE_PTR(linux_nfsctl_arg_ptr), // struct nfsctl_arg *
     ARG_TYPE_PTR(linux_nfsctl_res_ptr), // union nfsctl_res *
     ARG_TYPE_PTR(linux_file_handle_ptr), // struct file_handle *
     ARG_TYPE_PTR(linux_fd_set_ptr), // fd_set *
-    ARG_TYPE_PTR(linux_stat_ptr),  // struct stat *
+    ARG_TYPE_PTR(linux_stat_ptr), // struct stat *
     ARG_TYPE_PTR(linux_statfs_ptr),  // struct statfs *
     ARG_TYPE_PTR(linux_pollfd_ptr), // struct pollfd *
     ARG_TYPE_PTR(linux_sigaction_ptr), // struct sigaction *
