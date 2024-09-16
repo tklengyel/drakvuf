@@ -212,6 +212,10 @@ jobs:
           ./configure
           make -j2
 
+      - name: Check after make
+        run: |
+          make -j2 check
+
   codeql-analyze:
     name: Code QL Analyze
     runs-on: ${{ matrix.os }}
