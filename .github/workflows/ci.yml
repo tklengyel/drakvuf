@@ -26,7 +26,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y\
             build-essential flex bison libjson-c-dev liblzo2-dev \
-            libglib2.0-dev meson ninja-build lld llvm clang
+            libglib2.0-dev meson ninja-build lld llvm clang check
 
       - name: Get submodule hashes version
         id: get-hash
@@ -117,7 +117,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang llvm lld build-essential flex bison \
-            libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build
+            libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build check
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
@@ -240,7 +240,7 @@ jobs:
         sudo apt-get update -q
         sudo apt-get install -y \
             clang llvm lld build-essential libjson-c-dev \
-            liblzo2-dev libglib2.0-dev meson ninja-build
+            liblzo2-dev libglib2.0-dev meson ninja-build check
 
     - name: Cache Xen debball
       uses: actions/cache@v4
@@ -287,7 +287,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang clang-tools-15 llvm lld \
-            libjson-c-dev meson ninja-build
+            libjson-c-dev meson ninja-build check
 
       - name: Cache Xen debball
         uses: actions/cache@v4
@@ -333,7 +333,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang clang-tools clang-tidy llvm lld \
-            libjson-c-dev meson ninja-build
+            libjson-c-dev meson ninja-build check
 
       - name: Cache Xen debball
         uses: actions/cache@v4

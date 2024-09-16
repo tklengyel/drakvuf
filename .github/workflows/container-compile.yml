@@ -29,9 +29,9 @@ jobs:
       run: |
         apt-get update -q
         apt-get install -y \
-            autoconf-archive flex bison libjson-c-dev clang build-essential \
+            autoconf-archive flex bison libjson-c-dev build-essential \
             git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev \
-            clang llvm lld meson ninja-build
+            clang llvm lld meson ninja-build check
         apt-get clean
 
     - name: Configure safe dirs
