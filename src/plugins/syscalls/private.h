@@ -590,6 +590,7 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_32(linux_intopt_pr_), // int option, PR_* values
     ARG_TYPE_32(linux_intopt_arch_), // int code, ARCH_* values
     // other types
+    ARG_TYPE_32(linux_ptrace_request),
     ARG_TYPE_32(linux_pid_t),
     ARG_TYPE_32(linux_uid_t),
     ARG_TYPE_32(linux_gid_t),
@@ -624,7 +625,6 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_PTR(linux_rusage_ptr), // struct rusage *
     ARG_TYPE_PTR(linux_sembuf_ptr), // struct sembuf *
     ARG_TYPE_PTR(linux_dirent_ptr), // struct dirent *
-    ARG_TYPE_PTR(linux_ptrace_request), // enum __ptrace_request
     ARG_TYPE_PTR(linux_timespec_ptr), // struct timespec *
     ARG_TYPE_PTR(linux_itimerspec_ptr), // struct itimerspec *
     ARG_TYPE_PTR(linux_utimbuf_ptr), // struct utimbuf *
