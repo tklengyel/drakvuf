@@ -168,7 +168,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y \
-            clang autoconf-archive automake \
+            clang autoconf-archive automake check \
             libjson-c-dev liblzo2-dev libglib2.0-dev
           sudo pip3 install ctypesgen ipython
 
