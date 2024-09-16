@@ -109,7 +109,8 @@
 
 START_TEST(test_syscall_arg_type_parameters)
 {
-    ck_assert(syscalls_ns::arg_type_t::__ARG_TYPE_MAX == syscalls_ns::arg_types.size());
+    for (size_t i = 0; i < syscalls_ns::arg_type_t::__ARG_TYPE_MAX; i++)
+        ck_assert_msg(syscalls_ns::arg_types.find((syscalls_ns::arg_type_t)i) != syscalls_ns::arg_types.end(), "information missing for syscall argument type %zu", i);
 }
 END_TEST
 
