@@ -573,6 +573,7 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     // base types
     ARG_TYPE_NATIVE(linux_size_t),
     ARG_TYPE_PTR_TO_TYPE(linux_size_t_ptr, linux_size_t),
+    ARG_TYPE_NATIVE(linux_ssize_t),
     ARG_TYPE_NATIVE(linux_long),
     ARG_TYPE_NATIVE(linux_unsigned_long),
     ARG_TYPE_PTR_TO_TYPE(linux_unsigned_long_ptr, linux_unsigned_long),
