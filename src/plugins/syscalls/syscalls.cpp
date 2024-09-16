@@ -148,6 +148,7 @@ std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t
                 break;
             }
             case PCHAR:
+            case linux_char_ptr:
                 cstr = drakvuf_read_ascii_str(drakvuf, info, val);
                 break;
             case linux_intmask_prot_:
