@@ -184,6 +184,7 @@ uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
             return val & 0xffff;
         case ARG_SIZE_32:
             return val & 0xffffffff;
+        case ARG_SIZE_64:
         case ARG_SIZE_NATIVE:
             return val;
         default:
