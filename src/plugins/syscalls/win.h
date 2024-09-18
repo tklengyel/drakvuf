@@ -372,6 +372,9 @@ SYSCALL(NtAlpcAcceptConnectPort, NTSTATUS,
     "ConnectionMessageAttributes", "opt", DIR_INOUT, PALPC_MESSAGE_ATTRIBUTES,
     "AcceptConnection", "", DIR_IN, BOOLEAN,
 );
+SYSCALL(NtAlpcConnectPortEx, NTSTATUS,
+    "PortHandle", "", DIR_OUT, PHANDLE,
+);
 SYSCALL(NtAlpcCancelMessage, NTSTATUS,
     "PortHandle", "", DIR_IN, HANDLE,
     "Flags", "", DIR_IN, ULONG,
@@ -1314,7 +1317,7 @@ SYSCALL(NtNotifyChangeKey, NTSTATUS,
 SYSCALL(NtNotifyChangeMultipleKeys, NTSTATUS,
     "MasterKeyHandle", "", DIR_IN, HANDLE,
     "Count", "opt", DIR_IN, ULONG,
-    "SlaveObjects[]", "ecount_opt(Count)", DIR_IN, OBJECT_ATTRIBUTES,
+    "SlaveObjects", "ecount_opt(Count)", DIR_IN, POBJECT_ATTRIBUTES,
     "Event", "opt", DIR_IN, HANDLE,
     "ApcRoutine", "opt", DIR_IN, PIO_APC_ROUTINE,
     "ApcContext", "opt", DIR_IN, PVOID,
@@ -2528,6 +2531,12 @@ SYSCALL(NtUserCreateDesktopEx, NTSTATUS,
     "dwflags", "", DIR_IN, DWORD,
     "access", "", DIR_IN, ACCESS_MASK,
     "heapsize", "", DIR_IN, DWORD);
+SYSCALL(NtUserFindWindowEx, HWND,
+    "hwndParent", "", DIR_MISSING, HWND,
+    "hwndChildAfter", "", DIR_MISSING, HWND,
+    "ucClassName", "", DIR_IN, PVOID,
+    "ucWindowName", "", DIR_IN, PVOID,
+    "dwUnknown", "", DIR_MISSING, DWORD);
 SYSCALL(NtUserGetAsyncKeyState, SHORT,
     "Key", "", DIR_IN, INT
 );
@@ -2655,6 +2664,33 @@ SYSCALL(NtWriteVirtualMemory, NTSTATUS,
     "BufferSize", "", DIR_IN, SIZE_T,
     "NumberOfBytesWritten", "opt", DIR_OUT, PSIZE_T,
 );
+SYSCALL(NtSetInformationVirtualMemory, NTSTATUS,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "VmInformationClass", "", DIR_IN, VIRTUAL_MEMORY_INFORMATION_CLASS,
+    "NumberOfEntries", "", DIR_IN, ULONG_PTR,
+    "VirtualAddresses", "ecount(NumberOfEntries)", DIR_IN, PMEMORY_RANGE_ENTRY,
+    "VmInformation", "bcount(VmInformationLength)", DIR_IN, PVOID,
+    "VmInformationLength", "opt", DIR_IN, ULONG,
+);
+SYSCALL(NtManagePartition, NTSTATUS,
+    "TargetHandle", "", DIR_IN, HANDLE,
+    "SourceHandle", "opt", DIR_IN, HANDLE,
+    "PartitionInformationClass", "", DIR_IN, PARTITION_INFORMATION_CLASS,
+    "PartitionInformation", "", DIR_INOUT, PVOID,
+    "PartitionInformationLength", "", DIR_IN, ULONG,
+);
+SYSCALL(NtSetInformationSymbolicLink, NTSTATUS,
+    "LinkHandle", "", DIR_IN, HANDLE,
+    "SymbolicLinkInformationClass", "", DIR_IN, SYMBOLIC_LINK_INFO_CLASS,
+    "SymbolicLinkInformation", "bcount(SymbolicLinkInformationLength)", DIR_IN, PVOID,
+    "SymbolicLinkInformationLength", "", DIR_IN, ULONG,
+);
+SYSCALL(NtManageHotPatch, NTSTATUS,
+    "HotPatchInformation", "", DIR_IN, HOT_PATCH_INFORMATION_CLASS,
+    "HotPatchData", "bcount(Length)", DIR_IN, PVOID,
+    "Length", "", DIR_IN, ULONG,
+    "ReturnLength", "", DIR_OUT, PULONG,
+);
 
 // TODO: fill in argument information
 SYSCALL(NtUmsThreadYield, NTSTATUS);
@@ -2668,15 +2704,14 @@ SYSCALL(NtEnableLastKnownGood, NTSTATUS);
 SYSCALL(NtDisableLastKnownGood, NTSTATUS);
 SYSCALL(NtFlushProcessWriteBuffers, VOID);
 SYSCALL(NtGetCurrentProcessorNumber, ULONG);
-SYSCALL(NtGetEnvironmentVariableEx, MISSING);
+SYSCALL(NtGetEnvironmentVariableEx, NTSTATUS);
 SYSCALL(NtIsSystemResumeAutomatic, BOOLEAN);
 SYSCALL(NtIsUILanguageComitted, NTSTATUS);
-SYSCALL(NtQueryEnvironmentVariableInfoEx, MISSING);
+SYSCALL(NtQueryEnvironmentVariableInfoEx, NTSTATUS);
 SYSCALL(NtYieldExecution, NTSTATUS);
 SYSCALL(NtAcquireProcessActivityReference, NTSTATUS);
 SYSCALL(NtAddAtomEx, NTSTATUS);
 SYSCALL(NtAlertThreadByThreadId, NTSTATUS);
-SYSCALL(NtAlpcConnectPortEx, NTSTATUS);
 SYSCALL(NtAlpcImpersonateClientContainerOfPort, NTSTATUS);
 SYSCALL(NtAssociateWaitCompletionPacket, NTSTATUS);
 SYSCALL(NtCallEnclave, NTSTATUS);
@@ -2706,7 +2741,6 @@ SYSCALL(NtGetCurrentProcessorNumberEx, NTSTATUS);
 SYSCALL(NtInitializeEnclave, NTSTATUS);
 SYSCALL(NtLoadEnclaveData, NTSTATUS);
 SYSCALL(NtLoadHotPatch, NTSTATUS);
-SYSCALL(NtManagePartition, NTSTATUS);
 SYSCALL(NtNotifyChangeDirectoryFileEx, NTSTATUS);
 SYSCALL(NtOpenPartition, NTSTATUS);
 SYSCALL(NtOpenRegistryTransaction, NTSTATUS);
@@ -2721,8 +2755,6 @@ SYSCALL(NtRollbackRegistryTransaction, NTSTATUS);
 SYSCALL(NtSetCachedSigningLevel, NTSTATUS);
 SYSCALL(NtSetCachedSigningLevel2, NTSTATUS);
 SYSCALL(NtSetIRTimer, NTSTATUS);
-SYSCALL(NtSetInformationSymbolicLink, NTSTATUS);
-SYSCALL(NtSetInformationVirtualMemory, NTSTATUS);
 SYSCALL(NtSetTimer2, NTSTATUS);
 SYSCALL(NtSetWnfProcessNotificationEvent, NTSTATUS);
 SYSCALL(NtSubscribeWnfStateChange, NTSTATUS);
@@ -2730,7 +2762,6 @@ SYSCALL(NtTerminateEnclave, NTSTATUS);
 SYSCALL(NtUnsubscribeWnfStateChange, NTSTATUS);
 SYSCALL(NtUpdateWnfStateData, NTSTATUS);
 SYSCALL(NtWaitForAlertByThreadId, NTSTATUS);
-SYSCALL(NtManageHotPatch, NTSTATUS);
 SYSCALL(BvgaSetVirtualFrameBuffer, NTSTATUS);
 SYSCALL(CmpCleanUpHigherLayerKcbCachesPreCallback, NTSTATUS);
 SYSCALL(GetPnpProperty, NTSTATUS);
@@ -3717,7 +3748,6 @@ SYSCALL(NtUserEvent, NTSTATUS);
 SYSCALL(NtUserExcludeUpdateRgn, NTSTATUS);
 SYSCALL(NtUserFillWindow, NTSTATUS);
 SYSCALL(NtUserFindExistingCursorIcon, NTSTATUS);
-SYSCALL(NtUserFindWindowEx, NTSTATUS);
 SYSCALL(NtUserFlashWindowEx, NTSTATUS);
 SYSCALL(NtUserForceWindowToDpiForTest, NTSTATUS);
 SYSCALL(NtUserFrostCrashedWindow, NTSTATUS);
