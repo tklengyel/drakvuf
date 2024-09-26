@@ -148,6 +148,10 @@ jobs:
           meson setup build --native-file llvm.ini ${{ matrix.flags }}
           ninja -C build
 
+      - name: Run check ${{ matrix.flags }}
+        run: |
+          meson test -C build
+
   tarbuild:
     name: Build using autoconf tarball
     runs-on: ${{ matrix.os }}
