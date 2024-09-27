@@ -774,10 +774,12 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     uint32_t injection_tid,
     vmi_pid_t pid)
 {
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+    if ( !injector )
+        return;
+
     PRINT_DEBUG("Target PID %u to terminate %u\n", injection_pid, pid);
     drakvuf_interrupt(drakvuf, 0); // clean
-
-    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
 
     injector->method = INJECT_METHOD_TERMINATEPROC;
     injector->drakvuf = drakvuf;
@@ -805,10 +807,12 @@ void injector_exitthread_on_win(drakvuf_t drakvuf,
     vmi_pid_t injection_pid,
     uint32_t injection_tid)
 {
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+    if ( !injector )
+        return;
+
     PRINT_DEBUG("Target PID %u to terminate TID %u\n", injection_pid, injection_tid);
     drakvuf_interrupt(drakvuf, 0); // clean
-
-    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
 
     injector->method = INJECT_METHOD_EXITTHREAD;
     injector->drakvuf = drakvuf;
