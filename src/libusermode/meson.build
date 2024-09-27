@@ -14,3 +14,23 @@ libusermode = static_library('usermode',
     include_directories : libusermode_h,
     link_with : libdrakvuf
 )
+
+if check.found()
+    utils_o = libusermode.extract_objects('printers/utils.cpp')
+    utils_dep = declare_dependency(objects: utils_o)
+    libusermode_printers_check = executable('libusermode_printers_check',
+        sources : 'printers/check.cpp',
+        include_directories : libusermode_h,
+        dependencies : [deps, utils_dep, check],
+        link_with : libdrakvuf,
+    )
+    test('libusermode_printers_check', libusermode_printers_check)
+
+    userhook_check = executable('userhook_check',
+        sources : 'check.cpp',
+        include_directories : libusermode_h,
+        dependencies : [deps, check],
+        link_with : [libdrakvuf, libusermode]
+    )
+    test('userhook_check', userhook_check)    
+endif
