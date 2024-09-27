@@ -238,14 +238,15 @@ addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib,
 void free_memtraps(injector_t injector)
 {
     GSList* loop = injector->memtraps;
-    injector->memtraps = NULL;
 
     while (loop)
     {
         drakvuf_remove_trap(injector->drakvuf, loop->data, (drakvuf_trap_free_t)free);
         loop = loop->next;
     }
-    g_slist_free(loop);
+
+    g_slist_free(injector->memtraps);
+    injector->memtraps = NULL;
 }
 
 void free_injector(injector_t injector)
