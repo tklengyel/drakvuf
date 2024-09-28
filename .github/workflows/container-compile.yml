@@ -31,7 +31,7 @@ jobs:
         apt-get install -y \
             autoconf-archive flex bison libjson-c-dev build-essential \
             git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev \
-            clang llvm lld meson ninja-build check
+            clang llvm lld meson ninja-build
         apt-get clean
 
     - name: Configure safe dirs
