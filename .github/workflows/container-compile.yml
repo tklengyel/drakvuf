@@ -14,8 +14,8 @@ jobs:
         container:
           - 'debian:bullseye-slim'
           - 'debian:bookworm-slim'
-          - 'ubuntu:focal'
           - 'ubuntu:jammy'
+          - 'ubuntu:noble'
           - 'ubuntu:rolling'
 
     runs-on: ubuntu-latest
