@@ -11,12 +11,15 @@ DISTRIBUTION=$(lsb_release -cs)
 if [ "$SYSTEM" = "Debian" ]
 then
     echo "deb-src http://deb.debian.org/debian ${DISTRIBUTION} main" >> /etc/apt/sources.list
-    apt-get update
 else
-    sed -i 's/# deb-src/deb-src/g' /etc/apt/sources.list
-    apt-get update
+    if [ "$DISTRIBUTION" = "noble" ]; then
+        sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+    else
+        sed -i 's/# deb-src/deb-src/g' /etc/apt/sources.list
+    fi
 fi
 
+apt-get update
 apt-get --quiet --yes install build-essential git wget curl cmake flex bison \
     libjson-c-dev autoconf-archive clang python3-dev libsystemd-dev nasm bc \
     libx11-dev ninja-build python3-pip meson llvm lld zlib1g-dev
