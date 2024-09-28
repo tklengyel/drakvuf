@@ -32,5 +32,5 @@ if check.found()
         dependencies : [deps, check],
         link_with : [libdrakvuf, libusermode]
     )
-    test('userhook_check', userhook_check)    
+    test('userhook_check', userhook_check)
 endif
