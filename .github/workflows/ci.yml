@@ -18,7 +18,7 @@ jobs:
       matrix:
         os:
           - 'ubuntu-22.04'
-          - 'ubuntu-latest'
+          - 'ubuntu-24.04'
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -102,7 +102,7 @@ jobs:
         matrix:
           os:
             - 'ubuntu-22.04'
-            - 'ubuntu-latest'
+            - 'ubuntu-24.04'
           flags:
             - ''
             - '-Dbuildtype=debug -Db_lto=false'
@@ -162,7 +162,7 @@ jobs:
       matrix:
         os:
           - 'ubuntu-22.04'
-          - 'ubuntu-latest'
+          - 'ubuntu-24.04'
 
     steps:
       - name: Checkout repository
@@ -230,7 +230,7 @@ jobs:
       matrix:
         os:
           - 'ubuntu-22.04'
-          - 'ubuntu-latest'
+          - 'ubuntu-24.04'
 
     steps:
     - name: Checkout repository
@@ -295,7 +295,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang clang-tools-15 llvm lld \
-            libjson-c-dev meson ninja-build check
+            libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v4
@@ -341,7 +341,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang clang-tools clang-tidy llvm lld \
-            libjson-c-dev meson ninja-build check
+            libjson-c-dev meson ninja-build
 
       - name: Cache Xen debball
         uses: actions/cache@v4
