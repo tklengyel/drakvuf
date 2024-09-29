@@ -21,6 +21,7 @@ if get_option('plugin-syscalls')
             include_directories : incdir,
             dependencies : [deps, check],
             link_with : libdrakvuf,
+            install : false
         )
         test('syscalls_check', syscalls_check)
     endif
@@ -378,6 +379,7 @@ if check.found()
         include_directories : incdir,
         dependencies : [deps, check],
         link_with : libdrakvuf,
+        install : false
     )
     test('output_format_check', output_format_check)
 
@@ -389,6 +391,7 @@ if check.found()
             include_directories : incdir,
             dependencies : [deps, plugin_utils_dep, check],
             link_with : libdrakvuf,
+            install : false
         )
         test('plugin_utils_check', plugin_utils_check)
 
@@ -402,6 +405,7 @@ if check.found()
                 include_directories : incdir,
                 dependencies : [deps, procmon_deps, check],
                 link_with : libdrakvuf,
+                install : false
             )
             test('procmon_check', procmon_check)
         endif

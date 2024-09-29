@@ -20,7 +20,8 @@ if check.found()
         sources : 'check.cpp',
         include_directories : libusermode_h,
         dependencies : [deps, check],
-        link_with : [libdrakvuf, libusermode]
+        link_with : [libdrakvuf, libusermode],
+        install : false
     )
     test('userhook_check', userhook_check)
 
@@ -32,6 +33,7 @@ if check.found()
             include_directories : libusermode_h,
             dependencies : [deps, utils_dep, check],
             link_with : libdrakvuf,
+            install : false
         )
         test('libusermode_printers_check', libusermode_printers_check)
     endif
