@@ -18,8 +18,8 @@ jobs:
         container:
           - "debian:bullseye"
           - "debian:bookworm"
-          - "ubuntu:focal"
           - "ubuntu:jammy"
+          - "ubuntu:noble"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -102,8 +102,8 @@ jobs:
         container:
           - "debian:bullseye"
           - "debian:bookworm"
-          - "ubuntu:focal"
           - "ubuntu:jammy"
+          - "ubuntu:noble"
     container:
       image: ${{ matrix.container}}
     steps:

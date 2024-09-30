@@ -28,6 +28,10 @@ libvmi = dependency('libvmi')
 jsonc = dependency('json-c')
 deps = [glib, libvmi, jsonc]
 
+# Find optional dependencies
+check = dependency('check', required : false)
+
+# Set version string
 version = meson.project_version()
 if not get_option('release')
     version += '-' + run_command('git', 'describe', '--always', check: true).stdout().strip()
