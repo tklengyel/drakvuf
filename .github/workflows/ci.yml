@@ -117,8 +117,14 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang llvm lld build-essential flex bison \
-            libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build check
-          sudo pip3 install ctypesgen ipython
+            libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build check \
+            python3-ipython
+
+      - name: Setup python venv for REPL
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip3 install ctypesgen
 
       - name: Cache Xen debball
         uses: actions/cache@v4
@@ -145,6 +151,7 @@ jobs:
 
       - name: Compile ${{ matrix.flags }}
         run: |
+          source venv/bin/activate
           meson setup build --native-file llvm.ini ${{ matrix.flags }}
           ninja -C build
 
@@ -174,7 +181,6 @@ jobs:
           sudo apt-get install -y \
             clang autoconf-archive automake check \
             libjson-c-dev liblzo2-dev libglib2.0-dev
-          sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
         uses: actions/cache@v4
