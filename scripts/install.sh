@@ -125,7 +125,7 @@ apt-get --quiet --yes install python3-pip python3-venv
 
 python3 -m venv /opt/volatility3
 source /opt/volatility3/bin/activate
-pip3 install wheel construct pefile
+pip3 install wheel construct pefile setuptools
 cd /opt/volatility3
 python3 setup.py build
 python3 -m pip install .

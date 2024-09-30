@@ -14,6 +14,17 @@ if get_option('plugin-syscalls')
     plugin_sources += 'syscalls/linux.cpp'
 
     config_h.set('ENABLE_PLUGIN_SYSCALLS', 1)
+
+    if check.found()
+        syscalls_check = executable('syscalls_check',
+            sources : 'syscalls/check.cpp',
+            include_directories : incdir,
+            dependencies : [deps, check],
+            link_with : libdrakvuf,
+            install : false
+        )
+        test('syscalls_check', syscalls_check)
+    endif
 endif
 
 if get_option('plugin-poolmon')
@@ -361,3 +372,42 @@ drakvuf_plugins = static_library('drakvuf_plugins',
     link_with : [libdrakvuf, libhook, libusermode],
     link_args : hardened_link_args
 )
+
+if check.found()
+    output_format_check = executable('output_format_check',
+        sources : 'output_format/check.cpp',
+        include_directories : incdir,
+        dependencies : [deps, check],
+        link_with : libdrakvuf,
+        install : false
+    )
+    test('output_format_check', output_format_check)
+
+    if meson.version().version_compare('>=1.1.0')
+        plugin_utils_o = drakvuf_plugins.extract_objects('plugin_utils.cpp')
+        plugin_utils_dep = declare_dependency(objects: plugin_utils_o)
+        plugin_utils_check = executable('plugin_utils_check',
+            sources : 'plugin_utils_check.cpp',
+            include_directories : incdir,
+            dependencies : [deps, plugin_utils_dep, check],
+            link_with : libdrakvuf,
+            install : false
+        )
+        test('plugin_utils_check', plugin_utils_check)
+
+        if get_option('plugin-procmon')
+            linux_utils_o = drakvuf_plugins.extract_objects('procmon/linux_utils.cpp')
+            winnt_o = drakvuf_plugins.extract_objects('procmon/winnt.cpp')
+            procmon_deps = declare_dependency(objects: [linux_utils_o, winnt_o])
+
+            procmon_check = executable('procmon_check',
+                sources : 'procmon/check.cpp',
+                include_directories : incdir,
+                dependencies : [deps, procmon_deps, check],
+                link_with : libdrakvuf,
+                install : false
+            )
+            test('procmon_check', procmon_check)
+        endif
+    endif
+endif
