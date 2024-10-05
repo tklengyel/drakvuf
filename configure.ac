@@ -860,6 +860,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/libusermode/Makefile
                  src/librepl/Makefile
                  src/libhook/Makefile
+                 src/libfs/Makefile
                  src/helpers/hiddump/Makefile
                ])
 

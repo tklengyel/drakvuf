@@ -144,6 +144,10 @@ extern bool verbose;
 #else
 #define PRINT_DEBUG(...) do {} while(0)
 #endif
+#define PRINT_ERROR(...) \
+    do { \
+        eprint_current_time(); fprintf(stderr, __VA_ARGS__); \
+    } while (0)
 
 #define UNUSED(x)       (void)(x)
 #define NUMBER_OF(x)    (sizeof(x) / sizeof(x[0]))
