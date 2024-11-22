@@ -145,13 +145,15 @@ protected:
         // this is required because of printf() logging
         fflush(stdout);
 
-        for (auto size = pptr() - pbase(); size > 0; )
+        auto size_remains = pptr() - pbase();
+        char* current_position = pbase();
+        while (size_remains > 0)
         {
-            auto written = write(STDOUT_FILENO, pbase(), size);
+            ssize_t written = write(STDOUT_FILENO, current_position, size_remains);
             if (written < 0)
                 return -1;
-            size -= written;
-            seekoff(written, std::ios_base::cur, std::ios_base::out);
+            size_remains -= written;
+            current_position += written;
         }
         seekpos(0);
         return 0;
