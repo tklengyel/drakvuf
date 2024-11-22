@@ -154,6 +154,7 @@ static constexpr uint16_t win_8_1_ver       = 9600;
 static constexpr uint16_t win_serv_2016_ver = 14393;
 static constexpr uint16_t win_10_1803_ver   = 17134;
 static constexpr uint16_t win_serv_2019_ver = 17763;
+static constexpr uint16_t win_10_1909_ver   = 18362;
 static constexpr uint16_t win_10_21h2_ver   = 19044;
 static constexpr uint16_t win_10_22h2_ver   = 19045;
 static constexpr uint16_t win_10_23h2_ver   = 22631;
@@ -225,6 +226,16 @@ static const std::unordered_map<uint16_t, udp_offsets_t> udp_offsets_x64 =
         }
     },
     {
+        win_10_1909_ver,
+        {
+            .family_1    = 0x20,
+            .family_2    = 0x18,
+            .local_port  = 0x78,
+            .remote_port = 0xE8,
+            .remote_addr = 0xF0
+        }
+    },
+    {
         win_10_21h2_ver,
         {
             .family_1    = 0x20,
@@ -262,6 +273,8 @@ static const uint16_t* get_tcp_offsets(uint16_t buildnumber)
         return win7_sp1_tcp_offsets;
     if (buildnumber == win_10_1803_ver)
         return win10_1803_tcp_offsets;
+    if (buildnumber == win_10_1909_ver)
+        return win10_1909_tcp_offsets;
     if (buildnumber == win_serv_2019_ver)
         return winserv_2019_tcp_offsets;
     if (buildnumber >= win_10_21h2_ver && buildnumber <= win_10_23h2_ver)
