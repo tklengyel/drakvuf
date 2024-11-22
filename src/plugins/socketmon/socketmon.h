@@ -105,6 +105,7 @@
 #ifndef SOCKETMON_H
 #define SOCKETMON_H
 
+#include <libusermode/userhook.hpp>
 #include "plugins/plugins.h"
 #include "private.h"
 
@@ -120,6 +121,7 @@ public:
     output_format_t format;
     win_build_info_t build;
     drakvuf_t drakvuf;
+    wanted_hooks_t wanted_hooks;
 
     drakvuf_trap_t tcpip_trap[2] =
     {
