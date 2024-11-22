@@ -106,6 +106,10 @@
 #define PLUGINS_OUTPUT_FORMAT_OSTREAM_H
 #pragma once
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif /* HAVE_CONFIG_H */
+
 #include <iostream>
 
 namespace fmt

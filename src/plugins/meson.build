@@ -314,6 +314,10 @@ if get_option('plugin-windowmon')
     config_h.set('ENABLE_PLUGIN_WINDOWMON', 1)
 endif
 
+if get_option('disable-output-buffering')
+    config_h.set('DISABLE_OUTPUT_BUFFERING', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),

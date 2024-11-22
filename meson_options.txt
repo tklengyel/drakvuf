@@ -6,6 +6,7 @@ option('xtf', type : 'boolean', value : 'false')
 option('repl', type : 'boolean', value : 'false')
 option('threadsafety', type : 'boolean', value : 'false')
 option('coverage', type : 'boolean', value : 'false')
+option('disable-output-buffering', type : 'boolean', value : 'false')
 
 option('plugin-syscalls', type : 'boolean', value : true)
 option('plugin-poolmon', type : 'boolean', value : true)
