@@ -323,6 +323,9 @@ typedef struct os_interface
     unicode_string_t* (*get_object_type_name)
     (drakvuf_t drakvuf, addr_t object);
 
+    bool (*get_object_type_index)
+    (drakvuf_t drakvuf, access_context_t* object_header_ctx, uint8_t* index);
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);
