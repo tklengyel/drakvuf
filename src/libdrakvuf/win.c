@@ -485,7 +485,7 @@ bool win_get_object_type_index(drakvuf_t drakvuf, access_context_t* object_heade
 
     // https://medium.com/@ashabdalhalim/a-light-on-windows-10s-object-header-typeindex-value-e8f907e7073a
     // Due to security mitigations type_index no longer equals to index in ObTypeIndexTable array on win 10
-    // but calculated as following:
+    // but is calculated as following:
     if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_10)
     {
         *index = *index ^ ((object_header_addr >> 8) & 0xff) ^ drakvuf->ob_header_cookie;
