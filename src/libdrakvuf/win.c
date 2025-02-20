@@ -474,6 +474,30 @@ unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object)
     return drakvuf_read_unicode_va(drakvuf, type + drakvuf->offsets[OBJECT_TYPE_NAME], 0);
 }
 
+bool win_get_object_type_index(drakvuf_t drakvuf, access_context_t* object_header_ctx, uint8_t* index)
+{
+    addr_t object_header_addr = object_header_ctx->addr;
+
+    if (VMI_SUCCESS != vmi_read_8(drakvuf->vmi, object_header_ctx, index))
+    {
+        return false;
+    }
+
+    // https://medium.com/@ashabdalhalim/a-light-on-windows-10s-object-header-typeindex-value-e8f907e7073a
+    // Due to security mitigations type_index no longer equals to index in ObTypeIndexTable array on win 10
+    // but is calculated as following:
+    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_10)
+    {
+        *index = *index ^ ((object_header_addr >> 8) & 0xff) ^ drakvuf->ob_header_cookie;
+    }
+    else
+    {
+        return false;
+    }
+
+    return true;
+}
+
 static bool enumerate_directory(drakvuf_t drakvuf, addr_t directory, void (*visitor_func)(drakvuf_t drakvuf, const object_info_t* object_info, void* visitor_ctx), void* visitor_ctx)
 {
     // There is only 37 _OBJECT_DIRECTORY_ENTRY entries in object directory:
@@ -737,6 +761,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_kernel_symbol_va = win_get_kernel_symbol_va;
     drakvuf->osi.get_object_type_name = win_get_object_type_name;
     drakvuf->osi.get_object_name = win_get_object_name;
+    drakvuf->osi.get_object_type_index = win_get_object_type_index;
 
     return true;
 }
