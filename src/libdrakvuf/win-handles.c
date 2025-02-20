@@ -228,7 +228,6 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-
 bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t current_eprocess,
     addr_t handle, object_manager_object_t obj_type_arg, addr_t* obj_body_addr )
 {
@@ -248,23 +247,25 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, ad
         // Get TypeIndex from _OBJ_HEADER...
         ctx.addr = obj_addr + drakvuf->offsets[ OBJECT_HEADER_TYPEINDEX ] ;
 
-        if ( vmi_read_8( drakvuf->vmi, &ctx, &object_type ) == VMI_SUCCESS )
+        if (!drakvuf->osi.get_object_type_index(drakvuf, &ctx, &object_type))
         {
-            if ( object_type == obj_type_arg )
+            return false;
+        }
+
+        if ( object_type == obj_type_arg )
+        {
+            if ( object_type == OBJ_MANAGER_PROCESS_OBJECT )
             {
-                if ( object_type == OBJ_MANAGER_PROCESS_OBJECT )
-                {
-                    // Object Body must be an _EPROCESS...
-                    ret = drakvuf_is_process( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
-                }
-                else if ( object_type == OBJ_MANAGER_THREAD_OBJECT )
-                {
-                    // Object Body must be an _ETHREAD...
-                    ret = drakvuf_is_thread( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
-                }
-                else // Other object types...
-                    ret = true ;
+                // Object Body must be an _EPROCESS...
+                ret = drakvuf_is_process( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
             }
+            else if ( object_type == OBJ_MANAGER_THREAD_OBJECT )
+            {
+                // Object Body must be an _ETHREAD...
+                ret = drakvuf_is_thread( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
+            }
+            else // Other object types...
+                ret = true ;
         }
     }
 
