@@ -302,7 +302,8 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang clang-tools-15 llvm lld \
-            libjson-c-dev meson ninja-build
+            libjson-c-dev meson ninja-build \
+            libglib2.0-dev
 
       - name: Cache Xen debball
         uses: actions/cache@v4
@@ -348,7 +349,8 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y \
             clang clang-tools clang-tidy llvm lld \
-            libjson-c-dev meson ninja-build
+            libjson-c-dev meson ninja-build \
+            libglib2.0-dev
 
       - name: Cache Xen debball
         uses: actions/cache@v4
