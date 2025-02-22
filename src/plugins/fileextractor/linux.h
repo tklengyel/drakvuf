@@ -102,27 +102,88 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <inttypes.h>
-#include <assert.h>
+#ifndef FILEEXTRACTOR_LINUX_H
+#define FILEEXTRACTOR_LINUX_H
 
-#include "fileextractor.h"
-#include "linux.h"
-#include "win.h"
+#include <libfs/libfs.hpp>
 
-fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output) : pluginex(drakvuf, output)
+#include "plugins/plugins_ex.h"
+#include "plugins/output_format.h"
+#include "helpers/exclude_matcher.h"
+#include "private.h"
+
+#include <unordered_map>
+
+using namespace fileextractor_ns;
+
+class linux_fileextractor : public pluginex
 {
-    auto os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->wf = std::make_unique<win_fileextractor>(drakvuf, config, output);
-    else
-        this->lf = std::make_unique<linux_fileextractor>(drakvuf, config, output);
-}
+private:
+    std::unique_ptr<libfs::Ext4Filesystem> ext4;
+    std::array<size_t, fileextractor_ns::__LINUX_OFFSET_MAX> offsets;
+    const exclude_matcher exclude;
+    uint64_t hash_size = 0;
+    const char* dump_folder;
+    uint64_t sequence_number{0};
+    std::unordered_map<task_id, std::unique_ptr<linux_task_t>> tasks;
 
-bool fileextractor::stop_impl()
-{
-    auto os = drakvuf_get_os_type(this->drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        return this->wf->stop();
-    else
-        return this->lf->stop();
-}
+    /* Callbacks */
+    event_response_t unlink_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t close_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t mmap_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t openat_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    /* Additional info */
+    enum extract_reasons
+    {
+        REASON_DELETE,
+        REASON_CLOSE,
+        REASON_MMAP,
+    };
+
+    std::unordered_map<extract_reasons, std::string> extract_reason =
+    {
+        { REASON_DELETE, "DeleteFile" },
+        { REASON_CLOSE,  "CloseFile" },
+        { REASON_MMAP,   "MmapFile" }
+    };
+
+    struct extract_result
+    {
+        std::unique_ptr<libfs::file_info> file_info;
+        std::string filename;
+        std::string filehash;
+        extract_reasons reason;
+        uint64_t seq_num{0};
+    };
+
+    /* Hooks */
+    std::unique_ptr<libhook::SyscallHook> ext4_unlink_hook;
+    std::unique_ptr<libhook::SyscallHook> ext4_release_file_hook;
+    std::unique_ptr<libhook::SyscallHook> ext4_file_write_iter_hook;
+    std::unique_ptr<libhook::SyscallHook> ext4_page_mkwrite_hook;
+    std::unique_ptr<libhook::SyscallHook> ext4_dax_huge_fault_hook;
+    std::unique_ptr<libhook::SyscallHook> do_sys_openat2_hook;
+
+    /* Helpers */
+    std::string get_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t file_addr);
+    void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::unique_ptr<extract_result>& result);
+    void print_extraction_failure(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::string& filename, const std::string& message);
+    void print_extraction_exclusion(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::string& filename);
+    std::unique_ptr<libfs::file_info> get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t inode);
+    std::unique_ptr<extract_result> extract_file(drakvuf_t dravkuf, drakvuf_trap_info_t* info, addr_t inode, std::string& filename);
+
+    task_id make_task_id(uint64_t inode);
+
+    void save_file_metadata(const std::string& metadata_file, drakvuf_trap_info_t* info, const extract_result& result);
+
+    std::string calculate_hash(std::string& filename, uint64_t filesize);
+public:
+    linux_fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output);
+    linux_fileextractor(const linux_fileextractor&) = delete;
+    linux_fileextractor& operator=(const linux_fileextractor&) = delete;
+    ~linux_fileextractor() = default;
+};
+
+#endif
