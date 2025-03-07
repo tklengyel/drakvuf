@@ -116,6 +116,71 @@
 
 using namespace syscalls_ns;
 
+void syscalls_base::fill_fmt_args(
+    fmt_args_t& fmt_args, const syscall_t* sc, drakvuf_trap_info_t* info,
+    const std::vector<uint64_t>& args, bool is_ret, bool ret_success
+)
+{
+    for (size_t i = 0; i < args.size(); ++i)
+    {
+        bool is_complete_value =
+            (sc->args[i].dir == DIR_IN) ||
+            (sc->args[i].dir == DIR_OUT || sc->args[i].dir == DIR_INOUT) && is_ret && ret_success;
+
+        uint64_t value = this->value_from_uint64(sc->args[i].type, args[i]);
+        std::string value_str;
+
+        if (is_complete_value)
+            value_str = this->parse_argument(drakvuf, info, sc->args[i], value);
+
+        auto type_info = arg_types.at(sc->args[i].type);
+
+        if (value && is_complete_value &&
+            type_info.is_ptr && type_info.ptr_for_type != Void &&
+            this->dereference_args != SYSCALLS_DEREFERENCE_ARGS_NONE)
+        {
+            auto vmi = vmi_lock_guard(drakvuf);
+            ACCESS_CONTEXT(ctx,
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3,
+                .addr = value
+            );
+
+            uint64_t actual_value;
+            if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &actual_value))
+            {
+                auto actual_arg = sc->args[i];
+                actual_arg.type = type_info.ptr_for_type;
+
+                actual_value = this->value_from_uint64(type_info.ptr_for_type, actual_value);
+                auto actual_value_str = this->parse_argument(drakvuf, info, actual_arg, actual_value);
+
+                if (this->dereference_args == SYSCALLS_DEREFERENCE_ARGS_ADD_FIELD)
+                {
+                    auto arg_name = std::string("*") + sc->args[i].name;
+
+                    if (actual_value_str.empty())
+                        fmt_args.emplace(arg_name, fmt::Xval(actual_value));
+                    else
+                        fmt_args.emplace(arg_name, fmt::Estr(actual_value_str));
+                }
+                else // SYSCALLS_DEREFERENCE_ARGS_REPLACE_FIELD
+                {
+                    value = actual_value;
+                    value_str = actual_value_str;
+                }
+            }
+            else
+                fprintf(stderr, "Failed to read value by address (%p)\n", (void*)value);
+        }
+
+        if (value_str.empty())
+            fmt_args.emplace(sc->args[i].name, fmt::Xval(value));
+        else
+            fmt_args.emplace(sc->args[i].name, fmt::Estr(value_str));
+    }
+}
+
 void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info)
 {
     fmt::print(this->m_output_format, "sysret", drakvuf, info,
@@ -132,37 +197,34 @@ std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t
 {
     char* cstr = nullptr;
 
-    if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
+    switch (arg.type)
     {
-        switch (arg.type)
+        case PUNICODE_STRING:
         {
-            case PUNICODE_STRING:
+            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
+            if ( us )
             {
-                unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-                if ( us )
-                {
-                    cstr = (char*)us->contents;
-                    us->contents = nullptr;
-                    vmi_free_unicode_str(us);
-                }
-                break;
+                cstr = (char*)us->contents;
+                us->contents = nullptr;
+                vmi_free_unicode_str(us);
             }
-            case PCHAR:
-            case linux_char_ptr:
-                cstr = drakvuf_read_ascii_str(drakvuf, info, val);
-                break;
-            case linux_intmask_prot_:
-                // PROT_NONE == 0, so incorrect for parsing flags
-                return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
-            case linux_intopt_pr_:
-                return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
-            case linux_intopt_arch_:
-                return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
-            default:
-                if (this->os == VMI_OS_WINDOWS)
-                    cstr = win_extract_string(drakvuf, info, arg, val);
-                break;
+            break;
         }
+        case PCHAR:
+        case linux_char_ptr:
+            cstr = drakvuf_read_ascii_str(drakvuf, info, val);
+            break;
+        case linux_intmask_prot_:
+            // PROT_NONE == 0, so incorrect for parsing flags
+            return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
+        case linux_intopt_pr_:
+            return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
+        case linux_intopt_arch_:
+            return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
+        default:
+            if (this->os == VMI_OS_WINDOWS)
+                cstr = win_extract_string(drakvuf, info, arg, val);
+            break;
     }
 
     if (cstr)
@@ -174,9 +236,9 @@ std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t
     return {};
 }
 
-uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
+uint64_t syscalls_base::value_from_uint64(syscalls_ns::arg_type_t type, uint64_t val)
 {
-    switch (arg_types.at(arg.type).size)
+    switch (arg_types.at(type).size)
     {
         case ARG_SIZE_8:
             return val & 0xff;
@@ -193,30 +255,6 @@ uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
     }
 }
 
-uint64_t syscalls_base::transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
-{
-    if ((arg.type == PPVOID) && val)
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = val
-        );
-
-        uint64_t _val;
-
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &_val))
-        {
-            fprintf(stderr, "Failed to read address (%p)\n", (void*) val);
-            _val = 0;
-        }
-
-        val = _val;
-    }
-    return mask_value(arg, val);
-}
-
 static std::string rstrip(std::string s)
 {
     while (!s.empty() && isspace(s.back()))
@@ -224,9 +262,9 @@ static std::string rstrip(std::string s)
     return s;
 }
 
-bool syscalls_base::read_syscalls_filter(const char* filter_file)
+bool syscalls_base::read_syscalls_list(const char* syscall_list_file)
 {
-    std::ifstream file(filter_file);
+    std::ifstream file(syscall_list_file);
     if (!file.is_open())
     {
         fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?\n");
@@ -237,8 +275,21 @@ bool syscalls_base::read_syscalls_filter(const char* filter_file)
     while (std::getline(file, line))
     {
         line = rstrip(std::move(line));
-        if (!line.empty())
-            this->filter.insert(line);
+        if (line.empty())
+            continue;
+
+        size_t pos = line.find(',');
+        if (pos == std::string::npos)
+        {
+            this->syscall_list.emplace(line, false);
+            continue;
+        }
+
+        auto syscall = line.substr(0, pos);
+        auto param = line.substr(pos + 1);
+        bool is_ret = param == "retval";
+
+        this->syscall_list.emplace(syscall, is_ret);
     }
 
     return true;
@@ -252,8 +303,9 @@ syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, o
     this->register_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
     this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     this->disable_sysret = config->disable_sysret;
+    this->dereference_args = config->syscalls_dereference_args;
 
-    if (config->syscalls_filter_file && !this->read_syscalls_filter(config->syscalls_filter_file))
+    if (config->syscalls_list_file && !this->read_syscalls_list(config->syscalls_list_file))
         throw -1;
 }
 
