@@ -716,9 +716,11 @@ struct linux_syscall_data : PluginResult
 {
     linux_syscall_data()
         : PluginResult()
-        , type()
         , sc()
+        , type()
         , num()
+        , args()
+        , is_ret()
     {
     }
 
