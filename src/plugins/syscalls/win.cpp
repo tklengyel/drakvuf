@@ -140,13 +140,13 @@ static bool enum_modules_cb(drakvuf_t dravkuf, const module_info_t* module_info,
     return true;
 }
 
-static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t sysret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     //Loads a pointer to the plugin, which is responsible for the trap
     auto s = get_trap_plugin<win_syscalls>(info);
 
     //get_trap_params reinterprets the pointer of info->trap->data as a pointer to duplicate_result_t
-    auto wr = get_trap_params<wrapper_t>(info);
+    auto wr = get_trap_params<windows_syscall_trap_data_t>(info);
 
     //Verifies that the params we got above (preset by the previous trap) match the trap_information this cb got called with.
     if (!wr->verify_result_call_params(drakvuf, info))
@@ -360,15 +360,17 @@ drakvuf_trap_t* init_syscall_return_bp(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto s = get_trap_plugin<win_syscalls>(info);
-    auto w = get_trap_params<wrapper_t>(info);
+    auto w = get_trap_params<windows_syscall_trap_data_t>(info);
     const syscall_t* sc = w->sc;
     auto num_args = sc ? sc->num_args : 0;
 
     auto args = extract_args(drakvuf, info, s->register_size, num_args);
     auto [mode, module, parent_module] = get_syscall_retinfo(drakvuf, info, s);
-    s->print_syscall(drakvuf, info, w->num, w->type, sc, std::move(args), mode, std::move(module), std::move(parent_module));
 
-    if (s->disable_sysret || s->is_stopping())
+    if (!w->is_ret)
+        s->print_syscall(drakvuf, info, w->num, w->type, sc, args, mode, module, parent_module, w->is_ret, {});
+
+    if ((!w->is_ret && s->disable_sysret) || s->is_stopping())
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
@@ -389,7 +391,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     //get_trap_params reinterprets the pointer of trap->data as a pointer to wrapper
     //Load the information that is saved by hitting the first trap.
     //With params we can preset the params that the newly risen second breakpoint will receive.
-    auto wr = get_trap_params<wrapper_t>(trap);
+    auto wr = get_trap_params<windows_syscall_trap_data_t>(trap);
 
     //Save the address of the target thread, address of the rsp (this was the rip-address, which we used for construction) and the value of the CR3 register to the params.
     addr_t user_rsp = 0;
@@ -409,6 +411,12 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wr->num = w->num;
     wr->type = w->type;
     wr->sc = w->sc;
+    wr->mode = w->mode;
+
+    wr->args = std::move(args);
+    wr->is_ret = w->is_ret;
+    wr->module = std::move(module);
+    wr->parent_module = std::move(parent_module);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -498,14 +506,17 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
         else
             symbol_name = definition->name;
 
-        if ( !this->filter.empty() && ( !symbol_name || (this->filter.find(symbol_name) == this->filter.end())))
+        auto syscall_list_it = this->syscall_list.find(symbol_name);
+        if ( !this->syscall_list.empty() && (!symbol_name || syscall_list_it == this->syscall_list.end()) )
         {
-            PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol_name ? symbol_name : "<unknown>");
+            PRINT_DEBUG("Syscall %s filtered out by syscalls list file\n", symbol_name ? symbol_name : "<unknown>");
             continue;
         }
 
+        bool is_ret = this->syscall_list.empty() ? false : syscall_list_it->second;
+
         breakpoint_by_dtb_searcher bp;
-        auto trap = this->register_trap<wrapper_t>(
+        auto trap = this->register_trap<windows_syscall_trap_data_t>(
                 nullptr,
                 syscall_cb,
                 bp.for_virt_addr(syscall_va).for_dtb(cr3),
@@ -523,12 +534,13 @@ bool win_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t 
         //get_trap_params reinterprets the pointer of trap->data as a pointer to wrapper
         //Load the information that is saved by hitting the first trap.
         //With params we can preset the params that the newly risen second breakpoint will receive.
-        auto w = get_trap_params<wrapper_t>(trap);
+        auto w = get_trap_params<windows_syscall_trap_data_t>(trap);
 
         //enrich the params of the new/next trap. This information is used later.
         w->num = syscall_num;
         w->type = ntos ? "nt" : "win32k";
         w->sc = definition;
+        w->is_ret = is_ret;
     }
 
     drakvuf_free_symbols(symbols);
@@ -673,30 +685,30 @@ bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
 
 char* win_syscalls::win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
-    if (arg.type == PUNICODE_STRING)
+    switch (arg.type)
     {
-        unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-        if (us)
+        case PUNICODE_STRING:
         {
-            char* str = (char*)us->contents;
-            us->contents = nullptr; // move ownership
-            vmi_free_unicode_str(us);
+            char* str = nullptr;
+            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
+            if (us)
+            {
+                str = (char*)us->contents;
+                us->contents = nullptr; // move ownership
+                vmi_free_unicode_str(us);
+            }
+
             return str;
         }
+        case POBJECT_ATTRIBUTES:
+            return drakvuf_get_filename_from_object_attributes(drakvuf, info, val);
+        case HANDLE:
+            if (!strcmp(arg.name, "FileHandle"))
+                return drakvuf_get_filename_from_handle(drakvuf, info, val);
+            return nullptr;
+        default:
+            return nullptr;
     }
-    else if ( arg.type == POBJECT_ATTRIBUTES )
-    {
-        char* filename = drakvuf_get_filename_from_object_attributes(drakvuf, info, val);
-        if ( filename ) return filename;
-    }
-
-    if ( !strcmp(arg.name, "FileHandle") )
-    {
-        char* filename = drakvuf_get_filename_from_handle(drakvuf, info, val);
-        if ( filename ) return filename;
-    }
-
-    return nullptr;
 }
 
 event_response_t win_syscalls::load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -782,39 +794,28 @@ event_response_t win_syscalls::delete_process_cb(drakvuf_t drakvuf, drakvuf_trap
 void win_syscalls::print_syscall(
     drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     int nr, const char* module, const syscall_t* sc,
-    std::vector<uint64_t> args, privilege_mode_t mode,
-    std::optional<std::string> from_dll,
-    std::optional<std::string> from_parent_dll
+    const std::vector<uint64_t>& args, privilege_mode_t mode,
+    const std::optional<std::string>& from_dll, const std::optional<std::string>& from_parent_dll,
+    bool is_ret, std::optional<uint32_t> status
 )
 {
-    if (sc)
-        info->trap->name = sc->name;
+    info->trap->name = sc->name;
 
-    this->fmt_args.clear();
-
-    if (sc)
-    {
-        for (size_t i = 0; i < args.size(); ++i)
-        {
-            auto str = this->parse_argument(drakvuf, info, sc->args[i], args[i]);
-            if ( !str.empty() )
-                this->fmt_args.push_back(keyval(sc->args[i].name, fmt::Estr(str)));
-            else
-            {
-                uint64_t val = transform_value(drakvuf, info, sc->args[i], args[i]);
-                this->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(val)));
-            }
-        }
-    }
+    fmt_args_t fmt_args;
+    fill_fmt_args(fmt_args, sc, info, args, is_ret, status.has_value() && *status == 0 /* STATUS_SUCCESS */ );
 
     std::optional<fmt::Estr<std::string>> from_dll_opt, from_parent_dll_opt;
     std::optional<fmt::Rstr<const char*>> priv_mode_opt;
+    std::optional<fmt::Xval<uint32_t>> status_opt;
 
     if (from_dll.has_value())
         from_dll_opt = fmt::Estr(std::move(*from_dll));
 
     if (from_parent_dll.has_value())
         from_dll_opt = fmt::Estr(std::move(*from_parent_dll));
+
+    if (status.has_value())
+        status_opt = fmt::Xval(*status);
 
     if (mode != MAXIMUM_MODE)
         priv_mode_opt = fmt::Rstr(mode == USER_MODE ? "User" : "Kernel");
@@ -828,7 +829,8 @@ void win_syscalls::print_syscall(
         keyval("PreviousMode", priv_mode_opt),
         keyval("FromModule", from_dll_opt),
         keyval("FromParentModule", from_parent_dll_opt),
-        std::move(fmt_args)
+        keyval("ReturnValue", status_opt),
+        fmt_args
     );
 }
 

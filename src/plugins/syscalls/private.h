@@ -140,6 +140,9 @@ static const char* arg_direction_names[]
 // All types for Windows and Linux
 typedef enum
 {
+    // All
+    Void,
+    VoidPtr,
     // Windows
     ACCESS_MASK,
     ALPC_HANDLE,
@@ -202,8 +205,10 @@ typedef enum
     PCONTEXT,
     PCRM_PROTOCOL_ID,
     PDBGUI_WAIT_STATE_CHANGE,
+    PDEVICE_POWER_STATE,
     PEFI_DRIVER_ENTRY,
     PEXCEPTION_RECORD,
+    PEXECUTION_STATE,
     PFILE_BASIC_INFORMATION,
     PFILE_IO_COMPLETION_INFORMATION,
     PFILE_NETWORK_OPEN_INFORMATION,
@@ -218,6 +223,7 @@ typedef enum
     PJOB_SET_ARRAY,
     PKEY_VALUE_ENTRY,
     PKTMOBJECT_CURSOR,
+    PLANGID,
     PLARGE_INTEGER,
     PLCID,
     PLONG,
@@ -262,7 +268,6 @@ typedef enum
     PULONG_PTR,
     PUNICODE_STRING,
     PUSHORT,
-    PVOID,
     PWSTR,
     RESOURCEMANAGER_INFORMATION_CLASS,
     RTL_ATOM,
@@ -291,7 +296,6 @@ typedef enum
     USHORT,
     VDMSERVICECLASS,
     VIRTUAL_MEMORY_INFORMATION_CLASS,
-    VOID,
     WAIT_TYPE,
     WIN32_PROTECTION_MASK,
     WORD,
@@ -364,8 +368,6 @@ typedef enum
     linux_unsigned_long,
     linux_unsigned_long_ptr,
     linux_utimbuf_ptr,
-    linux_void,
-    linux_void_ptr,
 
     __ARG_TYPE_MAX,
 } arg_type_t;
@@ -388,22 +390,31 @@ typedef struct
     arg_type_t ptr_for_type; // VOID if not pointer or pointer to incomplete type
 } arg_type_info_t;
 
-#define ARG_TYPE_VOID(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_VOID, .is_ptr = false, .ptr_for_type = VOID}}
-#define ARG_TYPE_8(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_8, .is_ptr = false, .ptr_for_type = VOID}}
-#define ARG_TYPE_16(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_16, .is_ptr = false, .ptr_for_type = VOID}}
-#define ARG_TYPE_32(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_32, .is_ptr = false, .ptr_for_type = VOID}}
-#define ARG_TYPE_64(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_64, .is_ptr = false, .ptr_for_type = VOID}}
-#define ARG_TYPE_NATIVE(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = false, .ptr_for_type = VOID}}
+#define ARG_TYPE_VOID(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_VOID, .is_ptr = false, .ptr_for_type = Void}}
+#define ARG_TYPE_8(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_8, .is_ptr = false, .ptr_for_type = Void}}
+#define ARG_TYPE_16(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_16, .is_ptr = false, .ptr_for_type = Void}}
+#define ARG_TYPE_32(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_32, .is_ptr = false, .ptr_for_type = Void}}
+#define ARG_TYPE_64(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_64, .is_ptr = false, .ptr_for_type = Void}}
+#define ARG_TYPE_NATIVE(TYPE) {TYPE, {.name = #TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = false, .ptr_for_type = Void}}
 
 #define ARG_TYPE_PTR_TO_TYPE(PTR_TYPE, TO_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = true, .ptr_for_type = TO_TYPE}}
-#define ARG_TYPE_PTR(PTR_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = true, .ptr_for_type = VOID}}
+#define ARG_TYPE_PTR(PTR_TYPE) {PTR_TYPE, {.name = #PTR_TYPE, .size = ARG_SIZE_NATIVE, .is_ptr = true, .ptr_for_type = Void}}
+
+#define VOID Void
+#define PVOID VoidPtr
+
+#define linux_void Void
+#define linux_void_ptr VoidPtr
 
 static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
 {
+    // All //
+    // void-related types
+    ARG_TYPE_VOID(Void),
+    ARG_TYPE_PTR_TO_TYPE(VoidPtr, Void),
+
     // Windows //
     // void-related types
-    ARG_TYPE_VOID(VOID),
-    ARG_TYPE_PTR_TO_TYPE(PVOID, VOID),
     ARG_TYPE_PTR_TO_TYPE(PPVOID, PVOID),
     // base types
     ARG_TYPE_NATIVE(ULONG_PTR),
@@ -480,6 +491,7 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_32(WORKERFACTORYINFOCLASS),
     // other types
     ARG_TYPE_16(LANGID),
+    ARG_TYPE_PTR_TO_TYPE(PLANGID, LANGID),
     ARG_TYPE_16(RTL_ATOM),
     ARG_TYPE_PTR_TO_TYPE(PRTL_ATOM, RTL_ATOM),
     ARG_TYPE_32(LCID),
@@ -491,8 +503,10 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_32(APPHELPCOMMAND),
     ARG_TYPE_32(AUDIT_EVENT_TYPE),
     ARG_TYPE_32(DEVICE_POWER_STATE),
+    ARG_TYPE_PTR_TO_TYPE(PDEVICE_POWER_STATE, DEVICE_POWER_STATE),
     ARG_TYPE_32(EVENT_TYPE),
     ARG_TYPE_32(EXECUTION_STATE),
+    ARG_TYPE_PTR_TO_TYPE(PEXECUTION_STATE, EXECUTION_STATE),
     ARG_TYPE_32(IO_SESSION_STATE),
     ARG_TYPE_32(KPROFILE_SOURCE),
     ARG_TYPE_32(KTMOBJECT_TYPE),
@@ -567,9 +581,6 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_PTR(PTRANSACTION_NOTIFICATION),
 
     // Linux //
-    // void-related types
-    ARG_TYPE_VOID(linux_void),
-    ARG_TYPE_PTR_TO_TYPE(linux_void_ptr, linux_void),
     // base types
     ARG_TYPE_NATIVE(linux_size_t),
     ARG_TYPE_PTR_TO_TYPE(linux_size_t_ptr, linux_size_t),
@@ -673,14 +684,20 @@ typedef struct
     addr_t size;
 } resolve_ctx_t;
 
-struct wrapper_t : public call_result_t
+struct windows_syscall_trap_data_t : public call_result_t
 {
-    wrapper_t() : call_result_t()
+    windows_syscall_trap_data_t() : call_result_t()
     {}
 
     const syscall_t* sc;
     const char* type;
     uint16_t num;
+
+    std::vector<uint64_t> args;
+    bool is_ret;
+    privilege_mode_t mode;
+    std::optional<std::string> module;
+    std::optional<std::string> parent_module;
 };
 
 #define SYSCALL_EX(_name, _alias, _ret, ...)                     \
@@ -705,9 +722,12 @@ struct linux_syscall_data : PluginResult
     {
     }
 
-    std::string type;
     const syscall_t* sc;
+    std::string type;
     uint16_t num;
+
+    std::vector<uint64_t> args;
+    bool is_ret;
 };
 
 #define ENUM(name, number) { number, #name }

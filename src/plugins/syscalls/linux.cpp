@@ -242,26 +242,20 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
     return arguments;
 }
 
-void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::vector<uint64_t> arguments)
+void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::vector<uint64_t> arguments, bool is_ret, std::optional<int> retcode)
 {
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
 
-    this->fmt_args.clear();
-    for (size_t i = 0; i < arguments.size(); i++)
-    {
-        auto str = this->parse_argument(drakvuf, info, params->sc->args[i], arguments[i]);
-        if (!str.empty())
-            this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Estr(str)));
-        else
-        {
-            uint64_t value = this->transform_value(drakvuf, info, params->sc->args[i], arguments[i]);
-            this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Xval(value)));
-        }
-    }
+    fmt_args_t fmt_args;
+    fill_fmt_args(fmt_args, params->sc, info, arguments, is_ret, retcode.has_value() && *retcode >= 0);
 
     char* tmp = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
     std::string thread_name = tmp ?: "";
     g_free(tmp);
+
+    std::optional<fmt::Xval<int>> retcode_opt;
+    if (retcode.has_value())
+        retcode_opt = fmt::Xval(*retcode);
 
     fmt::print(this->m_output_format, "syscall", drakvuf, info,
         keyval("ThreadName", fmt::Estr(thread_name)),
@@ -271,11 +265,12 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         keyval("Syscall", fmt::Nval((uint64_t)(params->num))),
         keyval("NArgs", fmt::Nval(params->sc->num_args)),
         keyval("Type", fmt::Estr(params->type)),
-        this->fmt_args
+        keyval("ReturnValue", retcode_opt),
+        fmt_args
     );
 }
 
-event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t linux_syscalls::linux_sysret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
     if (!params->verifyResultCallParams(drakvuf, info))
@@ -289,7 +284,23 @@ event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t linux_syscalls::linux_syscall_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<linux_syscall_data>(info);
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    int retcode = (int)info->regs->rax;
+
+    this->print_syscall(drakvuf, info, params->args, true, retcode);
+
+    auto hookID = make_hook_id(info);
+    this->ret_hooks.erase(hookID);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t linux_syscalls::linux_syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t pt_regs_addr = 0;
     addr_t nr = ~0;
@@ -301,24 +312,34 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     }
 
     auto arguments = build_arguments_buffer(drakvuf, info, pt_regs_addr, nr);
-    this->print_syscall(drakvuf, info, arguments);
 
-    if (this->disable_sysret)
+    auto orig_params = libhook::GetTrapParams<linux_syscall_data>(info->trap);
+
+    if (!orig_params->is_ret)
+        this->print_syscall(drakvuf, info, arguments, false, {});
+
+    if (!orig_params->is_ret && this->disable_sysret)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto hook = this->createReturnHook<linux_syscall_data>(info, &linux_syscalls::linux_ret_cb, info->trap->name);
+    auto hook = this->createReturnHook<linux_syscall_data>(info, orig_params->is_ret ? &linux_syscalls::linux_syscall_ret_cb : &linux_syscalls::linux_sysret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
     params->setResultCallParams(drakvuf, info);
 
     auto hookID = make_hook_id(info, params->target_rsp);
+    params->num = orig_params->num;
+    params->type = orig_params->type;
+    params->sc = orig_params->sc;
+    params->args = std::move(arguments);
+    params->is_ret = orig_params->is_ret;
+
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, const syscall_t* syscall_definition, bool is_x64)
+bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, const syscall_t* syscall_definition, bool is_ret, bool is_x64)
 {
-    auto hook = createSyscallHook<linux_syscall_data>(syscall_name, &linux_syscalls::linux_cb, syscall_definition->display_name);
+    auto hook = createSyscallHook<linux_syscall_data>(syscall_name, &linux_syscalls::linux_syscall_cb, syscall_definition->display_name);
     if (!hook)
     {
         PRINT_DEBUG("[SYSCALLS] Failed to register %s\n", syscall_name);
@@ -330,6 +351,7 @@ bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, 
     params->num = syscall_number;
     params->type = is_x64 ? SYSCALL_TYPE_LINUX_X64 : SYSCALL_TYPE_LINUX_X32;
     params->sc = syscall_definition;
+    params->is_ret = is_ret;
 
     // If there is a collision when two functions point to the same address (for example getpid/getppid),
     // then we will take only the last one that got into the map, in this case __x64_sys_*
@@ -352,13 +374,16 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
     for (uint64_t syscall_number = 0; syscall_number < num_syscalls; syscall_number++)
     {
         const syscall_t* syscall_defintion = syscall_table[syscall_number];
-        // Setup filter
-        if (!this->filter.empty() && (this->filter.find(syscall_defintion->display_name) == this->filter.end()))
+
+        auto syscall_list_it = this->syscall_list.find(syscall_defintion->display_name);
+        if (!this->syscall_list.empty() && syscall_list_it == this->syscall_list.end())
             continue;
+
+        bool is_ret = this->syscall_list.empty() ? false : syscall_list_it->second;
 
         // x32 syscall breakpoint
         snprintf(syscall_name, sizeof(syscall_name), "__ia32_sys_%s", syscall_defintion->name);
-        if (!this->register_hook(syscall_name, syscall_number, syscall_defintion, false))
+        if (!this->register_hook(syscall_name, syscall_number, syscall_defintion, is_ret, false))
             check = false;
         memset(syscall_name, sizeof(char), sizeof(syscall_name));
 
@@ -367,7 +392,7 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
 
         // x64 syscall breakpoint
         snprintf(syscall_name, sizeof(syscall_name), "__x64_sys_%s", syscall_defintion->name);
-        if (!this->register_hook(syscall_name, syscall_number, syscall_defintion, true))
+        if (!this->register_hook(syscall_name, syscall_number, syscall_defintion, is_ret, true))
             check = false;
         memset(syscall_name, sizeof(char), sizeof(syscall_name));
     }
