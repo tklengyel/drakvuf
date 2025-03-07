@@ -105,7 +105,7 @@
 #ifndef SYSCALLS_PRIVATE_2_H
 #define SYSCALLS_PRIVATE_2_H
 
-#include <unordered_set>
+#include <unordered_map>
 
 #include "plugins/plugin_utils.h"
 #include "plugins/plugins_ex.h"
@@ -115,9 +115,10 @@
 
 struct syscalls_config
 {
-    const char* syscalls_filter_file;
+    const char* syscalls_list_file;
     const char* win32k_profile;
     bool disable_sysret;
+    syscalls_dereference_args_t syscalls_dereference_args;
 };
 
 // internal syscalls class
@@ -129,15 +130,20 @@ public:
     addr_t register_size;
     bool is32bit;
     bool disable_sysret;
+    syscalls_dereference_args_t dereference_args;
 
-    std::unordered_set<std::string> filter;
-    std::vector<std::pair<char const*, fmt::Aarg>> fmt_args;
+    std::unordered_map<std::string, bool> syscall_list; // name -> is_ret
+
+    typedef std::unordered_map<std::string, fmt::Aarg> fmt_args_t;
+    void fill_fmt_args(
+        fmt_args_t& fmt_args, const syscalls_ns::syscall_t* sc, drakvuf_trap_info_t* info,
+        const std::vector<uint64_t>& args, bool is_ret, bool ret_success
+    );
 
     void print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info = nullptr);
     std::string parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
-    uint64_t mask_value(const syscalls_ns::arg_t& arg, uint64_t val);
-    uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, uint64_t val);
-    bool read_syscalls_filter(const char* filter_file);
+    uint64_t value_from_uint64(syscalls_ns::arg_type_t type, uint64_t val);
+    bool read_syscalls_list(const char* syscall_list_file);
 
     virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val)
     {

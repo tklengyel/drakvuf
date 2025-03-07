@@ -178,9 +178,10 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     syscalls_config config =
                     {
-                        .syscalls_filter_file = options->syscalls_filter_file,
+                        .syscalls_list_file = options->syscalls_list_file,
                         .win32k_profile = options->win32k_profile,
                         .disable_sysret = options->disable_sysret,
+                        .syscalls_dereference_args = options->syscalls_dereference_args,
                     };
                     this->plugins[plugin_id] = std::make_unique<syscalls>(this->drakvuf, &config, this->output);
                     break;
