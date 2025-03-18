@@ -131,20 +131,6 @@ CpuidHook::~CpuidHook()
     }
 }
 
-CpuidHook::CpuidHook(CpuidHook&& rhs) noexcept
-    : BaseHook(std::forward<BaseHook>(rhs))
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->callback_, rhs.callback_);
-}
-
-CpuidHook& CpuidHook::operator=(CpuidHook&& rhs) noexcept
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->callback_, rhs.callback_);
-    return *this;
-}
-
 CpuidHook::CpuidHook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : BaseHook(drakvuf),
       callback_(cb)

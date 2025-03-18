@@ -127,26 +127,16 @@ public:
     ~Cr3Hook() override;
 
     /**
-     * delete copy ctor, as this class has ownership via RAII
+     * delete copy and move ctors, as this class has ownership via RAII
      */
     Cr3Hook(const Cr3Hook&) = delete;
+    Cr3Hook(Cr3Hook&&) = delete;
 
     /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    Cr3Hook(Cr3Hook&&) noexcept;
-
-    /**
-     * delete copy assignment operator, as this class has ownership via RAII
+     * delete copy and move assignment operators, as this class has ownership via RAII
      */
     Cr3Hook& operator=(const Cr3Hook&) = delete;
-
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    Cr3Hook& operator=(Cr3Hook&&) noexcept;
+    Cr3Hook& operator=(Cr3Hook&&) = delete;
 
     std::shared_ptr<CallResult> params() override;
 
