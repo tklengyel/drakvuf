@@ -131,20 +131,6 @@ Cr3Hook::~Cr3Hook()
     }
 }
 
-Cr3Hook::Cr3Hook(Cr3Hook&& rhs) noexcept
-    : BaseHook(std::forward<BaseHook>(rhs))
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->callback_, rhs.callback_);
-}
-
-Cr3Hook& Cr3Hook::operator=(Cr3Hook&& rhs) noexcept
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->callback_, rhs.callback_);
-    return *this;
-}
-
 Cr3Hook::Cr3Hook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : BaseHook(drakvuf),
       callback_(cb)

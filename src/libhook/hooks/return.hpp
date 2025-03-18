@@ -128,26 +128,16 @@ public:
     ~ReturnHook() override;
 
     /**
-     * delete copy ctor, as this class has ownership via RAII
+     * delete copy and move ctors, as this class has ownership via RAII
      */
     ReturnHook(const ReturnHook&) = delete;
+    ReturnHook(ReturnHook&&) = delete;
 
     /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    ReturnHook(ReturnHook&&) noexcept;
-
-    /**
-     * delete copy assignment operator, as this class has ownership via RAII
+     * delete copy and move assignment operators, as this class has ownership via RAII
      */
     ReturnHook& operator=(const ReturnHook&) = delete;
-
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    ReturnHook& operator=(ReturnHook&&) noexcept;
+    ReturnHook& operator=(ReturnHook&&) = delete;
 
     std::shared_ptr<CallResult> params() override;
 

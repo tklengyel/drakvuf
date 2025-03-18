@@ -127,26 +127,16 @@ public:
     ~CatchAllHook() override;
 
     /**
-     * delete copy ctor, as this class has ownership via RAII
+     * delete copy and move ctors, as this class has ownership via RAII
      */
     CatchAllHook(const CatchAllHook&) = delete;
+    CatchAllHook(CatchAllHook&&) = delete;
 
     /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    CatchAllHook(CatchAllHook&&) noexcept;
-
-    /**
-     * delete copy assignment operator, as this class has ownership via RAII
+     * delete copy and move assignment operators, as this class has ownership via RAII
      */
     CatchAllHook& operator=(const CatchAllHook&) = delete;
-
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    CatchAllHook& operator=(CatchAllHook&&) noexcept;
+    CatchAllHook& operator=(CatchAllHook&&) = delete;
 
     std::shared_ptr<CallResult> params() override;
 

@@ -110,17 +110,6 @@ BaseHook::BaseHook(drakvuf_t drakvuf)
     : drakvuf_(drakvuf)
 {}
 
-BaseHook::BaseHook(BaseHook&& rhs) noexcept
-{
-    std::swap(this->drakvuf_, rhs.drakvuf_);
-}
-
-BaseHook& BaseHook::operator=(BaseHook&& rhs) noexcept
-{
-    std::swap(this->drakvuf_, rhs.drakvuf_);
-    return *this;
-}
-
 // don't ask me why C++ has "pure virtual dctors with default implementation"
 BaseHook::~BaseHook()
 {}

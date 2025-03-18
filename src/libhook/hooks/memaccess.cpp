@@ -131,20 +131,6 @@ MemAccessHook::~MemAccessHook()
     }
 }
 
-MemAccessHook::MemAccessHook(MemAccessHook&& rhs) noexcept
-    : BaseHook(std::forward<BaseHook>(rhs))
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->callback_, rhs.callback_);
-}
-
-MemAccessHook& MemAccessHook::operator=(MemAccessHook&& rhs) noexcept
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->callback_, rhs.callback_);
-    return *this;
-}
-
 MemAccessHook::MemAccessHook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : BaseHook(drakvuf),
       callback_(cb)

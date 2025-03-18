@@ -154,22 +154,6 @@ ReturnHook::~ReturnHook()
     }
 }
 
-ReturnHook::ReturnHook(ReturnHook&& rhs) noexcept
-    : BaseHook(std::forward<BaseHook>(rhs))
-{
-    std::swap(this->callback_, rhs.callback_);
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->display_name_, rhs.display_name_);
-}
-
-ReturnHook& ReturnHook::operator=(ReturnHook&& rhs) noexcept
-{
-    std::swap(this->callback_, rhs.callback_);
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->display_name_, rhs.display_name_);
-    return *this;
-}
-
 std::shared_ptr<CallResult> ReturnHook::params()
 {
     return this->params_;

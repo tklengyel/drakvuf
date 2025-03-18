@@ -137,26 +137,16 @@ public:
     ManualHook() = delete;
 
     /**
-     * delete copy ctor, as this class has ownership via RAII
+     * delete copy and move ctors, as this class has ownership via RAII
      */
     ManualHook(const ManualHook&) = delete;
+    ManualHook(ManualHook&&) = delete;
 
     /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    ManualHook(ManualHook&&) noexcept;
-
-    /**
-     * delete copy assignment operator, as this class has ownership via RAII
+     * delete copy and move assignment operators, as this class has ownership via RAII
      */
     ManualHook& operator=(const ManualHook&) = delete;
-
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    ManualHook& operator=(ManualHook&&) noexcept;
+    ManualHook& operator=(ManualHook&&) = delete;
 
     std::shared_ptr<CallResult> params() override;
 
