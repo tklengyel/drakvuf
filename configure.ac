@@ -120,7 +120,6 @@ AC_PROG_CXX(clang++)
 
 AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX])
 AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
-CXXFLAGS="-std=gnu++17"
 
 ######################################################
 
