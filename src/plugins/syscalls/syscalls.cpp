@@ -125,7 +125,7 @@ void syscalls_base::fill_fmt_args(
     {
         bool is_complete_value =
             (sc->args[i].dir == DIR_IN) ||
-            (sc->args[i].dir == DIR_OUT || sc->args[i].dir == DIR_INOUT) && is_ret && ret_success;
+            ((sc->args[i].dir == DIR_OUT || sc->args[i].dir == DIR_INOUT) && is_ret && ret_success);
 
         uint64_t value = this->value_from_uint64(sc->args[i].type, args[i]);
         std::string value_str;

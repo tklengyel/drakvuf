@@ -772,9 +772,9 @@ int main(int argc, char** argv)
                 options.disable_sysret = true;
                 break;
             case opt_syscall_dereference_args:
-                if (!strncmp(optarg, "replace", 4))
+                if (!strncmp(optarg, "replace", 7))
                     options.syscalls_dereference_args = SYSCALLS_DEREFERENCE_ARGS_REPLACE_FIELD;
-                else if (!strncmp(optarg, "add", 4))
+                else if (!strncmp(optarg, "add", 3))
                     options.syscalls_dereference_args = SYSCALLS_DEREFERENCE_ARGS_ADD_FIELD;
                 else if (!strncmp(optarg, "none", 4))
                     options.syscalls_dereference_args = SYSCALLS_DEREFERENCE_ARGS_NONE;
