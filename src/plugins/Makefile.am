@@ -146,6 +146,8 @@ if PLUGIN_FILEEXTRACTOR
 sources += fileextractor/fileextractor.cpp
 sources += fileextractor/fileextractor.h
 sources += fileextractor/private.h
+sources += fileextractor/linux.cpp
+sources += fileextractor/linux.h
 sources += fileextractor/win.cpp
 sources += fileextractor/win.h
 endif
