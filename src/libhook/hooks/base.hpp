@@ -127,26 +127,16 @@ public:
     virtual ~BaseHook() = 0;
 
     /**
-     * delete copy ctor, as this class has ownership via RAII
+     * delete copy and move ctors, as this class has ownership via RAII
      */
     BaseHook(const BaseHook&) = delete;
+    BaseHook(BaseHook&&) = delete;
 
     /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    BaseHook(BaseHook&&) noexcept;
-
-    /**
-     * delete copy assignment operator, as this class has ownership via RAII
+     * delete copy and move assignment operators, as this class has ownership via RAII
      */
     BaseHook& operator=(const BaseHook&) = delete;
-
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    BaseHook& operator=(BaseHook&&) noexcept;
+    BaseHook& operator=(BaseHook&&) = delete;
 
     virtual std::shared_ptr<CallResult> params() = 0;
 
