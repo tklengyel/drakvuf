@@ -142,20 +142,6 @@ ManualHook::~ManualHook()
     }
 }
 
-ManualHook::ManualHook(ManualHook&& rhs) noexcept
-    : BaseHook(std::forward<ManualHook>(rhs))
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->free_routine_, rhs.free_routine_);
-}
-
-ManualHook& ManualHook::operator=(ManualHook&& rhs) noexcept
-{
-    std::swap(this->trap_, rhs.trap_);
-    std::swap(this->free_routine_, rhs.free_routine_);
-    return *this;
-}
-
 std::shared_ptr<CallResult> ManualHook::params()
 {
     return nullptr;

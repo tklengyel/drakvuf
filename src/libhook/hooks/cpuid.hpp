@@ -127,26 +127,16 @@ public:
     ~CpuidHook() override;
 
     /**
-     * delete copy ctor, as this class has ownership via RAII
+     * delete copy and move ctors, as this class has ownership via RAII
      */
     CpuidHook(const CpuidHook&) = delete;
+    CpuidHook(CpuidHook&&) = delete;
 
     /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    CpuidHook(CpuidHook&&) noexcept;
-
-    /**
-     * delete copy assignment operator, as this class has ownership via RAII
+     * delete copy and move assignment operators, as this class has ownership via RAII
      */
     CpuidHook& operator=(const CpuidHook&) = delete;
-
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    CpuidHook& operator=(CpuidHook&&) noexcept;
+    CpuidHook& operator=(CpuidHook&&) = delete;
 
     std::shared_ptr<CallResult> params() override;
 

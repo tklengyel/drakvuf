@@ -127,26 +127,16 @@ public:
     ~MemAccessHook() override;
 
     /**
-     * delete copy ctor, as this class has ownership via RAII
+     * delete copy and move ctors, as this class has ownership via RAII
      */
     MemAccessHook(const MemAccessHook&) = delete;
+    MemAccessHook(MemAccessHook&&) = delete;
 
     /**
-     * move ctor, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    MemAccessHook(MemAccessHook&&) noexcept;
-
-    /**
-     * delete copy assignment operator, as this class has ownership via RAII
+     * delete copy and move assignment operators, as this class has ownership via RAII
      */
     MemAccessHook& operator=(const MemAccessHook&) = delete;
-
-    /**
-     * move assignment operator, required for move semantics to work properly
-     * important to be noexcept, otherwise bad things will happen
-     */
-    MemAccessHook& operator=(MemAccessHook&&) noexcept;
+    MemAccessHook& operator=(MemAccessHook&&) = delete;
 
     std::shared_ptr<CallResult> params() override;
 
