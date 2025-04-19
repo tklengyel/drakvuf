@@ -490,10 +490,6 @@ bool win_get_object_type_index(drakvuf_t drakvuf, access_context_t* object_heade
     {
         *index = *index ^ ((object_header_addr >> 8) & 0xff) ^ drakvuf->ob_header_cookie;
     }
-    else
-    {
-        return false;
-    }
 
     return true;
 }
