@@ -16,7 +16,6 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:bullseye"
           - "debian:bookworm"
           - "ubuntu:jammy"
           - "ubuntu:noble"
@@ -100,7 +99,6 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:bullseye"
           - "debian:bookworm"
           - "ubuntu:jammy"
           - "ubuntu:noble"
@@ -140,7 +138,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: debianbullseye-debs
+          name: debianbookworm-debs
           path: debs
 
       - name: remove xen

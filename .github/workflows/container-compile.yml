@@ -12,12 +12,9 @@ jobs:
     strategy:
       matrix:
         container:
-          - 'debian:bullseye-slim'
           - 'debian:bookworm-slim'
           - 'ubuntu:jammy'
           - 'ubuntu:noble'
-          - 'ubuntu:rolling'
-
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
@@ -63,7 +60,7 @@ jobs:
             flex ocaml-findlib xz-utils gettext libpixman-1-dev \
             libaio-dev libfdt-dev cabextract libfuse-dev \
             liblzma-dev autoconf-archive kpartx python3-dev \
-            python3-pip golang libsystemd-dev
+            python3-pip golang libsystemd-dev python3-tomli
         git submodule update --init xen
         cd xen
         ./configure --enable-githttp --disable-pvshim --disable-stubdom --disable-docs --disable-werror --with-extra-qemuu-configure-args="--disable-werror"
