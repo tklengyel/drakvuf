@@ -162,7 +162,6 @@ struct injector
     vmi_pid_t terminate_pid;
     addr_t open_process;
     addr_t exit_process;
-    addr_t exit_thread;
 
     // For shellcode execution
     addr_t payload, payload_addr, memset;
