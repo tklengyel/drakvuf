@@ -154,7 +154,7 @@ event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         if (!setup_exitthread_stack(injector, info->regs))
             return cleanup(injector, info);
 
-        info->regs->rip = injector->exit_thread;
+        info->regs->rip = injector->exec_func;
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         event = VMI_EVENT_RESPONSE_SET_REGISTERS;
 
