@@ -681,10 +681,13 @@ bool set_os_windows(drakvuf_t drakvuf)
         return 0;
     }
 
-    if (VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObpInfoMaskToOffset", &drakvuf->ob_infomask2off) ||
-        VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObTypeIndexTable",    &drakvuf->ob_type_table))
+    if (vmi_get_winver(drakvuf->vmi) != VMI_OS_WINDOWS_VISTA)
     {
-        return 0;
+        if (VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObpInfoMaskToOffset", &drakvuf->ob_infomask2off) ||
+            VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "ObTypeIndexTable",    &drakvuf->ob_type_table))
+        {
+            return 0;
+        }
     }
 
     if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_10 && VMI_FAILURE == vmi_read_8_ksym(drakvuf->vmi, "ObHeaderCookie", &drakvuf->ob_header_cookie))
