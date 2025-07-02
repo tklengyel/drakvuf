@@ -453,23 +453,33 @@ unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object)
     size_t ptrsize = drakvuf_get_address_width(drakvuf);
     addr_t header  = object - drakvuf->sizes[OBJECT_HEADER] + ptrsize;
 
-    uint8_t index = 0;
-    if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_TYPEINDEX], 0, &index))
-    {
-        return NULL;
-    }
-    // https://medium.com/@ashabdalhalim/a-light-on-windows-10s-object-header-typeindex-value-e8f907e7073a
-    // Due to security mitigations type_index is no longer equals to index in ObTypeIndexTable array on win 10
-    // but calculated as following:
-    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_10)
-    {
-        index = index ^ ((header >> 8) & 0xff) ^ drakvuf->ob_header_cookie;
-    }
-
     addr_t type = 0;
-    if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, drakvuf->ob_type_table + index * ptrsize, 0, &type))
+
+    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_VISTA)
     {
-        return NULL;
+        // Vista: OBJECT_HEADER->Type is a direct pointer to OBJECT_TYPE 
+        if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_TYPE], 0, &type))
+            return NULL;
+    }
+    else 
+    {
+        uint8_t index = 0;
+        if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_TYPEINDEX], 0, &index))
+        {
+            return NULL;
+        }
+        // https://medium.com/@ashabdalhalim/a-light-on-windows-10s-object-header-typeindex-value-e8f907e7073a
+        // Due to security mitigations type_index is no longer equals to index in ObTypeIndexTable array on win 10
+        // but calculated as following:
+        if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_10)
+        {
+            index = index ^ ((header >> 8) & 0xff) ^ drakvuf->ob_header_cookie;
+        }
+
+        if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, drakvuf->ob_type_table + index * ptrsize, 0, &type))
+        {
+            return NULL;
+        }
     }
     return drakvuf_read_unicode_va(drakvuf, type + drakvuf->offsets[OBJECT_TYPE_NAME], 0);
 }
