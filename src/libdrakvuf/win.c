@@ -431,6 +431,13 @@ unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object)
     size_t ptrsize = drakvuf_get_address_width(drakvuf);
     addr_t header  = object - drakvuf->sizes[OBJECT_HEADER] + ptrsize;
 
+    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_VISTA){
+        uint8_t name_info_offset = 0;
+        if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_OFFSET], 0, &name_info_offset) || name_info_offset == 0)
+            return NULL;
+
+        return drakvuf_read_unicode_va(drakvuf, header - name_info_offset + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_NAME], 0);
+    }
     uint8_t infomask = 0, name_info_off = 0;
 
     if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_INFOMASK], 0, &infomask))
