@@ -431,7 +431,8 @@ unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object)
     size_t ptrsize = drakvuf_get_address_width(drakvuf);
     addr_t header  = object - drakvuf->sizes[OBJECT_HEADER] + ptrsize;
 
-    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_VISTA){
+    if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_VISTA)
+    {
         uint8_t name_info_offset = 0;
         if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_OFFSET], 0, &name_info_offset) || name_info_offset == 0)
             return NULL;
@@ -444,13 +445,12 @@ unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object)
         return NULL;
     // Get object name. Some objects are anonymous. See ObQueryNameInfo for more info.
     //
-    if (infomask & 2)
-    {
-        if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, drakvuf->ob_infomask2off + (infomask & 3), 0, &name_info_off))
-            return NULL;
-        return drakvuf_read_unicode_va(drakvuf, header - name_info_off + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_NAME], 0);
-    }
-    return NULL;
+    if (!(infomask & 2))
+        return NULL;
+
+    if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, drakvuf->ob_infomask2off + (infomask & 3), 0, &name_info_off))
+        return NULL;
+    return drakvuf_read_unicode_va(drakvuf, header - name_info_off + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_NAME], 0);
 }
 
 unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object)
@@ -464,11 +464,11 @@ unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object)
 
     if (vmi_get_winver(drakvuf->vmi) == VMI_OS_WINDOWS_VISTA)
     {
-        // Vista: OBJECT_HEADER->Type is a direct pointer to OBJECT_TYPE 
+        // Vista: OBJECT_HEADER->Type is a direct pointer to OBJECT_TYPE
         if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_TYPE], 0, &type))
             return NULL;
     }
-    else 
+    else
     {
         uint8_t index = 0;
         if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_TYPEINDEX], 0, &index))
