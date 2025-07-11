@@ -445,12 +445,13 @@ unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object)
         return NULL;
     // Get object name. Some objects are anonymous. See ObQueryNameInfo for more info.
     //
-    if (!(infomask & 2))
-        return NULL;
-
-    if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, drakvuf->ob_infomask2off + (infomask & 3), 0, &name_info_off))
-        return NULL;
-    return drakvuf_read_unicode_va(drakvuf, header - name_info_off + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_NAME], 0);
+    if (infomask & 2)
+    {
+        if (VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, drakvuf->ob_infomask2off + (infomask & 3), 0, &name_info_off))
+            return NULL;
+        return drakvuf_read_unicode_va(drakvuf, header - name_info_off + drakvuf->offsets[OBJECT_HEADER_NAME_INFO_NAME], 0);
+    }
+    return NULL;
 }
 
 unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object)

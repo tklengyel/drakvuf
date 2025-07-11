@@ -529,15 +529,12 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         throw -1;
     }
 
-    vmi_lock_guard vmi(drakvuf);
-    if (vmi_get_winver(vmi) != VMI_OS_WINDOWS_VISTA)
+    if (!drakvuf_get_kernel_symbol_va(drakvuf, "ObTypeIndexTable", &ob_type_table_va))
     {
-        if (!drakvuf_get_kernel_symbol_va(drakvuf, "ObTypeIndexTable", &ob_type_table_va))
-        {
-            throw -1;
-        }
+        throw -1;
     }
 
+    vmi_lock_guard vmi(drakvuf);
     const uint16_t ver = vmi_get_win_buildnumber(vmi);
 
     auto get_ksymbol_va = [&](const char* symb) -> addr_t
