@@ -102,27 +102,121 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <inttypes.h>
-#include <assert.h>
+#include <libfs/base.hpp>
 
-#include "fileextractor.h"
-#include "linux.h"
-#include "win.h"
-
-fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output) : pluginex(drakvuf, output)
+namespace libfs
 {
-    auto os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->wf = std::make_unique<win_fileextractor>(drakvuf, config, output);
-    else
-        this->lf = std::make_unique<linux_fileextractor>(drakvuf, config, output);
+
+bool BaseFilesystem::detect_filesystem_start_gpt()
+{
+    auto gpt = get_struct_from_disk<gpt_t>(LBA_SIZE);
+    auto partitions = get_array_of_structs_from_disk<gpt_partition_t>(LBA_SIZE * gpt->partition_start_lba, gpt->number_of_partitions);
+
+    for (const auto& partition : partitions)
+    {
+        if (partition.first_lba == 0 || partition.last_lba == 0)
+            continue;
+
+        /* Detect linux data partition */
+        if (!std::memcmp(partition.type_guid, GPT_GUID_LINUX_FILESYSTEM_DATA, 16))
+        {
+            filesystem_start = partition.first_lba * SECTOR_SIZE;
+            return true;
+        }
+    }
+
+    return false;
 }
 
-bool fileextractor::stop_impl()
+/*
+ * find real offset to filesystem with detecting MBR or GPT layout
+ * NOTE: currently support only Linux
+ */
+bool BaseFilesystem::detect_filesystem_start()
 {
-    auto os = drakvuf_get_os_type(this->drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        return this->wf->stop();
-    else
-        return this->lf->stop();
+    PRINT_ERROR("[libfs] detect filesystem start\n");
+    if (drakvuf_get_os_type(drakvuf_) != VMI_OS_LINUX)
+        return false;
+
+    auto mbr = get_struct_from_disk<mbr_t>(ZERO_OFFSET);
+    PRINT_ERROR("[libfs] read mbr from disk successfully\n");
+
+    if (mbr->boot_signature != MBR_BOOT_SIGNATURE)
+    {
+        PRINT_ERROR("[FILEEXTRACTOR] MBR not found\n");
+        throw -1;
+    }
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (mbr->partition_table[i].type == MBR_TYPE_UNUSED)
+            continue;
+
+        /* special case for parsing gpt */
+        if (mbr->partition_table[i].type == MBR_TYPE_EFI_GPT)
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] Detecting GPT disk layout\n");
+            return detect_filesystem_start_gpt();
+        }
+
+        /* Currently support only linux */
+        if (mbr->partition_table[i].type == MBR_TYPE_LINUX)
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR] Detecting MBR disk layout\n");
+            filesystem_start = mbr->partition_table[i].starting_lba * SECTOR_SIZE;
+            return true;
+        }
+    }
+
+    return false;
 }
+
+void BaseFilesystem::init_disk()
+{
+    auto vmi = vmi_lock_guard(drakvuf_);
+
+    uint32_t number_of_disks;
+    char** devices_ids = vmi_get_disks(vmi, &number_of_disks);
+    if (!devices_ids)
+    {
+        PRINT_ERROR("[ext4] failed to get list of disks\n");
+        throw -1;
+    }
+
+    /* by default use first device_id */
+    device_id = std::string(devices_ids[0]);
+    for (uint32_t i = 0; i < number_of_disks; i++)
+    {
+        PRINT_ERROR("[libfs] devices_ids[%d]=%s\n", i, devices_ids[i]);
+        free(devices_ids[i]);
+    }
+    free(devices_ids);
+}
+
+BaseFilesystem::BaseFilesystem(drakvuf_t drakvuf)
+    : drakvuf_(drakvuf)
+{
+    init_disk();
+
+    if (!detect_filesystem_start())
+    {
+        PRINT_ERROR("[FILEEXTRACTOR] can't find filesystem start offset\n");
+        throw -1;
+    }
+}
+
+BaseFilesystem::BaseFilesystem(BaseFilesystem&& rhs) noexcept
+{
+    std::swap(this->drakvuf_, rhs.drakvuf_);
+}
+
+BaseFilesystem& BaseFilesystem::operator=(BaseFilesystem&& rhs) noexcept
+{
+    std::swap(this->drakvuf_, rhs.drakvuf_);
+    return *this;
+}
+
+BaseFilesystem::~BaseFilesystem()
+{}
+
+} // namespace libfs
