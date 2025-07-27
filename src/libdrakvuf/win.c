@@ -492,6 +492,19 @@ unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object)
     return drakvuf_read_unicode_va(drakvuf, type + drakvuf->offsets[OBJECT_TYPE_NAME], 0);
 }
 
+// Vista: get the address of the OBJECT_TYPE of an object
+addr_t win_get_object_type_address(drakvuf_t drakvuf, addr_t object)
+{
+    size_t ptrsize = drakvuf_get_address_width(drakvuf);
+    addr_t header  = object - drakvuf->sizes[OBJECT_HEADER] + ptrsize;
+    addr_t type = 0;
+
+    // Vista: OBJECT_HEADER->Type is a direct pointer to OBJECT_TYPE
+    if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, header + drakvuf->offsets[OBJECT_HEADER_TYPE], 0, &type))
+        return 0;
+    return type;
+}
+
 bool win_get_object_type_index(drakvuf_t drakvuf, access_context_t* object_header_ctx, uint8_t* index)
 {
     addr_t object_header_addr = object_header_ctx->addr;

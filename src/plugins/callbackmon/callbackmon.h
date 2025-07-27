@@ -105,6 +105,7 @@
 
 #include "plugins/plugins_ex.h"
 #include "private.h"
+#include <unordered_set>
 
 struct callbackmon_config
 {
@@ -157,6 +158,7 @@ public:
     std::vector<addr_t> wfpcallouts;
 
     std::vector<callbackmon_ns::object_type_t> object_type;
+    std::unordered_set<addr_t> vista_object_type_addresses;
     std::vector<callbackmon_ns::object_t> object_cb;
     std::unordered_map<addr_t, protocol_cb_t> ndis_protocol_cb;
 

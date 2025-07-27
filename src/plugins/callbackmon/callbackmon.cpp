@@ -102,6 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 #include <libdrakvuf/libdrakvuf.h>
+#include <libdrakvuf/win.h>
 #include <plugins/plugins_ex.h>
 #include <plugins/output_format.h>
 #include <mutex>
@@ -113,6 +114,7 @@ using namespace callbackmon_ns;
 
 static constexpr uint16_t win_vista_ver     = 6000;
 static constexpr uint16_t win_vista_sp1_ver = 6001;
+static constexpr uint16_t win_vista_sp2_ver = 6002;
 static constexpr uint16_t win_7_sp1_ver     = 7601;
 static constexpr uint16_t win_8_1_ver       = 9600;
 static constexpr uint16_t win_10_rs1_ver    = 14393;
@@ -364,108 +366,168 @@ static std::vector<addr_t> get_callback_object_callbacks(drakvuf_t drakvuf, call
     return out;
 }
 
+// Vista: store unique OBJECT_TYPE addresses because
+// ObTypeIndexTable is not available in Vista, and
+// collect callback objects.
+static void vista_enumerate_object_types_and_callbacks(drakvuf_t drakvuf, const object_info_t* info, void* ctx)
+{
+    auto plugin = static_cast<callbackmon*>(ctx);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA)
+    {
+        addr_t obj_type = win_get_object_type_address(drakvuf, info->base_addr);
+        if (obj_type)
+            plugin->vista_object_type_addresses.insert(obj_type);
+    }
+
+    // Enumerate callback objects.
+    if (!strcmp((const char*)info->name->contents, "Callback"))
+    {
+        auto name = drakvuf_get_object_name(drakvuf, info->base_addr);
+        plugin->object_cb.push_back(
+        {
+            .base = info->base_addr,
+            .name = name ? (const char*)name->contents : "Anonymous",
+            .callbacks = get_callback_object_callbacks(drakvuf, plugin, info->base_addr)
+        });
+        if (name) vmi_free_unicode_str(name);
+    }
+
+    drakvuf_release_vmi(drakvuf);
+}
+
+static bool fill_object_type_callbacks(vmi_instance_t vmi, drakvuf_t drakvuf, callbackmon* plugin, addr_t ob_type_base)
+{
+    object_type_t ob_type{};
+    ob_type.base = ob_type_base;
+
+    // Collect type initializer callbacks.
+    //
+    for (size_t cb_n = 0; cb_n < 8; cb_n++)
+    {
+        addr_t callback{};
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, ob_type.base + plugin->offsets[OBJECT_TYPE_TYPEINFO] + plugin->offsets[OBJECT_TYPE_INITIALIZER_DUMP_CB] + cb_n * drakvuf_get_address_width(drakvuf), 0, &callback))
+        {
+            return false;
+        }
+        if (callback)
+        {
+            ob_type.initializer.push_back(callback);
+        }
+    }
+    // Collect object type callbacks.
+    //
+    addr_t head = ob_type.base + plugin->offsets[OBJECT_TYPE_CALLBACKLIST];
+    addr_t entry{};
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 0, &entry))
+        return false;
+
+    while (entry != head && entry)
+    {
+        uint32_t active{};
+        addr_t pre_cb{}, post_cb{};
+        // Undocumented structure. No symbols.
+        // typedef struct _CALLBACK_ENTRY_ITEM
+        // {
+        //     LIST_ENTRY CallbackList; // 0x0
+        //     OB_OPERATION Operations; // 0x10
+        //     DWORD Active; // 0x14
+        //     CALLBACK_ENTRY *CallbackEntry; // 0x18
+        //     PVOID ObjectType; // 0x20
+        //     POB_PRE_OPERATION_CALLBACK PreOperation; // 0x28
+        //     POB_POST_OPERATION_CALLBACK PostOperation; // 0x30
+        //     QWORD unk1; // 0x38
+        // } CALLBACK_ENTRY_ITEM, *PCALLBACK_ENTRY_ITEM; // size: 0x40
+        if (VMI_SUCCESS != vmi_read_32_va  (vmi, entry + 0x14, 0, &active)  ||
+            VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x28, 0, &pre_cb)  ||
+            VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x30, 0, &post_cb) ||
+            VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
+        {
+            return false;
+        }
+
+        if (active)
+        {
+            if (pre_cb)
+                ob_type.callbacks.push_back({ .base = entry, .callback = pre_cb  });
+            if (post_cb)
+                ob_type.callbacks.push_back({ .base = entry, .callback = post_cb });
+        }
+    }
+    // Fill object type name.
+    //
+    if (auto name = drakvuf_get_object_name(drakvuf, ob_type.base))
+    {
+        ob_type.name = (const char*)name->contents;
+        vmi_free_unicode_str(name);
+    }
+    else
+    {
+        ob_type.name = "Anonymous";
+    }
+    plugin->object_type.push_back(std::move(ob_type));
+    return true;
+}
+
 static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, callbackmon* plugin)
 {
     if (drakvuf_get_address_width(drakvuf) != 8)
         return true;
     // Enumerate callback objects.
     //
-    if (!drakvuf_enumerate_object_directory(drakvuf, [](drakvuf_t drakvuf, const object_info_t* info, void* ctx)
-{
-    auto plugin = static_cast<callbackmon*>(ctx);
-
-        if (!strcmp((const char*)info->name->contents, "Callback"))
-        {
-            auto name = drakvuf_get_object_name(drakvuf, info->base_addr);
-            plugin->object_cb.push_back(
+    if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA){
+        if (!drakvuf_enumerate_object_directory(drakvuf, vista_enumerate_object_types_and_callbacks, plugin))
             {
-                .base = info->base_addr,
-                .name = name ? (const char*)name->contents : "Anonymous",
-                .callbacks = get_callback_object_callbacks(drakvuf, plugin, info->base_addr)
-            });
-            if (name) vmi_free_unicode_str(name);
-        }
-    }, plugin))
-    {
-        return false;
+                return false;
+            }
+    }else{
+        if (!drakvuf_enumerate_object_directory(drakvuf, [](drakvuf_t drakvuf, const object_info_t* info, void* ctx)
+        {
+            auto plugin = static_cast<callbackmon*>(ctx);
+
+                if (!strcmp((const char*)info->name->contents, "Callback"))
+                {
+                    auto name = drakvuf_get_object_name(drakvuf, info->base_addr);
+                    plugin->object_cb.push_back(
+                    {
+                        .base = info->base_addr,
+                        .name = name ? (const char*)name->contents : "Anonymous",
+                        .callbacks = get_callback_object_callbacks(drakvuf, plugin, info->base_addr)
+                    });
+                    if (name) vmi_free_unicode_str(name);
+                }
+            }, plugin))
+            {
+                return false;
+            }
     }
-    // Enumerate every object type. First 2 entries are not used.
+    // Enumerate every object type.
     //
-    for (size_t i = 2; ; i++)
+    if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA)
     {
-        object_type_t ob_type{};
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, plugin->ob_type_table_va + i * drakvuf_get_address_width(drakvuf), 0, &ob_type.base))
-            return false;
-        // if reached the end.
-        //
-        if (!ob_type.base)
-            break;
-        // Collect type initializer callbacks.
-        //
-        for (size_t cb_n = 0; cb_n < 8; cb_n++)
+        for (addr_t obj_type_addr : plugin->vista_object_type_addresses)
         {
-            addr_t callback{};
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, ob_type.base + plugin->offsets[OBJECT_TYPE_TYPEINFO] + plugin->offsets[OBJECT_TYPE_INITIALIZER_DUMP_CB] + cb_n * drakvuf_get_address_width(drakvuf), 0, &callback))
-            {
+            if (!fill_object_type_callbacks(vmi, drakvuf, plugin, obj_type_addr))
                 return false;
-            }
-            if (callback)
-            {
-                ob_type.initializer.push_back(callback);
-            }
         }
-        // Collect object type callbacks.
-        //
-        addr_t head = ob_type.base + plugin->offsets[OBJECT_TYPE_CALLBACKLIST];
-        addr_t entry{};
-        if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 0, &entry))
-            return false;
-
-        while (entry != head && entry)
-        {
-            uint32_t active{};
-            addr_t pre_cb{}, post_cb{};
-            // Undocumented structure. No symbols.
-            // typedef struct _CALLBACK_ENTRY_ITEM
-            // {
-            //     LIST_ENTRY CallbackList; // 0x0
-            //     OB_OPERATION Operations; // 0x10
-            //     DWORD Active; // 0x14
-            //     CALLBACK_ENTRY *CallbackEntry; // 0x18
-            //     PVOID ObjectType; // 0x20
-            //     POB_PRE_OPERATION_CALLBACK PreOperation; // 0x28
-            //     POB_POST_OPERATION_CALLBACK PostOperation; // 0x30
-            //     QWORD unk1; // 0x38
-            // } CALLBACK_ENTRY_ITEM, *PCALLBACK_ENTRY_ITEM; // size: 0x40
-            if (VMI_SUCCESS != vmi_read_32_va  (vmi, entry + 0x14, 0, &active)  ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x28, 0, &pre_cb)  ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry + 0x30, 0, &post_cb) ||
-                VMI_SUCCESS != vmi_read_addr_va(vmi, entry, 0, &entry))
-            {
-                return false;
-            }
-
-            if (active)
-            {
-                if (pre_cb)
-                    ob_type.callbacks.push_back({ .base = entry, .callback = pre_cb  });
-                if (post_cb)
-                    ob_type.callbacks.push_back({ .base = entry, .callback = post_cb });
-            }
-        }
-        // Fill object type name.
-        //
-        if (auto name = drakvuf_get_object_name(drakvuf, ob_type.base))
-        {
-            ob_type.name = (const char*)name->contents;
-            vmi_free_unicode_str(name);
-        }
-        else
-        {
-            ob_type.name = "Anonymous";
-        }
-        plugin->object_type.push_back(std::move(ob_type));
     }
+    else
+    {
+        // First 2 entries are not used.
+        for (size_t i = 2; ; i++)
+        {
+            object_type_t ob_type{};
+            if (VMI_SUCCESS != vmi_read_addr_va(vmi, plugin->ob_type_table_va + i * drakvuf_get_address_width(drakvuf), 0, &ob_type.base))
+                return false;
+            // if reached the end.
+            //
+            if (!ob_type.base)
+                break;
+            if (!fill_object_type_callbacks(vmi, drakvuf, plugin, ob_type.base))
+                return false;   
+        }
+      }
     return true;
 }
 
@@ -529,12 +591,15 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         throw -1;
     }
 
-    if (!drakvuf_get_kernel_symbol_va(drakvuf, "ObTypeIndexTable", &ob_type_table_va))
+    vmi_lock_guard vmi(drakvuf);
+    if (vmi_get_winver(vmi) != VMI_OS_WINDOWS_VISTA)
     {
-        throw -1;
+        if (!drakvuf_get_kernel_symbol_va(drakvuf, "ObTypeIndexTable", &ob_type_table_va))
+        {
+            throw -1;
+        }
     }
 
-    vmi_lock_guard vmi(drakvuf);
     const uint16_t ver = vmi_get_win_buildnumber(vmi);
 
     auto get_ksymbol_va = [&](const char* symb) -> addr_t
@@ -605,12 +670,35 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
         std::vector<addr_t> out;
         if (vmi_get_win_buildnumber(vmi) < win_8_1_ver)
         {
-            for (const auto& symbol : callout_symbols)
+            if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA){
+                for (const auto& symbol : callout_symbols)
+                {
+                    addr_t fn = 0;
+                    addr_t va = 0;
+                    try
+                    {
+                        va = get_ksymbol_va(symbol);
+                    }
+                    catch (...)
+                    {
+                        continue; // Skip if symbol not found
+                    }
+
+                    if (!va || VMI_SUCCESS != vmi_read_addr_va(vmi, va, 4, &fn))
+                        continue;
+
+                    out.push_back(fn);
+                }
+            }
+            else
             {
-                addr_t fn = 0;
-                if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va(symbol), 4, &fn))
-                    throw -1;
-                out.push_back(fn);
+                for (const auto& symbol : callout_symbols)
+                {
+                    addr_t fn = 0;
+                    if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va(symbol), 4, &fn))
+                        throw -1;
+                    out.push_back(fn);
+                }
             }
         }
         else
@@ -704,7 +792,11 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     this->drvreinit_cb = consume_callbacks("IopDriverReinitializeQueueHead", 3 * ptrsize);
     this->drvreinit2_cb= consume_callbacks("IopBootDriverReinitializeQueueHead", 3 * ptrsize);
     this->nmi_cb       = consume_callbacks("KiNmiCallbackListHead", 1 * ptrsize);
-    this->priority_cb  = consume_callbacks_ex("IopUpdatePriorityCallbackRoutine", 8);
+    // This callback doesn't exist in Vista
+    if (vmi_get_winver(vmi) != VMI_OS_WINDOWS_VISTA)
+    {
+        this->priority_cb  = consume_callbacks_ex("IopUpdatePriorityCallbackRoutine", 8);
+    }
     this->pnp_prof_cb  = consume_callbacks("PnpProfileNotifyList", 4 * ptrsize);
     this->pnp_class_cb = consume_callbacks("PnpDeviceClassNotifyList", 5 * ptrsize);
     this->emp_cb       = consume_callbacks("EmpCallbackListHead", -3 * ptrsize);
@@ -759,9 +851,19 @@ bool callbackmon::stop_impl()
     {
         if (winver < win_8_1_ver)
         {
-            for (size_t i = 0; i < callout_symbols.size(); i++)
-                if (previous[i] != current[i])
-                    report(drakvuf, callout_symbols[i], current[i], "Replaced");
+            if (winver >= win_vista_ver && winver <= win_vista_sp2_ver)
+            {
+                // Some symbols had to be skipped for Vista
+                for (size_t i = 0; i < std::min(previous.size(), current.size()); i++)  
+                    if (previous[i] != current[i])
+                        report(drakvuf, callout_symbols[i], current[i], "Replaced");
+            }
+            else
+            {
+                for (size_t i = 0; i < callout_symbols.size(); i++)
+                    if (previous[i] != current[i])
+                        report(drakvuf, callout_symbols[i], current[i], "Replaced");
+            }
         }
         else
         {
