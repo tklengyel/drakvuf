@@ -149,6 +149,55 @@ static const std::unordered_map<uint16_t, std::tuple<size_t, size_t, size_t>> wf
     { win_10_1803_ver, { 0x50, 0x190, 0x198 } },
 };
 
+static std::vector<addr_t> get_win32_callouts_vista(vmi_instance_t vmi, const std::vector<const char*>& symbols, std::function<addr_t(const char*)> get_ksymbol_va)
+{
+    std::vector<addr_t> out;
+    for (const auto& symbol : symbols)
+    {
+        addr_t fn = 0;
+        addr_t va = 0;
+        try
+        {
+            va = get_ksymbol_va(symbol);
+        }
+        catch (...)
+        {
+            continue; // Skip if symbol not found
+        }
+        if (!va || VMI_SUCCESS != vmi_read_addr_va(vmi, va, 4, &fn))
+            continue;
+        out.push_back(fn);
+    }
+    return out;
+}
+
+static std::vector<addr_t> get_win32_callouts_pre_win81(vmi_instance_t vmi, const std::vector<const char*>& symbols, std::function<addr_t(const char*)> get_ksymbol_va)
+{
+    std::vector<addr_t> out;
+    for (const auto& symbol : symbols)
+    {
+        addr_t fn = 0;
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va(symbol), 4, &fn))
+            throw -1;
+        out.push_back(fn);
+    }
+    return out;
+}
+
+static std::vector<addr_t> get_win32_callouts_win81_and_newer(vmi_instance_t vmi, std::function<addr_t(const char*)> get_ksymbol_va, size_t ptrsize, size_t fast_ref)
+{
+    std::vector<addr_t> out;
+    addr_t cb_block, fn;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va("PsWin32CallBack"), 4, &cb_block))
+        throw -1;
+    // Strip ref count
+    cb_block &= ~fast_ref;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, cb_block + ptrsize, 4, &fn))
+        throw -1;
+    out.push_back(fn);
+    return out;
+}
+
 static inline size_t get_process_cb_table_size(uint16_t winver)
 {
     if (winver >= win_vista_sp1_ver)
@@ -372,14 +421,9 @@ static std::vector<addr_t> get_callback_object_callbacks(drakvuf_t drakvuf, call
 static void vista_enumerate_object_types_and_callbacks(drakvuf_t drakvuf, const object_info_t* info, void* ctx)
 {
     auto plugin = static_cast<callbackmon*>(ctx);
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA)
-    {
-        addr_t obj_type = win_get_object_type_address(drakvuf, info->base_addr);
-        if (obj_type)
-            plugin->vista_object_type_addresses.insert(obj_type);
-    }
+    addr_t obj_type = win_get_object_type_address(drakvuf, info->base_addr);
+    if (obj_type)
+        plugin->vista_object_type_addresses.insert(obj_type);
 
     // Enumerate callback objects.
     if (!strcmp((const char*)info->name->contents, "Callback"))
@@ -476,31 +520,34 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
         return true;
     // Enumerate callback objects.
     //
-    if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA){
+    if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA)
+    {
         if (!drakvuf_enumerate_object_directory(drakvuf, vista_enumerate_object_types_and_callbacks, plugin))
-            {
-                return false;
-            }
-    }else{
+        {
+            return false;
+        }
+    }
+    else
+    {
         if (!drakvuf_enumerate_object_directory(drakvuf, [](drakvuf_t drakvuf, const object_info_t* info, void* ctx)
         {
-            auto plugin = static_cast<callbackmon*>(ctx);
+        auto plugin = static_cast<callbackmon*>(ctx);
 
-                if (!strcmp((const char*)info->name->contents, "Callback"))
-                {
-                    auto name = drakvuf_get_object_name(drakvuf, info->base_addr);
-                    plugin->object_cb.push_back(
-                    {
-                        .base = info->base_addr,
-                        .name = name ? (const char*)name->contents : "Anonymous",
-                        .callbacks = get_callback_object_callbacks(drakvuf, plugin, info->base_addr)
-                    });
-                    if (name) vmi_free_unicode_str(name);
-                }
-            }, plugin))
+            if (!strcmp((const char*)info->name->contents, "Callback"))
             {
-                return false;
+                auto name = drakvuf_get_object_name(drakvuf, info->base_addr);
+                plugin->object_cb.push_back(
+                {
+                    .base = info->base_addr,
+                    .name = name ? (const char*)name->contents : "Anonymous",
+                    .callbacks = get_callback_object_callbacks(drakvuf, plugin, info->base_addr)
+                });
+                if (name) vmi_free_unicode_str(name);
             }
+        }, plugin))
+        {
+            return false;
+        }
     }
     // Enumerate every object type.
     //
@@ -525,9 +572,9 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
             if (!ob_type.base)
                 break;
             if (!fill_object_type_callbacks(vmi, drakvuf, plugin, ob_type.base))
-                return false;   
+                return false;
         }
-      }
+    }
     return true;
 }
 
@@ -592,12 +639,10 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     }
 
     vmi_lock_guard vmi(drakvuf);
-    if (vmi_get_winver(vmi) != VMI_OS_WINDOWS_VISTA)
+
+    if (!drakvuf_get_kernel_symbol_va(drakvuf, "ObTypeIndexTable", &ob_type_table_va) && (vmi_get_winver(vmi) != VMI_OS_WINDOWS_VISTA))
     {
-        if (!drakvuf_get_kernel_symbol_va(drakvuf, "ObTypeIndexTable", &ob_type_table_va))
-        {
-            throw -1;
-        }
+        throw -1;
     }
 
     const uint16_t ver = vmi_get_win_buildnumber(vmi);
@@ -668,51 +713,18 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     auto consume_w32callouts = [&]() -> std::vector<addr_t>
     {
         std::vector<addr_t> out;
-        if (vmi_get_win_buildnumber(vmi) < win_8_1_ver)
+        if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA)
         {
-            if (vmi_get_winver(vmi) == VMI_OS_WINDOWS_VISTA){
-                for (const auto& symbol : callout_symbols)
-                {
-                    addr_t fn = 0;
-                    addr_t va = 0;
-                    try
-                    {
-                        va = get_ksymbol_va(symbol);
-                    }
-                    catch (...)
-                    {
-                        continue; // Skip if symbol not found
-                    }
-
-                    if (!va || VMI_SUCCESS != vmi_read_addr_va(vmi, va, 4, &fn))
-                        continue;
-
-                    out.push_back(fn);
-                }
-            }
-            else
-            {
-                for (const auto& symbol : callout_symbols)
-                {
-                    addr_t fn = 0;
-                    if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va(symbol), 4, &fn))
-                        throw -1;
-                    out.push_back(fn);
-                }
-            }
+            return get_win32_callouts_vista(vmi, callout_symbols, get_ksymbol_va);
+        }
+        else if (vmi_get_win_buildnumber(vmi) < win_8_1_ver)
+        {
+            return get_win32_callouts_pre_win81(vmi, callout_symbols, get_ksymbol_va);
         }
         else
         {
-            addr_t cb_block, fn;
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, get_ksymbol_va("PsWin32CallBack"), 4, &cb_block))
-                throw -1;
-            // Strip ref count
-            cb_block &= ~fast_ref;
-            if (VMI_SUCCESS != vmi_read_addr_va(vmi, cb_block + ptrsize, 4, &fn))
-                throw -1;
-            out.push_back(fn);
+            return get_win32_callouts_win81_and_newer(vmi, get_ksymbol_va, ptrsize, fast_ref);
         }
-        return out;
     };
     // Extract Wfp Callouts
     auto consume_wfpcallouts = [&](const char* profile) -> std::vector<addr_t>
@@ -854,7 +866,7 @@ bool callbackmon::stop_impl()
             if (winver >= win_vista_ver && winver <= win_vista_sp2_ver)
             {
                 // Some symbols had to be skipped for Vista
-                for (size_t i = 0; i < std::min(previous.size(), current.size()); i++)  
+                for (size_t i = 0; i < std::min(previous.size(), current.size()); i++)
                     if (previous[i] != current[i])
                         report(drakvuf, callout_symbols[i], current[i], "Replaced");
             }
