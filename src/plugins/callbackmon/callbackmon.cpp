@@ -530,7 +530,7 @@ static bool consume_object_callbacks(drakvuf_t drakvuf, vmi_instance_t vmi, call
     else
     {
         if (!drakvuf_enumerate_object_directory(drakvuf, [](drakvuf_t drakvuf, const object_info_t* info, void* ctx)
-        {
+    {
         auto plugin = static_cast<callbackmon*>(ctx);
 
             if (!strcmp((const char*)info->name->contents, "Callback"))
