@@ -145,7 +145,7 @@ public:
 
     void usermode_print(drakvuf_trap_info*, std::vector<uint64_t>&, hook_target_entry_t*);
 
-    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+    std::map<std::pair<uint64_t, addr_t>, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 };
 
 #endif

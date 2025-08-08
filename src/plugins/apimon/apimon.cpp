@@ -123,11 +123,11 @@ struct ApimonReturnHookData : PluginResult
 
 }
 
-static uint64_t make_hook_id(const drakvuf_trap_info_t* info)
+static std::pair<uint64_t, addr_t> make_hook_id(const drakvuf_trap_info_t* info, addr_t target_rsp)
 {
     uint64_t u64_pid = info->attached_proc_data.pid;
     uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
+    return std::make_pair((u64_pid << 32) | u64_tid, target_rsp);
 }
 
 static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -203,7 +203,7 @@ event_response_t apimon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
 
     usermode_print(info, params->arguments, params->target);
 
-    uint64_t hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     ret_hooks.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -251,10 +251,10 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     }
     else
     {
-        uint64_t hookID = make_hook_id(info);
         auto hook = plugin->createReturnHook<ApimonReturnHookData>(info,
                 &apimon::usermode_return_hook_cb, target->target_name.data(), drakvuf_get_limited_traps_ttl(drakvuf));
         auto params = libhook::GetTrapParams<ApimonReturnHookData>(hook->trap_);
+        auto hookID = make_hook_id(info, params->target_rsp);
 
         params->arguments = std::move(arguments);
         params->target = target;
