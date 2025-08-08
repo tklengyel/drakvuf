@@ -257,8 +257,7 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
  */
 void drakvuf_request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
 
-
-void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
+void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
 void userhooks_set_injection_mode(bool enable);
 

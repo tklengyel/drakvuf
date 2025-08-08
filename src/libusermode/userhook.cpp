@@ -919,12 +919,8 @@ userhook::~userhook()
     }
 
     for (auto trap : running_traps)
-        delete trap;
-    running_traps.clear();
-
-    for (auto trap : running_rh_traps)
         rh_data_t::free_trap(trap);
-    running_rh_traps.clear();
+    running_traps.clear();
 }
 
 void userhook::increment_injection_in_progress_count(const proc_data_t& proc_data)
