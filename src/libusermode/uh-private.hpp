@@ -277,19 +277,16 @@ public:
     void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
 
     bool add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
-    bool add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+    void remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
 private:
     userhook(drakvuf_t drakvuf, bool injection_mode_enabled); // Force get_instance().
     ~userhook();
 
     // We need to keep these for memory management purposes.
-    // running_rh_traps are traps with data field set to rh_data_t and are used
-    // internaly inside library.
+    // running_traps are traps with data field set to rh_data_t and are used
+    // internally inside library.
     std::vector<drakvuf_trap_t*> running_traps;
-    std::vector<drakvuf_trap_t*> running_rh_traps;
 };
 
 proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info);
