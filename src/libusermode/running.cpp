@@ -322,16 +322,17 @@ event_response_t hook_process_cb(
 
     // We have managed to resolve the physical address. Place the trap.
     drakvuf_trap_t* trap = new drakvuf_trap_t();
+    auto trap_rh_data = new rh_data_t(*rh_data);
     trap->type = BREAKPOINT;
-    trap->name = rh_data->func_name.c_str();
+    trap->name = trap_rh_data->func_name.c_str();
     trap->cb = rh_data->cb;
-    trap->data = rh_data->extra;
+    trap->data = trap_rh_data;
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = func_pa;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if (!userhook_plugin->add_running_trap(drakvuf, trap))
-        delete trap;
+        rh_data_t::free_trap(trap);
 
     userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
     return VMI_EVENT_RESPONSE_NONE;
