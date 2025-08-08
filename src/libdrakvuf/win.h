@@ -224,6 +224,13 @@ bool win_get_kernel_symbol_va(drakvuf_t drakvuf, const char* function, addr_t* v
 
 unicode_string_t* win_get_object_name(drakvuf_t drakvuf, addr_t object);
 unicode_string_t* win_get_object_type_name(drakvuf_t drakvuf, addr_t object);
+#ifdef __cplusplus
+extern "C" {
+#endif
+addr_t win_get_object_type_address(drakvuf_t drakvuf, addr_t object);
+#ifdef __cplusplus
+}
+#endif
 
 bool win_get_object_type_index(drakvuf_t drakvuf, access_context_t* object_header_ctx, uint8_t* index);
 
