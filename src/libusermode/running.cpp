@@ -418,3 +418,10 @@ void drakvuf_request_userhook_on_running_process(
 {
     userhook::get_instance(drakvuf).request_userhook_on_running_process(drakvuf, target_process, dll_name, func_name, cb, extra);
 }
+
+
+void* drakvuf_get_extra_from_running_trap(const drakvuf_trap_t* trap)
+{
+    auto rh_data = static_cast<rh_data_t*>(trap->data);
+    return rh_data->extra;
+}

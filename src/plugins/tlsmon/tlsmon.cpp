@@ -104,7 +104,6 @@
 
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
 #include <assert.h>
 #include <array>
 #include <vector>
@@ -113,8 +112,6 @@
 #include "plugins/output_format.h"
 #include "private.h"
 #include "tlsmon.h"
-
-#include "libusermode/uh-private.hpp"
 
 
 struct ssl_generate_master_key_result_t: public call_result_t
@@ -247,8 +244,7 @@ event_response_t ssl_generate_master_key_ret_cb(drakvuf_t drakvuf, drakvuf_trap_
 static
 event_response_t ssl_generate_master_key_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
-    auto rh_data = static_cast<rh_data_t*>(info->trap->data);
-    auto plugin = static_cast<tlsmon*>(rh_data->extra);
+    auto plugin = static_cast<tlsmon*>(drakvuf_get_extra_from_running_trap(info->trap));
     auto trap = plugin->register_trap<ssl_generate_master_key_result_t>(
             info,
             ssl_generate_master_key_ret_cb,
