@@ -120,53 +120,31 @@
 #include "uh-private.hpp"
 
 
-
-void userhook::remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+void userhook::remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     auto it = std::find(running_traps.begin(), running_traps.end(), trap);
     if (it == running_traps.end())
     {
-        PRINT_DEBUG("[USERHOOK] BUG: attempted to destroy non-existant running trap");
+        PRINT_DEBUG("[USERHOOK] BUG: attempted to destroy non-existent running trap");
         throw -1;
     }
     running_traps.erase(it);
-    drakvuf_remove_trap(drakvuf, trap, free_routine);
+    drakvuf_remove_trap(drakvuf, trap, rh_data_t::free_trap);
 }
 
-void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-    userhook::get_instance(drakvuf).remove_running_trap(drakvuf, trap, free_routine);
+    userhook::get_instance(drakvuf).remove_running_trap(drakvuf, trap);
 }
 
 bool userhook::add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if (!drakvuf_add_trap(drakvuf, trap))
         return false;
     running_traps.push_back(trap);
     return true;
 }
 
-void userhook::remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
-{
-    auto it = std::find(running_rh_traps.begin(), running_rh_traps.end(), trap);
-    if (it == running_rh_traps.end())
-    {
-        PRINT_DEBUG("[USERHOOK] BUG: attempted to destroy non-existant running_rh trap");
-        throw -1;
-    }
-    running_rh_traps.erase(it);
-    drakvuf_remove_trap(drakvuf, trap, rh_data_t::free_trap);
-}
-
-bool userhook::add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
-{
-    trap->ttl = UNLIMITED_TTL;
-    if (!drakvuf_add_trap(drakvuf, trap))
-        return false;
-    running_rh_traps.push_back(trap);
-    return true;
-}
 
 /**
  * Searches process's InLoadOrderModuleList for given dll library and
@@ -260,13 +238,13 @@ event_response_t hook_process_cb(
         addr_t dll_base = 0;
         if (!get_dll_base(drakvuf, rh_data->target_process, rh_data->dll_name, &dll_base))
         {
-            userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+            userhook_plugin->remove_running_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
         if (!drakvuf_get_process_dtb(drakvuf, rh_data->target_process, &rh_data->target_process_dtb))
         {
-            userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+            userhook_plugin->remove_running_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
@@ -276,7 +254,7 @@ event_response_t hook_process_cb(
         );
         if (!get_func_addr(drakvuf, ctx, dll_base, rh_data->func_name, &rh_data->func_addr))
         {
-            userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+            userhook_plugin->remove_running_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
     }
@@ -290,7 +268,7 @@ event_response_t hook_process_cb(
             if (rh_data->state == HOOK_PAGEFAULT_RETRY)
             {
                 // We have already tried requesting page fault, so nothing more we can do.
-                userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+                userhook_plugin->remove_running_trap(drakvuf, info->trap);
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
@@ -315,25 +293,26 @@ event_response_t hook_process_cb(
                 userhook_plugin->increment_injection_in_progress_count(proc_data);
                 return VMI_EVENT_RESPONSE_NONE;
             }
-            userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+            userhook_plugin->remove_running_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
     }
 
     // We have managed to resolve the physical address. Place the trap.
     drakvuf_trap_t* trap = new drakvuf_trap_t();
+    auto trap_rh_data = new rh_data_t(*rh_data);
     trap->type = BREAKPOINT;
-    trap->name = rh_data->func_name.c_str();
+    trap->name = trap_rh_data->func_name.c_str();
     trap->cb = rh_data->cb;
-    trap->data = rh_data->extra;
+    trap->data = trap_rh_data;
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = func_pa;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if (!userhook_plugin->add_running_trap(drakvuf, trap))
-        delete trap;
+        rh_data_t::free_trap(trap);
 
-    userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+    userhook_plugin->remove_running_trap(drakvuf, info->trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -355,7 +334,7 @@ event_response_t wait_for_target_process_cb(
     addr_t thread = drakvuf_get_current_thread(drakvuf, info);
     if (!thread)
     {
-        userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+        userhook_plugin->remove_running_trap(drakvuf, info->trap);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -365,19 +344,20 @@ event_response_t wait_for_target_process_cb(
         addr_t trap_frame = 0;
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, thread + userhook_plugin->offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
         {
-            userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+            userhook_plugin->remove_running_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, trap_frame + userhook_plugin->offsets[KTRAP_FRAME_RIP], 0, &rip))
         {
-            userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+            userhook_plugin->remove_running_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
     } // Unlock vmi.
 
     drakvuf_trap_t* trap = new drakvuf_trap_t();
     trap->type = BREAKPOINT;
+    trap->ttl = UNLIMITED_TTL;
     trap->name = "Hook process trap";
     trap->cb = hook_process_cb;
     trap->data = new rh_data_t(*rh_data);
@@ -385,10 +365,10 @@ event_response_t wait_for_target_process_cb(
     trap->breakpoint.dtb = info->regs->cr3;
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = rip;
-    if (!userhook_plugin->add_running_rh_trap(drakvuf, trap))
+    if (!userhook_plugin->add_running_trap(drakvuf, trap))
         rh_data_t::free_trap(trap);
 
-    userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
+    userhook_plugin->remove_running_trap(drakvuf, info->trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -415,10 +395,11 @@ void userhook::request_userhook_on_running_process(
 
     drakvuf_trap_t* trap = new drakvuf_trap_t();
     trap->type = REGISTER;
+    trap->ttl = UNLIMITED_TTL;
     trap->regaccess.type = CR3;
     trap->cb = wait_for_target_process_cb;
     trap->data = new rh_data_t(this, target_process, target_pid, dll_name, func_name, cb, extra);
-    if (!add_running_rh_trap(drakvuf, trap))
+    if (!add_running_trap(drakvuf, trap))
         rh_data_t::free_trap(trap);
 }
 
@@ -436,4 +417,11 @@ void drakvuf_request_userhook_on_running_process(
     void* extra)
 {
     userhook::get_instance(drakvuf).request_userhook_on_running_process(drakvuf, target_process, dll_name, func_name, cb, extra);
+}
+
+
+void* drakvuf_get_extra_from_running_trap(const drakvuf_trap_t* trap)
+{
+    auto rh_data = static_cast<rh_data_t*>(trap->data);
+    return rh_data->extra;
 }
