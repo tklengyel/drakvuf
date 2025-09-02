@@ -242,7 +242,6 @@ private:
         void* buffer,
         size_t size);
     void dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint64_t offset, size_t size);
-    uint64_t make_hook_id(drakvuf_trap_info_t*);
     uint64_t make_task_id(vmi_pid_t pid, handle_t handle);
     uint64_t make_task_id(task_t&);
     void free_pool(addr_t va);

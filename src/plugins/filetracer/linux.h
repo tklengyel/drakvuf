@@ -180,7 +180,6 @@ public:
     event_response_t memfd_create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     /* Helper functions */
-    uint64_t make_hook_id(drakvuf_trap_info_t* info);
     void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params);
 
     /* File info parsing */

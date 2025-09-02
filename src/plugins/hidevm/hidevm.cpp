@@ -116,17 +116,12 @@
 #include "hidevm.h"
 #include "private.h"
 
-static uint64_t make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 event_response_t hidevm::NtClose_cb(drakvuf_t, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    uint64_t hook_ID = make_hook_id(info);
+    auto params = libhook::GetTrapParams(info);
+    
+    uint64_t hook_ID = make_hook_id(info, params->target_rsp);
 
     // We need to set our fake handle value with 0 to avoid invalid handle exception
     if (this->NtClose_hook.count(hook_ID))
@@ -152,7 +147,7 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
     auto vmi = vmi_lock_guard(drakvuf);
     auto params = libhook::GetTrapParams(info);
 
-    uint64_t hook_ID = make_hook_id(info);
+    uint64_t hook_ID = make_hook_id(info, params->target_rsp);
 
     // Verify that hook for this thread was created
     if (this->ret_hooks.count(hook_ID))
@@ -373,7 +368,8 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
 
     uint64_t IoControlCode = drakvuf_get_function_argument(drakvuf, info, 6) & 0xFFFFFFFF;
     // Hook ID is needed to validate, that syscall return hook is in the same context as our hook chain
-    uint64_t hook_ID = make_hook_id(info);
+    auto params = libhook::GetTrapParams(info);
+    uint64_t hook_ID = make_hook_id(info, params->target_rsp);
 
     // First NtDeviceIoControlFile call with IoControlCode IOCTL_WMI_OPEN_GUID_BLOCK should return WmiGuid handle
     if (IoControlCode == IOCTL_WMI_OPEN_GUID_BLOCK)
