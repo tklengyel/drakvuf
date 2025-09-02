@@ -691,7 +691,7 @@ event_response_t win_filetracer::create_file_ret_cb(drakvuf_t drakvuf, drakvuf_t
     if (succ)
         print_create_file_obj_info(drakvuf, info, handle, io_information, file_attrs, params, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -748,7 +748,7 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     params->desired_access = desired_access;
     params->rsp = ret_addr;
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -790,7 +790,7 @@ event_response_t win_filetracer::open_file_ret_cb(drakvuf_t drakvuf, drakvuf_tra
     if (succ)
         print_open_file_obj_info(drakvuf, info, handle, io_information, file_attrs, params, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -836,7 +836,7 @@ event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
     params->desired_access = desired_access;
     params->rsp = ret_addr;
 
-    uint64_t hookID = make_hook_id(info, prarms->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -873,7 +873,7 @@ event_response_t win_filetracer::query_attributes_file_ret_cb(drakvuf_t drakvuf,
     if (succ_1 && succ_2)
         print_file_query_attributes(drakvuf, info, file_attrs, file_info, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -901,7 +901,7 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
     params->file_information = file_information;
     params->rsp = ret_addr;
 
-        uint64_t hookID = make_hook_id(info, params->target_rsp);
+        auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -920,7 +920,7 @@ event_response_t win_filetracer::query_full_attributes_file_ret_cb(drakvuf_t dra
     if (succ_1 && succ_2)
         print_file_query_full_attributes(drakvuf, info, file_attrs, file_info, info->regs->rax);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -948,7 +948,7 @@ event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf
     params->file_information = file_information;
     params->rsp = ret_addr;
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -1085,7 +1085,7 @@ event_response_t win_filetracer::query_information_file_ret_cb(drakvuf_t drakvuf
             break;
     };
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -1121,7 +1121,7 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
         params->file_information = fileinfo;
         params->file_information_class = fileinfoclass;
 
-        uint64_t hookID = make_hook_id(info, params->target_rsp);
+        auto hookID = make_hook_id(info, params->target_rsp);
         this->ret_hooks[hookID] = std::move(hook);
     }
 

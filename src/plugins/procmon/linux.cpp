@@ -352,7 +352,7 @@ event_response_t linux_procmon::send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         keyval("SignalStr", fmt::Rstr(signal_str))
     );
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -416,7 +416,7 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     params->target_proc_ppid = target_proc_data.ppid;
     params->signal = signal;
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     g_free(const_cast<char*>(target_proc_data.name));
@@ -444,7 +444,7 @@ event_response_t linux_procmon::kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_t
         keyval("NewPid", fmt::Nval(new_pid))
     );
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -491,7 +491,7 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
     params->flags = flags;
     params->exit_signal = exit_signal;
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -611,7 +611,7 @@ event_response_t linux_procmon::execve_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
     print_info(drakvuf, info, extra_args);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -648,7 +648,7 @@ event_response_t linux_procmon::execve_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     params->thread_name = thread_name ?: "";
     params->old_creds = get_current_credentials(drakvuf, info);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     g_free(thread_name);

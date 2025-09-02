@@ -145,7 +145,7 @@ public:
     std::unique_ptr<libhook::SyscallHook> read_link_hook;
 
     /* Return hooks */
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+    std::map<std::pair<uint64_t, addr_t>, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 
     /* Callbacks */
     // File operations callbacks

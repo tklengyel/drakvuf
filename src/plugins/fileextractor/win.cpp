@@ -189,7 +189,7 @@ event_response_t win_fileextractor::createfile_ret_cb(drakvuf_t,
     if (!params_copy.verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto hook_id = make_hook_id(info, params_copy->target_rsp);
+    auto hook_id = make_hook_id(info, params_copy.target_rsp);
     createfile_ret_hooks.erase(hook_id);
 
     // Return if NtCreateFile/NtOpenFile failed
@@ -515,7 +515,7 @@ event_response_t win_fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
     if (!params_copy.verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto hook_id = make_hook_id(info, params_copy->target_rsp);
+    auto hook_id = make_hook_id(info, params_copy.target_rsp);
     writefile_ret_hooks.erase(hook_id);
 
     // Return if NtWriteFile failed

@@ -273,7 +273,7 @@ event_response_t linux_filetracer::open_file_ret_cb(drakvuf_t drakvuf, drakvuf_t
         if (get_file_info(drakvuf, info, params, file_struct))
             print_info(drakvuf, info, params);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -300,7 +300,7 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     // Save data
     params->setResultCallParams(drakvuf, info);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -423,7 +423,7 @@ event_response_t linux_filetracer::memfd_create_file_ret_cb(drakvuf_t drakvuf, d
     if (params->file_handle > -1 && !params->filename.empty())
         print_info(drakvuf, info, params);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -473,7 +473,7 @@ event_response_t linux_filetracer::memfd_create_file_cb(drakvuf_t drakvuf, drakv
 
     params->flags = parse_flags(flags, linux_memfd_flags, this->m_output_format);
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;

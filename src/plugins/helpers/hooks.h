@@ -141,3 +141,10 @@ Plugin* GetTrapPlugin(const drakvuf_trap_info_t* info)
     static_assert(std::is_base_of_v<pluginex, Plugin>, "Plugin must derive from pluginex");
     return dynamic_cast<Plugin*>(libhook::GetTrapParams<PluginResult>(info)->plugin_);
 }
+
+inline std::pair<uint64_t, addr_t> make_hook_id(const drakvuf_trap_info_t* info, addr_t target_rsp)
+{
+    uint64_t u64_pid = info->attached_proc_data.pid;
+    uint64_t u64_tid = info->attached_proc_data.tid;
+    return std::make_pair((u64_pid << 32) | u64_tid, target_rsp);
+}

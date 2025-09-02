@@ -402,7 +402,7 @@ event_response_t rpcmon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
         keyval("ExtraNum", fmt_extra_num)
     );
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     ret_hooks.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -451,7 +451,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     params->arguments = std::move(arguments);
     params->target = target;
 
-    uint64_t hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     plugin->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
