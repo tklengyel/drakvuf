@@ -901,7 +901,7 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
     params->file_information = file_information;
     params->rsp = ret_addr;
 
-        auto hookID = make_hook_id(info, params->target_rsp);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;

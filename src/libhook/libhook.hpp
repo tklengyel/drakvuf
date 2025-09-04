@@ -152,4 +152,3 @@
  *  - get hook from trap
  *  - call callback stored in hook
  */
-

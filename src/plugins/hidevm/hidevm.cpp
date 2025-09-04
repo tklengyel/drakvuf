@@ -120,7 +120,7 @@ event_response_t hidevm::NtClose_cb(drakvuf_t, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
     auto params = libhook::GetTrapParams(info);
-    
+
     auto hook_ID = make_hook_id(info, params->target_rsp);
 
     // We need to set our fake handle value with 0 to avoid invalid handle exception
