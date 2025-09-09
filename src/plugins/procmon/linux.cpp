@@ -147,13 +147,6 @@ void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
 
 } // namespace
 
-uint64_t make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->proc_data.pid;
-    uint64_t u64_tid = info->proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 bool linux_procmon::get_struct_field_pointer(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t struct_addr, int offset_field, addr_t* value)
 {
     auto vmi = vmi_lock_guard(drakvuf);
@@ -359,7 +352,7 @@ event_response_t linux_procmon::send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         keyval("SignalStr", fmt::Rstr(signal_str))
     );
 
-    uint64_t hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -409,7 +402,6 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     char* current_thread_name = drakvuf_get_process_name(drakvuf, process_base_of_current_process, false);
 
     // Create new trap for return callback
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<send_signal_data>(info, &linux_procmon::send_signal_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<send_signal_data>(hook->trap_);
 
@@ -424,6 +416,7 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
     params->target_proc_ppid = target_proc_data.ppid;
     params->signal = signal;
 
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     g_free(const_cast<char*>(target_proc_data.name));
@@ -451,7 +444,7 @@ event_response_t linux_procmon::kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_t
         keyval("NewPid", fmt::Nval(new_pid))
     );
 
-    uint64_t hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -492,13 +485,13 @@ event_response_t linux_procmon::kernel_clone_cb(drakvuf_t drakvuf, drakvuf_trap_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    uint64_t hookID = make_hook_id(info);
     auto hook = this->createReturnHook<kernel_clone_data>(info, &linux_procmon::kernel_clone_ret_cb, info->trap->name);
     auto params = libhook::GetTrapParams<kernel_clone_data>(hook->trap_);
 
     params->flags = flags;
     params->exit_signal = exit_signal;
 
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -618,7 +611,7 @@ event_response_t linux_procmon::execve_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
     print_info(drakvuf, info, extra_args);
 
-    uint64_t hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -655,7 +648,7 @@ event_response_t linux_procmon::execve_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     params->thread_name = thread_name ?: "";
     params->old_creds = get_current_credentials(drakvuf, info);
 
-    uint64_t hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     g_free(thread_name);
