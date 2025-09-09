@@ -113,12 +113,6 @@
 
 using namespace syscalls_ns;
 
-static uint64_t make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->proc_data.pid;
-    uint64_t u64_tid = info->proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
 
 bool linux_syscalls::get_pt_regs_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* pt_regs_addr, addr_t* nr)
 {
@@ -289,7 +283,7 @@ event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
     this->print_sysret(drakvuf, info, (uint64_t)params->num);
 
-    auto hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -316,7 +310,7 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
     params->setResultCallParams(drakvuf, info);
 
-    auto hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;

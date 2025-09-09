@@ -133,7 +133,7 @@ public:
     std::unique_ptr<libhook::SyscallHook> kernel_clone_hook;
 
     /* Return hooks */
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+    std::map<std::pair<uint64_t, addr_t>, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 
     /* Callbacks */
     event_response_t execve_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

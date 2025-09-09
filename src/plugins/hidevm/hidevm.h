@@ -128,14 +128,14 @@ public:
     uint8_t query_stage = 0;
 
     std::unique_ptr<libhook::SyscallHook> NtDeviceIoControlFile_hook;
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::SyscallHook>> NtClose_hook;
+    std::map<std::pair<uint64_t, addr_t>, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+    std::map<std::pair<uint64_t, addr_t>, std::unique_ptr<libhook::SyscallHook>> NtClose_hook;
 
     addr_t objattr_length;
     addr_t objattr_name;
     addr_t iostatusblock_information;
 
-    uint64_t pid_tid;
+    std::pair<uint64_t, addr_t> prev_hook_ID;
 
     // Stage 1
     // Address of WMI_KM_REQUEST_OPEN_BLOCK.Handle field, where WmiGuid handle should be stored on return of NtDeviceIoControlFile(IOCTL_WMI_OPEN_GUID_BLOCK)

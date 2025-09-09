@@ -171,7 +171,6 @@ void win_fileextractor::createfile_cb_impl(drakvuf_t,
     drakvuf_trap_info_t* info,
     addr_t handle, bool del, bool append)
 {
-    auto hook_id = make_hook_id(info);
     auto hook = createReturnHook<createfile_result_t>(info,
             &win_fileextractor::createfile_ret_cb);
     auto params = libhook::GetTrapParams<createfile_result_t>(hook->trap_);
@@ -179,6 +178,7 @@ void win_fileextractor::createfile_cb_impl(drakvuf_t,
     params->append = append;
     params->del = del;
 
+    auto hook_id = make_hook_id(info, params->target_rsp);
     createfile_ret_hooks[hook_id] = std::move(hook);
 }
 
@@ -189,7 +189,7 @@ event_response_t win_fileextractor::createfile_ret_cb(drakvuf_t,
     if (!params_copy.verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto hook_id = make_hook_id(info);
+    auto hook_id = make_hook_id(info, params_copy.target_rsp);
     createfile_ret_hooks.erase(hook_id);
 
     // Return if NtCreateFile/NtOpenFile failed
@@ -479,7 +479,6 @@ void win_fileextractor::writefile_cb_impl(drakvuf_t,
     task_t& task, uint64_t str, uint64_t len)
 {
     // return hook setup
-    auto hook_id = make_hook_id(info);
     auto hook = createReturnHook<writefile_result_t>(info,
             &win_fileextractor::writefile_ret_cb);
     auto params = libhook::GetTrapParams<writefile_result_t>(hook->trap_);
@@ -499,6 +498,7 @@ void win_fileextractor::writefile_cb_impl(drakvuf_t,
     else
         params->byteoffset = FILE_WRITE_TO_END_OF_FILE;
 
+    auto hook_id = make_hook_id(info, params->target_rsp);
     writefile_ret_hooks[hook_id] = std::move(hook);
 }
 
@@ -515,7 +515,7 @@ event_response_t win_fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
     if (!params_copy.verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto hook_id = make_hook_id(info);
+    auto hook_id = make_hook_id(info, params_copy.target_rsp);
     writefile_ret_hooks.erase(hook_id);
 
     // Return if NtWriteFile failed
@@ -1712,13 +1712,6 @@ void win_fileextractor::dump_mem_to_file(uint64_t cr3, addr_t str, int idx, uint
     }
 
     return;
-}
-
-uint64_t win_fileextractor::make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
 }
 
 uint64_t win_fileextractor::make_task_id(vmi_pid_t pid, handle_t handle)

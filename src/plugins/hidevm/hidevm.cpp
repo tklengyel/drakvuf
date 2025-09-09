@@ -116,17 +116,12 @@
 #include "hidevm.h"
 #include "private.h"
 
-static uint64_t make_hook_id(drakvuf_trap_info_t* info)
-{
-    uint64_t u64_pid = info->attached_proc_data.pid;
-    uint64_t u64_tid = info->attached_proc_data.tid;
-    return (u64_pid << 32) | u64_tid;
-}
-
 event_response_t hidevm::NtClose_cb(drakvuf_t, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    uint64_t hook_ID = make_hook_id(info);
+    auto params = libhook::GetTrapParams(info);
+
+    auto hook_ID = make_hook_id(info, params->target_rsp);
 
     // We need to set our fake handle value with 0 to avoid invalid handle exception
     if (this->NtClose_hook.count(hook_ID))
@@ -152,7 +147,7 @@ event_response_t hidevm::ReturnNtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_
     auto vmi = vmi_lock_guard(drakvuf);
     auto params = libhook::GetTrapParams(info);
 
-    uint64_t hook_ID = make_hook_id(info);
+    auto hook_ID = make_hook_id(info, params->target_rsp);
 
     // Verify that hook for this thread was created
     if (this->ret_hooks.count(hook_ID))
@@ -373,7 +368,8 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
 
     uint64_t IoControlCode = drakvuf_get_function_argument(drakvuf, info, 6) & 0xFFFFFFFF;
     // Hook ID is needed to validate, that syscall return hook is in the same context as our hook chain
-    uint64_t hook_ID = make_hook_id(info);
+    auto params = libhook::GetTrapParams(info);
+    auto hook_ID = make_hook_id(info, params->target_rsp);
 
     // First NtDeviceIoControlFile call with IoControlCode IOCTL_WMI_OPEN_GUID_BLOCK should return WmiGuid handle
     if (IoControlCode == IOCTL_WMI_OPEN_GUID_BLOCK)
@@ -453,7 +449,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
                     this->stage = STAGE_WMI_OPEN_BLOCK;
                     auto hook = this->createReturnHook(info, &hidevm::ReturnNtDeviceIoControlFile_cb);
                     // Save original PID and TID to validate that next steps are in the same chain
-                    this->pid_tid = hook_ID;
+                    this->prev_hook_ID = hook_ID;
                     this->ret_hooks[hook_ID] = std::move(hook);
                 }
                 vmi_free_unicode_str(guid_object_name);
@@ -462,7 +458,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
         }
     }
     // Second stage of getting data is checking the status of WmiGuid
-    else if (IoControlCode == IOCTL_WMI_QUERY_GUID_INFORMATION && hook_ID == this->pid_tid)
+    else if (IoControlCode == IOCTL_WMI_QUERY_GUID_INFORMATION && hook_ID == this->prev_hook_ID)
     {
         if (check_process_is_wmiprvse(info))
         {
@@ -513,7 +509,7 @@ event_response_t hidevm::NtDeviceIoControlFile_cb(drakvuf_t, drakvuf_trap_info_t
         }
     }
     // Third stage of getting data consists of 2 steps: 1) Get data size 2) Get data
-    else if (IoControlCode == IOCTL_WMI_QUERY_ALL_DATA && hook_ID == this->pid_tid)
+    else if (IoControlCode == IOCTL_WMI_QUERY_ALL_DATA && hook_ID == this->prev_hook_ID)
     {
         if (check_process_is_wmiprvse(info))
         {
