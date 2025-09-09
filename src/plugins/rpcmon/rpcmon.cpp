@@ -339,6 +339,12 @@ static std::optional<rpc_message_t> parse_RPC_MESSAGE(drakvuf_t drakvuf, drakvuf
         ctx.addr = arg + RPC_MESSAGE_RPCINTERFACEINFO_OFFSET_X86;
     else
         ctx.addr = arg + RPC_MESSAGE_RPCINTERFACEINFO_OFFSET_X64;
+
+    addr_t p_rpc_iface = 0;
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &p_rpc_iface))
+        return {};
+
+    ctx.addr = p_rpc_iface;
     auto rpc_iface = read_struct<_RPC_CLIENT_INTERFACE>(vmi, &ctx);
     if (!rpc_iface)
         return {};
