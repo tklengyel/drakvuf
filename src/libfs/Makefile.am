@@ -102,95 +102,48 @@
 #                                                                         #
 #*************************************************************************#
 
-bin_PROGRAMS = drakvuf injector proc_stat
+sources  = ext4/ext4.cpp ext4/ext4.hpp ext4/private.hpp
+sources += base.cpp base.hpp
+sources += libfs.hpp
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libusermode libhook libfs helpers/hiddump
-
-drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h exitcodes.h
-injector_SOURCES = injector.cpp
-proc_stat_SOURCES = proc_stat.cpp
-
-AM_CPPFLAGS = $(CPPFLAGS)
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
+AM_CPPFLAGS += $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
 AM_CPPFLAGS += $(JSONC_CFLAGS)
-AM_CPPFLAGS += $(ZLIB_CFLAGS)
-AM_CPPFLAGS += $(ZSTD_CFLAGS)
-AM_CPPFLAGS += -I$(top_srcdir) -I$(srcdir)
 
 AM_LDFLAGS =  $(LDFLAGS)
-AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(GLIB_LIBS)
+AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
-AM_LDFLAGS += $(ZLIB_LIBS)
-AM_LDFLAGS += $(ZSTD_LIBS)
 
-AM_CFLAGS = $(CFLAGS)
 AM_CXXFLAGS = $(CXXFLAGS)
 
 if HARDENING
-AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-AM_LDFLAGS += $(HARDEN_LDFLAGS)
 endif
 
 if SANITIZE
-AM_CFLAGS += $(SANITIZE_CFLAGS)
 AM_CXXFLAGS += $(SANITIZE_CFLAGS)
 AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
-if !OUTPUT_BUFFERING
-AM_CXXFLAGS += -DDISABLE_OUTPUT_BUFFERING
-endif
-
-# Note that -pg is incompatible with HARDENING
 if !DEBUG
 AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
-AM_CXXFLAGS += -Wno-unknown-warning-option
 else
-AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CXXFLAGS += -Wformat -Wformat-security
-AM_CXXFLAGS += -ferror-limit=0 -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-unused-parameter -Wno-unknown-warning-option
 AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
+AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
+               -Wpointer-arith -Winit-self -Wshadow \
+               -Wredundant-decls -Wfloat-equal -Wundef \
+               -Wvla
+# Note that -pg is incompatible with HARDENING
 if !HARDENING
-AM_CFLAGS += -pg
 AM_CXXFLAGS += -pg
 endif
 endif
 
-drakvuf_LDADD = libdrakvuf/libdrakvuf.la
-drakvuf_LDADD += xen_helper/libxenhelper.la
-drakvuf_LDADD += plugins/libdrakvufplugins.la
-drakvuf_LDADD += libinjector/libinjector.la
-drakvuf_LDADD += libusermode/libusermode.la
-drakvuf_LDADD += libhook/libhook.la
-drakvuf_LDADD += libfs/libfs.la
-
-injector_LDADD = libdrakvuf/libdrakvuf.la
-injector_LDADD += libinjector/libinjector.la
-
-proc_stat_LDADD = libdrakvuf/libdrakvuf.la
-
-if XTF
-bin_PROGRAMS += xtf
-xtf_SOURCES = xtf.c
-xtf_LDADD = libdrakvuf/libdrakvuf.la
-endif
-
-if REPL
-bin_PROGRAMS += repl
-
-SUBDIRS += librepl
-
-repl_SOURCES = repl.cpp
-
-drakvuf_LDADD += librepl/librepl.la
-
-repl_LDADD = librepl/librepl.la
-repl_LDADD += libdrakvuf/libdrakvuf.la
-
-repl_CXXFLAGS = $(AM_CXXFLAGS) -fpie
-repl_LDFLAGS = $(AM_LDFLAGS) -Wl,-E
-endif
+noinst_LTLIBRARIES= libfs.la
+libfs_la_SOURCES = $(sources)
+libfs_la_LIBADD = ../libdrakvuf/libdrakvuf.la
