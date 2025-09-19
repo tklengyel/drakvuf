@@ -242,6 +242,21 @@ struct DataPrinter
             return print_data(os, arg, sep);
         }, data);
     }
+
+    static bool print(std::ostream& os, const fmt::Subkey& data, char sep)
+    {
+        bool printed = false;
+        for (const auto& [key, value] : data.sub_map)
+        {
+            bool printed_prev = printed;
+            if (printed)
+                os << sep;
+            printed = print_data(os, value, sep);
+            if (!printed && printed_prev)
+                fmt::unputc(os);
+        }
+        return true;
+    }
 };
 
 template <class T>

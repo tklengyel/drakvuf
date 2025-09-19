@@ -288,6 +288,55 @@ struct DataPrinter
             return print_data(os, arg, sep);
         }, data);
     }
+
+    // base case for a subkey, probably never called directly but needed by compiler
+    static bool print(std::ostream& os, const fmt::Subkey& data, char sep)
+    {
+        if (data.sub_map.empty())
+        {
+            return false;
+        }
+
+        bool printed = false;
+        for (const auto& [key, value] : data.sub_map)
+        {
+            bool printed_prev = printed;
+            if (printed)
+            {
+                os << sep;
+            }
+
+            // We don't have a parent key, so just print the sub-key and its value.
+            printed = print_data(os, keyval(key.c_str(), value), sep);
+
+            if (!printed && printed_prev)
+            {
+                fmt::unputc(os);
+            }
+        }
+        return printed;
+    }
+
+    template <class Tk>
+    static bool print(std::ostream& os, const std::pair<Tk, fmt::Subkey>& data, char sep)
+    {
+        const char* parent_key = data.first;
+        const auto& sub_map = data.second.sub_map;
+        if (sub_map.empty()) return false;
+
+        bool printed = false;
+        for (const auto& [sub_key, sub_val] : sub_map)
+        {
+            bool printed_prev = printed;
+            if (printed) os << sep;
+
+            std::string flat_key = std::string(parent_key) + "." + sub_key;
+            printed = print_data(os, keyval(flat_key.c_str(), sub_val), sep);
+
+            if (!printed && printed_prev) fmt::unputc(os);
+        }
+        return printed;
+    }
 };
 
 template <class T>
