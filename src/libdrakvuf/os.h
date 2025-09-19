@@ -326,6 +326,13 @@ typedef struct os_interface
     bool (*get_object_type_index)
     (drakvuf_t drakvuf, access_context_t* object_header_ctx, uint8_t* index);
 
+    bool (*get_user_rsp)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* user_rsp);
+
+    addr_t (*get_syscall_retaddr)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode);
+
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

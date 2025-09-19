@@ -730,6 +730,10 @@ unicode_string_t* drakvuf_get_object_type_name(drakvuf_t drakvuf, addr_t object)
 
 unicode_string_t* drakvuf_get_object_name(drakvuf_t drakvuf, addr_t object) NOEXCEPT;
 
+bool drakvuf_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* user_rsp) NOEXCEPT;
+
+addr_t drakvuf_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode) NOEXCEPT;
+
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
     addr_t module_list_head,
     const char* module_name,

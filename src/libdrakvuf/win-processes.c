@@ -194,6 +194,82 @@ static bool win_get_current_kpcr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     return true;
 }
 
+
+bool win_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* user_rsp)
+{
+    if (!user_rsp)
+        return false;
+
+
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t kpcr = 0;
+    addr_t prcb = 0;
+
+    if (!win_get_current_kpcr(drakvuf, info, &kpcr, &prcb))
+    {
+        PRINT_DEBUG("win_get_user_rsp: FAILED to get KPCR base address.\n");
+        return false;
+    }
+    addr_t read_rsp = 0;
+
+    status_t read_status;
+    // Assume KPTI enabled
+    read_status = vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_USERRSPSHADOW], 0, &read_rsp);
+
+    if (VMI_SUCCESS != read_status)
+    {
+        PRINT_DEBUG("win_get_user_rsp: vmi_read_addr_va FAILED with status %d\n", read_status);
+        return false;
+    }
+
+    // Fallback to KPTI disabled
+    if (read_rsp == 0)
+    {
+        read_status = vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPCR_USERRSP], 0, &read_rsp);
+        if (VMI_SUCCESS != read_status)
+        {
+            PRINT_DEBUG("win_get_user_rsp: vmi_read_addr_va FAILED with status %d\n", read_status);
+            return false;
+        }
+    }
+
+    *user_rsp = read_rsp;
+    return true;
+}
+
+addr_t win_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    if (mode == MAXIMUM_MODE)
+    {
+        return 0;
+    }
+    if (mode == KERNEL_MODE)
+    {
+        // Read return address.
+        //
+        return drakvuf_get_function_return_address(drakvuf, info);
+    }
+    // Read usermode address.
+    //
+    // The qword at offset 0x28 - return address to usermode:
+    // -0x00:  mov     rsp, gs:1A8h
+    // -0x08:  push    2Bh
+    // -0x10:  push    qword ptr gs:10h
+    // -0x18:  push    r11
+    // -0x20:  push    33h
+    // -0x28:  push    rcx
+    // -0x28:  mov     rcx, r10
+    // -0x30:  sub     rsp, 8
+    // -0x38:  push    rbp
+    // -0x190: sub     rsp, 158h
+    //
+    addr_t user_ret_addr = 0;
+    vmi_read_addr_va(vmi, drakvuf_get_rspbase(drakvuf, info) - 0x28, 0, &user_ret_addr);
+    return user_ret_addr;
+}
+
 bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql)
 {
     vmi_instance_t vmi = drakvuf->vmi;
