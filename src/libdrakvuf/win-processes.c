@@ -225,7 +225,7 @@ bool win_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* user
     // Fallback to KPTI disabled
     if (read_rsp == 0)
     {
-        read_status = vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPCR_USERRSP], 0, &read_rsp);
+        read_status = vmi_read_addr_va(vmi, kpcr + drakvuf->offsets[KPCR_USERRSP], 0, &read_rsp);
         if (VMI_SUCCESS != read_status)
         {
             PRINT_DEBUG("win_get_user_rsp: vmi_read_addr_va FAILED with status %d\n", read_status);
