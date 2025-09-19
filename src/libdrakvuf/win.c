@@ -792,6 +792,8 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_object_type_name = win_get_object_type_name;
     drakvuf->osi.get_object_name = win_get_object_name;
     drakvuf->osi.get_object_type_index = win_get_object_type_index;
+    drakvuf->osi.get_user_rsp = win_get_user_rsp;
+    drakvuf->osi.get_syscall_retaddr = win_get_syscall_retaddr;
 
     return true;
 }
