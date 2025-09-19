@@ -1262,4 +1262,3 @@ addr_t drakvuf_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 
     return ret;
 }
-
