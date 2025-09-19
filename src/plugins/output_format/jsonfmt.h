@@ -245,6 +245,37 @@ public:
         static_assert(always_false<Tv>::value, "Non-printable type");
         return false;
     }
+
+    static bool print(std::ostream& os, const fmt::Subkey& data, char sep)
+    {
+        os << '{';
+        bool first = true;
+        for (const auto& [key, value] : data.sub_map)
+        {
+            if (!first)
+            {
+                os << ',';
+            }
+            first = false;
+
+            DataPrinter<fmt::Qstr<const std::string&>>::print(os, fmt::Qstr(key), ',');
+
+            os << ':';
+
+            DataPrinter<fmt::Aarg>::print(os, value, ',');
+        }
+        os << '}';
+        return true;
+    }
+
+    template <class Tk>
+    static bool print(std::ostream& os, const std::pair<Tk, fmt::Subkey>& data, char sep)
+    {
+        DataPrinter<Tk>::print(os, fmt::Qstr(data.first), sep);
+        os << ':';
+        DataPrinter<fmt::Subkey>::print(os, data.second, sep);
+        return true;
+    }
 };
 
 template <class T>
@@ -381,6 +412,16 @@ private:
             printed = printed || printed_rest;
         }
         return printed;
+    }
+
+    template <class Tv>
+    static bool print_data(std::ostream& os, const std::optional<Tv>& data, char sep)
+    {
+        if (!data)
+        {
+            return false;
+        }
+        return print_data(os, *data, sep);
     }
 
 public:
