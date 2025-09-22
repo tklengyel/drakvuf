@@ -262,14 +262,14 @@ struct DataPrinter
     // base case for a subkey, probably never called directly but needed by compiler
     static bool print(std::ostream& os, const fmt::Subkey& data, char sep)
     {
-        if (data.sub_map.empty())
+        if (data.sub_data.empty())
         {
             return false;
         }
 
         bool printed = false;
         os << "["; // unnamed object
-        for (const auto& [key, value] : data.sub_map)
+        for (const auto& [key, value] : data.sub_data)
         {
             bool printed_prev = printed;
             if (printed)
@@ -286,13 +286,13 @@ struct DataPrinter
     static bool print(std::ostream& os, const std::pair<Tk, fmt::Subkey>& data, char sep)
     {
         const char* parent_key = data.first;
-        const auto& sub_map = data.second.sub_map;
-        if (sub_map.empty()) return false;
+        const auto& sub_data = data.second.sub_data;
+        if (sub_data.empty()) return false;
 
         bool printed = false;
         os << parent_key << ":[";
 
-        for (const auto& [sub_key, sub_val] : sub_map)
+        for (const auto& [sub_key, sub_val] : sub_data)
         {
             bool printed_prev = printed;
             if (printed)

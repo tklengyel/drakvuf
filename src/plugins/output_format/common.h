@@ -346,23 +346,23 @@ using Aarg = std::variant<
 
 struct Subkey
 {
-    std::unordered_map<std::string, Aarg> sub_map;
-    explicit Subkey(const std::unordered_map<std::string, Aarg>& map)
-        : sub_map(map) {}
+    std::vector<std::pair<std::string, Aarg>> sub_data;
+    explicit Subkey(const std::vector<std::pair<std::string, Aarg>>& data)
+        : sub_data(data) {}
 
-    explicit Subkey(std::unordered_map<std::string, Aarg>&& map)
-        : sub_map(std::move(map)) {}
+    explicit Subkey(std::vector<std::pair<std::string, Aarg>>&& data)
+        : sub_data(std::move(data)) {}
 };
 
 
-inline Subkey Skey(const std::unordered_map<std::string, Aarg>& map)
+inline Subkey Skey(const std::vector<std::pair<std::string, Aarg>>& data)
 {
-    return Subkey(map);
+    return Subkey(data);
 }
 
-inline Subkey Skey(std::unordered_map<std::string, Aarg>&& map)
+inline Subkey Skey(std::vector<std::pair<std::string, Aarg>>&& data)
 {
-    return Subkey(std::move(map));
+    return Subkey(std::move(data));
 }
 
 } // namespace fmt

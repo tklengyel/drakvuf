@@ -246,7 +246,7 @@ struct DataPrinter
     static bool print(std::ostream& os, const fmt::Subkey& data, char sep)
     {
         bool printed = false;
-        for (const auto& [key, value] : data.sub_map)
+        for (const auto& [key, value] : data.sub_data)
         {
             bool printed_prev = printed;
             if (printed)

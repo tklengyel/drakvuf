@@ -250,7 +250,7 @@ public:
     {
         os << '{';
         bool first = true;
-        for (const auto& [key, value] : data.sub_map)
+        for (const auto& [key, value] : data.sub_data)
         {
             if (!first)
             {
