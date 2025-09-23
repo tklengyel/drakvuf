@@ -278,39 +278,6 @@ static std::optional<std::string> resolve_module(drakvuf_t drakvuf, addr_t addr,
     return {};
 }
 
-static addr_t get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode)
-{
-    vmi_lock_guard vmi(drakvuf);
-
-    if (mode == MAXIMUM_MODE)
-    {
-        return 0;
-    }
-    if (mode == KERNEL_MODE)
-    {
-        // Read return address.
-        //
-        return drakvuf_get_function_return_address(drakvuf, info);
-    }
-    // Read usermode address.
-    //
-    // The qword at offset 0x28 - return address to usermode:
-    // -0x00:  mov     rsp, gs:1A8h
-    // -0x08:  push    2Bh
-    // -0x10:  push    qword ptr gs:10h
-    // -0x18:  push    r11
-    // -0x20:  push    33h
-    // -0x28:  push    rcx
-    // -0x28:  mov     rcx, r10
-    // -0x30:  sub     rsp, 8
-    // -0x38:  push    rbp
-    // -0x190: sub     rsp, 158h
-    //
-    addr_t user_ret_addr{};
-    vmi_read_addr_va(vmi, drakvuf_get_rspbase(drakvuf, info) - 0x28, 0, &user_ret_addr);
-    return user_ret_addr;
-}
-
 static std::optional<std::string> resolve_parent_module(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_syscalls* s)
 {
     vmi_lock_guard vmi(drakvuf);
@@ -339,7 +306,7 @@ static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<st
     {
         PRINT_DEBUG("[SYSCALLS] Failed to get previous mode\n");
     }
-    auto ret = get_syscall_retaddr(drakvuf, info, mode);
+    auto ret = drakvuf_get_syscall_retaddr(drakvuf, info, mode);
 
     if (mode == KERNEL_MODE)
     {
@@ -369,6 +336,27 @@ static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<st
     return { MAXIMUM_MODE, {}, {} };
 }
 
+drakvuf_trap_t* init_syscall_return_bp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap)
+{
+    if (!trap)
+    {
+        return nullptr;
+    }
+
+    privilege_mode_t mode;
+    addr_t ret_addr = 0;
+
+    if (drakvuf_get_current_thread_previous_mode(drakvuf, info, &mode))
+    {
+        ret_addr = drakvuf_get_syscall_retaddr(drakvuf, info, mode);
+        PRINT_DEBUG("Setting syscall return breakpoint at %lx\n", ret_addr);
+    }
+
+    return breakpoint_by_dtb_searcher()
+        .for_virt_addr(ret_addr)
+        (drakvuf, info, trap);
+}
+
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto s = get_trap_plugin<win_syscalls>(info);
@@ -387,7 +375,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!ret_addr)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto trap = s->register_trap<wrapper_t>(info, ret_cb, breakpoint_by_dtb_searcher());
+    auto trap = s->register_trap<wrapper_t>(info, ret_cb, init_syscall_return_bp);
     if (!trap)
     {
         PRINT_DEBUG("Failed to trap syscall return %hu\n", w->num);
@@ -404,7 +392,18 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     auto wr = get_trap_params<wrapper_t>(trap);
 
     //Save the address of the target thread, address of the rsp (this was the rip-address, which we used for construction) and the value of the CR3 register to the params.
-    wr->set_result_call_params(info);
+    addr_t user_rsp = 0;
+
+    if (mode == USER_MODE && drakvuf_get_user_rsp(drakvuf, info, &user_rsp))
+    {
+        wr->set_result_call_params(info, user_rsp);
+        PRINT_DEBUG("[SYSCALLS] set trap with user rsp: %lx, module: %s\n", user_rsp, w->type);
+    }
+    else
+    {
+        wr->set_result_call_params(info);
+        PRINT_DEBUG("[SYSCALLS] set trap with kernel rsp: %lx, module %s\n", info->regs->rsp, w->type);
+    }
 
     //enrich the params of the new/next trap. This information is used later.
     wr->num = w->num;
