@@ -679,11 +679,19 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 {
     if ( kthread )
     {
+        uint8_t previous_mode_byte = 0xFF;
         if ( vmi_read_8_va( drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PREVIOUSMODE ], 0,
-                (uint8_t*)previous_mode ) == VMI_SUCCESS )
+                &previous_mode_byte ) == VMI_SUCCESS )
         {
+            *previous_mode = (privilege_mode_t)previous_mode_byte;
             if ( ( *previous_mode == KERNEL_MODE ) || ( *previous_mode == USER_MODE ) )
                 return true ;
+            else
+                PRINT_DEBUG("Read an unexpected value for previous mode: %d\n", (int)(*previous_mode));
+        }
+        else
+        {
+            PRINT_DEBUG("Failed to read kthread previous mode\n");
         }
     }
 
@@ -695,7 +703,7 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
     privilege_mode_t* previous_mode )
 {
     addr_t kthread = win_get_current_thread(drakvuf, info);
-
+    PRINT_DEBUG("kthread: %lx\n", kthread);
     return win_get_thread_previous_mode(drakvuf, kthread, previous_mode);
 }
 

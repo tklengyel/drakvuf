@@ -338,18 +338,20 @@ static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<st
 
 drakvuf_trap_t* init_syscall_return_bp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap)
 {
-    if (!trap) {
+    if (!trap)
+    {
         return nullptr;
     }
 
     privilege_mode_t mode;
     addr_t ret_addr = 0;
 
-    if (drakvuf_get_current_thread_previous_mode(drakvuf, info, &mode)) {
+    if (drakvuf_get_current_thread_previous_mode(drakvuf, info, &mode))
+    {
         ret_addr = drakvuf_get_syscall_retaddr(drakvuf, info, mode);
         PRINT_DEBUG("Setting syscall return breakpoint at %lx\n", ret_addr);
     }
-    
+
     return breakpoint_by_dtb_searcher()
         .for_virt_addr(ret_addr)
         (drakvuf, info, trap);
