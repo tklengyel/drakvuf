@@ -311,16 +311,7 @@ struct breakpoint_by_dtb_searcher
             addr_t addr = m_addr;
             if (!addr)
             {
-                privilege_mode_t mode = MAXIMUM_MODE;
-                if (!drakvuf_get_current_thread_previous_mode(drakvuf, info, &mode))
-                {
-                    addr = drakvuf_get_function_return_address(drakvuf, info);
-                    PRINT_DEBUG("Failed to get previous mode\n");
-                }
-                else
-                {
-                    addr = drakvuf_get_syscall_retaddr(drakvuf, info, mode);
-                }
+                addr = drakvuf_get_function_return_address(drakvuf, info);
                 if (!addr)
                     return nullptr;
             }

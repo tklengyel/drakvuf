@@ -336,6 +336,25 @@ static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<st
     return { MAXIMUM_MODE, {}, {} };
 }
 
+drakvuf_trap_t* init_syscall_return_bp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap)
+{
+    if (!trap) {
+        return nullptr;
+    }
+
+    privilege_mode_t mode;
+    addr_t ret_addr = 0;
+
+    if (drakvuf_get_current_thread_previous_mode(drakvuf, info, &mode)) {
+        ret_addr = drakvuf_get_syscall_retaddr(drakvuf, info, mode);
+        PRINT_DEBUG("Setting syscall return breakpoint at %lx\n", ret_addr);
+    }
+    
+    return breakpoint_by_dtb_searcher()
+        .for_virt_addr(ret_addr)
+        (drakvuf, info, trap);
+}
+
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto s = get_trap_plugin<win_syscalls>(info);
@@ -354,7 +373,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!ret_addr)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto trap = s->register_trap<wrapper_t>(info, ret_cb, breakpoint_by_dtb_searcher());
+    auto trap = s->register_trap<wrapper_t>(info, ret_cb, init_syscall_return_bp);
     if (!trap)
     {
         PRINT_DEBUG("Failed to trap syscall return %hu\n", w->num);
