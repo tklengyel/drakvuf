@@ -134,16 +134,6 @@ enum dump_compression_t
     DUMP_COMPRESSION_ZSTD,
 };
 
-// how to print arguments when pointer to printable type is specified:
-// - PPVOID BaseAddress
-// - PHANDLE Handle
-// ...
-enum syscalls_dereference_args_t
-{
-    SYSCALLS_DEREFERENCE_ARGS_NONE,          // BaseAddress:0xFFFFF880034FC988
-    SYSCALLS_DEREFERENCE_ARGS_REPLACE_FIELD, // BaseAddress:0x44A0000
-    SYSCALLS_DEREFERENCE_ARGS_ADD_FIELD,     // BaseAddress:0xFFFFF880034FC988, *BaseAddress:0x44A0000
-};
 
 struct plugins_options
 {
@@ -165,9 +155,10 @@ struct plugins_options
     const char* wow_kernel32_profile;   // PLUGIN_ENVMON
     const char* iphlpapi_profile;       // PLUGIN_ENVMON
     const char* mpr_profile;            // PLUGIN_ENVMON
-    syscalls_dereference_args_t syscalls_dereference_args = SYSCALLS_DEREFERENCE_ARGS_NONE; // PLUGIN_SYSCALLS
     const char* syscalls_list_file;     // PLUGIN_SYSCALLS
     bool disable_sysret;                // PLUGIN_SYSCALLS
+    bool syscalls_dereference_args = false; // PLUGIN_SYSCALLS
+    bool syscalls_nested_args = false;        // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
     const char* crashdump_dir;          // PLUGIN_BSODMON
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON

@@ -182,6 +182,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .win32k_profile = options->win32k_profile,
                         .disable_sysret = options->disable_sysret,
                         .syscalls_dereference_args = options->syscalls_dereference_args,
+                        .syscalls_nested_args = options->syscalls_nested_args,
                     };
                     this->plugins[plugin_id] = std::make_unique<syscalls>(this->drakvuf, &config, this->output);
                     break;

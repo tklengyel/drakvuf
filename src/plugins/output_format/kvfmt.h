@@ -320,7 +320,6 @@ struct DataPrinter
     template <class Tk>
     static bool print(std::ostream& os, const std::pair<Tk, fmt::Subkey>& data, char sep)
     {
-        const char* parent_key = data.first;
         const auto& sub_data = data.second.sub_data;
         if (sub_data.empty()) return false;
 
@@ -330,7 +329,7 @@ struct DataPrinter
             bool printed_prev = printed;
             if (printed) os << sep;
 
-            std::string flat_key = std::string(parent_key) + "." + sub_key;
+            std::string flat_key = std::string(data.first) + "." + sub_key;
             printed = print_data(os, keyval(flat_key.c_str(), sub_val), sep);
 
             if (!printed && printed_prev) fmt::unputc(os);

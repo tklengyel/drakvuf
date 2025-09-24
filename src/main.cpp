@@ -250,6 +250,9 @@ static void print_usage()
         "\t -S, --syscall-hooks-list <syscalls filter>\n"
         "\t                           File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
         "\t --disable-sysret          Do not monitor syscall results\n"
+        "\t --syscall-nested-args     Nested Arguments field in output\n"
+        "\t --syscall-dereference-args\n"
+        "\t                           Dereference syscall argument values\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCMON
         "\t -q, --procmon-envs-list <procmon filter>\n"
@@ -505,6 +508,7 @@ int main(int argc, char** argv)
         opt_procdump_disable_kedelayexecutionthread_hook,
         opt_procdump_exclude_list,
         opt_syscall_dereference_args,
+        opt_syscall_nested_args,
         opt_json_clr,
         opt_json_mscorwks,
         opt_disable_sysret,
@@ -594,7 +598,8 @@ int main(int argc, char** argv)
         {"procdump-exclude-list", required_argument, NULL, opt_procdump_exclude_list},
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
-        {"syscall-dereference-args", required_argument, NULL, opt_syscall_dereference_args},
+        {"syscall-dereference-args", no_argument, NULL, opt_syscall_dereference_args},
+        {"syscall-nested-args", no_argument, NULL, opt_syscall_nested_args},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
         {"procmon-envs-list", required_argument, NULL, 'q'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
@@ -772,12 +777,10 @@ int main(int argc, char** argv)
                 options.disable_sysret = true;
                 break;
             case opt_syscall_dereference_args:
-                if (!strncmp(optarg, "replace", 7))
-                    options.syscalls_dereference_args = SYSCALLS_DEREFERENCE_ARGS_REPLACE_FIELD;
-                else if (!strncmp(optarg, "add", 3))
-                    options.syscalls_dereference_args = SYSCALLS_DEREFERENCE_ARGS_ADD_FIELD;
-                else if (!strncmp(optarg, "none", 4))
-                    options.syscalls_dereference_args = SYSCALLS_DEREFERENCE_ARGS_NONE;
+                options.syscalls_dereference_args = true;
+                break;
+            case opt_syscall_nested_args:
+                options.syscalls_nested_args = true;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCMON

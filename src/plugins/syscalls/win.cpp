@@ -336,6 +336,31 @@ static std::tuple<privilege_mode_t, std::optional<std::string>, std::optional<st
     return { MAXIMUM_MODE, {}, {} };
 }
 
+static event_response_t syscall_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    //Loads a pointer to the plugin, which is responsible for the trap
+    auto s = get_trap_plugin<win_syscalls>(info);
+
+    //get_trap_params reinterprets the pointer of info->trap->data as a pointer to duplicate_result_t
+    auto wr = get_trap_params<windows_syscall_trap_data_t>(info);
+
+    //Verifies that the params we got above (preset by the previous trap) match the trap_information this cb got called with.
+
+    if (!wr->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    uint32_t status = (uint32_t)info->regs->rax; // NTSTATUS
+
+    s->print_syscall(drakvuf, info, wr->num, wr->type, wr->sc, wr->args, wr->mode, wr->module, wr->parent_module, wr->is_ret, status);
+    //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
+    //Deletes this trap from the list of existing traps traps
+    //Additionally removes the trap and frees the memory
+    s->destroy_trap(info->trap);
+
+    return 0;
+}
+
+
 drakvuf_trap_t* init_syscall_return_bp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap)
 {
     if (!trap)
@@ -377,7 +402,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!ret_addr)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto trap = s->register_trap<wrapper_t>(info, ret_cb, init_syscall_return_bp);
+    auto trap = s->register_trap<windows_syscall_trap_data_t>(info, w->is_ret ? syscall_ret_cb : sysret_cb, init_syscall_return_bp);
     if (!trap)
     {
         PRINT_DEBUG("Failed to trap syscall return %hu\n", w->num);
@@ -622,6 +647,8 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
         this->create_process_hook = this->createSyscallHook("NtCreateUserProcess", &win_syscalls::create_process_cb);
     }
     this->delete_process_hook = this->createSyscallHook("PspProcessDelete", &win_syscalls::delete_process_cb);
+
+    register_parsers();
 }
 
 bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
@@ -683,33 +710,6 @@ bool win_syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
     return true;
 }
 
-char* win_syscalls::win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
-{
-    switch (arg.type)
-    {
-        case PUNICODE_STRING:
-        {
-            char* str = nullptr;
-            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-            if (us)
-            {
-                str = (char*)us->contents;
-                us->contents = nullptr; // move ownership
-                vmi_free_unicode_str(us);
-            }
-
-            return str;
-        }
-        case POBJECT_ATTRIBUTES:
-            return drakvuf_get_filename_from_object_attributes(drakvuf, info, val);
-        case HANDLE:
-            if (!strcmp(arg.name, "FileHandle"))
-                return drakvuf_get_filename_from_handle(drakvuf, info, val);
-            return nullptr;
-        default:
-            return nullptr;
-    }
-}
 
 event_response_t win_syscalls::load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -799,10 +799,15 @@ void win_syscalls::print_syscall(
     bool is_ret, std::optional<uint32_t> status
 )
 {
-    info->trap->name = sc->name;
+    fmt_args_t original_args;
+    fmt_args_t extra_args;
 
-    fmt_args_t fmt_args;
-    fill_fmt_args(fmt_args, sc, info, args, is_ret, status.has_value() && *status == 0 /* STATUS_SUCCESS */ );
+    if (sc)
+    {
+        info->trap->name = sc->name;
+        // status success type (0 − 0x3FFFFFFF) or an informational type (0x40000000 − 0x7FFFFFFF).
+        fill_fmt_args(original_args, extra_args, sc, info, args, is_ret, status.has_value() && static_cast<int32_t>(*status) >= 0 );
+    }
 
     std::optional<fmt::Estr<std::string>> from_dll_opt, from_parent_dll_opt;
     std::optional<fmt::Rstr<const char*>> priv_mode_opt;
@@ -820,19 +825,237 @@ void win_syscalls::print_syscall(
     if (mode != MAXIMUM_MODE)
         priv_mode_opt = fmt::Rstr(mode == USER_MODE ? "User" : "Kernel");
 
-    fmt::print(this->m_output_format, "syscall", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("NArgs", fmt::Nval(args.size())),
-        keyval("PreviousMode", priv_mode_opt),
-        keyval("FromModule", from_dll_opt),
-        keyval("FromParentModule", from_parent_dll_opt),
-        keyval("ReturnValue", status_opt),
-        fmt_args
-    );
+    if (!this->nested_args)
+    {
+        // original args are flat, Extra is nested.
+        fmt::print(this->m_output_format, "syscall", drakvuf, info,
+            keyval("Module", fmt::Qstr(std::move(module))),
+            keyval("vCPU", fmt::Nval(info->vcpu)),
+            keyval("CR3", fmt::Xval(info->regs->cr3)),
+            keyval("Syscall", fmt::Nval(nr)),
+            keyval("NArgs", fmt::Nval(args.size())),
+            keyval("PreviousMode", priv_mode_opt),
+            keyval("FromModule", from_dll_opt),
+            keyval("FromParentModule", from_parent_dll_opt),
+            keyval("ReturnValue", status_opt),
+            std::move(original_args),
+            extra_args.empty() ? std::nullopt : std::optional(keyval("Extra", fmt::Skey(std::move(extra_args))))
+        );
+    }
+    else
+    {
+        // both original and extra args are nested.
+        fmt::print(this->m_output_format, "syscall", drakvuf, info,
+            keyval("Module", fmt::Qstr(std::move(module))),
+            keyval("vCPU", fmt::Nval(info->vcpu)),
+            keyval("CR3", fmt::Xval(info->regs->cr3)),
+            keyval("Syscall", fmt::Nval(nr)),
+            keyval("NArgs", fmt::Nval(args.size())),
+            keyval("PreviousMode", priv_mode_opt),
+            keyval("FromModule", from_dll_opt),
+            keyval("FromParentModule", from_parent_dll_opt),
+            keyval("ReturnValue", status_opt),
+            keyval("Arguments", fmt::Skey(std::move(original_args))),
+            extra_args.empty() ? std::nullopt : std::optional(keyval("Extra", fmt::Skey(std::move(extra_args))))
+        );
+    }
 }
+
+
+void win_syscalls::register_parsers()
+{
+    // register os agnostic parsers
+    syscalls_base::register_parsers();
+
+    // name based parsers
+    m_name_parsers["ProcessHandle"] = [](
+            syscalls_base* base, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
+            const std::vector<uint64_t>& all_args)
+    {
+        if (!base->dereference_args || value == 0)
+        {
+            return;
+        }
+
+        addr_t handle_to_resolve = 0;
+
+        if (arg.type == HANDLE)
+        {
+            handle_to_resolve = value;
+        }
+
+        if (handle_to_resolve)
+        {
+            vmi_pid_t resolved_pid = 0;
+
+            if (drakvuf_get_pid_from_handle(base->drakvuf, info, handle_to_resolve, &resolved_pid) && resolved_pid != 0)
+            {
+                extra_args.push_back(keyval(std::string(arg.name) + "_PID", fmt::Nval(static_cast<unsigned long>(resolved_pid))));
+            }
+        }
+    };
+
+    m_name_parsers["ThreadHandle"] = [](
+            syscalls_base* base, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
+            const std::vector<uint64_t>& all_args)
+    {
+        if (!base->dereference_args || value == 0)
+        {
+            return;
+        }
+
+        addr_t handle_to_resolve = 0;
+        if (arg.type == HANDLE)
+        {
+            handle_to_resolve = value;
+        }
+
+        if (handle_to_resolve)
+        {
+            uint32_t resolved_tid = 0;
+            if (drakvuf_get_tid_from_handle(base->drakvuf, info, handle_to_resolve, &resolved_tid) && resolved_tid != 0)
+            {
+                extra_args.push_back(keyval(std::string(arg.name) + "_TID", fmt::Nval(static_cast<unsigned long>(resolved_tid))));
+            }
+
+            vmi_pid_t resolved_pid = 0;
+            if (drakvuf_get_pid_from_thread_handle(base->drakvuf, info, handle_to_resolve, &resolved_pid) && resolved_pid != 0)
+            {
+                extra_args.push_back(keyval(std::string(arg.name) + "_PID", fmt::Nval(static_cast<unsigned long>(resolved_pid))));
+            }
+        }
+    };
+
+    m_name_parsers["FileHandle"] = [](
+            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            const auto& arg, auto* info, uint64_t value, const auto& all_args)
+    {
+        if (value == 0) return;
+        char* cstr = drakvuf_get_filename_from_handle(base->drakvuf, info, value);
+        if (cstr)
+        {
+            extra_args.push_back(keyval(std::string(arg.name) + "_Path", fmt::Estr(std::string(cstr))));
+            g_free(cstr);
+        }
+    };
+
+    // type based parsers
+    m_type_parsers[PUNICODE_STRING] = [](
+            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            const auto& arg, auto* info, uint64_t value, const auto& all_args)
+    {
+        if (value == 0) return;
+        unicode_string_t* us = drakvuf_read_unicode(base->drakvuf, info, value);
+        if (us)
+        {
+            extra_args.push_back(keyval(std::string(arg.name), fmt::Estr(std::string((char*)us->contents))));
+            vmi_free_unicode_str(us);
+        }
+    };
+
+    m_type_parsers[POBJECT_ATTRIBUTES] = [](
+            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            const auto& arg, auto* info, uint64_t value, const auto& all_args)
+    {
+        if (value == 0) return;
+        char* cstr = drakvuf_get_filename_from_object_attributes(base->drakvuf, info, value);
+        if (cstr)
+        {
+            extra_args.push_back(keyval(std::string(arg.name), fmt::Estr(std::string(cstr))));
+            g_free(cstr);
+        }
+    };
+
+    // resolve registers commonly used in process injection from context parameter
+    m_type_parsers[PCONTEXT] = [](
+            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            const auto& arg, auto* info, uint64_t value, const auto& all_args)
+    {
+        if (value == 0) return;
+
+        addr_t rip = 0, rcx = 0;
+
+        fmt_args_t context_map;
+
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3
+        );
+
+        ctx.addr = value + 0xf8; // rip offset in CONTEXT
+        if (VMI_SUCCESS == drakvuf_read_addr(base->drakvuf, info, &ctx, &rip))
+        {
+            context_map.push_back(keyval("rip", fmt::Xval(rip)));
+        }
+
+        ctx.addr = value + 0x80; // rcx offset in CONTEXT
+        if (VMI_SUCCESS == drakvuf_read_addr(base->drakvuf, info, &ctx, &rcx))
+        {
+            context_map.push_back(keyval("rcx", fmt::Xval(rcx)));
+        }
+
+        if (!context_map.empty())
+        {
+            extra_args.push_back(keyval("Context", fmt::Skey(std::move(context_map))));
+        }
+    };
+
+    // syscall name + arg name based parsers
+    m_syscall_arg_parsers[ {"NtSetInformationThread", "ThreadInformation"}] =
+        [](
+            syscalls_base* base, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            const syscalls_ns::arg_t& arg_to_parse, drakvuf_trap_info_t* info,
+            uint64_t value_to_parse, const std::vector<uint64_t>& all_args)
+    {
+        auto tic_opt = base->get_arg_value_by_name(sc, all_args, "ThreadInformationClass");
+        if (!tic_opt)
+        {
+            return;
+        }
+
+        constexpr uint64_t ThreadWow64Context = 0x1d;
+        if (*tic_opt != ThreadWow64Context)
+        {
+            return;
+        }
+
+        const addr_t wow64_context_addr = value_to_parse;
+        if (wow64_context_addr == 0)
+        {
+            return;
+        }
+
+        fmt_args_t context_map;
+
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3
+        );
+
+        addr_t wow_eax = 0;
+        ctx.addr = wow64_context_addr + 0xb0; // eax offset in Wow64Context
+        if (VMI_SUCCESS == drakvuf_read_addr(base->drakvuf, info, &ctx, &wow_eax))
+        {
+            context_map.push_back(keyval("eax", fmt::Xval((uint64_t)wow_eax)));
+        }
+
+        addr_t wow_eip = 0;
+        ctx.addr = wow64_context_addr + 0xb8; // eip offset in Wow64Context
+        if (VMI_SUCCESS == drakvuf_read_addr(base->drakvuf, info, &ctx, &wow_eip))
+        {
+            context_map.push_back(keyval("Eip", fmt::Xval((uint64_t)wow_eip)));
+        }
+
+        if (!context_map.empty())
+        {
+            extra_args.push_back(keyval("Wow64Context", fmt::Skey(std::move(context_map))));
+        }
+    };
+}
+
+
 
 win_syscalls::~win_syscalls()
 {

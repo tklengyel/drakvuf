@@ -285,12 +285,11 @@ struct DataPrinter
     template <class Tk>
     static bool print(std::ostream& os, const std::pair<Tk, fmt::Subkey>& data, char sep)
     {
-        const char* parent_key = data.first;
         const auto& sub_data = data.second.sub_data;
         if (sub_data.empty()) return false;
 
         bool printed = false;
-        os << parent_key << ":[";
+        os << std::string(data.first) << ":[";
 
         for (const auto& [sub_key, sub_val] : sub_data)
         {

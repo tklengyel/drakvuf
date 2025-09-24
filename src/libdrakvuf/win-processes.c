@@ -703,7 +703,6 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
     privilege_mode_t* previous_mode )
 {
     addr_t kthread = win_get_current_thread(drakvuf, info);
-    PRINT_DEBUG("kthread: %lx\n", kthread);
     return win_get_thread_previous_mode(drakvuf, kthread, previous_mode);
 }
 

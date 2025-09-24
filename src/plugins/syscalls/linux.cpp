@@ -246,8 +246,9 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 {
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
 
-    fmt_args_t fmt_args;
-    fill_fmt_args(fmt_args, params->sc, info, arguments, is_ret, retcode.has_value() && *retcode >= 0);
+    fmt_args_t original_args;
+    fmt_args_t extra_args;
+    fill_fmt_args(original_args, extra_args, params->sc, info, arguments, is_ret, retcode.has_value() && *retcode >= 0);
 
     char* tmp = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
     std::string thread_name = tmp ?: "";
@@ -266,7 +267,8 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         keyval("NArgs", fmt::Nval(params->sc->num_args)),
         keyval("Type", fmt::Estr(params->type)),
         keyval("ReturnValue", retcode_opt),
-        fmt_args
+        original_args,
+        extra_args
     );
 }
 
@@ -294,7 +296,7 @@ event_response_t linux_syscalls::linux_syscall_ret_cb(drakvuf_t drakvuf, drakvuf
 
     this->print_syscall(drakvuf, info, params->args, true, retcode);
 
-    auto hookID = make_hook_id(info);
+    auto hookID = make_hook_id(info, params->target_rsp);
     this->ret_hooks.erase(hookID);
 
     return VMI_EVENT_RESPONSE_NONE;
