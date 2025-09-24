@@ -279,6 +279,9 @@ typedef struct os_interface
     bool (*get_tid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid);
 
+    bool (*get_pid_from_thread_handle)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+
     bool (*is_process_suspended)
     (drakvuf_t drakvuf, addr_t process, bool* status);
 

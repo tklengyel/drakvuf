@@ -1983,7 +1983,7 @@ bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 
 bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid)
 {
-    if (handle == 0 || handle == UINT64_MAX)
+    if (handle == 0 || handle == UINT64_MAX - 1)
     {
         *tid = info->proc_data.tid;
         return false;
@@ -2002,4 +2002,46 @@ bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 
     addr_t ethread = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
     return win_get_thread_id(drakvuf, ethread, tid);
+}
+
+
+bool win_get_pid_from_thread_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
+{
+    if (handle == 0 || handle == UINT64_MAX - 1)
+    {
+        *pid = info->proc_data.pid;
+        return false;
+    }
+
+    if (!info->proc_data.base_addr || !pid)
+        return false;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+        return false;
+
+    addr_t ethread = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
+
+    addr_t kthread = ethread + drakvuf->offsets[ETHREAD_TCB];
+
+    addr_t eprocess = 0;
+    addr_t eprocess_ptr_addr = kthread + drakvuf->offsets[KTHREAD_PROCESS];
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = eprocess_ptr_addr,
+    );
+
+    if (VMI_SUCCESS != vmi_read_addr(drakvuf->vmi, &ctx, &eprocess))
+    {
+        return false;
+    }
+
+    if (!eprocess)
+    {
+        return false;
+    }
+
+    return win_get_process_pid(drakvuf, eprocess, pid);
 }

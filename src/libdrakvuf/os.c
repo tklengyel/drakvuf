@@ -1070,6 +1070,20 @@ bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     return ret;
 }
 
+bool drakvuf_get_pid_from_thread_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_pid_from_thread_handle )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_pid_from_thread_handle(drakvuf, info, handle, pid);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx)
 {
     bool ret = false;
