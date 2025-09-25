@@ -402,6 +402,47 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
     return check;
 }
 
+void linux_syscalls::register_parsers()
+{
+    syscalls_base::register_parsers();
+
+    m_type_parsers[linux_intmask_prot_]= [this](
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
+            const std::vector<uint64_t>& all_args)
+    {
+        if (value == 0)
+        {
+            find_replace_arg(original_args, std::string(arg.name), fmt::Qstr("PROT_NONE"));
+        }
+        else
+        {
+            find_replace_arg(original_args, std::string(arg.name), fmt::Qstr(parse_flags(value, mmap_prot, m_output_format)));
+        }
+    };
+
+    m_type_parsers[linux_intopt_pr_]= [](
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
+            const std::vector<uint64_t>& all_args)
+    {
+        if (prctl_option.find(value) != prctl_option.end())
+        {
+            find_replace_arg(original_args, std::string(arg.name), fmt::Qstr(prctl_option.at(value)));
+        }
+    };
+
+    m_type_parsers[linux_intopt_arch_]= [](
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
+            const std::vector<uint64_t>& all_args)
+    {
+        if (arch_prctl_code.find(value) != arch_prctl_code.end())
+        {
+            find_replace_arg(original_args, std::string(arg.name), fmt::Qstr(arch_prctl_code.at(value)));
+        }
+    };
+}
 
 linux_syscalls::linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : syscalls_base(drakvuf, config, output)
 {
@@ -413,4 +454,6 @@ linux_syscalls::linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config,
 
     if (!this->trap_syscall_table_entries(drakvuf))
         PRINT_DEBUG("[SYSCALLS] Failed to set breakpoints on some syscalls.\n");
+
+    register_parsers();
 }

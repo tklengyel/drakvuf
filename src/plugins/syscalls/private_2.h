@@ -144,6 +144,7 @@ public:
 
     using arg_parser_t = std::function<void(
             syscalls_base* base,
+            fmt_args_t& original_args,
             fmt_args_t& extra_args,
             const syscalls_ns::syscall_t* sc,
             const syscalls_ns::arg_t& arg_to_parse,
@@ -155,6 +156,7 @@ public:
     void print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info = nullptr);
     uint64_t value_from_uint64(syscalls_ns::arg_type_t type, uint64_t val);
     bool read_syscalls_list(const char* syscall_list_file);
+    static void find_replace_arg(std::vector<std::pair<std::string, fmt::Aarg>>& vec, const std::string& key, const fmt::Aarg& newValue);
 
     static std::optional<uint64_t> get_arg_value_by_name(
         const syscalls_ns::syscall_t* sc,

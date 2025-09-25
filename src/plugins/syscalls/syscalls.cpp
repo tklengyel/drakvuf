@@ -214,7 +214,7 @@ void syscalls_base::fill_fmt_args(
 
         if (parser)
         {
-            parser(this, extra_args, sc, arg_to_parse, info, value_to_parse, args);
+            parser(this, original_args, extra_args, sc, arg_to_parse, info, value_to_parse, args);
         }
         else if (dereferenced_value)
         {
@@ -247,6 +247,21 @@ static std::string rstrip(std::string s)
     while (!s.empty() && isspace(s.back()))
         s.pop_back();
     return s;
+}
+
+void syscalls_base::find_replace_arg(std::vector<std::pair<std::string, fmt::Aarg>>& vec, const std::string& key, const fmt::Aarg& newValue)
+{
+    auto it = std::find_if(vec.begin(), vec.end(),
+            [&key](const std::pair<std::string, fmt::Aarg>& element)
+    {
+        return element.first == key;
+    }
+        );
+
+    if (it != vec.end())
+    {
+        it->second = newValue;
+    }
 }
 
 bool syscalls_base::read_syscalls_list(const char* syscall_list_file)
@@ -285,7 +300,7 @@ bool syscalls_base::read_syscalls_list(const char* syscall_list_file)
 void syscalls_base::register_parsers()
 {
     auto ascii_string_parser = [](
-            syscalls_base* base, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
             const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
             const std::vector<uint64_t>& all_args)
     {
@@ -294,7 +309,7 @@ void syscalls_base::register_parsers()
         char* cstr = drakvuf_read_ascii_str(base->drakvuf, info, value);
         if (cstr)
         {
-            extra_args.push_back(keyval(std::string(arg.name), fmt::Estr(std::string(cstr))));
+            find_replace_arg(original_args, std::string(arg.name), fmt::Estr(std::string(cstr)));
             g_free(cstr);
         }
     };

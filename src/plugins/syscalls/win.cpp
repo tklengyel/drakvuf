@@ -869,7 +869,7 @@ void win_syscalls::register_parsers()
 
     // name based parsers
     m_name_parsers["ProcessHandle"] = [](
-            syscalls_base* base, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
             const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
             const std::vector<uint64_t>& all_args)
     {
@@ -897,7 +897,7 @@ void win_syscalls::register_parsers()
     };
 
     m_name_parsers["ThreadHandle"] = [](
-            syscalls_base* base, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
             const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
             const std::vector<uint64_t>& all_args)
     {
@@ -929,48 +929,48 @@ void win_syscalls::register_parsers()
     };
 
     m_name_parsers["FileHandle"] = [](
-            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const auto* sc,
             const auto& arg, auto* info, uint64_t value, const auto& all_args)
     {
         if (value == 0) return;
         char* cstr = drakvuf_get_filename_from_handle(base->drakvuf, info, value);
         if (cstr)
         {
-            extra_args.push_back(keyval(std::string(arg.name) + "_Path", fmt::Estr(std::string(cstr))));
+            find_replace_arg(original_args, std::string(arg.name), fmt::Estr(std::string(cstr)));
             g_free(cstr);
         }
     };
 
     // type based parsers
     m_type_parsers[PUNICODE_STRING] = [](
-            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const auto* sc,
             const auto& arg, auto* info, uint64_t value, const auto& all_args)
     {
         if (value == 0) return;
         unicode_string_t* us = drakvuf_read_unicode(base->drakvuf, info, value);
         if (us)
         {
-            extra_args.push_back(keyval(std::string(arg.name), fmt::Estr(std::string((char*)us->contents))));
+            find_replace_arg(original_args, std::string(arg.name), fmt::Estr(std::string((char*)us->contents)));
             vmi_free_unicode_str(us);
         }
     };
 
     m_type_parsers[POBJECT_ATTRIBUTES] = [](
-            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const auto* sc,
             const auto& arg, auto* info, uint64_t value, const auto& all_args)
     {
         if (value == 0) return;
         char* cstr = drakvuf_get_filename_from_object_attributes(base->drakvuf, info, value);
         if (cstr)
         {
-            extra_args.push_back(keyval(std::string(arg.name), fmt::Estr(std::string(cstr))));
+            find_replace_arg(original_args, std::string(arg.name), fmt::Estr(std::string(cstr)));
             g_free(cstr);
         }
     };
 
     // resolve registers commonly used in process injection from context parameter
     m_type_parsers[PCONTEXT] = [](
-            syscalls_base* base, fmt_args_t& extra_args, const auto* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const auto* sc,
             const auto& arg, auto* info, uint64_t value, const auto& all_args)
     {
         if (value == 0) return;
@@ -1005,7 +1005,7 @@ void win_syscalls::register_parsers()
     // syscall name + arg name based parsers
     m_syscall_arg_parsers[ {"NtSetInformationThread", "ThreadInformation"}] =
         [](
-            syscalls_base* base, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
+            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
             const syscalls_ns::arg_t& arg_to_parse, drakvuf_trap_info_t* info,
             uint64_t value_to_parse, const std::vector<uint64_t>& all_args)
     {
