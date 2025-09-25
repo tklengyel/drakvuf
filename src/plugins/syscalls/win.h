@@ -134,12 +134,25 @@ public:
     event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t cr3, bool ntos, addr_t base, std::array<addr_t, 2> _sst, json_object* json);
-    virtual char* win_extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::arg_t& arg, addr_t val);
 
-    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* module, const syscalls_ns::syscall_t* sc, std::vector<uint64_t> args, privilege_mode_t mode, std::optional<std::string> from_dll, std::optional<std::string> from_parent_dll);
+    void print_syscall(
+        drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+        int nr, const char* module, const syscalls_ns::syscall_t* sc,
+        const std::vector<uint64_t>& args, privilege_mode_t mode,
+        const std::optional<std::string>& from_dll, const std::optional<std::string>& from_parent_dll,
+        bool is_ret, std::optional<uint32_t> status
+    );
 
     win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~win_syscalls();
+
+protected:
+    void register_parsers() override;
+
+    void parse_handle_for_pid_tid(
+        fmt_args_t& fmt_args, const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info,
+        uint64_t value, bool resolve_pid, bool resolve_tid
+    );
 };
 
 namespace syscalls_ns
@@ -346,7 +359,7 @@ SYSCALL(NtAllocateUuids, NTSTATUS,
 );
 SYSCALL(NtAllocateVirtualMemory, NTSTATUS,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "ZeroBits", "", DIR_IN, ULONG_PTR,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "AllocationType", "", DIR_IN, DWORD,
@@ -354,7 +367,7 @@ SYSCALL(NtAllocateVirtualMemory, NTSTATUS,
 );
 SYSCALL(NtAllocateVirtualMemoryEx, NTSTATUS,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "AllocationType", "", DIR_IN, DWORD,
     "Protect", "", DIR_IN, DWORD,
@@ -374,6 +387,16 @@ SYSCALL(NtAlpcAcceptConnectPort, NTSTATUS,
 );
 SYSCALL(NtAlpcConnectPortEx, NTSTATUS,
     "PortHandle", "", DIR_OUT, PHANDLE,
+    "ConnectionPortObjectAttributes", "", DIR_IN, POBJECT_ATTRIBUTES,
+    "ClientPortObjectAttributes", "opt", DIR_IN, POBJECT_ATTRIBUTES,
+    "PortAttributes", "opt", DIR_IN, PALPC_PORT_ATTRIBUTES,
+    "Flags", "", DIR_IN, ULONG,
+    "ServerSecurityRequirements", "opt", DIR_IN, PSECURITY_DESCRIPTOR,
+    "ConnectionMessage", "opt", DIR_INOUT, PPORT_MESSAGE,
+    "BufferLength", "opt", DIR_INOUT, PSIZE_T,
+    "OutMessageAttributes", "opt", DIR_INOUT, PALPC_MESSAGE_ATTRIBUTES,
+    "InMessageAttributes", "opt", DIR_INOUT, PALPC_MESSAGE_ATTRIBUTES,
+    "Timeout", "opt", DIR_IN, PLARGE_INTEGER,
 );
 SYSCALL(NtAlpcCancelMessage, NTSTATUS,
     "PortHandle", "", DIR_IN, HANDLE,
@@ -590,11 +613,23 @@ SYSCALL(NtContinue, NTSTATUS,
     "ContextRecord", "", DIR_IN, PCONTEXT,
     "TestAlert", "", DIR_IN, BOOLEAN,
 );
+SYSCALL(NtCopyFileChunk, NTSTATUS,
+    "SourceHandle", "", DIR_IN, HANDLE,
+    "DestinationHandle", "", DIR_IN, HANDLE,
+    "EventHandle", "", DIR_IN, HANDLE,
+    "IoStatusBlock", "", DIR_OUT, PIO_STATUS_BLOCK,
+    "Length", "", DIR_IN, ULONG,
+    "SourceOffset", "", DIR_IN, PLARGE_INTEGER,
+    "DestOffset", "", DIR_IN, PLARGE_INTEGER,
+    "SourceKey", "", DIR_IN, PULONG,
+    "DestKey", "", DIR_IN, PULONG,
+    "Flags", "", DIR_IN, ULONG
+);
 SYSCALL(NtCreateDebugObject, NTSTATUS,
     "DebugObjectHandle", "", DIR_OUT, PHANDLE,
-    "DesiredAccess", "", DIR_OUT, ACCESS_MASK,
-    "ObjectAttributes", "", DIR_OUT, POBJECT_ATTRIBUTES,
-    "Flags", "", DIR_OUT, ULONG,
+    "DesiredAccess", "", DIR_IN, ACCESS_MASK,
+    "ObjectAttributes", "", DIR_IN, POBJECT_ATTRIBUTES,
+    "Flags", "", DIR_IN, ULONG,
 );
 SYSCALL(NtCreateDirectoryObject, NTSTATUS,
     "DirectoryHandle", "", DIR_OUT, PHANDLE,
@@ -911,13 +946,13 @@ SYSCALL(NtCreateWorkerFactory, NTSTATUS,
     "StackCommit", "opt", DIR_IN, SIZE_T,
 );
 SYSCALL(NtDebugActiveProcess, NTSTATUS,
-    "ProcessHandle", "", DIR_OUT, HANDLE,
-    "DebugObjectHandle", "", DIR_OUT, HANDLE,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "DebugObjectHandle", "", DIR_IN, HANDLE,
 );
 SYSCALL(NtDebugContinue, NTSTATUS,
-    "DebugObjectHandle", "", DIR_OUT, HANDLE,
-    "ClientId", "", DIR_OUT, PCLIENT_ID,
-    "ContinueStatus", "", DIR_OUT, NTSTATUS,
+    "DebugObjectHandle", "", DIR_IN, HANDLE,
+    "ClientId", "", DIR_IN, PCLIENT_ID,
+    "ContinueStatus", "", DIR_IN, NTSTATUS,
 );
 SYSCALL(NtDelayExecution, NTSTATUS,
     "Alertable", "", DIR_IN, BOOLEAN,
@@ -970,7 +1005,7 @@ SYSCALL(NtDrawText, NTSTATUS,
 );
 SYSCALL(NtDuplicateObject, NTSTATUS,
     "SourceProcessHandle", "", DIR_IN, HANDLE,
-    "SourceHandle", "", DIR_IN, PHANDLE,
+    "SourceHandle", "", DIR_IN, HANDLE,
     "TargetProcessHandle", "opt", DIR_IN, HANDLE,
     "TargetHandle", "opt", DIR_OUT, PHANDLE,
     "DesiredAccess", "", DIR_IN, ACCESS_MASK,
@@ -1056,7 +1091,7 @@ SYSCALL(NtFlushKey, NTSTATUS,
 );
 SYSCALL(NtFlushVirtualMemory, NTSTATUS,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "IoStatus", "", DIR_OUT, PIO_STATUS_BLOCK,
 );
@@ -1067,7 +1102,7 @@ SYSCALL(NtFreeUserPhysicalPages, NTSTATUS,
 );
 SYSCALL(NtFreeVirtualMemory, NTSTATUS,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "FreeType", "", DIR_IN, ULONG,
 );
@@ -1101,14 +1136,15 @@ SYSCALL(NtGdiBitBlt, INT,
     "ySrc", "", DIR_IN, INT,
     "rop4", "", DIR_IN, DWORD,
     "crBackColor", "", DIR_IN, DWORD,
-    "fl", "", DIR_IN, ULONG);
+    "fl", "", DIR_IN, ULONG
+);
 SYSCALL(NtGetContextThread, NTSTATUS,
     "ThreadHandle", "", DIR_IN, HANDLE,
     "ThreadContext", "", DIR_INOUT, PCONTEXT,
 );
 SYSCALL(NtGetDevicePowerState, NTSTATUS,
     "Device", "", DIR_IN, HANDLE,
-    "*State", "", DIR_OUT, DEVICE_POWER_STATE,
+    "State", "", DIR_OUT, PDEVICE_POWER_STATE,
 );
 SYSCALL(NtGetMUIRegistryInfo, NTSTATUS,
     "Flags", "", DIR_IN, ULONG,
@@ -1134,7 +1170,7 @@ SYSCALL(NtGetNlsSectionPtr, NTSTATUS,
     "SectionType", "", DIR_IN, ULONG,
     "SectionData", "", DIR_IN, ULONG,
     "ContextData", "", DIR_IN, PVOID,
-    "*SectionPointer", "", DIR_OUT, PVOID,
+    "SectionPointer", "", DIR_OUT, PPVOID,
     "SectionSize", "", DIR_OUT, PULONG,
 );
 SYSCALL(NtGetNotificationResourceManager, NTSTATUS,
@@ -1157,7 +1193,7 @@ SYSCALL(NtGetWriteWatch, NTSTATUS,
     "Flags", "", DIR_IN, ULONG,
     "BaseAddress", "", DIR_IN, PVOID,
     "RegionSize", "", DIR_IN, SIZE_T,
-    "*UserAddressArray", "ecount(*EntriesInUserAddressArray)", DIR_OUT, PVOID,
+    "UserAddressArray", "ecount(*EntriesInUserAddressArray)", DIR_OUT, PVOID,
     "EntriesInUserAddressArray", "", DIR_INOUT, PULONG_PTR,
     "Granularity", "", DIR_OUT, PULONG,
 );
@@ -1174,7 +1210,7 @@ SYSCALL(NtImpersonateThread, NTSTATUS,
     "SecurityQos", "", DIR_IN, PSECURITY_QUALITY_OF_SERVICE,
 );
 SYSCALL(NtInitializeNlsFiles, NTSTATUS,
-    "*BaseAddress", "", DIR_OUT, PVOID,
+    "BaseAddress", "", DIR_OUT, PPVOID,
     "DefaultLocaleId", "", DIR_OUT, PLCID,
     "DefaultCasingTableSize", "", DIR_OUT, PLARGE_INTEGER,
 );
@@ -1226,15 +1262,15 @@ SYSCALL(NtLockFile, NTSTATUS,
     "ExclusiveLock", "", DIR_IN, BOOLEAN,
 );
 SYSCALL(NtLockProductActivationKeys, NTSTATUS,
-    "*pPrivateVer", "opt", DIR_INOUT, ULONG,
-    "*pSafeMode", "opt", DIR_OUT, ULONG,
+    "pPrivateVer", "opt", DIR_INOUT, PULONG,
+    "pSafeMode", "opt", DIR_OUT, PULONG,
 );
 SYSCALL(NtLockRegistryKey, NTSTATUS,
     "KeyHandle", "", DIR_IN, HANDLE,
 );
 SYSCALL(NtLockVirtualMemory, NTSTATUS,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "MapType", "", DIR_IN, ULONG,
 );
@@ -1250,7 +1286,7 @@ SYSCALL(NtMapCMFModule, NTSTATUS,
     "CacheIndexOut", "opt", DIR_OUT, PULONG,
     "CacheFlagsOut", "opt", DIR_OUT, PULONG,
     "ViewSizeOut", "opt", DIR_OUT, PULONG,
-    "*BaseAddress", "opt", DIR_OUT, PVOID,
+    "BaseAddress", "opt", DIR_OUT, PPVOID,
 );
 SYSCALL(NtMapUserPhysicalPages, NTSTATUS,
     "VirtualAddress", "", DIR_IN, PVOID,
@@ -1258,14 +1294,14 @@ SYSCALL(NtMapUserPhysicalPages, NTSTATUS,
     "UserPfnArra;", "ecount_opt(NumberOfPages)", DIR_IN, PULONG_PTR,
 );
 SYSCALL(NtMapUserPhysicalPagesScatter, NTSTATUS,
-    "*VirtualAddresses", "ecount(NumberOfPages)", DIR_IN, PVOID,
+    "VirtualAddresses", "ecount(NumberOfPages)", DIR_IN, PVOID,
     "NumberOfPages", "", DIR_IN, ULONG_PTR,
     "UserPfnArray", "ecount_opt(NumberOfPages)", DIR_IN, PULONG_PTR,
 );
 SYSCALL(NtMapViewOfSection, NTSTATUS,
     "SectionHandle", "", DIR_IN, HANDLE,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "ZeroBits", "", DIR_IN, ULONG_PTR,
     "CommitSize", "", DIR_IN, SIZE_T,
     "SectionOffset", "opt", DIR_INOUT, PLARGE_INTEGER,
@@ -1277,7 +1313,7 @@ SYSCALL(NtMapViewOfSection, NTSTATUS,
 SYSCALL(NtMapViewOfSectionEx, NTSTATUS,
     "SectionHandle", "", DIR_IN, HANDLE,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "SectionOffset", "opt", DIR_INOUT, PLARGE_INTEGER,
     "ViewSize", "", DIR_INOUT, PSIZE_T,
     "AllocationType", "", DIR_IN, ULONG,
@@ -1576,7 +1612,7 @@ SYSCALL(NtPropagationFailed, NTSTATUS,
 );
 SYSCALL(NtProtectVirtualMemory, NTSTATUS,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "NewProtectWin32", "", DIR_IN, WIN32_PROTECTION_MASK,
     "OldProtect", "", DIR_OUT, PULONG,
@@ -1606,7 +1642,7 @@ SYSCALL(NtQueryDefaultLocale, NTSTATUS,
     "DefaultLocaleId", "", DIR_OUT, PLCID,
 );
 SYSCALL(NtQueryDefaultUILanguage, NTSTATUS,
-    "*DefaultUILanguageId", "", DIR_OUT, LANGID,
+    "DefaultUILanguageId", "", DIR_OUT, PLANGID,
 );
 SYSCALL(NtQueryDirectoryFile, NTSTATUS,
     "FileHandle", "", DIR_IN, HANDLE,
@@ -1741,7 +1777,7 @@ SYSCALL(NtQueryInformationWorkerFactory, NTSTATUS,
     "ReturnLength", "opt", DIR_OUT, PULONG,
 );
 SYSCALL(NtQueryInstallUILanguage, NTSTATUS,
-    "*InstallUILanguageId", "", DIR_OUT, LANGID,
+    "InstallUILanguageId", "", DIR_OUT, PLANGID,
 );
 SYSCALL(NtQueryIntervalProfile, NTSTATUS,
     "ProfileSource", "", DIR_IN, KPROFILE_SOURCE,
@@ -1922,6 +1958,15 @@ SYSCALL(NtQueueApcThreadEx, NTSTATUS,
     "ApcArgument2", "opt", DIR_IN, PVOID,
     "ApcArgument3", "opt", DIR_IN, PVOID,
 );
+SYSCALL(NtQueueApcThreadEx2, NTSTATUS,
+    "ThreadHandle", "", DIR_IN, HANDLE,
+    "ReserveHandle", "", DIR_IN, HANDLE,
+    "ApcFlags", "", DIR_IN, ULONG,
+    "ApcRoutine", "", DIR_IN, PPS_APC_ROUTINE,
+    "ApcArgument1", "", DIR_IN, PVOID,
+    "ApcArgument2", "", DIR_IN, PVOID,
+    "ApcArgument3", "", DIR_IN, PVOID
+);
 SYSCALL(NtQueueApcThread, NTSTATUS,
     "ThreadHandle", "", DIR_IN, HANDLE,
     "ApcRoutine", "", DIR_IN, PPS_APC_ROUTINE,
@@ -1930,9 +1975,9 @@ SYSCALL(NtQueueApcThread, NTSTATUS,
     "ApcArgument3", "opt", DIR_IN, PVOID,
 );
 SYSCALL(NtRaiseException, NTSTATUS,
-    "ExceptionRecord", "", DIR_OUT, PEXCEPTION_RECORD,
-    "ContextRecord", "", DIR_OUT, PCONTEXT,
-    "FirstChance", "", DIR_OUT, BOOLEAN,
+    "ExceptionRecord", "", DIR_IN, PEXCEPTION_RECORD,
+    "ContextRecord", "", DIR_IN, PCONTEXT,
+    "FirstChance", "", DIR_IN, BOOLEAN,
 );
 SYSCALL(NtRaiseHardError, NTSTATUS,
     "ErrorStatus", "", DIR_IN, NTSTATUS,
@@ -2039,14 +2084,14 @@ SYSCALL(NtRemoveIoCompletionEx, NTSTATUS,
 );
 SYSCALL(NtRemoveIoCompletion, NTSTATUS,
     "IoCompletionHandle", "", DIR_IN, HANDLE,
-    "*KeyContext", "", DIR_OUT, PVOID,
-    "*ApcContext", "", DIR_OUT, PVOID,
+    "KeyContext", "", DIR_OUT, PPVOID,
+    "ApcContext", "", DIR_OUT, PPVOID,
     "IoStatusBlock", "", DIR_OUT, PIO_STATUS_BLOCK,
     "Timeout", "opt", DIR_IN, PLARGE_INTEGER,
 );
 SYSCALL(NtRemoveProcessDebug, NTSTATUS,
-    "ProcessHandle", "", DIR_OUT, HANDLE,
-    "DebugObjectHandle", "", DIR_OUT, HANDLE,
+    "ProcessHandle", "", DIR_IN, HANDLE,
+    "DebugObjectHandle", "", DIR_IN, HANDLE,
 );
 SYSCALL(NtRenameKey, NTSTATUS,
     "KeyHandle", "", DIR_IN, HANDLE,
@@ -2072,14 +2117,14 @@ SYSCALL(NtReplyPort, NTSTATUS,
 );
 SYSCALL(NtReplyWaitReceivePortEx, NTSTATUS,
     "PortHandle", "", DIR_IN, HANDLE,
-    "*PortContext", "opt", DIR_OUT, PVOID,
+    "PortContext", "opt", DIR_OUT, PPVOID,
     "ReplyMessage", "opt", DIR_IN, PPORT_MESSAGE,
     "ReceiveMessage", "", DIR_OUT, PPORT_MESSAGE,
     "Timeout", "opt", DIR_IN, PLARGE_INTEGER,
 );
 SYSCALL(NtReplyWaitReceivePort, NTSTATUS,
     "PortHandle", "", DIR_IN, HANDLE,
-    "*PortContext", "opt", DIR_OUT, PVOID,
+    "PortContext", "opt", DIR_OUT, PPVOID,
     "ReplyMessage", "opt", DIR_IN, PPORT_MESSAGE,
     "ReceiveMessage", "", DIR_OUT, PPORT_MESSAGE,
 );
@@ -2209,11 +2254,11 @@ SYSCALL(NtSetHighWaitLowEventPair, NTSTATUS,
     "EventPairHandle", "", DIR_IN, HANDLE,
 );
 SYSCALL(NtSetInformationDebugObject, NTSTATUS,
-    "DebugObjectHandle", "", DIR_OUT, HANDLE,
-    "DebugObjectInformationClass", "", DIR_OUT, DEBUGOBJECTINFOCLASS,
-    "DebugInformation", "", DIR_OUT, PVOID,
-    "DebugInformationLength", "", DIR_OUT, ULONG,
-    "ReturnLength", "", DIR_OUT, PULONG,
+    "DebugObjectHandle", "", DIR_IN, HANDLE,
+    "DebugObjectInformationClass", "", DIR_IN, DEBUGOBJECTINFOCLASS,
+    "DebugInformation", "", DIR_IN, PVOID,
+    "DebugInformationLength", "", DIR_IN, ULONG,
+    "ReturnLength", "opt", DIR_OUT, PULONG,
 );
 SYSCALL(NtSetInformationEnlistment, NTSTATUS,
     "EnlistmentHandle", "opt", DIR_IN, HANDLE,
@@ -2359,7 +2404,7 @@ SYSCALL(NtSetSystemTime, NTSTATUS,
 );
 SYSCALL(NtSetThreadExecutionState, NTSTATUS,
     "esFlags", "", DIR_IN, EXECUTION_STATE,
-    "*PreviousFlags", "", DIR_OUT, EXECUTION_STATE,
+    "PreviousFlags", "", DIR_OUT, PEXECUTION_STATE,
 );
 SYSCALL(NtSetTimerEx, NTSTATUS,
     "TimerHandle", "", DIR_IN, HANDLE,
@@ -2404,7 +2449,7 @@ SYSCALL(NtShutdownSystem, NTSTATUS,
 );
 SYSCALL(NtShutdownWorkerFactory, NTSTATUS,
     "WorkerFactoryHandle", "", DIR_IN, HANDLE,
-    "*PendingWorkerCount", "", DIR_INOUT, LONG,
+    "PendingWorkerCount", "", DIR_INOUT, PLONG,
 );
 SYSCALL(NtSignalAndWaitForSingleObject, NTSTATUS,
     "SignalHandle", "", DIR_IN, HANDLE,
@@ -2492,7 +2537,7 @@ SYSCALL(NtUnlockFile, NTSTATUS,
 );
 SYSCALL(NtUnlockVirtualMemory, NTSTATUS,
     "ProcessHandle", "", DIR_IN, HANDLE,
-    "*BaseAddress", "", DIR_INOUT, PPVOID,
+    "BaseAddress", "", DIR_INOUT, PPVOID,
     "RegionSize", "", DIR_INOUT, PSIZE_T,
     "MapType", "", DIR_IN, ULONG,
 );
@@ -2584,9 +2629,9 @@ SYSCALL(NtVdmControl, NTSTATUS,
     "ServiceData", "", DIR_INOUT, PVOID,
 );
 SYSCALL(NtWaitForDebugEvent, NTSTATUS,
-    "DebugObjectHandle", "", DIR_OUT, HANDLE,
-    "Alertable", "", DIR_OUT, BOOLEAN,
-    "Timeout", "", DIR_OUT, PLARGE_INTEGER,
+    "DebugObjectHandle", "", DIR_IN, HANDLE,
+    "Alertable", "", DIR_IN, BOOLEAN,
+    "Timeout", "opt", DIR_IN, PLARGE_INTEGER,
     "WaitStateChange", "", DIR_OUT, PDBGUI_WAIT_STATE_CHANGE,
 );
 SYSCALL(NtWaitForKeyedEvent, NTSTATUS,
@@ -4271,6 +4316,7 @@ static const syscall_t* nt[] =
     &NtCompressKey,
     &NtConnectPort,
     &NtContinue,
+    &NtCopyFileChunk,
     &NtCreateDebugObject,
     &NtCreateDirectoryObject,
     &NtCreateEnlistment,
@@ -4482,6 +4528,7 @@ static const syscall_t* nt[] =
     &NtQueryVirtualMemory,
     &NtQueryVolumeInformationFile,
     &NtQueueApcThreadEx,
+    &NtQueueApcThreadEx2,
     &NtQueueApcThread,
     &NtRaiseException,
     &NtRaiseHardError,

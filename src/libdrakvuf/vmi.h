@@ -148,4 +148,7 @@ bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle);
 bool control_io_trap(drakvuf_t drakvuf, bool toggle);
 bool control_msr_trap(drakvuf_t drakvuf, bool toggle);
 bool control_msr_trap_any(drakvuf_t drakvuf, bool toggle, uint32_t index);
+bool win_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* user_rsp);
+addr_t win_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode);
+
 #endif

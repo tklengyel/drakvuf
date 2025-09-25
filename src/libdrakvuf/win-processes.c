@@ -194,6 +194,82 @@ static bool win_get_current_kpcr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     return true;
 }
 
+
+bool win_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* user_rsp)
+{
+    if (!user_rsp)
+        return false;
+
+
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t kpcr = 0;
+    addr_t prcb = 0;
+
+    if (!win_get_current_kpcr(drakvuf, info, &kpcr, &prcb))
+    {
+        PRINT_DEBUG("win_get_user_rsp: FAILED to get KPCR base address.\n");
+        return false;
+    }
+    addr_t read_rsp = 0;
+
+    status_t read_status;
+    // Assume KPTI enabled
+    read_status = vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_USERRSPSHADOW], 0, &read_rsp);
+
+    if (VMI_SUCCESS != read_status)
+    {
+        PRINT_DEBUG("win_get_user_rsp: vmi_read_addr_va FAILED with status %d\n", read_status);
+        return false;
+    }
+
+    // Fallback to KPTI disabled
+    if (read_rsp == 0)
+    {
+        read_status = vmi_read_addr_va(vmi, kpcr + drakvuf->offsets[KPCR_USERRSP], 0, &read_rsp);
+        if (VMI_SUCCESS != read_status)
+        {
+            PRINT_DEBUG("win_get_user_rsp: vmi_read_addr_va FAILED with status %d\n", read_status);
+            return false;
+        }
+    }
+
+    *user_rsp = read_rsp;
+    return true;
+}
+
+addr_t win_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    if (mode == MAXIMUM_MODE)
+    {
+        return 0;
+    }
+    if (mode == KERNEL_MODE)
+    {
+        // Read return address.
+        //
+        return drakvuf_get_function_return_address(drakvuf, info);
+    }
+    // Read usermode address.
+    //
+    // The qword at offset 0x28 - return address to usermode:
+    // -0x00:  mov     rsp, gs:1A8h
+    // -0x08:  push    2Bh
+    // -0x10:  push    qword ptr gs:10h
+    // -0x18:  push    r11
+    // -0x20:  push    33h
+    // -0x28:  push    rcx
+    // -0x28:  mov     rcx, r10
+    // -0x30:  sub     rsp, 8
+    // -0x38:  push    rbp
+    // -0x190: sub     rsp, 158h
+    //
+    addr_t user_ret_addr = 0;
+    vmi_read_addr_va(vmi, drakvuf_get_rspbase(drakvuf, info) - 0x28, 0, &user_ret_addr);
+    return user_ret_addr;
+}
+
 bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql)
 {
     vmi_instance_t vmi = drakvuf->vmi;
@@ -603,11 +679,19 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 {
     if ( kthread )
     {
+        uint8_t previous_mode_byte = 0xFF;
         if ( vmi_read_8_va( drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PREVIOUSMODE ], 0,
-                (uint8_t*)previous_mode ) == VMI_SUCCESS )
+                &previous_mode_byte ) == VMI_SUCCESS )
         {
+            *previous_mode = (privilege_mode_t)previous_mode_byte;
             if ( ( *previous_mode == KERNEL_MODE ) || ( *previous_mode == USER_MODE ) )
                 return true ;
+            else
+                PRINT_DEBUG("Read an unexpected value for previous mode: %d\n", (int)(*previous_mode));
+        }
+        else
+        {
+            PRINT_DEBUG("Failed to read kthread previous mode\n");
         }
     }
 
@@ -619,7 +703,6 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
     privilege_mode_t* previous_mode )
 {
     addr_t kthread = win_get_current_thread(drakvuf, info);
-
     return win_get_thread_previous_mode(drakvuf, kthread, previous_mode);
 }
 
@@ -1899,7 +1982,7 @@ bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 
 bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid)
 {
-    if (handle == 0 || handle == UINT64_MAX)
+    if (handle == 0 || handle == UINT64_MAX - 1)
     {
         *tid = info->proc_data.tid;
         return false;
@@ -1918,4 +2001,46 @@ bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 
     addr_t ethread = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
     return win_get_thread_id(drakvuf, ethread, tid);
+}
+
+
+bool win_get_pid_from_thread_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
+{
+    if (handle == 0 || handle == UINT64_MAX - 1)
+    {
+        *pid = info->proc_data.pid;
+        return false;
+    }
+
+    if (!info->proc_data.base_addr || !pid)
+        return false;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+        return false;
+
+    addr_t ethread = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
+
+    addr_t kthread = ethread + drakvuf->offsets[ETHREAD_TCB];
+
+    addr_t eprocess = 0;
+    addr_t eprocess_ptr_addr = kthread + drakvuf->offsets[KTHREAD_PROCESS];
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = eprocess_ptr_addr,
+    );
+
+    if (VMI_SUCCESS != vmi_read_addr(drakvuf->vmi, &ctx, &eprocess))
+    {
+        return false;
+    }
+
+    if (!eprocess)
+    {
+        return false;
+    }
+
+    return win_get_process_pid(drakvuf, eprocess, pid);
 }

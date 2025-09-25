@@ -780,6 +780,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.mmvad_protection = win_mmvad_protection;
     drakvuf->osi.get_pid_from_handle = win_get_pid_from_handle;
     drakvuf->osi.get_tid_from_handle = win_get_tid_from_handle;
+    drakvuf->osi.get_pid_from_thread_handle = win_get_pid_from_thread_handle;
     drakvuf->osi.get_wow_context = win_get_wow_context;
     drakvuf->osi.get_user_stack32 = win_get_user_stack32;
     drakvuf->osi.get_user_stack64 = win_get_user_stack64;
@@ -792,6 +793,8 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_object_type_name = win_get_object_type_name;
     drakvuf->osi.get_object_name = win_get_object_name;
     drakvuf->osi.get_object_type_index = win_get_object_type_index;
+    drakvuf->osi.get_user_rsp = win_get_user_rsp;
+    drakvuf->osi.get_syscall_retaddr = win_get_syscall_retaddr;
 
     return true;
 }

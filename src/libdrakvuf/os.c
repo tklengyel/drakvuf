@@ -1070,6 +1070,20 @@ bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     return ret;
 }
 
+bool drakvuf_get_pid_from_thread_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_pid_from_thread_handle )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_pid_from_thread_handle(drakvuf, info, handle, pid);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx)
 {
     bool ret = false;
@@ -1228,6 +1242,35 @@ unicode_string_t* drakvuf_get_object_type_name(drakvuf_t drakvuf, addr_t object)
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.get_object_type_name(drakvuf, object);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+
+bool drakvuf_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* user_rsp)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_user_rsp )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_user_rsp(drakvuf, info, user_rsp);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+addr_t drakvuf_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode)
+{
+    addr_t ret = 0;
+
+    if ( drakvuf->osi.get_syscall_retaddr )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_syscall_retaddr(drakvuf, info, mode);
         drakvuf_release_vmi(drakvuf);
     }
 
