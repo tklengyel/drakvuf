@@ -328,6 +328,8 @@ struct BinaryString<T,
     }
 };
 
+struct Subkey;
+
 /* Any argument type */
 using Aarg = std::variant<
     fmt::Nval<unsigned long>,
@@ -338,7 +340,30 @@ using Aarg = std::variant<
     fmt::Qstr<const char*>,
     fmt::Qstr<std::string>,
     fmt::Estr<const char*>,
-    fmt::Estr<std::string>>;
+    fmt::Estr<std::string>,
+    fmt::Subkey>;
+
+
+struct Subkey
+{
+    std::vector<std::pair<std::string, Aarg>> sub_data;
+    explicit Subkey(const std::vector<std::pair<std::string, Aarg>>& data)
+        : sub_data(data) {}
+
+    explicit Subkey(std::vector<std::pair<std::string, Aarg>>&& data)
+        : sub_data(std::move(data)) {}
+};
+
+
+inline Subkey Skey(const std::vector<std::pair<std::string, Aarg>>& data)
+{
+    return Subkey(data);
+}
+
+inline Subkey Skey(std::vector<std::pair<std::string, Aarg>>&& data)
+{
+    return Subkey(std::move(data));
+}
 
 } // namespace fmt
 
