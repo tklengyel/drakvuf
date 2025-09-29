@@ -258,6 +258,52 @@ struct DataPrinter
             return print_data(os, arg, sep);
         }, data);
     }
+
+    // base case for a subkey, probably never called directly but needed by compiler
+    static bool print(std::ostream& os, const fmt::Subkey& data, char sep)
+    {
+        if (data.sub_data.empty())
+        {
+            return false;
+        }
+
+        bool printed = false;
+        os << "["; // unnamed object
+        for (const auto& [key, value] : data.sub_data)
+        {
+            bool printed_prev = printed;
+            if (printed)
+                os << sep;
+            printed = print_data(os, keyval(key.c_str(), value), ' ');
+            if (!printed && printed_prev)
+                fmt::unputc(os);
+        }
+        os << "] ";
+        return true;
+    }
+
+    template <class Tk>
+    static bool print(std::ostream& os, const std::pair<Tk, fmt::Subkey>& data, char sep)
+    {
+        const char* parent_key = data.first;
+        const auto& sub_data = data.second.sub_data;
+        if (sub_data.empty()) return false;
+
+        bool printed = false;
+        os << parent_key << ":[";
+
+        for (const auto& [sub_key, sub_val] : sub_data)
+        {
+            bool printed_prev = printed;
+            if (printed)
+                os << sep;
+            printed = print_data(os, keyval(sub_key.c_str(), sub_val), ' ');
+            if (!printed && printed_prev)
+                fmt::unputc(os);
+        }
+        os << "] ";
+        return true;
+    }
 };
 
 template <class T>
