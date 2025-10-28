@@ -1280,7 +1280,7 @@ void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
 
     drakvuf_lock_and_get_vmi(drakvuf);
-    
+
     if (drakvuf_lookup_injection(drakvuf, info) == info->trap)
     {
         if (!g_hash_table_remove(drakvuf->injections_in_progress, key))
