@@ -114,6 +114,84 @@
 #include "tlsmon.h"
 
 
+static std::optional<std::string> ssl_get_master_key(
+    drakvuf_t drakvuf, drakvuf_trap_info* info, vmi_instance_t vmi, access_context_t ctx
+)
+{
+    tlsmon_priv::ssl_master_secret_t master_secret;
+
+    // We first extract master key by tracing down relevant structures starting with master_key_handle.
+    addr_t ncrypt_ssl_key_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    // master_key_handle points to NCryptSslKey structure.
+    tlsmon_priv::ncrypt_ssl_key_t ncrypt_ssl_key;
+    ctx.addr = ncrypt_ssl_key_addr;
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(ncrypt_ssl_key), &ncrypt_ssl_key, nullptr))
+    {
+        PRINT_DEBUG("[TLSMON] Can't read NCryptSslKey structure\n");
+        return {};
+    }
+
+    // We can validate that we indeed found NCryptSslKey by checking magic bytes value.
+    if (ncrypt_ssl_key.magic != tlsmon_priv::NCRYPT_SSL_KEY_MAGIC_BYTES)
+    {
+        PRINT_DEBUG("[TLSMON] Wrong NCryptSslKey magic\n");
+        return {};
+    }
+
+    // NCryptSslKey contains a pointer to SslMasterSecret structure.
+    ctx.addr = (addr_t) ncrypt_ssl_key.master_secret;
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(master_secret), &master_secret, nullptr))
+    {
+        PRINT_DEBUG("[TLSMON] Can't read SslMasterSecret structure\n");
+        return {};
+    }
+
+    // Again we can validate that we found SslMasterSecret structure bychecking magic bytes.
+    if (master_secret.magic != tlsmon_priv::MASTER_SECRET_MAGIC_BYTES)
+    {
+        PRINT_DEBUG("[TLSMON] Wrong SslMasterSecret magic\n");
+        return {};
+    }
+
+    // Output retrieved master secret in hex format.
+    std::string master_key_str = tlsmon_priv::byte2str(master_secret.master_key, tlsmon_priv::MASTER_KEY_SZ);
+    return master_key_str;
+}
+
+static
+std::optional< std::vector<tlsmon_priv::ncrypt_buffer_t> > ssl_get_ncrypt_buffers(
+    drakvuf_t drakvuf, drakvuf_trap_info* info, vmi_instance_t vmi, access_context_t ctx
+)
+{
+    // Now retrieve client random and server random values. pParameterList points to an array of
+    // NCryptBuffer buffers which contains at least client and server random
+    // values.
+    ctx.addr = drakvuf_get_function_argument(drakvuf, info, 5);
+    tlsmon_priv::ncrypt_buffer_desc_t ncrypt_buffer_desc;
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(ncrypt_buffer_desc), &ncrypt_buffer_desc, nullptr))
+    {
+        PRINT_DEBUG("[TLSMON] Failed to read ncrypt parameter list\n");
+        return {};
+    }
+
+    size_t ncrypt_buffers_size = ncrypt_buffer_desc.cbuffers;
+    if ( ncrypt_buffers_size != 2 )
+    {
+        PRINT_DEBUG("[TLSMON] Ncrypt parameter list has different size than 2\n");
+        return {};
+    }
+
+    std::vector<tlsmon_priv::ncrypt_buffer_t> ncrypt_buffers = std::vector<tlsmon_priv::ncrypt_buffer_t>(ncrypt_buffers_size);
+    ctx.addr = (addr_t) ncrypt_buffer_desc.buffers;
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, (ncrypt_buffers_size * sizeof(tlsmon_priv::ncrypt_buffer_t)), ncrypt_buffers.data(), nullptr))
+    {
+        PRINT_DEBUG("[TLSMON] Failed to read ncrypt parameter list buffers\n");
+        return {};
+    }
+    return ncrypt_buffers;
+}
+
 
 /**
  * Sets a trap on return from SslGenerateSessionKeys function to obtain the
@@ -128,79 +206,27 @@ event_response_t ssl_generate_session_keys_cb(drakvuf_t drakvuf, drakvuf_trap_in
         .dtb = info->regs->cr3
     );
 
-    tlsmon_priv::ssl_master_secret_t master_secret;
     auto vmi = vmi_lock_guard(drakvuf);
 
-    // We first extract master key by tracing down relevant structures starting with master_key_handle.
-    addr_t ncrypt_ssl_key_addr = drakvuf_get_function_argument(drakvuf, info, 2);
-
-    // master_key_handle points to NCryptSslKey structure.
-    tlsmon_priv::ncrypt_ssl_key_t ncrypt_ssl_key;
-    ctx.addr = ncrypt_ssl_key_addr;
-    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(ncrypt_ssl_key), &ncrypt_ssl_key, nullptr))
+    auto master_key = ssl_get_master_key(drakvuf, info, vmi, ctx);
+    if (!master_key)
     {
-        PRINT_DEBUG("[TLSMON] Can't read NCryptSslKey structure\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    // We can validate that we indeed found NCryptSslKey by checking magic bytes value.
-    if (ncrypt_ssl_key.magic != tlsmon_priv::NCRYPT_SSL_KEY_MAGIC_BYTES)
+    auto ncrypt_buffers = ssl_get_ncrypt_buffers(drakvuf, info, vmi, ctx);
+    if (!ncrypt_buffers)
     {
-        PRINT_DEBUG("[TLSMON] Wrong NCryptSslKey magic\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // NCryptSslKey contains a pointer to SslMasterSecret structure.
-    ctx.addr = (addr_t) ncrypt_ssl_key.master_secret;
-    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(master_secret), &master_secret, nullptr))
-    {
-        PRINT_DEBUG("[TLSMON] Can't read SslMasterSecret structure\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // Again we can validate that we found SslMasterSecret structure bychecking magic bytes.
-    if (master_secret.magic != tlsmon_priv::MASTER_SECRET_MAGIC_BYTES)
-    {
-        PRINT_DEBUG("[TLSMON] Wrong SslMasterSecret magic\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // Output retrieved master secret in hex format.
-    std::string master_key_str = tlsmon_priv::byte2str(master_secret.master_key, tlsmon_priv::MASTER_KEY_SZ);
-
-    // Now retrieve client random and server random values. pParameterList points to an array of
-    // NCryptBuffer buffers which contains at least client and server random
-    // values.
-    ctx.addr = drakvuf_get_function_argument(drakvuf, info, 5);
-    tlsmon_priv::ncrypt_buffer_desc_t ncrypt_buffer_desc;
-    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(ncrypt_buffer_desc), &ncrypt_buffer_desc, nullptr))
-    {
-        PRINT_DEBUG("[TLSMON] Failed to read ncrypt parameter list\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    size_t ncrypt_buffers_size = ncrypt_buffer_desc.cbuffers;
-    if ( ncrypt_buffers_size != 2 )
-    {
-        PRINT_DEBUG("[TLSMON] Ncrypt parameter list has different size than 2\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    std::vector<tlsmon_priv::ncrypt_buffer_t> ncrypt_buffers = std::vector<tlsmon_priv::ncrypt_buffer_t>(ncrypt_buffers_size);
-    ctx.addr = (addr_t) ncrypt_buffer_desc.buffers;
-    if (VMI_SUCCESS != vmi_read(vmi, &ctx, (ncrypt_buffers_size * sizeof(tlsmon_priv::ncrypt_buffer_t)), ncrypt_buffers.data(), nullptr))
-    {
-        PRINT_DEBUG("[TLSMON] Failed to read ncrypt parameter list buffers\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
     // buffer for both ClientRandom and ServerRandom
     std::array<char, tlsmon_priv::CLIENT_RANDOM_SZ> randoms_buffer = std::array<char,  tlsmon_priv::CLIENT_RANDOM_SZ>();
 
-    for (tlsmon_priv::ncrypt_buffer_t ncrypt_buffer_iter: ncrypt_buffers)
+    for (tlsmon_priv::ncrypt_buffer_t ncrypt_buffer_iter: *ncrypt_buffers)
     {
         uint32_t buffer_type = ncrypt_buffer_iter.buffer_type;
-        uint32_t size = ncrypt_buffer_iter.cbbuffer;
+        uint32_t size = ncrypt_buffer_iter.cbbuffer;;
         if ( size != tlsmon_priv::CLIENT_RANDOM_SZ )
         {
             PRINT_DEBUG("[TLSMON] Wrong ncrypt buffer size\n");
@@ -221,7 +247,7 @@ event_response_t ssl_generate_session_keys_cb(drakvuf_t drakvuf, drakvuf_trap_in
         {
             fmt::print(plugin->m_output_format, "tlsmon", drakvuf, info,
                 keyval("client_random", fmt::Qstr(client_random_str)),
-                keyval("master_key", fmt::Qstr(master_key_str))
+                keyval("master_key", fmt::Qstr(*master_key))
             );
         }
         else if (buffer_type != tlsmon_priv::NCRYPTBUFFER_SSL_SERVER_RANDOM)
