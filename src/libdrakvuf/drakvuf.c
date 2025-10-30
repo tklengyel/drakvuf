@@ -1281,8 +1281,11 @@ void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     drakvuf_lock_and_get_vmi(drakvuf);
 
-    g_assert (drakvuf_lookup_injection(drakvuf, info) == info->trap);
-    g_assert (g_hash_table_remove(drakvuf->injections_in_progress, key));
+    if (drakvuf_lookup_injection(drakvuf, info) == info->trap)
+    {
+        if (!g_hash_table_remove(drakvuf->injections_in_progress, key))
+            PRINT_DEBUG("drakvuf_remove_injection: failed to remove from hash table\n");
+    }
 
     drakvuf_release_vmi(drakvuf);
 }
