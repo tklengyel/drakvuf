@@ -231,7 +231,7 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             {
                 PRINT_DEBUG("Finishing\n");
 
-                if (!setup_close_handle_stack(injector, info->regs))
+                if (!setup_close_handle_stack(injector, info->regs, injector->file_handle))
                 {
                     PRINT_DEBUG("Failed to setup stack for closing handle\n");
                     return cleanup(drakvuf, info);

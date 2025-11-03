@@ -155,6 +155,9 @@ injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
     injector_t* injector_to_be_freed,
     bool global_search,
     bool wait_for_exit,
+    int args_count,
+    const char** args,
+    const char* shellexec_verb,
     vmi_pid_t* injected_pid);
 
 void injector_terminate_on_win(drakvuf_t drakvuf,

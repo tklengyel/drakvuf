@@ -123,6 +123,7 @@ injector_status_t injector_start_app(
     bool wait_for_exit,
     int args_count,
     const char* args[],
+    const char* shellexec_verb,
     vmi_pid_t* injected_pid)
 {
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
@@ -140,6 +141,9 @@ injector_status_t injector_start_app(
                 injector_to_be_freed,
                 global_search,
                 wait_for_exit,
+                args_count,
+                args,
+                shellexec_verb,
                 injected_pid);
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)

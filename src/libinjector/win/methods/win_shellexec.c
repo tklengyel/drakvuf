@@ -106,6 +106,7 @@
 #include <win/win_functions.h>
 #include <win/method_helpers.h>
 
+static bool get_created_process_handle(injector_t injector, drakvuf_trap_info_t* info);
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -127,16 +128,62 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 return cleanup(drakvuf, info);
             }
 
+            injector->target_rsp = info->regs->rsp;
             info->regs->rip = injector->exec_func;
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2:
         {
-            // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND(6) while
-            // successfully opening file.
-            if (info->regs->rax != 6 && is_fun_error(drakvuf, info, "ShellExecute failed"))
+            if (info->regs->rax != 1 && is_fun_error(drakvuf, info, "ShellExecute failed"))
                 return cleanup(drakvuf, info);
 
+            if (!get_created_process_handle(injector, info))
+                return cleanup(drakvuf, info);
+
+            if (!injector->hProc)
+            {
+                // We were unable to get process handle. Let's just go on with it and return PID=0.
+                injector->pid = injector->tid = 0;
+
+                PRINT_DEBUG("ShellExecute successful but without hProcess received\n");
+
+                injector->rc = INJECTOR_SUCCEEDED;
+
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, SIGINT);
+
+                memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+                return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            }
+
+            if (!setup_get_process_id_stack(injector, info->regs))
+            {
+                fprintf(stderr, "Failed to setup stack for GetProcessId call!\n");
+                return cleanup(drakvuf, info);
+            }
+            injector->target_rsp = info->regs->rsp;
+            info->regs->rip = injector->get_process_id;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
+        case STEP3:
+        {
+            // We intentionally don't check it for errors: in worst case we get 0.
+            // ShellExecute will succeed and getting a process PID is just an extra stp.
+            injector->pid = info->regs->rax;
+            injector->tid = 0;
+
+            if (!setup_close_handle_stack(injector, info->regs, injector->hProc))
+            {
+                fprintf(stderr, "Failed to setup stack for CloseHandle call!\n");
+                return cleanup(drakvuf, info);
+            }
+            injector->target_rsp = info->regs->rsp;
+            info->regs->rip = injector->close_handle;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
+        case STEP4:
+        {
+            // Finished and cleaned up
             PRINT_DEBUG("ShellExecute successful\n");
 
             injector->rc = INJECTOR_SUCCEEDED;
@@ -155,6 +202,43 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     return VMI_EVENT_RESPONSE_NONE;
+}
+
+static bool get_created_process_handle(injector_t injector, drakvuf_trap_info_t* info)
+{
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = injector->process_info;
+    bool success = false;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+
+    if (injector->is32bit)
+    {
+        struct shell_execute_info_32 shlex_info = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct shell_execute_info_32), &shlex_info, NULL) )
+        {
+            injector->hProc = shlex_info.hProcess;
+            success = true;
+        }
+    }
+    else
+    {
+        struct shell_execute_info_64 shlex_info = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct shell_execute_info_64), &shlex_info, NULL) )
+        {
+            injector->hProc = shlex_info.hProcess;
+            success = true;
+        }
+    }
+
+    drakvuf_release_vmi(injector->drakvuf);
+
+    if (!success)
+        fprintf(stderr, "Failed to get created process handle\n");
+
+    return success;
 }
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

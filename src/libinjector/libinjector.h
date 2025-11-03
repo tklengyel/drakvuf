@@ -227,6 +227,8 @@ addr_t place_array_on_addr_32(vmi_instance_t vmi,
     addr_t* data_addr,
     addr_t* array_addr) NOEXCEPT;
 
+addr_t place_string_on_stack(drakvuf_t drakvuf, vmi_instance_t vmi, x86_registers_t* regs, void const* str, size_t str_len) NOEXCEPT;
+
 bool setup_stack(drakvuf_t drakvuf,
     x86_registers_t* regs,
     struct argument args[],
@@ -262,6 +264,7 @@ injector_status_t injector_start_app(drakvuf_t drakvuf,
     bool wait_for_exit,
     int args_count,
     const char* args[],
+    const char* shellexec_verb,
     vmi_pid_t* injected_pid) NOEXCEPT;
 
 void injector_terminate(drakvuf_t drakvuf,

@@ -147,17 +147,82 @@ bool setup_resume_thread_stack(injector_t injector, x86_registers_t* regs)
 
 bool setup_shell_execute_stack(injector_t injector, x86_registers_t* regs)
 {
-    struct argument args[6] = { {0} };
+    struct argument args[1] = { {0} };
+    struct shell_execute_info_32 shlexinfo_32 = { 0 };
+    struct shell_execute_info_64 shlexinfo_64 = { 0 };
 
-    // ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
-    init_int_argument(&args[0], 0);
-    init_unicode_argument(&args[1], NULL);
-    init_unicode_argument(&args[2], injector->target_file_us);
-    init_unicode_argument(&args[3], NULL);
-    init_unicode_argument(&args[4], injector->cwd_us);
-    init_int_argument(&args[5], SW_SHOWNORMAL);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
 
-    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+    addr_t target_file_addr = 0;
+    if (injector->target_file_us)
+    {
+        target_file_addr = place_string_on_stack(injector->drakvuf, vmi, regs, injector->target_file_us->contents, injector->target_file_us->length);
+        if (!target_file_addr)
+        {
+            drakvuf_release_vmi(injector->drakvuf);
+            return false;
+        }
+    }
+
+    addr_t cwd_addr = 0;
+    if (injector->cwd_us)
+    {
+        cwd_addr = place_string_on_stack(injector->drakvuf, vmi, regs, injector->cwd_us->contents, injector->cwd_us->length);
+        if (!cwd_addr)
+        {
+            drakvuf_release_vmi(injector->drakvuf);
+            return false;
+        }
+    }
+
+    addr_t shellexecex_verb_addr = 0;
+    if (injector->shellexec_verb_us)
+    {
+        shellexecex_verb_addr = place_string_on_stack(injector->drakvuf, vmi, regs, injector->shellexec_verb_us->contents, injector->shellexec_verb_us->length);
+        if (!shellexecex_verb_addr)
+        {
+            drakvuf_release_vmi(injector->drakvuf);
+            return false;
+        }
+    }
+
+    addr_t shellexecex_args_addr = 0;
+    if (injector->shellexec_args_us)
+    {
+        shellexecex_args_addr = place_string_on_stack(injector->drakvuf, vmi, regs, injector->shellexec_args_us->contents, injector->shellexec_args_us->length);
+        if (!shellexecex_args_addr)
+        {
+            drakvuf_release_vmi(injector->drakvuf);
+            return false;
+        }
+    }
+
+    if (injector->is32bit)
+    {
+        shlexinfo_32.cbSize = sizeof(shlexinfo_32);
+        shlexinfo_32.lpVerb = shellexecex_verb_addr;
+        shlexinfo_32.lpFile = target_file_addr;
+        shlexinfo_32.lpParameters = shellexecex_args_addr;
+        shlexinfo_32.lpDirectory = cwd_addr;
+        shlexinfo_32.nShow = SW_SHOWNORMAL;
+        shlexinfo_32.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+        init_struct_argument(&args[0], shlexinfo_32);
+    }
+    else
+    {
+        shlexinfo_64.cbSize = sizeof(shlexinfo_64);
+        shlexinfo_64.lpVerb = shellexecex_verb_addr;
+        shlexinfo_64.lpFile = target_file_addr;
+        shlexinfo_64.lpParameters = shellexecex_args_addr;
+        shlexinfo_64.lpDirectory = cwd_addr;
+        shlexinfo_64.nShow = SW_SHOWNORMAL;
+        shlexinfo_64.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+        init_struct_argument(&args[0], shlexinfo_64);
+    }
+    bool success = setup_stack_locked(injector->drakvuf, vmi, regs, args, ARRAY_SIZE(args));
+    injector->process_info = args[0].data_on_stack;
+    drakvuf_release_vmi(injector->drakvuf);
+    return success;
 }
 
 bool setup_virtual_alloc_stack(injector_t injector, x86_registers_t* regs)
@@ -255,13 +320,22 @@ bool setup_write_file_stack(injector_t injector, x86_registers_t* regs, size_t a
     return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
 }
 
-bool setup_close_handle_stack(injector_t injector, x86_registers_t* regs)
+bool setup_close_handle_stack(injector_t injector, x86_registers_t* regs, uint64_t handle)
 {
     struct argument args[1] = { {0} };
 
     // CloseHandle(HANDLE)
 
-    init_int_argument(&args[0], injector->file_handle);
+    init_int_argument(&args[0], handle);
+
+    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+}
+
+bool setup_get_process_id_stack(injector_t injector, x86_registers_t* regs)
+{
+    struct argument args[1] = { {0} };
+
+    init_int_argument(&args[0], injector->hProc);
 
     return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
 }

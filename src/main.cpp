@@ -198,7 +198,8 @@ static void print_usage()
         "\t                           Can be used multiple times to copy multiple files\n"
         "\t --write-file-timeout <seconds>\n"
         "\t                           write-file timeout (in seconds, default: 0 == no timeout, requires --write-file)\n"
-        "\t -f <args for exec>        Additional args for exec() (requires -m execproc)\n"
+        "\t -f <args for exec>        Additional args for exec() (requires -m execproc or -m shellexec)\n"
+        "\t -V <shellexec verb>       Verb for ShellExecute (e.g. runas for elevation into Administrator rights)\n"
         "\t -g                        Search required for injection functions in all processes\n"
         "\t -j, --injection-timeout <seconds>\n"
         "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
@@ -430,6 +431,7 @@ int main(int argc, char** argv)
     char* json_wow_path = nullptr;
     char* binary_path = nullptr;
     char* target_process = nullptr;
+    char* shellexec_verb = nullptr;
     vmi_pid_t injection_pid = -1;
     uint32_t injection_thread = 0;
     output_format_t output = OUTPUT_DEFAULT;
@@ -637,7 +639,7 @@ int main(int argc, char** argv)
         {"rebootmon-abort-on-power-off", no_argument, NULL, opt_rebootmon_abort_on_power_off},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:q:Mc:nblgj:k:w:W:hFC";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:V:spT:S:q:Mc:nblgj:k:w:W:hFC";
 
     int long_index = 0;
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
@@ -709,6 +711,9 @@ int main(int argc, char** argv)
                 break;
             case opt_write_file_timeout:
                 write_file_timeout = atoi(optarg);
+                break;
+            case 'V':
+                shellexec_verb = optarg;
                 break;
             case 't':
                 timeout = atoi(optarg);
@@ -1165,6 +1170,7 @@ int main(int argc, char** argv)
                 injection_global_search,
                 args.size(),
                 args.data(),
+                shellexec_verb,
                 &injected_pid
             );
         switch (ret)
