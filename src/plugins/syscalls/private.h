@@ -653,15 +653,32 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_PTR(linux_mmsghdr_ptr), // struct mmsghdr *
 };
 
-typedef struct
+// Forward declarations for parser function type
+struct arg_t_s;
+struct syscall_t_s;
+
+// Parser function pointer type (use void* to avoid circular dependencies and ambiguity)
+typedef void (*arg_parser_t)(
+    void* base,           // actually syscalls_base*
+    void* original_args,  // actually fmt_args_t&
+    void* extra_args,     // actually fmt_args_t&
+    const struct syscall_t_s* sc,
+    const struct arg_t_s& arg,
+    void* info,           // actually drakvuf_trap_info_t*
+    uint64_t value,
+    const void* all_args  // actually const std::vector<uint64_t>&
+);
+
+typedef struct arg_t_s
 {
     const char* name;
     const char* dir_opt;
     arg_direction_t dir;
     arg_type_t type;
+    arg_parser_t parser; // nullptr by default
 } arg_t;
 
-typedef struct
+typedef struct syscall_t_s
 {
     const char* name;
     const char* display_name;
@@ -699,6 +716,9 @@ struct windows_syscall_trap_data_t : public call_result_t
     std::optional<std::string> module;
     std::optional<std::string> parent_module;
 };
+
+#define ARG(name, dir_opt, dir, type) \
+    {name, dir_opt, dir, type, nullptr}
 
 #define SYSCALL_EX(_name, _alias, _ret, ...)                     \
    static const arg_t _name ## _arg[] = { __VA_ARGS__ };         \

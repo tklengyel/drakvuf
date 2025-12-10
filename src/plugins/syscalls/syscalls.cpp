@@ -189,35 +189,17 @@ void syscalls_base::fill_fmt_args(
 
         original_args.push_back(keyval(std::string(original_arg.name), fmt::Xval(raw_value)));
 
-        arg_parser_t parser;
-        auto syscall_arg_it = m_syscall_arg_parsers.find({sc->name, original_arg.name});
-        if (syscall_arg_it != m_syscall_arg_parsers.end())
-        {
-            parser = syscall_arg_it->second;
-        }
-        else
-        {
-            auto name_it = m_name_parsers.find(original_arg.name);
-            if (name_it != m_name_parsers.end())
-            {
-                parser = name_it->second;
-            }
-            else
-            {
-                auto type_it = m_type_parsers.find(arg_to_parse.type);
-                if (type_it != m_type_parsers.end())
-                {
-                    parser = type_it->second;
-                }
-            }
-        }
+        // Look up parser: use arg_to_parse which has dereferenced type if dereferencing occurred
+        arg_parser_t parser = arg_to_parse.parser;
 
         if (parser)
         {
-            parser(this, original_args, extra_args, sc, arg_to_parse, info, value_to_parse, args);
+            // Parser gets the dereferenced value and type
+            parser((void*)this, (void*)&original_args, (void*)&extra_args, sc, arg_to_parse, (void*)info, value_to_parse, (const void*)&args);
         }
         else if (dereferenced_value)
         {
+            // No parser, just show dereferenced hex value
             extra_args.push_back(keyval(std::string("*") + std::string(original_arg.name), fmt::Xval(*dereferenced_value)));
         }
     }
@@ -295,27 +277,6 @@ bool syscalls_base::read_syscalls_list(const char* syscall_list_file)
     }
 
     return true;
-}
-
-void syscalls_base::register_parsers()
-{
-    auto ascii_string_parser = [](
-            syscalls_base* base, fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc,
-            const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info, uint64_t value,
-            const std::vector<uint64_t>& all_args)
-    {
-        if (value == 0) return;
-
-        char* cstr = drakvuf_read_ascii_str(base->drakvuf, info, value);
-        if (cstr)
-        {
-            find_replace_arg(original_args, std::string(arg.name), fmt::Estr(std::string(cstr)));
-            g_free(cstr);
-        }
-    };
-
-    m_type_parsers[PCHAR] = ascii_string_parser;
-    m_type_parsers[linux_char_ptr] = ascii_string_parser;
 }
 
 syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)

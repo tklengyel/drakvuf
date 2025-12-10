@@ -142,17 +142,6 @@ public:
         const std::vector<uint64_t>& args, bool is_ret, bool ret_success
     );
 
-    using arg_parser_t = std::function<void(
-            syscalls_base* base,
-            fmt_args_t& original_args,
-            fmt_args_t& extra_args,
-            const syscalls_ns::syscall_t* sc,
-            const syscalls_ns::arg_t& arg_to_parse,
-            drakvuf_trap_info_t* info,
-            uint64_t value_to_parse,
-            const std::vector<uint64_t>& all_args
-        )>;
-
     void print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info = nullptr);
     uint64_t value_from_uint64(syscalls_ns::arg_type_t type, uint64_t val);
     bool read_syscalls_list(const char* syscall_list_file);
@@ -168,13 +157,6 @@ public:
     syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     syscalls_base(const syscalls_base&) = delete;
     syscalls_base& operator=(const syscalls_base&) = delete;
-
-protected:
-    std::map<std::pair<std::string, std::string>, arg_parser_t> m_syscall_arg_parsers;
-    std::map<std::string, arg_parser_t> m_name_parsers;
-    std::map<syscalls_ns::arg_type_t, arg_parser_t> m_type_parsers;
-
-    virtual void register_parsers();
 };
 
 #endif

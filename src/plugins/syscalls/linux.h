@@ -130,9 +130,6 @@ public:
     bool trap_syscall_table_entries(drakvuf_t drakvuf);
 
     linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
-
-protected:
-    void register_parsers() override;
 };
 namespace syscalls_ns
 {
@@ -147,287 +144,287 @@ namespace linuxsc
 #pragma clang diagnostic ignored "-Wmissing-braces"
 
 SYSCALL(read, linux_ssize_t,
-    "fd",    "", DIR_IN,    linux_int,
-    "buf",   "", DIR_INOUT, linux_void_ptr,
-    "count", "", DIR_IN,    linux_size_t
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_INOUT, linux_void_ptr),
+    ARG("count", "", DIR_IN, linux_size_t)
 );
 SYSCALL(write, linux_ssize_t,
-    "fd",    "", DIR_IN,    linux_int,
-    "buf",   "", DIR_IN,    linux_void_ptr,
-    "count", "", DIR_IN,    linux_size_t
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_IN, linux_void_ptr),
+    ARG("count", "", DIR_IN, linux_size_t)
 );
 SYSCALL(open, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "flags",    "", DIR_IN, linux_size_t,
-    "mode",     "", DIR_IN, linux_mode_t
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_size_t),
+    ARG("mode", "", DIR_IN, linux_mode_t)
 );
 SYSCALL(close, linux_int,
-    "fd", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
 );
 SYSCALL(openat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "flags",    "", DIR_IN, linux_int,
-    "mode",     "", DIR_IN, linux_mode_t,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
+    ARG("mode", "", DIR_IN, linux_mode_t),
 );
 SYSCALL(stat, linux_int,
-    "pathname", "", DIR_IN,  linux_char_ptr,
-    "statbuf",  "", DIR_OUT, linux_stat_ptr,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("statbuf", "", DIR_OUT, linux_stat_ptr),
 );
 SYSCALL_EX(newstat, stat, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "statbuf",  "", DIR_IN, linux_void_ptr,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("statbuf", "", DIR_IN, linux_void_ptr),
 );
 SYSCALL(fstat, linux_int,
-    "fd",      "", DIR_IN,  linux_int,
-    "statbuf", "", DIR_OUT, linux_stat_ptr,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("statbuf", "", DIR_OUT, linux_stat_ptr),
 );
 SYSCALL_EX(newfstat, fstat, linux_int,
-    "fd",      "", DIR_IN, linux_int,
-    "statbuf", "", DIR_IN, linux_stat_ptr,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("statbuf", "", DIR_IN, linux_stat_ptr),
 );
 SYSCALL(lstat, linux_int,
-    "filename", "", DIR_IN,  linux_char_ptr,
-    "statbuf",  "", DIR_OUT, linux_stat_ptr,
+    ARG("filename", "", DIR_IN, linux_char_ptr),
+    ARG("statbuf", "", DIR_OUT, linux_stat_ptr),
 );
 SYSCALL_EX(newlstat, lstat, linux_int,
-    "filename", "", DIR_IN, linux_char_ptr,
-    "statbuf",  "", DIR_IN, linux_stat_ptr,
+    ARG("filename", "", DIR_IN, linux_char_ptr),
+    ARG("statbuf", "", DIR_IN, linux_stat_ptr),
 );
 SYSCALL(poll, linux_int,
-    "fds",     "", DIR_OUT, linux_stat_ptr,
-    "nfds",    "", DIR_IN,  linux_nfds_t,
-    "timeout", "", DIR_IN,  linux_int,
+    ARG("fds", "", DIR_OUT, linux_stat_ptr),
+    ARG("nfds", "", DIR_IN, linux_nfds_t),
+    ARG("timeout", "", DIR_IN, linux_int),
 );
 SYSCALL(lseek, linux_off_t,
-    "fd",     "", DIR_IN, linux_int,
-    "offset", "", DIR_IN, linux_off_t,
-    "whence", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("offset", "", DIR_IN, linux_off_t),
+    ARG("whence", "", DIR_IN, linux_int),
 );
 SYSCALL(mmap, linux_void_ptr,
-    "addr",   "", DIR_IN, linux_void_ptr,
-    "length", "", DIR_IN, linux_size_t,
-    "prot",   "", DIR_IN, linux_intmask_prot_,
-    "flags",  "", DIR_IN, linux_intmask_map_,
-    "fd",     "", DIR_IN, linux_int,
-    "offset", "", DIR_IN, linux_off_t,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("length", "", DIR_IN, linux_size_t),
+    ARG("prot", "", DIR_IN, linux_intmask_prot_),
+    ARG("flags", "", DIR_IN, linux_intmask_map_),
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("offset", "", DIR_IN, linux_off_t),
 );
 SYSCALL(mprotect, linux_int,
-    "start", "", DIR_IN, linux_size_t,
-    "len",   "", DIR_IN, linux_size_t,
-    "prot",  "", DIR_IN, linux_intmask_prot_,
+    ARG("start", "", DIR_IN, linux_size_t),
+    ARG("len", "", DIR_IN, linux_size_t),
+    ARG("prot", "", DIR_IN, linux_intmask_prot_),
 );
 SYSCALL(munmap, linux_int,
-    "addr",   "", DIR_IN, linux_void_ptr,
-    "length", "", DIR_IN, linux_size_t,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("length", "", DIR_IN, linux_size_t),
 );
 SYSCALL(brk, linux_int,
-    "addr", "", DIR_IN, linux_void_ptr,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
 );
 SYSCALL(rt_sigaction, linux_int,
-    "signum", "", DIR_IN,  linux_int,
-    "act",    "", DIR_IN,  linux_sigaction_ptr,
-    "oldact", "", DIR_OUT, linux_sigaction_ptr,
+    ARG("signum", "", DIR_IN, linux_int),
+    ARG("act", "", DIR_IN, linux_sigaction_ptr),
+    ARG("oldact", "", DIR_OUT, linux_sigaction_ptr),
 );
 SYSCALL(rt_sigprocmask, linux_int,
-    "how",    "", DIR_IN,  linux_int,
-    "set",    "", DIR_IN,  linux_sigset_t_ptr,
-    "oldset", "", DIR_OUT, linux_sigset_t_ptr,
+    ARG("how", "", DIR_IN, linux_int),
+    ARG("set", "", DIR_IN, linux_sigset_t_ptr),
+    ARG("oldset", "", DIR_OUT, linux_sigset_t_ptr),
 );
 SYSCALL(rt_sigreturn, linux_int);
 SYSCALL(ioctl, linux_int,
-    "fd",      "", DIR_IN, linux_int,
-    "request", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("request", "", DIR_IN, linux_int),
 );
 SYSCALL(pread64, linux_ssize_t,
-    "fd",     "", DIR_IN,    linux_int,
-    "buf",    "", DIR_INOUT, linux_void_ptr,
-    "count",  "", DIR_IN,    linux_size_t,
-    "offset", "", DIR_IN,    linux_off64_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_INOUT, linux_void_ptr),
+    ARG("count", "", DIR_IN, linux_size_t),
+    ARG("offset", "", DIR_IN, linux_off64_t),
 );
 SYSCALL(pwrite64, linux_ssize_t,
-    "fd",     "", DIR_IN, linux_int,
-    "buf",    "", DIR_IN, linux_void_ptr,
-    "count",  "", DIR_IN, linux_size_t,
-    "offset", "", DIR_IN, linux_off64_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_IN, linux_void_ptr),
+    ARG("count", "", DIR_IN, linux_size_t),
+    ARG("offset", "", DIR_IN, linux_off64_t),
 );
 SYSCALL(readv, linux_ssize_t,
-    "fd",     "", DIR_IN, linux_int,
-    "iov",    "", DIR_IN, linux_iovec_ptr,
-    "iovcnt", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("iov", "", DIR_IN, linux_iovec_ptr),
+    ARG("iovcnt", "", DIR_IN, linux_int),
 );
 SYSCALL(writev, linux_ssize_t,
-    "fd",     "", DIR_IN, linux_int,
-    "iov",    "", DIR_IN, linux_iovec_ptr,
-    "iovcnt", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("iov", "", DIR_IN, linux_iovec_ptr),
+    ARG("iovcnt", "", DIR_IN, linux_int),
 );
 SYSCALL(access, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode", "", DIR_IN, linux_int,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_int),
 );
 SYSCALL(pipe, linux_int,
-    "pipefd", "", DIR_IN, linux_void_ptr, // int[2]
+    ARG("pipefd", "", DIR_IN, linux_void_ptr), // int[2]
 );
 SYSCALL(select, linux_int,
-    "nfds",      "", DIR_IN, linux_int,
-    "readfds",   "", DIR_IN, linux_fd_set_ptr,
-    "writefds",  "", DIR_IN, linux_fd_set_ptr,
-    "exceptfds", "", DIR_IN, linux_fd_set_ptr,
-    "timeout",   "", DIR_IN, linux_timeval_ptr,
+    ARG("nfds", "", DIR_IN, linux_int),
+    ARG("readfds", "", DIR_IN, linux_fd_set_ptr),
+    ARG("writefds", "", DIR_IN, linux_fd_set_ptr),
+    ARG("exceptfds", "", DIR_IN, linux_fd_set_ptr),
+    ARG("timeout", "", DIR_IN, linux_timeval_ptr),
 );
 SYSCALL(sched_yield, linux_int);
 SYSCALL(mremap, linux_void_ptr,
-    "old_address", "", DIR_IN, linux_void_ptr,
-    "old_size",    "", DIR_IN, linux_size_t,
-    "new_size",    "", DIR_IN, linux_size_t,
-    "flags",       "", DIR_IN, linux_unsigned_long,
+    ARG("old_address", "", DIR_IN, linux_void_ptr),
+    ARG("old_size", "", DIR_IN, linux_size_t),
+    ARG("new_size", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_unsigned_long),
 );
 SYSCALL(msync, linux_int,
-    "addr",   "", DIR_IN, linux_void_ptr,
-    "length", "", DIR_IN, linux_size_t,
-    "flags",  "", DIR_IN, linux_int,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("length", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(mincore, linux_int,
-    "addr",   "", DIR_IN,  linux_void_ptr,
-    "length", "", DIR_IN,  linux_size_t,
-    "vec",    "", DIR_OUT, linux_void_ptr, // unsigned char [length]
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("length", "", DIR_IN, linux_size_t),
+    ARG("vec", "", DIR_OUT, linux_void_ptr), // unsigned char [length]
 );
 SYSCALL(madvise, linux_int,
-    "addr",   "", DIR_IN, linux_void_ptr,
-    "length", "", DIR_IN, linux_size_t,
-    "advice", "", DIR_IN, linux_int,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("length", "", DIR_IN, linux_size_t),
+    ARG("advice", "", DIR_IN, linux_int),
 );
 SYSCALL(shmget, linux_int,
-    "key",    "", DIR_IN, linux_key_t,
-    "size",   "", DIR_IN, linux_int,
-    "shmflg", "", DIR_IN, linux_int,
+    ARG("key", "", DIR_IN, linux_key_t),
+    ARG("size", "", DIR_IN, linux_int),
+    ARG("shmflg", "", DIR_IN, linux_int),
 );
 SYSCALL(shmat, linux_void_ptr,
-    "shmid",   "", DIR_IN, linux_int,
-    "shmaddr", "", DIR_IN, linux_void_ptr,
-    "shmflg",  "", DIR_IN, linux_int,
+    ARG("shmid", "", DIR_IN, linux_int),
+    ARG("shmaddr", "", DIR_IN, linux_void_ptr),
+    ARG("shmflg", "", DIR_IN, linux_int),
 );
 SYSCALL(shmctl, linux_int,
-    "shmid", "", DIR_IN, linux_int,
-    "cmd",   "", DIR_IN, linux_int,
-    "buf",   "", DIR_IN, linux_shmid_ds_ptr,
+    ARG("shmid", "", DIR_IN, linux_int),
+    ARG("cmd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_IN, linux_shmid_ds_ptr),
 );
 SYSCALL(dup, linux_int,
-    "oldfd", "", DIR_IN, linux_int
+    ARG("oldfd", "", DIR_IN, linux_int)
 );
 SYSCALL(dup2, linux_int,
-    "oldfd", "", DIR_IN, linux_int,
-    "newfd", "", DIR_IN, linux_int,
+    ARG("oldfd", "", DIR_IN, linux_int),
+    ARG("newfd", "", DIR_IN, linux_int),
 );
 SYSCALL(pause, linux_int);
 // A very expensive syscall, the interception of which will greatly slow down the guest
 // It is recommended to exclude it using the filter file
 SYSCALL(nanosleep, linux_int,
-    "req", "", DIR_IN, linux_void_ptr,
-    "rem", "", DIR_IN, linux_void_ptr,
+    ARG("req", "", DIR_IN, linux_void_ptr),
+    ARG("rem", "", DIR_IN, linux_void_ptr),
 );
 SYSCALL(getitimer, linux_int,
-    "which",      "", DIR_IN, linux_int,
-    "curr_value", "", DIR_INOUT, linux_void_ptr,
+    ARG("which", "", DIR_IN, linux_int),
+    ARG("curr_value", "", DIR_INOUT, linux_void_ptr),
 );
 SYSCALL(alarm, linux_size_t,
-    "seconds", "", DIR_IN, linux_size_t,
+    ARG("seconds", "", DIR_IN, linux_size_t),
 );
 SYSCALL(setitimer, linux_int,
-    "which",     "", DIR_IN,  linux_int,
-    "new_value", "", DIR_IN,  linux_timespec_ptr,
-    "old_value", "", DIR_OUT, linux_timespec_ptr,
+    ARG("which", "", DIR_IN, linux_int),
+    ARG("new_value", "", DIR_IN, linux_timespec_ptr),
+    ARG("old_value", "", DIR_OUT, linux_timespec_ptr),
 );
 SYSCALL(getpid, linux_pid_t);
 SYSCALL(sendfile64, linux_ssize_t,
-    "out_fd", "", DIR_IN, linux_int,
-    "in_fd",  "", DIR_IN, linux_int,
-    "offset", "", DIR_IN, linux_off64_t_ptr,
-    "count",  "", DIR_IN, linux_size_t,
+    ARG("out_fd", "", DIR_IN, linux_int),
+    ARG("in_fd", "", DIR_IN, linux_int),
+    ARG("offset", "", DIR_IN, linux_off64_t_ptr),
+    ARG("count", "", DIR_IN, linux_size_t),
 );
 SYSCALL(socket, linux_int,
-    "domain",   "", DIR_IN, linux_int,
-    "type",     "", DIR_IN, linux_int,
-    "protocol", "", DIR_IN, linux_int,
+    ARG("domain", "", DIR_IN, linux_int),
+    ARG("type", "", DIR_IN, linux_int),
+    ARG("protocol", "", DIR_IN, linux_int),
 );
 SYSCALL(connect, linux_int,
-    "sockfd",  "", DIR_IN, linux_int,
-    "addr",    "", DIR_IN, linux_sockaddr_ptr,
-    "addrlen", "", DIR_IN, linux_socklen_t,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("addr", "", DIR_IN, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_IN, linux_socklen_t),
 );
 SYSCALL(accept, linux_int,
-    "sockfd",  "", DIR_IN, linux_int,
-    "addr",    "", DIR_IN, linux_sockaddr_ptr,
-    "addrlen", "", DIR_IN, linux_socklen_t_ptr,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("addr", "", DIR_IN, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_IN, linux_socklen_t_ptr),
 );
 SYSCALL(sendto, linux_ssize_t,
-    "sockfd",    "", DIR_IN, linux_int,
-    "buf",       "", DIR_IN, linux_void_ptr,
-    "len",       "", DIR_IN, linux_size_t,
-    "flags",     "", DIR_IN, linux_int,
-    "dest_addr", "", DIR_IN, linux_sockaddr_ptr,
-    "addrlen",   "", DIR_IN, linux_socklen_t,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_IN, linux_void_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_int),
+    ARG("dest_addr", "", DIR_IN, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_IN, linux_socklen_t),
 );
 SYSCALL(recvfrom, linux_int,
-    "sockfd",   "", DIR_IN, linux_int,
-    "buf",      "", DIR_IN, linux_void_ptr,
-    "len",      "", DIR_IN, linux_size_t,
-    "flags",    "", DIR_IN, linux_int,
-    "src_addr", "", DIR_IN, linux_sockaddr_ptr,
-    "addrlen",  "", DIR_IN, linux_socklen_t_ptr,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_IN, linux_void_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_int),
+    ARG("src_addr", "", DIR_IN, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_IN, linux_socklen_t_ptr),
 );
 SYSCALL(sendmsg, linux_ssize_t,
-    "sockfd", "", DIR_IN, linux_int,
-    "msg",    "", DIR_IN, linux_msghdr_ptr,
-    "flags",  "", DIR_IN, linux_int,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("msg", "", DIR_IN, linux_msghdr_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(recvmsg, linux_int,
-    "sockfd", "", DIR_IN,    linux_int,
-    "msg",    "", DIR_INOUT, linux_msghdr_ptr,
-    "flags",  "", DIR_IN,    linux_int,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("msg", "", DIR_INOUT, linux_msghdr_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(shutdown, linux_int,
-    "sockfd", "", DIR_IN, linux_int,
-    "how",    "", DIR_IN, linux_int,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("how", "", DIR_IN, linux_int),
 );
 SYSCALL(bind, linux_int,
-    "sockfd",  "", DIR_IN, linux_int,
-    "addr",    "", DIR_IN, linux_sockaddr_ptr,
-    "addrlen", "", DIR_IN, linux_socklen_t,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("addr", "", DIR_IN, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_IN, linux_socklen_t),
 );
 SYSCALL(listen, linux_int,
-    "sockfd",  "", DIR_IN, linux_int,
-    "backlog", "", DIR_IN, linux_int,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("backlog", "", DIR_IN, linux_int),
 );
 SYSCALL(getsockname, linux_int,
-    "sockfd",  "", DIR_IN,  linux_int,
-    "addr",    "", DIR_OUT, linux_sockaddr_ptr,
-    "addrlen", "", DIR_OUT, linux_socklen_t_ptr,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("addr", "", DIR_OUT, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_OUT, linux_socklen_t_ptr),
 );
 SYSCALL(getpeername, linux_int,
-    "sockfd",  "", DIR_IN,  linux_int,
-    "addr",    "", DIR_OUT, linux_sockaddr_ptr,
-    "addrlen", "", DIR_OUT, linux_socklen_t_ptr,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("addr", "", DIR_OUT, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_OUT, linux_socklen_t_ptr),
 );
 SYSCALL(socketpair, linux_int,
-    "domain",   "", DIR_IN, linux_int,
-    "type",     "", DIR_IN, linux_int,
-    "protocol", "", DIR_IN, linux_int,
-    "sv",       "", DIR_IN, linux_void_ptr, // int[2]
+    ARG("domain", "", DIR_IN, linux_int),
+    ARG("type", "", DIR_IN, linux_int),
+    ARG("protocol", "", DIR_IN, linux_int),
+    ARG("sv", "", DIR_IN, linux_void_ptr), // int[2]
 );
 SYSCALL(setsockopt, linux_int,
-    "sockfd",  "", DIR_IN, linux_int,
-    "level",   "", DIR_IN, linux_int,
-    "optname", "", DIR_IN, linux_int,
-    "optval",  "", DIR_IN, linux_void_ptr,
-    "optlen",  "", DIR_IN, linux_socklen_t,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("level", "", DIR_IN, linux_int),
+    ARG("optname", "", DIR_IN, linux_int),
+    ARG("optval", "", DIR_IN, linux_void_ptr),
+    ARG("optlen", "", DIR_IN, linux_socklen_t),
 );
 SYSCALL(getsockopt, linux_int,
-    "sockfd",  "", DIR_IN,  linux_int,
-    "level",   "", DIR_IN,  linux_int,
-    "optname", "", DIR_IN,  linux_int,
-    "optval",  "", DIR_OUT, linux_void_ptr,
-    "optlen",  "", DIR_OUT, linux_socklen_t_ptr,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("level", "", DIR_IN, linux_int),
+    ARG("optname", "", DIR_IN, linux_int),
+    ARG("optval", "", DIR_OUT, linux_void_ptr),
+    ARG("optlen", "", DIR_OUT, linux_socklen_t_ptr),
 );
 // We can ignore these syscalls because there is a better interpretation going on in the procmon plugin
 // procmon
@@ -438,30 +435,30 @@ SYSCALL(execve, linux_void);
 SYSCALL(exit, linux_void);
 // end procmon
 SYSCALL(wait4, linux_pid_t,
-    "pid",     "", DIR_IN, linux_pid_t,
-    "wstatus", "", DIR_IN, linux_int_ptr,
-    "options", "", DIR_IN, linux_int,
-    "rusage",  "", DIR_IN, linux_rusage_ptr,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("wstatus", "", DIR_IN, linux_int_ptr),
+    ARG("options", "", DIR_IN, linux_int),
+    ARG("rusage", "", DIR_IN, linux_rusage_ptr),
 );
 SYSCALL(kill, linux_int,
-    "pid", "", DIR_IN, linux_pid_t,
-    "sig", "", DIR_IN, linux_int,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("sig", "", DIR_IN, linux_int),
 );
 SYSCALL(uname, linux_int);
 SYSCALL(semget, linux_int,
-    "key",    "", DIR_IN, linux_key_t,
-    "nsems",  "", DIR_IN, linux_int,
-    "semflg", "", DIR_IN, linux_int,
+    ARG("key", "", DIR_IN, linux_key_t),
+    ARG("nsems", "", DIR_IN, linux_int),
+    ARG("semflg", "", DIR_IN, linux_int),
 );
 SYSCALL(semop, linux_int,
-    "semid", "", DIR_IN, linux_int,
-    "sops",  "", DIR_IN, linux_sembuf_ptr,
-    "nsops", "", DIR_IN, linux_unsigned,
+    ARG("semid", "", DIR_IN, linux_int),
+    ARG("sops", "", DIR_IN, linux_sembuf_ptr),
+    ARG("nsops", "", DIR_IN, linux_unsigned),
 );
 SYSCALL(semctl, linux_int,
-    "semid",  "", DIR_IN, linux_int,
-    "semnum", "", DIR_IN, linux_int,
-    "cmd",    "", DIR_IN, linux_int,
+    ARG("semid", "", DIR_IN, linux_int),
+    ARG("semnum", "", DIR_IN, linux_int),
+    ARG("cmd", "", DIR_IN, linux_int),
 );
 SYSCALL(shmdt, linux_void);
 SYSCALL(msgget, linux_void);
@@ -469,97 +466,97 @@ SYSCALL(msgsnd, linux_void);
 SYSCALL(msgrcv, linux_void);
 SYSCALL(msgctl, linux_void);
 SYSCALL(fcntl, linux_int,
-    "fd",  "", DIR_IN, linux_int,
-    "cmd", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("cmd", "", DIR_IN, linux_int),
 );
 SYSCALL(flock, linux_int,
-    "fd",  "", DIR_IN, linux_int,
-    "operation", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("operation", "", DIR_IN, linux_int),
 );
 SYSCALL(fsync, linux_int,
-    "fd",  "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
 );
 SYSCALL(fdatasync, linux_int,
-    "fd",  "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
 );
 SYSCALL(truncate, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "length",   "", DIR_IN, linux_off_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("length", "", DIR_IN, linux_off_t),
 );
 SYSCALL(ftruncate, linux_int,
-    "fd",     "", DIR_IN, linux_int,
-    "length", "", DIR_IN, linux_off_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("length", "", DIR_IN, linux_off_t),
 );
 SYSCALL(getdents, linux_int,
-    "fd",    "", DIR_IN,  linux_unsigned_int,
-    "dirp",  "", DIR_OUT, linux_dirent_ptr,
-    "count", "", DIR_IN,  linux_unsigned_int,
+    ARG("fd", "", DIR_IN, linux_unsigned_int),
+    ARG("dirp", "", DIR_OUT, linux_dirent_ptr),
+    ARG("count", "", DIR_IN, linux_unsigned_int),
 );
 SYSCALL(getcwd, linux_char_ptr);
 SYSCALL(chdir, linux_int,
-    "path", "", DIR_IN, linux_char_ptr,
+    ARG("path", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(fchdir, linux_int,
-    "fd", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
 );
 // filetracer
 SYSCALL(rename, linux_int,
-    "oldpath", "", DIR_IN, linux_char_ptr,
-    "newpath", "", DIR_IN, linux_char_ptr,
+    ARG("oldpath", "", DIR_IN, linux_char_ptr),
+    ARG("newpath", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(mkdir, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",     "", DIR_IN, linux_mode_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_mode_t),
 );
 SYSCALL(rmdir, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(creat, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",    "", DIR_IN, linux_mode_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_mode_t),
 );
 SYSCALL(link, linux_int,
-    "oldpath", "", DIR_IN, linux_char_ptr,
-    "newpath", "", DIR_IN, linux_char_ptr,
+    ARG("oldpath", "", DIR_IN, linux_char_ptr),
+    ARG("newpath", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(unlink, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(symlink, linux_int,
-    "target",   "", DIR_IN, linux_char_ptr,
-    "linkpath", "", DIR_IN, linux_char_ptr,
+    ARG("target", "", DIR_IN, linux_char_ptr),
+    ARG("linkpath", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(readlink, linux_ssize_t,
-    "pathname", "", DIR_IN,  linux_char_ptr,
-    "buf",      "", DIR_OUT, linux_char_ptr,
-    "bufsiz",   "", DIR_IN,  linux_size_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("buf", "", DIR_OUT, linux_char_ptr),
+    ARG("bufsiz", "", DIR_IN, linux_size_t),
 );
 SYSCALL(chmod, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",     "", DIR_IN, linux_mode_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_mode_t),
 );
 SYSCALL(fchmod, linux_int,
-    "fd",   "", DIR_IN, linux_int,
-    "mode", "", DIR_IN, linux_mode_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("mode", "", DIR_IN, linux_mode_t),
 );
 SYSCALL(chown, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "owner",    "", DIR_IN, linux_uid_t,
-    "group",    "", DIR_IN, linux_gid_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("owner", "", DIR_IN, linux_uid_t),
+    ARG("group", "", DIR_IN, linux_gid_t),
 );
 SYSCALL(fchown, linux_int,
-    "fd",    "", DIR_IN, linux_int,
-    "owner", "", DIR_IN, linux_uid_t,
-    "group", "", DIR_IN, linux_gid_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("owner", "", DIR_IN, linux_uid_t),
+    ARG("group", "", DIR_IN, linux_gid_t),
 );
 SYSCALL(lchown, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "owner",    "", DIR_IN, linux_uid_t,
-    "group",    "", DIR_IN, linux_gid_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("owner", "", DIR_IN, linux_uid_t),
+    ARG("group", "", DIR_IN, linux_gid_t),
 );
 // end filetracer
 SYSCALL(umask, linux_mode_t,
-    "mask", "", DIR_IN, linux_mode_t,
+    ARG("mask", "", DIR_IN, linux_mode_t),
 );
 SYSCALL(gettimeofday, linux_int);
 SYSCALL(getrlimit, linux_int);
@@ -568,62 +565,62 @@ SYSCALL(sysinfo, linux_int);
 SYSCALL(times, linux_clock_t);
 // ptracemon
 SYSCALL(ptrace, linux_long,
-    "request", "", DIR_IN, linux_ptrace_request,
-    "pid",     "", DIR_IN, linux_pid_t,
-    "addr",    "", DIR_IN, linux_void_ptr,
-    "data",    "", DIR_IN, linux_void_ptr,
+    ARG("request", "", DIR_IN, linux_ptrace_request),
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("data", "", DIR_IN, linux_void_ptr),
 );
 // end ptracemon
 SYSCALL(getuid, linux_uid_t);
 SYSCALL(syslog, linux_int,
-    "type", "", DIR_IN, linux_int,
-    "bufp", "", DIR_IN, linux_char_ptr,
-    "len",  "", DIR_IN, linux_int,
+    ARG("type", "", DIR_IN, linux_int),
+    ARG("bufp", "", DIR_IN, linux_char_ptr),
+    ARG("len", "", DIR_IN, linux_int),
 );
 SYSCALL(getgid, linux_gid_t);
 SYSCALL(setuid, linux_int,
-    "uid", "", DIR_IN, linux_uid_t,
+    ARG("uid", "", DIR_IN, linux_uid_t),
 );
 SYSCALL(setgid, linux_int,
-    "gid", "", DIR_IN, linux_gid_t,
+    ARG("gid", "", DIR_IN, linux_gid_t),
 );
 SYSCALL(geteuid, linux_uid_t);
 SYSCALL(getegid, linux_gid_t);
 SYSCALL(setpgid, linux_int,
-    "pid",  "", DIR_IN, linux_pid_t,
-    "pgid", "", DIR_IN, linux_pid_t,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("pgid", "", DIR_IN, linux_pid_t),
 );
 SYSCALL(getppid, linux_pid_t);
 SYSCALL(getpgrp, linux_pid_t);
 SYSCALL(setsid, linux_pid_t);
 SYSCALL(setreuid, linux_int,
-    "ruid", "", DIR_IN, linux_uid_t,
-    "euid", "", DIR_IN, linux_uid_t,
+    ARG("ruid", "", DIR_IN, linux_uid_t),
+    ARG("euid", "", DIR_IN, linux_uid_t),
 );
 SYSCALL(setregid, linux_int,
-    "rgid", "", DIR_IN, linux_gid_t,
-    "egid", "", DIR_IN, linux_gid_t,
+    ARG("rgid", "", DIR_IN, linux_gid_t),
+    ARG("egid", "", DIR_IN, linux_gid_t),
 );
 SYSCALL(getgroups, linux_int);
 SYSCALL(setgroups, linux_int);
 SYSCALL(setresuid, linux_int,
-    "ruid", "", DIR_IN, linux_uid_t,
-    "euid", "", DIR_IN, linux_uid_t,
-    "suid", "", DIR_IN, linux_uid_t,
+    ARG("ruid", "", DIR_IN, linux_uid_t),
+    ARG("euid", "", DIR_IN, linux_uid_t),
+    ARG("suid", "", DIR_IN, linux_uid_t),
 );
 SYSCALL(getresuid, linux_int);
 SYSCALL(setresgid, linux_int,
-    "rgid", "", DIR_IN, linux_gid_t,
-    "egid", "", DIR_IN, linux_gid_t,
-    "sgid", "", DIR_IN, linux_gid_t,
+    ARG("rgid", "", DIR_IN, linux_gid_t),
+    ARG("egid", "", DIR_IN, linux_gid_t),
+    ARG("sgid", "", DIR_IN, linux_gid_t),
 );
 SYSCALL(getresgid, linux_int);
 SYSCALL(getpgid, linux_pid_t);
 SYSCALL(setfsuid, linux_int,
-    "fsuid", "", DIR_IN, linux_uid_t,
+    ARG("fsuid", "", DIR_IN, linux_uid_t),
 );
 SYSCALL(setfsgid, linux_int,
-    "fsgid", "", DIR_IN, linux_gid_t,
+    ARG("fsgid", "", DIR_IN, linux_gid_t),
 );
 SYSCALL(getsid, linux_pid_t);
 SYSCALL(capget, linux_int);
@@ -634,187 +631,187 @@ SYSCALL(rt_sigqueueinfo, linux_int);
 SYSCALL(rt_sigsuspend, linux_int);
 SYSCALL(sigaltstack, linux_int);
 SYSCALL(utime, linux_int,
-    "filename", "", DIR_IN, linux_char_ptr,
-    "times",    "", DIR_IN, linux_utimbuf_ptr,
+    ARG("filename", "", DIR_IN, linux_char_ptr),
+    ARG("times", "", DIR_IN, linux_utimbuf_ptr),
 );
 // filetracer
 SYSCALL(mknod, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",     "", DIR_IN, linux_mode_t,
-    "dev",      "", DIR_IN, linux_dev_t,
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_mode_t),
+    ARG("dev", "", DIR_IN, linux_dev_t),
 );
 // end filetracer
 SYSCALL(uselib, linux_int,
-    "library", "", DIR_IN, linux_char_ptr,
+    ARG("library", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(personality, linux_int,
-    "persona", "", DIR_IN, linux_unsigned_long,
+    ARG("persona", "", DIR_IN, linux_unsigned_long),
 );
 SYSCALL(ustat, linux_int);
 SYSCALL(statfs, linux_int,
-    "path", "", DIR_IN,  linux_char_ptr,
-    "buf",  "", DIR_OUT, linux_statfs_ptr,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("buf", "", DIR_OUT, linux_statfs_ptr),
 );
 SYSCALL(fstatfs, linux_int,
-    "fd",  "", DIR_IN,  linux_int,
-    "buf", "", DIR_OUT, linux_statfs_ptr,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_OUT, linux_statfs_ptr),
 );
 SYSCALL(sysfs, linux_int);
 SYSCALL(getpriority, linux_int,
-    "which", "", DIR_IN, linux_int,
-    "who",   "", DIR_IN, linux_int,
+    ARG("which", "", DIR_IN, linux_int),
+    ARG("who", "", DIR_IN, linux_int),
 );
 SYSCALL(setpriority, linux_int,
-    "which", "", DIR_IN, linux_int,
-    "who",   "", DIR_IN, linux_int,
-    "prio",  "", DIR_IN, linux_int,
+    ARG("which", "", DIR_IN, linux_int),
+    ARG("who", "", DIR_IN, linux_int),
+    ARG("prio", "", DIR_IN, linux_int),
 );
 SYSCALL(sched_setparam, linux_int,
-    "pid",   "", DIR_IN, linux_pid_t,
-    "param", "", DIR_IN, linux_sched_param_ptr,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("param", "", DIR_IN, linux_sched_param_ptr),
 );
 SYSCALL(sched_getparam, linux_int,
-    "pid",   "", DIR_IN,  linux_pid_t,
-    "param", "", DIR_OUT, linux_sched_param_ptr,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("param", "", DIR_OUT, linux_sched_param_ptr),
 );
 SYSCALL(sched_setscheduler, linux_int,
-    "pid",    "", DIR_IN, linux_pid_t,
-    "policy", "", DIR_IN, linux_int,
-    "param",  "", DIR_IN, linux_sched_param_ptr,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("policy", "", DIR_IN, linux_int),
+    ARG("param", "", DIR_IN, linux_sched_param_ptr),
 );
 SYSCALL(sched_getscheduler, linux_int,
-    "pid", "", DIR_IN, linux_pid_t,
+    ARG("pid", "", DIR_IN, linux_pid_t),
 );
 SYSCALL(sched_get_priority_max, linux_int,
-    "policy", "", DIR_IN, linux_int,
+    ARG("policy", "", DIR_IN, linux_int),
 );
 SYSCALL(sched_get_priority_min, linux_int,
-    "policy", "", DIR_IN, linux_int,
+    ARG("policy", "", DIR_IN, linux_int),
 );
 SYSCALL(sched_rr_get_interval, linux_int,
-    "pid", "", DIR_IN,  linux_pid_t,
-    "tp",  "", DIR_OUT, linux_timespec_ptr,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("tp", "", DIR_OUT, linux_timespec_ptr),
 );
 SYSCALL(mlock, linux_int,
-    "addr", "", DIR_IN, linux_void_ptr,
-    "len",  "", DIR_IN, linux_size_t,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
 );
 SYSCALL(munlock, linux_int,
-    "addr", "", DIR_IN, linux_void_ptr,
-    "len",  "", DIR_IN, linux_size_t,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
 );
 SYSCALL(mlockall, linux_int,
-    "flags", "", DIR_IN, linux_int,
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(munlockall, linux_int);
 SYSCALL(vhangup, linux_int);
 SYSCALL(modify_ldt, linux_int);
 SYSCALL(pivot_root, linux_int,
-    "new_root", "", DIR_IN, linux_char_ptr,
-    "put_old",  "", DIR_IN, linux_char_ptr,
+    ARG("new_root", "", DIR_IN, linux_char_ptr),
+    ARG("put_old", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(_sysctl, linux_int,
-    "args", "", DIR_IN, linux_sysctl_args_ptr,
+    ARG("args", "", DIR_IN, linux_sysctl_args_ptr),
 );
 SYSCALL(prctl, linux_int,
-    "option", "", DIR_IN, linux_intopt_pr_,
-    "arg2",   "", DIR_IN, linux_unsigned_long,
-    "arg3",   "", DIR_IN, linux_unsigned_long,
-    "arg4",   "", DIR_IN, linux_unsigned_long,
-    "arg5",   "", DIR_IN, linux_unsigned_long,
+    ARG("option", "", DIR_IN, linux_intopt_pr_),
+    ARG("arg2", "", DIR_IN, linux_unsigned_long),
+    ARG("arg3", "", DIR_IN, linux_unsigned_long),
+    ARG("arg4", "", DIR_IN, linux_unsigned_long),
+    ARG("arg5", "", DIR_IN, linux_unsigned_long),
 );
 SYSCALL(arch_prctl, linux_int,
-    "code", "", DIR_IN, linux_intopt_arch_,
-    "addr", "", DIR_IN, linux_unsigned_long,
+    ARG("code", "", DIR_IN, linux_intopt_arch_),
+    ARG("addr", "", DIR_IN, linux_unsigned_long),
 );
 SYSCALL(adjtimex, linux_int,
-    "buf", "", DIR_IN, linux_timex_ptr,
+    ARG("buf", "", DIR_IN, linux_timex_ptr),
 );
 SYSCALL(setrlimit, linux_int,
-    "resource", "", DIR_IN, linux_int,
-    "rlim",     "", DIR_IN, linux_rlimit_ptr,
+    ARG("resource", "", DIR_IN, linux_int),
+    ARG("rlim", "", DIR_IN, linux_rlimit_ptr),
 );
 // filetracer
 SYSCALL(chroot, linux_int,
-    "path", "", DIR_IN, linux_char_ptr,
+    ARG("path", "", DIR_IN, linux_char_ptr),
 );
 // end filetracer
 SYSCALL(sync, linux_void);
 SYSCALL(acct, linux_int,
-    "filename", "", DIR_IN, linux_char_ptr,
+    ARG("filename", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(settimeofday, linux_int); // useless information
 SYSCALL(mount, linux_int,
-    "source",         "", DIR_IN, linux_char_ptr,
-    "target",         "", DIR_IN, linux_char_ptr,
-    "filesystemtype", "", DIR_IN, linux_char_ptr,
-    "mountflags",     "", DIR_IN, linux_unsigned_long,
-    "data",           "", DIR_IN, linux_void_ptr,
+    ARG("source", "", DIR_IN, linux_char_ptr),
+    ARG("target", "", DIR_IN, linux_char_ptr),
+    ARG("filesystemtype", "", DIR_IN, linux_char_ptr),
+    ARG("mountflags", "", DIR_IN, linux_unsigned_long),
+    ARG("data", "", DIR_IN, linux_void_ptr),
 );
 SYSCALL(umount2, linux_int,
-    "target", "", DIR_IN, linux_char_ptr,
-    "flags",  "", DIR_IN, linux_int,
+    ARG("target", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(swapon, linux_int,
-    "path",      "", DIR_IN, linux_char_ptr,
-    "swapflags", "", DIR_IN, linux_int,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("swapflags", "", DIR_IN, linux_int),
 );
 SYSCALL(swapoff, linux_int,
-    "path", "", DIR_IN, linux_char_ptr,
+    ARG("path", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(reboot, linux_int,
-    "magic",  "", DIR_IN, linux_int,
-    "magic2", "", DIR_IN, linux_int,
-    "cmd",    "", DIR_IN, linux_int,
-    "arg",    "", DIR_IN, linux_void_ptr,
+    ARG("magic", "", DIR_IN, linux_int),
+    ARG("magic2", "", DIR_IN, linux_int),
+    ARG("cmd", "", DIR_IN, linux_int),
+    ARG("arg", "", DIR_IN, linux_void_ptr),
 );
 SYSCALL(sethostname, linux_int,
-    "name", "", DIR_IN, linux_char_ptr,
-    "len",  "", DIR_IN, linux_size_t,
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
 );
 SYSCALL(setdomainname, linux_int,
-    "name", "", DIR_IN, linux_char_ptr,
-    "len",  "", DIR_IN, linux_size_t,
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
 );
 SYSCALL(iopl, linux_int,
-    "level", "", DIR_IN, linux_int,
+    ARG("level", "", DIR_IN, linux_int),
 );
 SYSCALL(ioperm, linux_int,
-    "from",    "", DIR_IN, linux_unsigned_long,
-    "num",     "", DIR_IN, linux_unsigned_long,
-    "turn_on", "", DIR_IN, linux_int,
+    ARG("from", "", DIR_IN, linux_unsigned_long),
+    ARG("num", "", DIR_IN, linux_unsigned_long),
+    ARG("turn_on", "", DIR_IN, linux_int),
 );
 SYSCALL(create_module, linux_caddr_t,
-    "name", "", DIR_IN, linux_char_ptr,
-    "size", "", DIR_IN, linux_size_t,
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
 );
 SYSCALL(init_module, linux_int,
-    "module_image", "", DIR_IN, linux_void_ptr,
-    "len",          "", DIR_IN, linux_size_t,
-    "param_values", "", DIR_IN, linux_char_ptr,
+    ARG("module_image", "", DIR_IN, linux_void_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
+    ARG("param_values", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(delete_module, linux_int,
-    "name",  "", DIR_IN, linux_char_ptr,
-    "flags", "", DIR_IN, linux_size_t,
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_size_t),
 );
 SYSCALL(get_kernel_syms, linux_int);
 SYSCALL(query_module, linux_int,
-    "name",    "", DIR_IN,    linux_char_ptr,
-    "wchich",  "", DIR_IN,    linux_int,
-    "buf",     "", DIR_INOUT, linux_void_ptr,
-    "bufsize", "", DIR_IN,    linux_size_t,
-    "ret",     "", DIR_OUT,   linux_size_t_ptr,
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("wchich", "", DIR_IN, linux_int),
+    ARG("buf", "", DIR_INOUT, linux_void_ptr),
+    ARG("bufsize", "", DIR_IN, linux_size_t),
+    ARG("ret", "", DIR_OUT, linux_size_t_ptr),
 );
 SYSCALL(quotactl, linux_int,
-    "cmd",     "", DIR_IN, linux_int,
-    "special", "", DIR_IN, linux_char_ptr,
-    "id",      "", DIR_IN, linux_int,
-    "addr",    "", DIR_IN, linux_caddr_t,
+    ARG("cmd", "", DIR_IN, linux_int),
+    ARG("special", "", DIR_IN, linux_char_ptr),
+    ARG("id", "", DIR_IN, linux_int),
+    ARG("addr", "", DIR_IN, linux_caddr_t),
 );
 SYSCALL(nfsservctl, linux_int,
-    "cmd",  "", DIR_IN, linux_int,
-    "argp", "", DIR_IN, linux_nfsctl_arg_ptr,
-    "resp", "", DIR_IN, linux_nfsctl_res_ptr,
+    ARG("cmd", "", DIR_IN, linux_int),
+    ARG("argp", "", DIR_IN, linux_nfsctl_arg_ptr),
+    ARG("resp", "", DIR_IN, linux_nfsctl_res_ptr),
 );
 SYSCALL(getpmsg, linux_void);
 SYSCALL(putpmsg, linux_void);
@@ -823,79 +820,79 @@ SYSCALL(tuxcall, linux_void);
 SYSCALL(security, linux_void);
 SYSCALL(gettid, linux_pid_t);
 SYSCALL(readahead, linux_ssize_t,
-    "fd",     "", DIR_IN, linux_int,
-    "offset", "", DIR_IN, linux_off64_t,
-    "count",  "", DIR_IN, linux_size_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("offset", "", DIR_IN, linux_off64_t),
+    ARG("count", "", DIR_IN, linux_size_t),
 );
 SYSCALL(setxattr, linux_int,
-    "path",  "", DIR_IN, linux_char_ptr,
-    "name",  "", DIR_IN, linux_char_ptr,
-    "value", "", DIR_IN, linux_void_ptr,
-    "size",  "", DIR_IN, linux_size_t,
-    "flags", "", DIR_IN, linux_int,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("value", "", DIR_IN, linux_void_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(lsetxattr, linux_int,
-    "path",  "", DIR_IN, linux_char_ptr,
-    "name",  "", DIR_IN, linux_char_ptr,
-    "value", "", DIR_IN, linux_void_ptr,
-    "size",  "", DIR_IN, linux_size_t,
-    "flags", "", DIR_IN, linux_int,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("value", "", DIR_IN, linux_void_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(fsetxattr, linux_int,
-    "fd",    "", DIR_IN, linux_char_ptr,
-    "name",  "", DIR_IN, linux_char_ptr,
-    "value", "", DIR_IN, linux_void_ptr,
-    "size",  "", DIR_IN, linux_size_t,
-    "flags", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("value", "", DIR_IN, linux_void_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(getxattr, linux_ssize_t,
-    "path",  "", DIR_IN,    linux_char_ptr,
-    "name",  "", DIR_IN,    linux_char_ptr,
-    "value", "", DIR_INOUT, linux_void_ptr,
-    "size",  "", DIR_IN,    linux_size_t,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("value", "", DIR_INOUT, linux_void_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
 );
 SYSCALL(lgetxattr, linux_ssize_t,
-    "path",  "", DIR_IN,    linux_char_ptr,
-    "name",  "", DIR_IN,    linux_char_ptr,
-    "value", "", DIR_INOUT, linux_void_ptr,
-    "size",  "", DIR_IN,    linux_size_t,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("value", "", DIR_INOUT, linux_void_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
 );
 SYSCALL(fgetxattr, linux_ssize_t,
-    "fd",    "", DIR_IN,    linux_char_ptr,
-    "name",  "", DIR_IN,    linux_char_ptr,
-    "value", "", DIR_INOUT, linux_void_ptr,
-    "size",  "", DIR_IN,    linux_size_t,
+    ARG("fd", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("value", "", DIR_INOUT, linux_void_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
 );
 SYSCALL(listxattr, linux_ssize_t,
-    "path", "", DIR_IN,    linux_char_ptr,
-    "list", "", DIR_INOUT, linux_char_ptr,
-    "size", "", DIR_IN,    linux_size_t,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("list", "", DIR_INOUT, linux_char_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
 );
 SYSCALL(llistxattr, linux_ssize_t,
-    "path", "", DIR_IN,    linux_char_ptr,
-    "list", "", DIR_INOUT, linux_char_ptr,
-    "size", "", DIR_IN,    linux_size_t,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("list", "", DIR_INOUT, linux_char_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
 );
 SYSCALL(flistxattr, linux_ssize_t,
-    "fd",   "", DIR_IN,    linux_char_ptr,
-    "list", "", DIR_INOUT, linux_char_ptr,
-    "size", "", DIR_IN,    linux_size_t,
+    ARG("fd", "", DIR_IN, linux_char_ptr),
+    ARG("list", "", DIR_INOUT, linux_char_ptr),
+    ARG("size", "", DIR_IN, linux_size_t),
 );
 SYSCALL(removexattr, linux_int,
-    "path", "", DIR_IN, linux_char_ptr,
-    "name", "", DIR_IN, linux_char_ptr,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(lremovexattr, linux_int,
-    "path", "", DIR_IN, linux_char_ptr,
-    "name", "", DIR_IN, linux_char_ptr,
+    ARG("path", "", DIR_IN, linux_char_ptr),
+    ARG("name", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(fremovexattr, linux_int,
-    "fd",   "", DIR_IN, linux_int,
-    "name", "", DIR_IN, linux_char_ptr,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("name", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(tkill, linux_int,
-    "pid", "", DIR_IN, linux_pid_t,
-    "sig", "", DIR_IN, linux_int,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("sig", "", DIR_IN, linux_int),
 );
 SYSCALL(time, linux_void);
 SYSCALL(futex, linux_void);
@@ -914,9 +911,9 @@ SYSCALL(epoll_ctl_old, linux_void);
 SYSCALL(epoll_wait_old, linux_void);
 SYSCALL(remap_file_pages, linux_void);
 SYSCALL(getdents64, linux_int,
-    "fd",    "", DIR_IN,  linux_unsigned_int,
-    "dirp",  "", DIR_OUT, linux_linux_dirent64_ptr,
-    "count", "", DIR_IN,  linux_unsigned_int,
+    ARG("fd", "", DIR_IN, linux_unsigned_int),
+    ARG("dirp", "", DIR_OUT, linux_linux_dirent64_ptr),
+    ARG("count", "", DIR_IN, linux_unsigned_int),
 );
 SYSCALL(set_tid_address, linux_int);
 SYSCALL(restart_syscall, linux_int);
@@ -932,29 +929,29 @@ SYSCALL(clock_gettime, linux_void);
 SYSCALL(clock_getres, linux_void);
 SYSCALL(clock_nanosleep, linux_void);
 SYSCALL(exit_group, linux_void,
-    "status", "", DIR_IN, linux_int,
+    ARG("status", "", DIR_IN, linux_int),
 );
 SYSCALL(epoll_wait, linux_void);
 SYSCALL(epoll_ctl, linux_void);
 SYSCALL(tgkill, linux_int,
-    "tgid", "", DIR_IN, linux_int,
-    "pid",  "", DIR_IN, linux_int,
-    "sig",  "", DIR_IN, linux_int,
+    ARG("tgid", "", DIR_IN, linux_int),
+    ARG("pid", "", DIR_IN, linux_int),
+    ARG("sig", "", DIR_IN, linux_int),
 );
 SYSCALL(utimes, linux_int,
-    "filename", "", DIR_IN, linux_char_ptr,
-    "times",    "", DIR_IN, linux_void_ptr, // struct timeval[2]
+    ARG("filename", "", DIR_IN, linux_char_ptr),
+    ARG("times", "", DIR_IN, linux_void_ptr), // struct timeval[2]
 );
 SYSCALL(vserver, linux_void);
 SYSCALL(mbind, linux_void);
 SYSCALL(set_mempolicy, linux_void);
 SYSCALL(get_mempolicy, linux_void);
 SYSCALL(mq_open, linux_void,
-    "name",  "", DIR_IN, linux_char_ptr,
-    "oflag", "", DIR_IN, linux_int,
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("oflag", "", DIR_IN, linux_int),
 );
 SYSCALL(mq_unlink, linux_int,
-    "name",  "", DIR_IN, linux_char_ptr,
+    ARG("name", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(mq_timedsend, linux_void);
 SYSCALL(mq_timedreceive, linux_void);
@@ -963,184 +960,184 @@ SYSCALL(mq_getsetattr, linux_void);
 SYSCALL(kexec_load, linux_void);
 SYSCALL(waitid, linux_void);
 SYSCALL(add_key, linux_key_serial_t,
-    "type",        "", DIR_IN, linux_char_ptr,
-    "description", "", DIR_IN, linux_char_ptr,
-    "payload",     "", DIR_IN, linux_void_ptr,
-    "plen",        "", DIR_IN, linux_size_t,
-    "keyring",     "", DIR_IN, linux_key_serial_t,
+    ARG("type", "", DIR_IN, linux_char_ptr),
+    ARG("description", "", DIR_IN, linux_char_ptr),
+    ARG("payload", "", DIR_IN, linux_void_ptr),
+    ARG("plen", "", DIR_IN, linux_size_t),
+    ARG("keyring", "", DIR_IN, linux_key_serial_t),
 );
 SYSCALL(request_key, linux_key_serial_t,
-    "type",         "", DIR_IN, linux_char_ptr,
-    "description",  "", DIR_IN, linux_char_ptr,
-    "callout_info", "", DIR_IN, linux_char_ptr,
-    "dest_keyring", "", DIR_IN, linux_key_serial_t,
+    ARG("type", "", DIR_IN, linux_char_ptr),
+    ARG("description", "", DIR_IN, linux_char_ptr),
+    ARG("callout_info", "", DIR_IN, linux_char_ptr),
+    ARG("dest_keyring", "", DIR_IN, linux_key_serial_t),
 );
 SYSCALL(keyctl, linux_long,
-    "operation", "", DIR_IN, linux_int,
-    "arg2",      "", DIR_IN, linux_size_t,
-    "arg3",      "", DIR_IN, linux_size_t,
-    "arg4",      "", DIR_IN, linux_size_t,
-    "arg5",      "", DIR_IN, linux_size_t,
+    ARG("operation", "", DIR_IN, linux_int),
+    ARG("arg2", "", DIR_IN, linux_size_t),
+    ARG("arg3", "", DIR_IN, linux_size_t),
+    ARG("arg4", "", DIR_IN, linux_size_t),
+    ARG("arg5", "", DIR_IN, linux_size_t),
 );
 SYSCALL(ioprio_set, linux_void);
 SYSCALL(ioprio_get, linux_void);
 SYSCALL(inotify_init, linux_void);
 SYSCALL(inotify_add_watch, linux_int,
-    "fd",       "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mask",     "", DIR_IN, linux_uint32_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mask", "", DIR_IN, linux_uint32_t),
 );
 SYSCALL(inotify_rm_watch, linux_int,
-    "fd", "", DIR_IN, linux_int,
-    "wd", "", DIR_IN, linux_uint32_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("wd", "", DIR_IN, linux_uint32_t),
 );
 SYSCALL(migrate_pages, linux_int,
-    "pid",       "", DIR_IN,    linux_int,
-    "maxnode",   "", DIR_IN,    linux_unsigned_long,
-    "old_nodes", "", DIR_INOUT, linux_void_ptr, // const unsigned long [maxnode]
-    "new_nodes", "", DIR_IN,    linux_void_ptr, // const unsigned long [maxnode]
+    ARG("pid", "", DIR_IN, linux_int),
+    ARG("maxnode", "", DIR_IN, linux_unsigned_long),
+    ARG("old_nodes", "", DIR_INOUT, linux_void_ptr), // const unsigned long [maxnode]
+    ARG("new_nodes", "", DIR_IN, linux_void_ptr), // const unsigned long [maxnode]
 );
 SYSCALL(mkdirat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",     "", DIR_IN, linux_mode_t,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_mode_t),
 );
 SYSCALL(mknodat, linux_int,
-    "dirfd",     "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",     "", DIR_IN, linux_mode_t,
-    "dev",      "", DIR_IN, linux_dev_t,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_mode_t),
+    ARG("dev", "", DIR_IN, linux_dev_t),
 );
 SYSCALL(fchownat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "owner",    "", DIR_IN, linux_uid_t,
-    "group",    "", DIR_IN, linux_gid_t,
-    "flags",    "", DIR_IN, linux_int,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("owner", "", DIR_IN, linux_uid_t),
+    ARG("group", "", DIR_IN, linux_gid_t),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(futimesat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "times",    "", DIR_IN, linux_void_ptr, // struct timeval[2]
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("times", "", DIR_IN, linux_void_ptr), // struct timeval[2]
 );
 SYSCALL(newfstatat, linux_int,
-    "dirfd",    "", DIR_IN,  linux_int,
-    "pathname", "", DIR_IN,  linux_char_ptr,
-    "statbuf",  "", DIR_OUT, linux_stat_ptr,
-    "flags",    "", DIR_IN,  linux_int,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("statbuf", "", DIR_OUT, linux_stat_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(unlinkat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "flags",    "", DIR_IN, linux_int,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(renameat, linux_int,
-    "olddirfd", "", DIR_IN, linux_int,
-    "oldpath",  "", DIR_IN, linux_char_ptr,
-    "newdirfd", "", DIR_IN, linux_int,
-    "newpath",  "", DIR_IN, linux_char_ptr,
+    ARG("olddirfd", "", DIR_IN, linux_int),
+    ARG("oldpath", "", DIR_IN, linux_char_ptr),
+    ARG("newdirfd", "", DIR_IN, linux_int),
+    ARG("newpath", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(linkat, linux_int,
-    "olddirfd", "", DIR_IN, linux_int,
-    "oldpath",  "", DIR_IN, linux_char_ptr,
-    "newdirfd", "", DIR_IN, linux_int,
-    "newpath",  "", DIR_IN, linux_char_ptr,
-    "flags",    "", DIR_IN, linux_int,
+    ARG("olddirfd", "", DIR_IN, linux_int),
+    ARG("oldpath", "", DIR_IN, linux_char_ptr),
+    ARG("newdirfd", "", DIR_IN, linux_int),
+    ARG("newpath", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(symlinkat, linux_int,
-    "target",   "", DIR_IN, linux_char_ptr,
-    "newdirfd", "", DIR_IN, linux_int,
-    "linkpath", "", DIR_IN, linux_char_ptr,
+    ARG("target", "", DIR_IN, linux_char_ptr),
+    ARG("newdirfd", "", DIR_IN, linux_int),
+    ARG("linkpath", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(readlinkat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "buf",      "", DIR_INOUT, linux_char_ptr,
-    "bufsize",  "", DIR_IN, linux_size_t,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("buf", "", DIR_INOUT, linux_char_ptr),
+    ARG("bufsize", "", DIR_IN, linux_size_t),
 );
 SYSCALL(fchmodat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",     "", DIR_IN, linux_mode_t,
-    "flags",    "", DIR_IN, linux_int,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_mode_t),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(faccessat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "mode",     "", DIR_IN, linux_int,
-    "flags",    "", DIR_IN, linux_int,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("mode", "", DIR_IN, linux_int),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(pselect6, linux_int);
 SYSCALL(ppoll, linux_int);
 SYSCALL(unshare, linux_int,
-    "flags", "", DIR_IN, linux_int,
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(set_robust_list, linux_void);
 SYSCALL(get_robust_list, linux_void);
 SYSCALL(splice, linux_void);
 SYSCALL(tee, linux_long,
-    "fd_in",  "", DIR_IN, linux_int,
-    "fd_out", "", DIR_IN, linux_int,
-    "len",    "", DIR_IN, linux_size_t,
-    "flags",  "", DIR_IN, linux_unsigned_int,
+    ARG("fd_in", "", DIR_IN, linux_int),
+    ARG("fd_out", "", DIR_IN, linux_int),
+    ARG("len", "", DIR_IN, linux_size_t),
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
 );
 SYSCALL(sync_file_range, linux_void);
 SYSCALL(vmsplice, linux_void);
 SYSCALL(move_pages, linux_void);
 SYSCALL(utimensat, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "times",    "", DIR_IN, linux_void_ptr, // struct timeval[2]
-    "flags",    "", DIR_IN, linux_int,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("times", "", DIR_IN, linux_void_ptr), // struct timeval[2]
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(epoll_pwait, linux_void);
 SYSCALL(signalfd, linux_void);
 SYSCALL(timerfd_create, linux_int,
-    "clockid", "", DIR_IN, linux_int,
-    "flags",   "", DIR_IN, linux_int,
+    ARG("clockid", "", DIR_IN, linux_int),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(eventfd, linux_int,
-    "initval", "", DIR_IN, linux_unsigned_int,
-    "flags",   "", DIR_IN, linux_int,
+    ARG("initval", "", DIR_IN, linux_unsigned_int),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(fallocate, linux_long,
-    "fd",     "", DIR_IN, linux_int,
-    "mode",   "", DIR_IN, linux_int,
-    "offset", "", DIR_IN, linux_loff_t,
-    "len",    "", DIR_IN, linux_loff_t,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("mode", "", DIR_IN, linux_int),
+    ARG("offset", "", DIR_IN, linux_loff_t),
+    ARG("len", "", DIR_IN, linux_loff_t),
 );
 SYSCALL(timerfd_settime, linux_int,
-    "fd",        "", DIR_IN,  linux_int,
-    "flags",     "", DIR_IN,  linux_int,
-    "new_value", "", DIR_IN,  linux_itimerspec_ptr,
-    "old_value", "", DIR_OUT, linux_itimerspec_ptr,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("flags", "", DIR_IN, linux_int),
+    ARG("new_value", "", DIR_IN, linux_itimerspec_ptr),
+    ARG("old_value", "", DIR_OUT, linux_itimerspec_ptr),
 );
 SYSCALL(timerfd_gettime, linux_int,
-    "fd",         "", DIR_IN,  linux_int,
-    "curr_value", "", DIR_OUT, linux_itimerspec_ptr,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("curr_value", "", DIR_OUT, linux_itimerspec_ptr),
 );
 SYSCALL(accept4, linux_int,
-    "sockfd",  "", DIR_IN, linux_int,
-    "addr",    "", DIR_IN, linux_sockaddr_ptr,
-    "addrlen", "", DIR_IN, linux_socklen_t_ptr,
-    "flags",   "", DIR_IN, linux_int,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("addr", "", DIR_IN, linux_sockaddr_ptr),
+    ARG("addrlen", "", DIR_IN, linux_socklen_t_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(signalfd4, linux_int);
 SYSCALL(eventfd2, linux_int,
-    "initval", "", DIR_IN, linux_unsigned_int,
-    "flags",   "", DIR_IN, linux_int,
+    ARG("initval", "", DIR_IN, linux_unsigned_int),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(epoll_create1, linux_int,
-    "flags", "", DIR_IN, linux_int,
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(dup3, linux_int,
-    "oldfd", "", DIR_IN, linux_int,
-    "newfd", "", DIR_IN, linux_int,
-    "flags", "", DIR_IN, linux_int,
+    ARG("oldfd", "", DIR_IN, linux_int),
+    ARG("newfd", "", DIR_IN, linux_int),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(pipe2, linux_int);
 SYSCALL(inotify_init1, linux_int,
-    "flags", "", DIR_IN, linux_int,
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(preadv, linux_int);
 SYSCALL(pwritev, linux_int);
@@ -1148,111 +1145,111 @@ SYSCALL(rt_tgsigqueueinfo, linux_int);
 SYSCALL(perf_event_open, linux_int);
 SYSCALL(recvmmsg, linux_int);
 SYSCALL(fanotify_init, linux_int,
-    "flags",         "", DIR_IN, linux_unsigned_int,
-    "event_f_flags", "", DIR_IN, linux_unsigned_int,
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
+    ARG("event_f_flags", "", DIR_IN, linux_unsigned_int),
 );
 SYSCALL(fanotify_mark, linux_int,
-    "fanotify_id", "", DIR_IN, linux_int,
-    "flags",       "", DIR_IN, linux_unsigned_int,
-    "mask",        "", DIR_IN, linux_uint64_t,
-    "dirfd",       "", DIR_IN, linux_int,
-    "pathname",    "", DIR_IN, linux_char_ptr,
+    ARG("fanotify_id", "", DIR_IN, linux_int),
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
+    ARG("mask", "", DIR_IN, linux_uint64_t),
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
 );
 SYSCALL(prlimit64, linux_int);
 SYSCALL(name_to_handle_at, linux_int,
-    "dirfd",    "", DIR_IN, linux_int,
-    "pathname", "", DIR_IN, linux_char_ptr,
-    "handle",   "", DIR_OUT, linux_file_handle_ptr,
-    "mount_id", "", DIR_IN, linux_int_ptr,
-    "flags",    "", DIR_IN, linux_int,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("handle", "", DIR_OUT, linux_file_handle_ptr),
+    ARG("mount_id", "", DIR_IN, linux_int_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(open_by_handle_at, linux_int,
-    "mount_fd", "", DIR_IN, linux_int,
-    "handle",   "", DIR_IN, linux_file_handle_ptr,
-    "flags",    "", DIR_IN, linux_int,
+    ARG("mount_fd", "", DIR_IN, linux_int),
+    ARG("handle", "", DIR_IN, linux_file_handle_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(clock_adjtime, linux_int);
 SYSCALL(syncfs, linux_int,
-    "fd", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
 );
 SYSCALL(sendmmsg, linux_int,
-    "sockfd", "", DIR_IN, linux_int,
-    "msgvec", "", DIR_IN, linux_mmsghdr_ptr,
-    "vlen",   "", DIR_IN, linux_unsigned_int,
-    "flags",  "", DIR_IN, linux_int,
+    ARG("sockfd", "", DIR_IN, linux_int),
+    ARG("msgvec", "", DIR_IN, linux_mmsghdr_ptr),
+    ARG("vlen", "", DIR_IN, linux_unsigned_int),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(setns, linux_int,
-    "fd",     "", DIR_IN, linux_int,
-    "nstype", "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("nstype", "", DIR_IN, linux_int),
 );
 SYSCALL(getcpu, linux_int);
 SYSCALL(process_vm_readv, linux_ssize_t,
-    "pid", "", DIR_IN, linux_pid_t,
+    ARG("pid", "", DIR_IN, linux_pid_t),
 );
 SYSCALL(process_vm_writev, linux_ssize_t,
-    "pid", "", DIR_IN, linux_pid_t,
+    ARG("pid", "", DIR_IN, linux_pid_t),
 );
 SYSCALL(kcmp, linux_int,
-    "pid1", "", DIR_IN, linux_pid_t,
-    "pid2", "", DIR_IN, linux_pid_t,
-    "type", "", DIR_IN, linux_int,
-    "idx1", "", DIR_IN, linux_unsigned_long,
-    "idx2", "", DIR_IN, linux_unsigned_long,
+    ARG("pid1", "", DIR_IN, linux_pid_t),
+    ARG("pid2", "", DIR_IN, linux_pid_t),
+    ARG("type", "", DIR_IN, linux_int),
+    ARG("idx1", "", DIR_IN, linux_unsigned_long),
+    ARG("idx2", "", DIR_IN, linux_unsigned_long),
 );
 SYSCALL(finit_module, linux_int,
-    "fd",           "", DIR_IN, linux_int,
-    "param_values", "", DIR_IN, linux_char_ptr,
-    "flags",        "", DIR_IN, linux_int,
+    ARG("fd", "", DIR_IN, linux_int),
+    ARG("param_values", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(sched_setattr, linux_int,
-    "pid",   "", DIR_IN, linux_pid_t,
-    "attr",  "", DIR_IN, linux_sched_attr_ptr,
-    "flags", "", DIR_IN, linux_unsigned_int,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("attr", "", DIR_IN, linux_sched_attr_ptr),
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
 );
 SYSCALL(sched_getattr, linux_int,
-    "pid",   "", DIR_IN,  linux_pid_t,
-    "attr",  "", DIR_OUT, linux_sched_attr_ptr,
-    "size",  "", DIR_IN,  linux_unsigned_int,
-    "flags", "", DIR_IN,  linux_unsigned_int,
+    ARG("pid", "", DIR_IN, linux_pid_t),
+    ARG("attr", "", DIR_OUT, linux_sched_attr_ptr),
+    ARG("size", "", DIR_IN, linux_unsigned_int),
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
 );
 // filetracer
 SYSCALL(renameat2, linux_int,
-    "olddirfd", "", DIR_IN, linux_int,
-    "oldpath",  "", DIR_IN, linux_char_ptr,
-    "newdirfd", "", DIR_IN, linux_int,
-    "newpath",  "", DIR_IN, linux_char_ptr,
-    "flags",    "", DIR_IN, linux_unsigned_int,
+    ARG("olddirfd", "", DIR_IN, linux_int),
+    ARG("oldpath", "", DIR_IN, linux_char_ptr),
+    ARG("newdirfd", "", DIR_IN, linux_int),
+    ARG("newpath", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
 );
 // end filetracer
 SYSCALL(seccomp, linux_int,
-    "operation", "", DIR_IN, linux_unsigned_int,
-    "flags",     "", DIR_IN, linux_unsigned_int,
-    "args",      "", DIR_IN, linux_void_ptr,
+    ARG("operation", "", DIR_IN, linux_unsigned_int),
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
+    ARG("args", "", DIR_IN, linux_void_ptr),
 );
 SYSCALL(getrandom, linux_void);
 // filetracer
 SYSCALL(memfd_create, linux_int,
-    "name",  "", DIR_IN, linux_char_ptr,
-    "flags", "", DIR_IN, linux_unsigned_int,
+    ARG("name", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
 );
 // end filetracer
 SYSCALL(kexec_file_load, linux_int,
-    "kernel_fd",   "", DIR_IN, linux_int,
-    "initrd_fd",   "", DIR_IN, linux_int,
-    "cmdline_len", "", DIR_IN, linux_unsigned_long,
-    "cmdline",     "", DIR_IN, linux_char_ptr,
-    "flags",       "", DIR_IN, linux_unsigned_long,
+    ARG("kernel_fd", "", DIR_IN, linux_int),
+    ARG("initrd_fd", "", DIR_IN, linux_int),
+    ARG("cmdline_len", "", DIR_IN, linux_unsigned_long),
+    ARG("cmdline", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_unsigned_long),
 );
 // ebpfmon
 SYSCALL(bpf, linux_int,
-    "cmd",  "", DIR_IN, linux_int,
-    "attr", "", DIR_IN, linux_bpf_attr_ptr,
-    "size", "", DIR_IN, linux_unsigned_int,
+    ARG("cmd", "", DIR_IN, linux_int),
+    ARG("attr", "", DIR_IN, linux_bpf_attr_ptr),
+    ARG("size", "", DIR_IN, linux_unsigned_int),
 );
 // ebpfmon
 SYSCALL(execveat, linux_void);
 SYSCALL(userfaultfd, linux_int,
-    "flags", "", DIR_IN, linux_int,
+    ARG("flags", "", DIR_IN, linux_int),
 );
 SYSCALL(membarrier, linux_int);
 SYSCALL(mlock2, linux_int);
@@ -1260,24 +1257,24 @@ SYSCALL(copy_file_range, linux_int);
 SYSCALL(preadv2, linux_int);
 SYSCALL(pwritev2, linux_int);
 SYSCALL(pkey_mprotect, linux_int,
-    "addr", "", DIR_IN, linux_void_ptr,
-    "len",  "", DIR_IN, linux_size_t,
-    "prot", "", DIR_IN, linux_int,
-    "pkey", "", DIR_IN, linux_int,
+    ARG("addr", "", DIR_IN, linux_void_ptr),
+    ARG("len", "", DIR_IN, linux_size_t),
+    ARG("prot", "", DIR_IN, linux_int),
+    ARG("pkey", "", DIR_IN, linux_int),
 );
 SYSCALL(pkey_alloc, linux_int,
-    "flags",         "", DIR_IN, linux_unsigned_int,
-    "access_rights", "", DIR_IN, linux_unsigned_int,
+    ARG("flags", "", DIR_IN, linux_unsigned_int),
+    ARG("access_rights", "", DIR_IN, linux_unsigned_int),
 );
 SYSCALL(pkey_free, linux_int,
-    "pkey", "", DIR_IN, linux_int,
+    ARG("pkey", "", DIR_IN, linux_int),
 );
 SYSCALL(statx, linux_int,
-    "dirfd",    "", DIR_IN,    linux_int,
-    "pathname", "", DIR_IN,    linux_char_ptr,
-    "flags",    "", DIR_IN,    linux_int,
-    "mask",     "", DIR_IN,    linux_unsigned_int,
-    "statxbuf", "", DIR_INOUT, linux_statx_ptr,
+    ARG("dirfd", "", DIR_IN, linux_int),
+    ARG("pathname", "", DIR_IN, linux_char_ptr),
+    ARG("flags", "", DIR_IN, linux_int),
+    ARG("mask", "", DIR_IN, linux_unsigned_int),
+    ARG("statxbuf", "", DIR_INOUT, linux_statx_ptr),
 );
 
 #pragma clang diagnostic pop
