@@ -410,6 +410,8 @@ linux_syscalls::linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config,
         return;
     }
 
+    register_parsers();
+
     if (!this->trap_syscall_table_entries(drakvuf))
         PRINT_DEBUG("[SYSCALLS] Failed to set breakpoints on some syscalls.\n");
 }

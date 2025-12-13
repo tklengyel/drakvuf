@@ -146,6 +146,8 @@ public:
     win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~win_syscalls();
 
+    void register_parsers();
+
 protected:
     void parse_handle_for_pid_tid(
         fmt_args_t& fmt_args, const syscalls_ns::arg_t& arg, drakvuf_trap_info_t* info,

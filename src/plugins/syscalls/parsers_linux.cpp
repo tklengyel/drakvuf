@@ -102,205 +102,141 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <glib.h>
-#include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <assert.h>
-#include <string>
-#include <variant>
-#include <fstream>
-#include <iostream>
 
-#include "syscalls.h"
-#include "private.h"
+#include "linux.h"
 
 using namespace syscalls_ns;
 
-
-void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info)
+namespace syscalls_ns
 {
-    fmt::print(this->m_output_format, "sysret", drakvuf, info,
-        keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
-        keyval("vCPU", fmt::Nval(info->vcpu)),
-        keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval(nr)),
-        keyval("Ret", fmt::Xval(info->regs->rax)),
-        keyval("Info", fmt::Rstr(extra_info ?: ""))
-    );
-}
 
-std::optional<uint64_t> syscalls_base::get_arg_value_by_name(
-    const syscall_t* sc, const std::vector<uint64_t>& all_args, const std::string& name)
+static void parse_linux_char_ptr(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
 {
-    for (size_t i = 0; i < sc->num_args; ++i)
+    if (value == 0) return;
+
+    auto* base = static_cast<syscalls_base*>(base_ptr);
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
+    auto* info = static_cast<drakvuf_trap_info_t*>(info_ptr);
+
+    char* cstr = drakvuf_read_ascii_str(base->drakvuf, info, value);
+    if (cstr)
     {
-        if (strcmp(sc->args[i].name, name.c_str()) == 0)
-        {
-            if (i < all_args.size())
-            {
-                return all_args[i];
-            }
-            return std::nullopt;
-        }
-    }
-    return std::nullopt;
-}
-
-
-void syscalls_base::fill_fmt_args(
-    fmt_args_t& original_args, fmt_args_t& extra_args, const syscall_t* sc, drakvuf_trap_info_t* info,
-    const std::vector<uint64_t>& args, bool is_ret, bool ret_success)
-{
-    for (size_t i = 0; i < args.size(); ++i)
-    {
-        const auto& original_arg = sc->args[i];
-        uint64_t raw_value = this->value_from_uint64(original_arg.type, args[i]);
-
-        auto type_info = arg_types.at(original_arg.type);
-        if (original_arg.dir == DIR_OUT && !type_info.is_ptr && !is_ret)
-        {
-            original_args.push_back(keyval(std::string(original_arg.name), fmt::Estr("<out>")));
-            continue;
-        }
-
-        auto arg_to_parse = original_arg;
-        uint64_t value_to_parse = raw_value;
-        std::optional<uint64_t> dereferenced_value;
-
-        bool is_value_complete = (original_arg.dir != DIR_OUT) || is_ret;
-
-        if (this->dereference_args && raw_value && type_info.is_ptr && type_info.ptr_for_type != Void && is_value_complete && ret_success)
-        {
-            auto vmi = vmi_lock_guard(drakvuf);
-            ACCESS_CONTEXT(ctx, .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3, .addr = raw_value);
-
-            uint64_t temp_val;
-            if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &temp_val))
-            {
-                dereferenced_value = temp_val;
-                arg_to_parse.type = type_info.ptr_for_type;
-                value_to_parse = *dereferenced_value;
-            }
-            else
-            {
-                PRINT_DEBUG("VMI read failed for address 0x%lx\n", raw_value);
-            }
-        }
-
-        original_args.push_back(keyval(std::string(original_arg.name), fmt::Xval(raw_value)));
-
-        if (is_value_complete)
-        {
-            arg_parser_t parser = arg_to_parse.parser;
-
-            if (parser)
-            {
-                // Parser gets the dereferenced value and type
-                parser((void*)this, (void*)&original_args, (void*)&extra_args, sc, arg_to_parse, (void*)info, value_to_parse, (const void*)&args);
-            }
-            else if (dereferenced_value)
-            {
-                // No parser, show dereferenced hex value
-                extra_args.push_back(keyval(std::string("*") + std::string(original_arg.name), fmt::Xval(*dereferenced_value)));
-            }
-        }
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Estr(std::string(cstr)));
+        g_free(cstr);
     }
 }
 
-uint64_t syscalls_base::value_from_uint64(arg_type_t type, uint64_t val)
+static void parse_linux_prot_flags(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
 {
-    switch (arg_types.at(type).size)
+    auto* base = static_cast<syscalls_base*>(base_ptr);
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
+
+    linux_syscalls* linux_base = dynamic_cast<linux_syscalls*>(base);
+    if (!linux_base) return;
+
+    if (value == 0)
     {
-        case ARG_SIZE_8:
-            return val & 0xff;
-        case ARG_SIZE_16:
-            return val & 0xffff;
-        case ARG_SIZE_32:
-            return val & 0xffffffff;
-        case ARG_SIZE_64:
-        case ARG_SIZE_NATIVE:
-            return val;
-        default:
-            assert(false && "Unknown size for type");
-            return val;
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Qstr("PROT_NONE"));
     }
-}
-
-static std::string rstrip(std::string s)
-{
-    while (!s.empty() && isspace(s.back()))
-        s.pop_back();
-    return s;
-}
-
-void syscalls_base::find_replace_arg(std::vector<std::pair<std::string, fmt::Aarg>>& vec, const std::string& key, const fmt::Aarg& newValue)
-{
-    auto it = std::find_if(vec.begin(), vec.end(),
-            [&key](const std::pair<std::string, fmt::Aarg>& element)
-    {
-        return element.first == key;
-    }
-        );
-
-    if (it != vec.end())
-    {
-        it->second = newValue;
-    }
-}
-
-bool syscalls_base::read_syscalls_list(const char* syscall_list_file)
-{
-    std::ifstream file(syscall_list_file);
-    if (!file.is_open())
-    {
-        fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?\n");
-        return false;
-    }
-
-    std::string line;
-    while (std::getline(file, line))
-    {
-        line = rstrip(std::move(line));
-        if (line.empty())
-            continue;
-
-        size_t pos = line.find(',');
-        if (pos == std::string::npos)
-        {
-            this->syscall_list.emplace(line, false);
-            continue;
-        }
-
-        auto syscall = line.substr(0, pos);
-        auto param = line.substr(pos + 1);
-        bool is_ret = param == "retval";
-
-        this->syscall_list.emplace(syscall, is_ret);
-    }
-
-    return true;
-}
-
-syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
-{
-    this->os = drakvuf_get_os_type(drakvuf);
-    this->kernel_base = drakvuf_get_kernel_base(drakvuf);
-    this->register_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
-    this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    this->disable_sysret = config->disable_sysret;
-    this->dereference_args = config->syscalls_dereference_args;
-    this->nested_args = config->syscalls_nested_args;
-
-
-    if (config->syscalls_list_file && !this->read_syscalls_list(config->syscalls_list_file))
-        throw -1;
-}
-
-syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
-{
-    os_t os = drakvuf_get_os_type(drakvuf);
-    if (os == VMI_OS_WINDOWS)
-        this->_win_syscalls = std::make_unique<win_syscalls>(drakvuf, config, output);
     else
-        this->_linux_syscalls = std::make_unique<linux_syscalls>(drakvuf, config, output);
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name),
+            fmt::Qstr(parse_flags(value, mmap_prot, linux_base->m_output_format)));
+    }
+}
+
+static void parse_linux_prctl_option(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
+{
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
+
+    if (prctl_option.find(value) != prctl_option.end())
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Qstr(prctl_option.at(value)));
+    }
+}
+
+static void parse_linux_arch_prctl_code(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
+{
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
+
+    if (arch_prctl_code.find(value) != arch_prctl_code.end())
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Qstr(arch_prctl_code.at(value)));
+    }
+}
+
+static void register_parsers_for_table(const syscall_t** syscalls, unsigned int count)
+{
+    for (unsigned int i = 0; i < count; i++)
+    {
+        const syscall_t* sc = syscalls[i];
+        if (!sc) continue;
+
+        arg_t* args = const_cast<arg_t*>(sc->args);
+
+        for (unsigned int j = 0; j < sc->num_args; j++)
+        {
+            // Type-based parsers
+            if (!args[j].parser)
+            {
+                switch (args[j].type)
+                {
+                    case linux_char_ptr:
+                        args[j].parser = parse_linux_char_ptr;
+                        break;
+                    case linux_intmask_prot_:
+                        args[j].parser = parse_linux_prot_flags;
+                        break;
+                    case linux_intopt_pr_:
+                        args[j].parser = parse_linux_prctl_option;
+                        break;
+                    case linux_intopt_arch_:
+                        args[j].parser = parse_linux_arch_prctl_code;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+}
+
+} // namespace syscalls_ns
+
+void linux_syscalls::register_parsers()
+{
+    register_parsers_for_table(linuxsc::linux_syscalls_table_x32, NUM_SYSCALLS_LINUX_X32);
+    register_parsers_for_table(linuxsc::linux_syscalls_table_x64, NUM_SYSCALLS_LINUX_X64);
 }

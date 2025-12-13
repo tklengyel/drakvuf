@@ -436,7 +436,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wr->num = w->num;
     wr->type = w->type;
     wr->sc = w->sc;
-    wr->mode = w->mode;
+    wr->mode = std::move(mode);
 
     wr->args = std::move(args);
     wr->is_ret = w->is_ret;
@@ -633,6 +633,8 @@ win_syscalls::win_syscalls(drakvuf_t drakvuf, const syscalls_config* config, out
         PRINT_DEBUG("[SYSCALLS] Failed to get ImagePathName from _RTL_USER_PROCESS_PARAMETERS\n");
         throw -1;
     }
+
+    register_parsers();
 
     if (!trap_syscall_table_entries(drakvuf, vmi, dtb, true, this->kernel_base, this->sst[0], vmi_get_kernel_json(vmi)))
     {

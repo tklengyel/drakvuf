@@ -653,20 +653,19 @@ static const std::unordered_map<arg_type_t, arg_type_info_t> arg_types
     ARG_TYPE_PTR(linux_mmsghdr_ptr), // struct mmsghdr *
 };
 
-// Forward declarations for parser function type
 struct arg_t_s;
 struct syscall_t_s;
 
-// Parser function pointer type (use void* to avoid circular dependencies and ambiguity)
+// syscall argument parser function pointer type
 typedef void (*arg_parser_t)(
-    void* base,           // actually syscalls_base*
-    void* original_args,  // actually fmt_args_t&
-    void* extra_args,     // actually fmt_args_t&
+    void* base,           // syscalls_base*
+    void* original_args,  // fmt_args_t&
+    void* extra_args,     // fmt_args_t&
     const struct syscall_t_s* sc,
     const struct arg_t_s& arg,
-    void* info,           // actually drakvuf_trap_info_t*
+    void* info,           // drakvuf_trap_info_t*
     uint64_t value,
-    const void* all_args  // actually const std::vector<uint64_t>&
+    const void* all_args  // const std::vector<uint64_t>&
 );
 
 typedef struct arg_t_s
@@ -675,7 +674,7 @@ typedef struct arg_t_s
     const char* dir_opt;
     arg_direction_t dir;
     arg_type_t type;
-    arg_parser_t parser; // nullptr by default
+    arg_parser_t parser;
 } arg_t;
 
 typedef struct syscall_t_s
@@ -684,7 +683,7 @@ typedef struct syscall_t_s
     const char* display_name;
     arg_type_t ret;
     unsigned int num_args;
-    const arg_t* args;
+    arg_t* args;
 } syscall_t;
 
 typedef struct
@@ -721,13 +720,13 @@ struct windows_syscall_trap_data_t : public call_result_t
     {name, dir_opt, dir, type, nullptr}
 
 #define SYSCALL_EX(_name, _alias, _ret, ...)                     \
-   static const arg_t _name ## _arg[] = { __VA_ARGS__ };         \
-   static const syscall_t _name = {                              \
+   inline arg_t _name ## _arg[] = { __VA_ARGS__ };         \
+   inline syscall_t _name = {                              \
      .name = #_name,                                             \
      .display_name = #_alias,                                    \
      .ret = _ret,                                                \
      .num_args = sizeof(_name ## _arg)/sizeof(arg_t),            \
-     .args = (const arg_t*)&_name ## _arg                        \
+     .args = (arg_t*)&_name ## _arg                        \
    }
 
 #define SYSCALL(_name, _ret, ...) SYSCALL_EX(_name, _name, _ret, __VA_ARGS__)
