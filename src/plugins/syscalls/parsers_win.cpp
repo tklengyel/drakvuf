@@ -190,8 +190,6 @@ static void parse_pcontext(
     uint64_t value,
     const void* all_args_ptr)
 {
-    if (value == 0) return;
-
     auto* base = static_cast<syscalls_base*>(base_ptr);
 
     if (!base->dereference_args || value == 0)
