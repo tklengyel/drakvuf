@@ -117,7 +117,10 @@ public:
     std::array<size_t, __PT_REGS_MAX> regs;
 
     /* Hooks */
-    // File operations hooks
+    // Unified syscall hook (modern kernels 6.x+)
+    std::unique_ptr<libhook::SyscallHook> syscall_hook;
+
+    // Legacy VFS hooks (older kernels)
     std::unique_ptr<libhook::SyscallHook> open_file_hook;
     std::unique_ptr<libhook::SyscallHook> read_file_hook;
     std::unique_ptr<libhook::SyscallHook> write_file_hook;
@@ -128,17 +131,14 @@ public:
     std::unique_ptr<libhook::SyscallHook> rename_file_hook;
     std::unique_ptr<libhook::SyscallHook> truncate_file_hook;
     std::unique_ptr<libhook::SyscallHook> allocate_file_hook;
-    // File attributes change hooks
     std::unique_ptr<libhook::SyscallHook> chmod_file_hook;
     std::unique_ptr<libhook::SyscallHook> chown_file_hook;
     std::unique_ptr<libhook::SyscallHook> utimes_file_hook;
     std::unique_ptr<libhook::SyscallHook> access_file_hook;
-    // Directory operations hooks
     std::unique_ptr<libhook::SyscallHook> mkdir_hook;
     std::unique_ptr<libhook::SyscallHook> rmdir_hook;
     std::unique_ptr<libhook::SyscallHook> chdir_hook;
     std::unique_ptr<libhook::SyscallHook> chroot_hook;
-    // Link operations hooks
     std::unique_ptr<libhook::SyscallHook> link_file_hook;
     std::unique_ptr<libhook::SyscallHook> unlink_file_hook;
     std::unique_ptr<libhook::SyscallHook> symbolic_link_file_hook;
@@ -148,7 +148,10 @@ public:
     std::map<std::pair<uint64_t, addr_t>, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 
     /* Callbacks */
-    // File operations callbacks
+    // Unified syscall callback (modern kernels)
+    event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    // Legacy file operations callbacks
     event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t read_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -181,6 +184,13 @@ public:
 
     /* Helper functions */
     void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params);
+    void print_syscall_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* syscall_name, linux_data* params);
+
+    /* Syscall argument extraction (modern kernels) */
+    bool get_pt_regs_and_nr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* pt_regs_addr, uint64_t* nr);
+    bool read_pt_regs_arg(drakvuf_t drakvuf, addr_t pt_regs_addr, int arg_index, uint64_t* value);
+    std::string get_filename_from_fd(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int fd);
+    char* read_user_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t user_addr);
 
     /* File info parsing */
     bool get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_data* params, addr_t struct_addr);

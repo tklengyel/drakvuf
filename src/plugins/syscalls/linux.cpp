@@ -104,6 +104,7 @@
 
 #include <inttypes.h>
 #include <assert.h>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -118,12 +119,39 @@ bool linux_syscalls::get_pt_regs_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 {
     auto vmi = vmi_lock_guard(drakvuf);
 
+    /*
+     * For x64_sys_call: long x64_sys_call(struct pt_regs *regs, unsigned int nr)
+     *   - rdi = pt_regs* (kernel address, bit 47 set)
+     *   - esi = syscall number (32-bit!)
+     *
+     * For syscall_enter_from_user_mode: (struct pt_regs *regs, long syscall)
+     *   - rdi = pt_regs* (kernel address, bit 47 set)
+     *   - rsi = syscall number
+     *
+     * For do_syscall_64 (older kernels): (struct pt_regs *regs)
+     *   - rdi = pt_regs*
+     *   - syscall number in pt_regs->orig_rax
+     *
+     * For do_syscall_64 (newer kernels): (unsigned long nr, struct pt_regs *regs)
+     *   - rdi = syscall number (won't have bit 47 set)
+     *   - rsi = pt_regs*
+     */
     if ( VMI_GET_BIT(info->regs->rdi, 47) )
     {
-        /*
-         * On older kernels: __visible void do_syscall_64(struct pt_regs *regs)
-         */
+        // rdi is a kernel pointer (pt_regs)
         *pt_regs_addr = info->regs->rdi;
+
+        // For x64_sys_call and syscall_enter_from_user_mode, the syscall number
+        // is passed as the second argument. Use 32-bit esi for x64_sys_call
+        // (unsigned int nr) or full rsi for syscall_enter_from_user_mode (long).
+        // Both are small values (< 0x1000), so just use the lower 32 bits.
+        uint32_t nr_32 = (uint32_t)(info->regs->rsi & 0xFFFFFFFF);
+        if (nr_32 < 0x1000) {
+            *nr = nr_32;
+            return true;
+        }
+
+        // Otherwise, read orig_rax from pt_regs (do_syscall_64 old style)
         return VMI_SUCCESS == vmi_read_addr_va(vmi, *pt_regs_addr + this->regs[PT_REGS_ORIG_RAX], 0, nr);
     }
 
@@ -300,17 +328,66 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    // When hooked at do_syscall_64, we need to look up the syscall definition dynamically
+    auto params = libhook::GetTrapParams<linux_syscall_data>(info);
+    const syscall_t* syscall_def = params->sc;
+    const char* syscall_type = params->type.c_str();
+    uint16_t syscall_num = params->num;
+
+    // Check if this is a do_syscall_64 entry point hook (sc will be null in this case)
+    if (!syscall_def)
+    {
+        // Look up syscall definition dynamically from syscall number
+        bool is_32bit_syscall = (info->trap->name && strstr(info->trap->name, "32") != nullptr);
+        const syscall_t** syscall_table = is_32bit_syscall ? linuxsc::linux_syscalls_table_x32 : linuxsc::linux_syscalls_table_x64;
+        uint64_t num_syscalls = is_32bit_syscall ? NUM_SYSCALLS_LINUX_X32 : NUM_SYSCALLS_LINUX_X64;
+        syscall_type = is_32bit_syscall ? SYSCALL_TYPE_LINUX_X32 : SYSCALL_TYPE_LINUX_X64;
+
+        // Check if syscall number is valid
+        if (nr >= num_syscalls)
+        {
+            PRINT_DEBUG("[SYSCALLS] Unknown syscall nr=%lu (max=%lu), skipping\n", nr, num_syscalls);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        syscall_def = syscall_table[nr];
+        if (!syscall_def)
+        {
+            PRINT_DEBUG("[SYSCALLS] No definition for syscall nr=%lu, skipping\n", nr);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        syscall_num = (uint16_t)nr;
+
+        // Apply filter if configured
+        if (!this->filter.empty() && (this->filter.find(syscall_def->display_name) == this->filter.end()))
+        {
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // Update params for use in build_arguments_buffer and print_syscall
+        params->num = syscall_num;
+        params->type = syscall_type;
+        params->sc = syscall_def;
+    }
+
     auto arguments = build_arguments_buffer(drakvuf, info, pt_regs_addr, nr);
     this->print_syscall(drakvuf, info, arguments);
 
     if (this->disable_sysret)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto hook = this->createReturnHook<linux_syscall_data>(info, &linux_syscalls::linux_ret_cb, info->trap->name);
-    auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
-    params->setResultCallParams(drakvuf, info);
+    auto hook = this->createReturnHook<linux_syscall_data>(info, &linux_syscalls::linux_ret_cb, syscall_def->display_name);
+    if (!hook)
+        return VMI_EVENT_RESPONSE_NONE;
 
-    auto hookID = make_hook_id(info, params->target_rsp);
+    auto ret_params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
+    ret_params->setResultCallParams(drakvuf, info);
+    ret_params->num = syscall_num;
+    ret_params->type = syscall_type;
+    ret_params->sc = syscall_def;
+
+    auto hookID = make_hook_id(info, ret_params->target_rsp);
     this->ret_hooks[hookID] = std::move(hook);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -339,33 +416,113 @@ bool linux_syscalls::register_hook(char* syscall_name, uint64_t syscall_number, 
 
 bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
 {
-    // In this case, we check whether we were able to install all syscalls without errors,
-    // and if this isn't the case, we simply warn the user that some syscalls couldn't be installed correctly
-    // For example, old kernels don't support new syscalls, and hooks can't be installed
+    /*
+     * Modern kernels (6.x) use static_call/retpoline optimizations that may bypass
+     * the actual function entry points. We try multiple hook points:
+     * 1. x64_sys_call - the actual syscall dispatcher, called from do_syscall_64
+     *    Signature: long x64_sys_call(struct pt_regs *regs, unsigned int nr)
+     *    Args: rdi = pt_regs*, esi = syscall number
+     * 2. do_syscall_64 - fallback
+     *
+     * Note: Filter is applied at callback time instead of hook registration time.
+     */
+    PRINT_DEBUG("[SYSCALLS] Using modern kernel syscall hooking mode\n");
+
+    // For x64 systems, first try x64_sys_call
+    if (!this->is32bit)
+    {
+        // Try x64_sys_call - the syscall dispatcher called from do_syscall_64
+        // Signature: long x64_sys_call(struct pt_regs *regs, unsigned int nr)
+        // Args: rdi = pt_regs*, esi = syscall number (32-bit!)
+        fprintf(stderr, "[SYSCALLS-DEBUG] Attempting to hook x64_sys_call...\n"); fflush(stderr);
+        auto hook = createSyscallHook<linux_syscall_data>("x64_sys_call", &linux_syscalls::linux_cb, "x64_sys_call");
+
+        if (hook)
+        {
+            auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
+            params->num = 0;
+            params->type = SYSCALL_TYPE_LINUX_X64;
+            params->sc = nullptr;  // null sc triggers dynamic lookup in linux_cb
+
+            addr_t hook_addr = hook->trap_->breakpoint.addr;
+            this->hooks[hook_addr] = std::move(hook);
+            fprintf(stderr, "[SYSCALLS-DEBUG] SUCCESS: Registered x64_sys_call hook at 0x%lx\n", (unsigned long)hook_addr); fflush(stderr);
+            PRINT_DEBUG("[SYSCALLS] Registered x64_sys_call hook at 0x%lx\n", (unsigned long)hook_addr);
+        }
+        else
+        {
+            // Fallback to do_syscall_64
+            fprintf(stderr, "[SYSCALLS-DEBUG] x64_sys_call hook failed, trying do_syscall_64...\n");
+            PRINT_DEBUG("[SYSCALLS] x64_sys_call not found, trying do_syscall_64\n");
+            hook = createSyscallHook<linux_syscall_data>("do_syscall_64", &linux_syscalls::linux_cb, "do_syscall_64");
+            if (hook)
+            {
+                auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
+                params->num = 0;
+                params->type = SYSCALL_TYPE_LINUX_X64;
+                params->sc = nullptr;
+
+                addr_t hook_addr = hook->trap_->breakpoint.addr;
+                this->hooks[hook_addr] = std::move(hook);
+                fprintf(stderr, "[SYSCALLS-DEBUG] SUCCESS: Registered do_syscall_64 hook at 0x%lx\n", (unsigned long)hook_addr);
+                PRINT_DEBUG("[SYSCALLS] Registered do_syscall_64 hook at 0x%lx\n", (unsigned long)hook_addr);
+            }
+            else
+            {
+                fprintf(stderr, "[SYSCALLS-DEBUG] FAILED: Both x64_sys_call and do_syscall_64 hooks failed, falling back to legacy\n");
+                PRINT_DEBUG("[SYSCALLS] Failed to register syscall hook, falling back to individual syscall hooks\n");
+                return this->trap_syscall_table_entries_legacy(drakvuf);
+            }
+        }
+    }
+    else
+    {
+        fprintf(stderr, "[SYSCALLS-DEBUG] Skipping x64_sys_call hook (is32bit=%d)\n", this->is32bit);
+    }
+
+    // For 32-bit compatibility, also try to hook do_int80_syscall_32
+    {
+        auto hook = createSyscallHook<linux_syscall_data>("do_int80_syscall_32", &linux_syscalls::linux_cb, "do_int80_syscall_32");
+        if (hook)
+        {
+            auto params = libhook::GetTrapParams<linux_syscall_data>(hook->trap_);
+            params->num = 0;
+            params->type = SYSCALL_TYPE_LINUX_X32;
+            params->sc = nullptr;  // null sc triggers dynamic lookup
+
+            this->hooks[hook->trap_->breakpoint.addr] = std::move(hook);
+            PRINT_DEBUG("[SYSCALLS] Successfully registered do_int80_syscall_32 hook\n");
+        }
+        else
+        {
+            PRINT_DEBUG("[SYSCALLS] do_int80_syscall_32 not found (may not be needed)\n");
+        }
+    }
+
+    return true;
+}
+
+// Legacy method for older kernels where individual __x64_sys_* hooks work
+bool linux_syscalls::trap_syscall_table_entries_legacy(drakvuf_t drakvuf)
+{
     bool check = true;
     static const syscall_t** syscall_table = (this->is32bit)? linuxsc::linux_syscalls_table_x32 : linuxsc::linux_syscalls_table_x64;
     uint64_t num_syscalls = (this->is32bit)? NUM_SYSCALLS_LINUX_X32 : NUM_SYSCALLS_LINUX_X64;
 
-    // Iterate over all syscalls and setup breakpoint on each function instead of do_syscall_64
-    // This increase performance, especially with filter file
     char syscall_name[256] = {0};
     for (uint64_t syscall_number = 0; syscall_number < num_syscalls; syscall_number++)
     {
         const syscall_t* syscall_defintion = syscall_table[syscall_number];
-        // Setup filter
         if (!this->filter.empty() && (this->filter.find(syscall_defintion->display_name) == this->filter.end()))
             continue;
 
-        // x32 syscall breakpoint
         snprintf(syscall_name, sizeof(syscall_name), "__ia32_sys_%s", syscall_defintion->name);
         if (!this->register_hook(syscall_name, syscall_number, syscall_defintion, false))
             check = false;
         memset(syscall_name, sizeof(char), sizeof(syscall_name));
 
-        // If only 32bit system we don't have x64 symbols so skip
         if (this->is32bit) continue;
 
-        // x64 syscall breakpoint
         snprintf(syscall_name, sizeof(syscall_name), "__x64_sys_%s", syscall_defintion->name);
         if (!this->register_hook(syscall_name, syscall_number, syscall_defintion, true))
             check = false;
@@ -378,12 +535,23 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
 
 linux_syscalls::linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : syscalls_base(drakvuf, config, output)
 {
+    fprintf(stderr, "[SYSCALLS-DEBUG] linux_syscalls constructor called\n"); fflush(stderr);
+
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_pt_regs_offsets_name, this->regs.size(), this->regs.data()))
     {
+        fprintf(stderr, "[SYSCALLS-DEBUG] FAILED: drakvuf_get_kernel_struct_members_array_rva failed\n"); fflush(stderr);
         PRINT_DEBUG("[SYSCALLS] Failed to get register offsets.\n");
         return;
     }
+    fprintf(stderr, "[SYSCALLS-DEBUG] Got register offsets successfully\n"); fflush(stderr);
 
     if (!this->trap_syscall_table_entries(drakvuf))
+    {
+        fprintf(stderr, "[SYSCALLS-DEBUG] trap_syscall_table_entries returned false\n"); fflush(stderr);
         PRINT_DEBUG("[SYSCALLS] Failed to set breakpoints on some syscalls.\n");
+    }
+    else
+    {
+        fprintf(stderr, "[SYSCALLS-DEBUG] trap_syscall_table_entries returned true\n"); fflush(stderr);
+    }
 }
