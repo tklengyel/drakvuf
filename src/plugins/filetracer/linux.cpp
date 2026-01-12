@@ -288,6 +288,7 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     )
     */
 
+    fprintf(stderr, "[FILETRACER-DEBUG] CALLBACK FIRED: %s at RIP=0x%lx\n", info->trap->name, (unsigned long)info->regs->rip); fflush(stderr);
     PRINT_DEBUG("[FILETRACER] Callback : %s \n", info->trap->name);
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if (!ret_addr)
@@ -315,8 +316,11 @@ event_response_t linux_filetracer::read_file_cb(drakvuf_t drakvuf, drakvuf_trap_
         size_t count,
         loff_t *pos
     )
+    // OR for ksys_read:
+    // ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
     */
 
+    fprintf(stderr, "[FILETRACER-DEBUG] CALLBACK FIRED: %s at RIP=0x%lx arg1=0x%lx\n", info->trap->name, (unsigned long)info->regs->rip, (unsigned long)info->regs->rdi); fflush(stderr);
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -354,8 +358,11 @@ event_response_t linux_filetracer::write_file_cb(drakvuf_t drakvuf, drakvuf_trap
         size_t count,
         loff_t *pos
     )
+    // OR for ksys_write:
+    // ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count)
     */
 
+    fprintf(stderr, "[FILETRACER-DEBUG] CALLBACK FIRED: %s at RIP=0x%lx arg1=0x%lx\n", info->trap->name, (unsigned long)info->regs->rip, (unsigned long)info->regs->rdi); fflush(stderr);
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -987,11 +994,488 @@ event_response_t linux_filetracer::read_link_cb(drakvuf_t drakvuf, drakvuf_trap_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+/* ---------------SYSCALL-BASED FILE TRACING (Modern kernels 6.x+)-------------- */
+
+// Linux x64 syscall numbers for file operations
+enum linux_file_syscalls {
+    __NR_read = 0,
+    __NR_write = 1,
+    __NR_open = 2,
+    __NR_close = 3,
+    __NR_stat = 4,
+    __NR_fstat = 5,
+    __NR_lstat = 6,
+    __NR_lseek = 8,
+    __NR_pread64 = 17,
+    __NR_pwrite64 = 18,
+    __NR_access = 21,
+    __NR_dup = 32,
+    __NR_dup2 = 33,
+    __NR_sendfile = 40,
+    __NR_fcntl = 72,
+    __NR_flock = 73,
+    __NR_fsync = 74,
+    __NR_fdatasync = 75,
+    __NR_truncate = 76,
+    __NR_ftruncate = 77,
+    __NR_getdents = 78,
+    __NR_getcwd = 79,
+    __NR_chdir = 80,
+    __NR_fchdir = 81,
+    __NR_rename = 82,
+    __NR_mkdir = 83,
+    __NR_rmdir = 84,
+    __NR_creat = 85,
+    __NR_link = 86,
+    __NR_unlink = 87,
+    __NR_symlink = 88,
+    __NR_readlink = 89,
+    __NR_chmod = 90,
+    __NR_fchmod = 91,
+    __NR_chown = 92,
+    __NR_fchown = 93,
+    __NR_lchown = 94,
+    __NR_getdents64 = 217,
+    __NR_openat = 257,
+    __NR_mkdirat = 258,
+    __NR_mknodat = 259,
+    __NR_fchownat = 260,
+    __NR_unlinkat = 263,
+    __NR_renameat = 264,
+    __NR_linkat = 265,
+    __NR_symlinkat = 266,
+    __NR_readlinkat = 267,
+    __NR_fchmodat = 268,
+    __NR_faccessat = 269,
+    __NR_renameat2 = 316,
+    __NR_memfd_create = 319,
+    __NR_openat2 = 437,
+};
+
+static const char* get_syscall_name(uint64_t nr)
+{
+    switch (nr) {
+        case __NR_read: return "read";
+        case __NR_write: return "write";
+        case __NR_open: return "open";
+        case __NR_close: return "close";
+        case __NR_stat: return "stat";
+        case __NR_fstat: return "fstat";
+        case __NR_lstat: return "lstat";
+        case __NR_lseek: return "lseek";
+        case __NR_pread64: return "pread64";
+        case __NR_pwrite64: return "pwrite64";
+        case __NR_access: return "access";
+        case __NR_dup: return "dup";
+        case __NR_dup2: return "dup2";
+        case __NR_sendfile: return "sendfile";
+        case __NR_truncate: return "truncate";
+        case __NR_ftruncate: return "ftruncate";
+        case __NR_getcwd: return "getcwd";
+        case __NR_chdir: return "chdir";
+        case __NR_fchdir: return "fchdir";
+        case __NR_rename: return "rename";
+        case __NR_mkdir: return "mkdir";
+        case __NR_rmdir: return "rmdir";
+        case __NR_creat: return "creat";
+        case __NR_link: return "link";
+        case __NR_unlink: return "unlink";
+        case __NR_symlink: return "symlink";
+        case __NR_readlink: return "readlink";
+        case __NR_chmod: return "chmod";
+        case __NR_fchmod: return "fchmod";
+        case __NR_chown: return "chown";
+        case __NR_fchown: return "fchown";
+        case __NR_lchown: return "lchown";
+        case __NR_getdents64: return "getdents64";
+        case __NR_openat: return "openat";
+        case __NR_mkdirat: return "mkdirat";
+        case __NR_mknodat: return "mknodat";
+        case __NR_fchownat: return "fchownat";
+        case __NR_unlinkat: return "unlinkat";
+        case __NR_renameat: return "renameat";
+        case __NR_linkat: return "linkat";
+        case __NR_symlinkat: return "symlinkat";
+        case __NR_readlinkat: return "readlinkat";
+        case __NR_fchmodat: return "fchmodat";
+        case __NR_faccessat: return "faccessat";
+        case __NR_renameat2: return "renameat2";
+        case __NR_memfd_create: return "memfd_create";
+        case __NR_openat2: return "openat2";
+        default: return nullptr;
+    }
+}
+
+static bool is_file_syscall(uint64_t nr)
+{
+    return get_syscall_name(nr) != nullptr;
+}
+
+bool linux_filetracer::get_pt_regs_and_nr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* pt_regs_addr, uint64_t* nr)
+{
+    /*
+     * For x64_sys_call: long x64_sys_call(struct pt_regs *regs, unsigned int nr)
+     *   - rdi = pt_regs* (kernel address, bit 47 set)
+     *   - esi = syscall number (32-bit)
+     */
+    if (VMI_GET_BIT(info->regs->rdi, 47))
+    {
+        *pt_regs_addr = info->regs->rdi;
+        uint32_t nr_32 = (uint32_t)(info->regs->rsi & 0xFFFFFFFF);
+        if (nr_32 < 0x1000) {
+            *nr = nr_32;
+            return true;
+        }
+
+        // Fallback: read orig_rax from pt_regs
+        auto vmi = vmi_lock_guard(drakvuf);
+        return VMI_SUCCESS == vmi_read_addr_va(vmi, *pt_regs_addr + this->regs[PT_REGS_ORIG_RAX], 0, nr);
+    }
+
+    // Newer kernel style: do_syscall_64(unsigned long nr, struct pt_regs *regs)
+    *nr = info->regs->rdi;
+    *pt_regs_addr = info->regs->rsi;
+    return true;
+}
+
+bool linux_filetracer::read_pt_regs_arg(drakvuf_t drakvuf, addr_t pt_regs_addr, int arg_index, uint64_t* value)
+{
+    // x64 syscall args in pt_regs: rdi, rsi, rdx, r10, r8, r9
+    static const int arg_offsets[] = {
+        PT_REGS_RDI, PT_REGS_RSI, PT_REGS_RDX, PT_REGS_R10, PT_REGS_R8, PT_REGS_R9
+    };
+
+    if (arg_index < 0 || arg_index >= 6)
+        return false;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    return VMI_SUCCESS == vmi_read_addr_va(vmi, pt_regs_addr + this->regs[arg_offsets[arg_index]], 0, value);
+}
+
+char* linux_filetracer::read_user_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t user_addr)
+{
+    if (!user_addr)
+        return nullptr;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = user_addr);
+
+    return vmi_read_str(vmi, &ctx);
+}
+
+std::string linux_filetracer::get_filename_from_fd(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int fd)
+{
+    if (fd < 0)
+        return "";
+
+    // Get current task's files_struct
+    addr_t task = drakvuf_get_current_process(drakvuf, info);
+    if (!task)
+        return "";
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    // task_struct->files (struct files_struct *)
+    addr_t files_struct;
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, task + this->offsets[_TASK_STRUCT_FILES], 0, &files_struct) || !files_struct)
+        return "";
+
+    // files_struct->fdt (struct fdtable *)
+    addr_t fdtable;
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, files_struct + this->offsets[_FILES_STRUCT_FDT], 0, &fdtable) || !fdtable)
+        return "";
+
+    // fdtable->fd (struct file **fd)
+    addr_t fd_array;
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, fdtable + this->offsets[_FDTABLE_FD], 0, &fd_array) || !fd_array)
+        return "";
+
+    // fd_array[fd] -> struct file *
+    addr_t file_struct;
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, fd_array + fd * sizeof(addr_t), 0, &file_struct) || !file_struct)
+        return "";
+
+    // file->f_path.dentry
+    addr_t dentry;
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, file_struct + this->offsets[_FILE_F_PATH] + this->offsets[_PATH_DENTRY], 0, &dentry) || !dentry)
+        return "";
+
+    // Use drakvuf helper to get full path from dentry
+    char* path = drakvuf_get_filepath_from_dentry(drakvuf, dentry);
+    if (!path)
+        return "";
+
+    std::string result(path);
+    g_free(path);
+    return result;
+}
+
+void linux_filetracer::print_syscall_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* syscall_name, linux_data* params)
+{
+    std::vector<std::pair<std::string, fmt::Aarg>> extra_args;
+
+    if (!params->filename.empty())
+        extra_args.emplace_back(keyval("FileName", fmt::Estr(params->filename)));
+    if (params->file_handle)
+        extra_args.emplace_back(keyval("FileHandle", fmt::Nval(static_cast<uint64_t>(params->file_handle))));
+    for (auto& arg : params->args)
+        extra_args.emplace_back(std::make_pair(arg.first, fmt::Rstr(arg.second)));
+
+    addr_t current_process = drakvuf_get_current_process(drakvuf, info);
+    const char* thread_name = drakvuf_get_process_name(drakvuf, current_process, false);
+
+    fmt::print(
+        this->m_output_format,
+        "filetracer",
+        drakvuf,
+        info,
+        keyval("Syscall", fmt::Qstr(syscall_name)),
+        keyval("ThreadName", fmt::Rstr(thread_name)),
+        std::move(extra_args)
+    );
+
+    g_free(const_cast<char*>(thread_name));
+}
+
+event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t pt_regs_addr = 0;
+    uint64_t nr = 0;
+
+    if (!get_pt_regs_and_nr(drakvuf, info, &pt_regs_addr, &nr))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    // Filter for file-related syscalls only
+    if (!is_file_syscall(nr))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    const char* syscall_name = get_syscall_name(nr);
+    linux_data params;
+
+    // Read syscall arguments from pt_regs
+    uint64_t arg0 = 0, arg1 = 0, arg2 = 0, arg3 = 0;
+    read_pt_regs_arg(drakvuf, pt_regs_addr, 0, &arg0);
+    read_pt_regs_arg(drakvuf, pt_regs_addr, 1, &arg1);
+    read_pt_regs_arg(drakvuf, pt_regs_addr, 2, &arg2);
+    read_pt_regs_arg(drakvuf, pt_regs_addr, 3, &arg3);
+
+    // Extract file information based on syscall type
+    switch (nr)
+    {
+        case __NR_read:
+        case __NR_write:
+        {
+            // ssize_t read/write(int fd, void *buf, size_t count)
+            int fd = (int)arg0;
+            params.file_handle = fd;
+            params.args["count"] = std::to_string(arg2);
+            params.filename = get_filename_from_fd(drakvuf, info, fd);
+            break;
+        }
+
+        case __NR_pread64:
+        case __NR_pwrite64:
+        {
+            // ssize_t pread64/pwrite64(int fd, void *buf, size_t count, off_t offset)
+            int fd = (int)arg0;
+            params.file_handle = fd;
+            params.args["count"] = std::to_string(arg2);
+            params.args["offset"] = std::to_string(arg3);
+            params.filename = get_filename_from_fd(drakvuf, info, fd);
+            break;
+        }
+
+        case __NR_open:
+        case __NR_creat:
+        {
+            // int open(const char *pathname, int flags, mode_t mode)
+            char* pathname = read_user_string(drakvuf, info, arg0);
+            if (pathname) {
+                params.filename = pathname;
+                g_free(pathname);
+            }
+            params.args["flags"] = std::to_string(arg1);
+            params.args["mode"] = std::to_string(arg2);
+            break;
+        }
+
+        case __NR_openat:
+        case __NR_openat2:
+        {
+            // int openat(int dirfd, const char *pathname, int flags, mode_t mode)
+            params.args["dirfd"] = std::to_string((int)arg0);
+            char* pathname = read_user_string(drakvuf, info, arg1);
+            if (pathname) {
+                params.filename = pathname;
+                g_free(pathname);
+            }
+            params.args["flags"] = std::to_string(arg2);
+            break;
+        }
+
+        case __NR_close:
+        {
+            // int close(int fd)
+            int fd = (int)arg0;
+            params.file_handle = fd;
+            params.filename = get_filename_from_fd(drakvuf, info, fd);
+            break;
+        }
+
+        case __NR_lseek:
+        {
+            // off_t lseek(int fd, off_t offset, int whence)
+            int fd = (int)arg0;
+            params.file_handle = fd;
+            params.args["offset"] = std::to_string((int64_t)arg1);
+            params.args["whence"] = std::to_string(arg2);
+            params.filename = get_filename_from_fd(drakvuf, info, fd);
+            break;
+        }
+
+        case __NR_stat:
+        case __NR_lstat:
+        case __NR_access:
+        case __NR_truncate:
+        case __NR_unlink:
+        case __NR_rmdir:
+        case __NR_mkdir:
+        case __NR_chmod:
+        case __NR_readlink:
+        case __NR_chdir:
+        {
+            // syscalls with (const char *pathname, ...)
+            char* pathname = read_user_string(drakvuf, info, arg0);
+            if (pathname) {
+                params.filename = pathname;
+                g_free(pathname);
+            }
+            break;
+        }
+
+        case __NR_fstat:
+        case __NR_ftruncate:
+        case __NR_fchmod:
+        case __NR_fchown:
+        case __NR_fchdir:
+        case __NR_dup:
+        {
+            // syscalls with (int fd, ...)
+            int fd = (int)arg0;
+            params.file_handle = fd;
+            params.filename = get_filename_from_fd(drakvuf, info, fd);
+            break;
+        }
+
+        case __NR_rename:
+        case __NR_link:
+        case __NR_symlink:
+        {
+            // syscalls with (const char *oldpath, const char *newpath)
+            char* oldpath = read_user_string(drakvuf, info, arg0);
+            char* newpath = read_user_string(drakvuf, info, arg1);
+            if (oldpath) {
+                params.filename = oldpath;
+                g_free(oldpath);
+            }
+            if (newpath) {
+                params.args["newpath"] = newpath;
+                g_free(newpath);
+            }
+            break;
+        }
+
+        case __NR_unlinkat:
+        case __NR_mkdirat:
+        case __NR_fchmodat:
+        case __NR_faccessat:
+        case __NR_readlinkat:
+        {
+            // syscalls with (int dirfd, const char *pathname, ...)
+            params.args["dirfd"] = std::to_string((int)arg0);
+            char* pathname = read_user_string(drakvuf, info, arg1);
+            if (pathname) {
+                params.filename = pathname;
+                g_free(pathname);
+            }
+            break;
+        }
+
+        case __NR_renameat:
+        case __NR_renameat2:
+        case __NR_linkat:
+        case __NR_symlinkat:
+        {
+            // syscalls with (int olddirfd, const char *oldpath, int newdirfd, const char *newpath, ...)
+            params.args["olddirfd"] = std::to_string((int)arg0);
+            char* oldpath = read_user_string(drakvuf, info, arg1);
+            if (oldpath) {
+                params.filename = oldpath;
+                g_free(oldpath);
+            }
+            params.args["newdirfd"] = std::to_string((int)arg2);
+            char* newpath = read_user_string(drakvuf, info, arg3);
+            if (newpath) {
+                params.args["newpath"] = newpath;
+                g_free(newpath);
+            }
+            break;
+        }
+
+        case __NR_memfd_create:
+        {
+            // int memfd_create(const char *name, unsigned int flags)
+            char* name = read_user_string(drakvuf, info, arg0);
+            if (name) {
+                params.filename = name;
+                g_free(name);
+            }
+            params.args["flags"] = std::to_string(arg1);
+            break;
+        }
+
+        case __NR_sendfile:
+        {
+            // ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
+            params.args["out_fd"] = std::to_string((int)arg0);
+            params.args["in_fd"] = std::to_string((int)arg1);
+            params.file_handle = (int)arg1;
+            params.args["count"] = std::to_string(arg3);
+            params.filename = get_filename_from_fd(drakvuf, info, (int)arg1);
+            break;
+        }
+
+        case __NR_dup2:
+        {
+            // int dup2(int oldfd, int newfd)
+            params.args["oldfd"] = std::to_string((int)arg0);
+            params.args["newfd"] = std::to_string((int)arg1);
+            params.file_handle = (int)arg0;
+            params.filename = get_filename_from_fd(drakvuf, info, (int)arg0);
+            break;
+        }
+
+        default:
+            // For other file syscalls, just log the syscall name
+            break;
+    }
+
+    print_syscall_info(drakvuf, info, syscall_name, &params);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+/* ---------------CONSTRUCTOR-------------- */
+
 linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output)
 {
+    PRINT_DEBUG("[FILETRACER] Initializing Linux filetracer\n");
+
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_offset_names, this->offsets.size(), this->offsets.data()))
     {
-        PRINT_DEBUG("[FILETRACER] Failed to get some offsets\n");
+        PRINT_DEBUG("[FILETRACER] Warning: Failed to get some offsets\n");
     }
 
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_pt_regs_offsets_name, this->regs.size(), this->regs.data()))
@@ -1000,7 +1484,17 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output) : 
         return;
     }
 
-    // File operations hooks
+    // Try modern kernel hook (x64_sys_call) first - works on kernel 6.x+
+    syscall_hook = createSyscallHook("x64_sys_call", &linux_filetracer::syscall_cb, "x64_sys_call");
+    if (syscall_hook)
+    {
+        PRINT_DEBUG("[FILETRACER] Using x64_sys_call hook for modern kernel\n");
+        return;  // Success - no need for legacy hooks
+    }
+
+    // Fallback to legacy VFS hooks (older kernels)
+    PRINT_DEBUG("[FILETRACER] x64_sys_call not available, using legacy VFS hooks\n");
+
     open_file_hook = createSyscallHook("do_filp_open", &linux_filetracer::open_file_cb);
     read_file_hook = createSyscallHook("vfs_read", &linux_filetracer::read_file_cb);
     write_file_hook = createSyscallHook("vfs_write", &linux_filetracer::write_file_cb);
@@ -1011,20 +1505,14 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output) : 
     rename_file_hook = createSyscallHook("vfs_rename", &linux_filetracer::rename_file_cb);
     truncate_file_hook = createSyscallHook("do_truncate", &linux_filetracer::truncate_file_cb);
     allocate_file_hook = createSyscallHook("vfs_allocate", &linux_filetracer::allocate_file_cb);
-
-    // File attributes change hooks
     chmod_file_hook = createSyscallHook("chmod_common", &linux_filetracer::chmod_file_cb);
     chown_file_hook = createSyscallHook("chown_common", &linux_filetracer::chown_file_cb);
     utimes_file_hook = createSyscallHook("vfs_utimes", &linux_filetracer::utimes_file_cb);
     access_file_hook = createSyscallHook("do_faccessat", &linux_filetracer::access_file_cb);
-
-    // Directory operations hooks
     mkdir_hook = createSyscallHook("vfs_mkdir", &linux_filetracer::mkdir_cb);
     rmdir_hook = createSyscallHook("vfs_rmdir", &linux_filetracer::rmdir_cb);
     chdir_hook = createSyscallHook("set_fs_pwd", &linux_filetracer::chdir_cb);
     chroot_hook = createSyscallHook("set_fs_root", &linux_filetracer::chroot_cb);
-
-    // Link operations hooks
     link_file_hook = createSyscallHook("vfs_link", &linux_filetracer::link_file_cb);
     unlink_file_hook = createSyscallHook("vfs_unlink", &linux_filetracer::unlink_file_cb);
     symbolic_link_file_hook = createSyscallHook("vfs_symlink", &linux_filetracer::symbolic_link_file_cb);

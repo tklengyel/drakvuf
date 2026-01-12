@@ -127,6 +127,7 @@ public:
     event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool trap_syscall_table_entries(drakvuf_t drakvuf);
+    bool trap_syscall_table_entries_legacy(drakvuf_t drakvuf);
 
     linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
 };

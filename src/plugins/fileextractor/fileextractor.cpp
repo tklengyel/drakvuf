@@ -107,15 +107,18 @@
 
 #include "fileextractor.h"
 #include "win.h"
+#include "linux.h"
 
 fileextractor::fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
     auto os = drakvuf_get_os_type(drakvuf);
     if (os == VMI_OS_WINDOWS)
         this->wf = std::make_unique<win_fileextractor>(drakvuf, config, output);
+    else if (os == VMI_OS_LINUX)
+        this->lf = std::make_unique<linux_fileextractor>(drakvuf, config, output);
     else
     {
-        PRINT_DEBUG("[FILEEXTRACTOR] Other platforms no supported yet\n");
+        PRINT_DEBUG("[FILEEXTRACTOR] Unsupported platform\n");
         throw -1;
     }
 }
@@ -125,9 +128,11 @@ bool fileextractor::stop_impl()
     auto os = drakvuf_get_os_type(this->drakvuf);
     if (os == VMI_OS_WINDOWS)
         return this->wf->stop();
+    else if (os == VMI_OS_LINUX)
+        return this->lf->stop();
     else
     {
-        PRINT_DEBUG("[FILEEXTRACTOR] Other platforms no supported yet\n");
+        PRINT_DEBUG("[FILEEXTRACTOR] Unsupported platform\n");
         return true;
     }
 }
