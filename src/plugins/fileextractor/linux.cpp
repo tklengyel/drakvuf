@@ -150,7 +150,8 @@ bool linux_fileextractor::get_pt_regs_and_nr(drakvuf_t drakvuf, drakvuf_trap_inf
 bool linux_fileextractor::read_pt_regs_arg(drakvuf_t drakvuf, addr_t pt_regs_addr, int arg_index, uint64_t* value)
 {
     /* x64 syscall args in pt_regs: rdi, rsi, rdx, r10, r8, r9 */
-    static const int arg_offsets[] = {
+    static const int arg_offsets[] =
+    {
         PT_REGS_RDI, PT_REGS_RSI, PT_REGS_RDX, PT_REGS_R10, PT_REGS_R8, PT_REGS_R9
     };
 
@@ -282,8 +283,8 @@ bool linux_fileextractor::save_file_chunk(const std::string& dump_path, const st
 }
 
 void linux_fileextractor::print_extraction_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                                 const std::string& filename, uint64_t size,
-                                                 const std::string& dump_path, const char* reason)
+    const std::string& filename, uint64_t size,
+    const std::string& dump_path, const char* reason)
 {
     addr_t current_process = drakvuf_get_current_process(drakvuf, info);
     const char* process_name = drakvuf_get_process_name(drakvuf, current_process, false);
@@ -369,7 +370,7 @@ event_response_t linux_fileextractor::syscall_cb(drakvuf_t drakvuf, drakvuf_trap
         it = tracked_files.emplace(file_key, std::move(file_info)).first;
 
         PRINT_DEBUG("[FILEEXTRACTOR-LINUX] New file: %s (seq=%d, pid=%d, fd=%d)\n",
-                    it->second.filename.c_str(), it->second.sequence_num, pid, fd);
+            it->second.filename.c_str(), it->second.sequence_num, pid, fd);
     }
 
     file_info_t& file_info = it->second;
@@ -393,7 +394,7 @@ event_response_t linux_fileextractor::syscall_cb(drakvuf_t drakvuf, drakvuf_trap
         if (file_info.total_bytes == buffer.size())
         {
             print_extraction_info(drakvuf, info, file_info.filename, buffer.size(),
-                                  file_info.dump_path, "WriteFile");
+                file_info.dump_path, "WriteFile");
         }
     }
     else

@@ -994,7 +994,8 @@ event_response_t linux_filetracer::read_link_cb(drakvuf_t drakvuf, drakvuf_trap_
 /* ---------------SYSCALL-BASED FILE TRACING (Modern kernels 6.x+)-------------- */
 
 // Linux x64 syscall numbers for file operations
-enum linux_file_syscalls {
+enum linux_file_syscalls
+{
     __NR_read = 0,
     __NR_write = 1,
     __NR_open = 2,
@@ -1051,55 +1052,104 @@ enum linux_file_syscalls {
 
 static const char* get_syscall_name(uint64_t nr)
 {
-    switch (nr) {
-        case __NR_read: return "read";
-        case __NR_write: return "write";
-        case __NR_open: return "open";
-        case __NR_close: return "close";
-        case __NR_stat: return "stat";
-        case __NR_fstat: return "fstat";
-        case __NR_lstat: return "lstat";
-        case __NR_lseek: return "lseek";
-        case __NR_pread64: return "pread64";
-        case __NR_pwrite64: return "pwrite64";
-        case __NR_access: return "access";
-        case __NR_dup: return "dup";
-        case __NR_dup2: return "dup2";
-        case __NR_sendfile: return "sendfile";
-        case __NR_truncate: return "truncate";
-        case __NR_ftruncate: return "ftruncate";
-        case __NR_getcwd: return "getcwd";
-        case __NR_chdir: return "chdir";
-        case __NR_fchdir: return "fchdir";
-        case __NR_rename: return "rename";
-        case __NR_mkdir: return "mkdir";
-        case __NR_rmdir: return "rmdir";
-        case __NR_creat: return "creat";
-        case __NR_link: return "link";
-        case __NR_unlink: return "unlink";
-        case __NR_symlink: return "symlink";
-        case __NR_readlink: return "readlink";
-        case __NR_chmod: return "chmod";
-        case __NR_fchmod: return "fchmod";
-        case __NR_chown: return "chown";
-        case __NR_fchown: return "fchown";
-        case __NR_lchown: return "lchown";
-        case __NR_getdents64: return "getdents64";
-        case __NR_openat: return "openat";
-        case __NR_mkdirat: return "mkdirat";
-        case __NR_mknodat: return "mknodat";
-        case __NR_fchownat: return "fchownat";
-        case __NR_unlinkat: return "unlinkat";
-        case __NR_renameat: return "renameat";
-        case __NR_linkat: return "linkat";
-        case __NR_symlinkat: return "symlinkat";
-        case __NR_readlinkat: return "readlinkat";
-        case __NR_fchmodat: return "fchmodat";
-        case __NR_faccessat: return "faccessat";
-        case __NR_renameat2: return "renameat2";
-        case __NR_memfd_create: return "memfd_create";
-        case __NR_openat2: return "openat2";
-        default: return nullptr;
+    switch (nr)
+    {
+        case __NR_read:
+            return "read";
+        case __NR_write:
+            return "write";
+        case __NR_open:
+            return "open";
+        case __NR_close:
+            return "close";
+        case __NR_stat:
+            return "stat";
+        case __NR_fstat:
+            return "fstat";
+        case __NR_lstat:
+            return "lstat";
+        case __NR_lseek:
+            return "lseek";
+        case __NR_pread64:
+            return "pread64";
+        case __NR_pwrite64:
+            return "pwrite64";
+        case __NR_access:
+            return "access";
+        case __NR_dup:
+            return "dup";
+        case __NR_dup2:
+            return "dup2";
+        case __NR_sendfile:
+            return "sendfile";
+        case __NR_truncate:
+            return "truncate";
+        case __NR_ftruncate:
+            return "ftruncate";
+        case __NR_getcwd:
+            return "getcwd";
+        case __NR_chdir:
+            return "chdir";
+        case __NR_fchdir:
+            return "fchdir";
+        case __NR_rename:
+            return "rename";
+        case __NR_mkdir:
+            return "mkdir";
+        case __NR_rmdir:
+            return "rmdir";
+        case __NR_creat:
+            return "creat";
+        case __NR_link:
+            return "link";
+        case __NR_unlink:
+            return "unlink";
+        case __NR_symlink:
+            return "symlink";
+        case __NR_readlink:
+            return "readlink";
+        case __NR_chmod:
+            return "chmod";
+        case __NR_fchmod:
+            return "fchmod";
+        case __NR_chown:
+            return "chown";
+        case __NR_fchown:
+            return "fchown";
+        case __NR_lchown:
+            return "lchown";
+        case __NR_getdents64:
+            return "getdents64";
+        case __NR_openat:
+            return "openat";
+        case __NR_mkdirat:
+            return "mkdirat";
+        case __NR_mknodat:
+            return "mknodat";
+        case __NR_fchownat:
+            return "fchownat";
+        case __NR_unlinkat:
+            return "unlinkat";
+        case __NR_renameat:
+            return "renameat";
+        case __NR_linkat:
+            return "linkat";
+        case __NR_symlinkat:
+            return "symlinkat";
+        case __NR_readlinkat:
+            return "readlinkat";
+        case __NR_fchmodat:
+            return "fchmodat";
+        case __NR_faccessat:
+            return "faccessat";
+        case __NR_renameat2:
+            return "renameat2";
+        case __NR_memfd_create:
+            return "memfd_create";
+        case __NR_openat2:
+            return "openat2";
+        default:
+            return nullptr;
     }
 }
 
@@ -1119,7 +1169,8 @@ bool linux_filetracer::get_pt_regs_and_nr(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         *pt_regs_addr = info->regs->rdi;
         uint32_t nr_32 = (uint32_t)(info->regs->rsi & 0xFFFFFFFF);
-        if (nr_32 < 0x1000) {
+        if (nr_32 < 0x1000)
+        {
             *nr = nr_32;
             return true;
         }
@@ -1138,7 +1189,8 @@ bool linux_filetracer::get_pt_regs_and_nr(drakvuf_t drakvuf, drakvuf_trap_info_t
 bool linux_filetracer::read_pt_regs_arg(drakvuf_t drakvuf, addr_t pt_regs_addr, int arg_index, uint64_t* value)
 {
     // x64 syscall args in pt_regs: rdi, rsi, rdx, r10, r8, r9
-    static const int arg_offsets[] = {
+    static const int arg_offsets[] =
+    {
         PT_REGS_RDI, PT_REGS_RSI, PT_REGS_RDX, PT_REGS_R10, PT_REGS_R8, PT_REGS_R9
     };
 
@@ -1290,7 +1342,8 @@ event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_in
         {
             // int open(const char *pathname, int flags, mode_t mode)
             char* pathname = read_user_string(drakvuf, info, arg0);
-            if (pathname) {
+            if (pathname)
+            {
                 params.filename = pathname;
                 g_free(pathname);
             }
@@ -1305,7 +1358,8 @@ event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_in
             // int openat(int dirfd, const char *pathname, int flags, mode_t mode)
             params.args["dirfd"] = std::to_string((int)arg0);
             char* pathname = read_user_string(drakvuf, info, arg1);
-            if (pathname) {
+            if (pathname)
+            {
                 params.filename = pathname;
                 g_free(pathname);
             }
@@ -1346,7 +1400,8 @@ event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_in
         {
             // syscalls with (const char *pathname, ...)
             char* pathname = read_user_string(drakvuf, info, arg0);
-            if (pathname) {
+            if (pathname)
+            {
                 params.filename = pathname;
                 g_free(pathname);
             }
@@ -1374,11 +1429,13 @@ event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_in
             // syscalls with (const char *oldpath, const char *newpath)
             char* oldpath = read_user_string(drakvuf, info, arg0);
             char* newpath = read_user_string(drakvuf, info, arg1);
-            if (oldpath) {
+            if (oldpath)
+            {
                 params.filename = oldpath;
                 g_free(oldpath);
             }
-            if (newpath) {
+            if (newpath)
+            {
                 params.args["newpath"] = newpath;
                 g_free(newpath);
             }
@@ -1394,7 +1451,8 @@ event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_in
             // syscalls with (int dirfd, const char *pathname, ...)
             params.args["dirfd"] = std::to_string((int)arg0);
             char* pathname = read_user_string(drakvuf, info, arg1);
-            if (pathname) {
+            if (pathname)
+            {
                 params.filename = pathname;
                 g_free(pathname);
             }
@@ -1409,13 +1467,15 @@ event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_in
             // syscalls with (int olddirfd, const char *oldpath, int newdirfd, const char *newpath, ...)
             params.args["olddirfd"] = std::to_string((int)arg0);
             char* oldpath = read_user_string(drakvuf, info, arg1);
-            if (oldpath) {
+            if (oldpath)
+            {
                 params.filename = oldpath;
                 g_free(oldpath);
             }
             params.args["newdirfd"] = std::to_string((int)arg2);
             char* newpath = read_user_string(drakvuf, info, arg3);
-            if (newpath) {
+            if (newpath)
+            {
                 params.args["newpath"] = newpath;
                 g_free(newpath);
             }
@@ -1426,7 +1486,8 @@ event_response_t linux_filetracer::syscall_cb(drakvuf_t drakvuf, drakvuf_trap_in
         {
             // int memfd_create(const char *name, unsigned int flags)
             char* name = read_user_string(drakvuf, info, arg0);
-            if (name) {
+            if (name)
+            {
                 params.filename = name;
                 g_free(name);
             }
