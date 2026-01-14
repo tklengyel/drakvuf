@@ -288,7 +288,6 @@ event_response_t linux_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     )
     */
 
-    fprintf(stderr, "[FILETRACER-DEBUG] CALLBACK FIRED: %s at RIP=0x%lx\n", info->trap->name, (unsigned long)info->regs->rip); fflush(stderr);
     PRINT_DEBUG("[FILETRACER] Callback : %s \n", info->trap->name);
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if (!ret_addr)
@@ -320,7 +319,6 @@ event_response_t linux_filetracer::read_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     // ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
     */
 
-    fprintf(stderr, "[FILETRACER-DEBUG] CALLBACK FIRED: %s at RIP=0x%lx arg1=0x%lx\n", info->trap->name, (unsigned long)info->regs->rip, (unsigned long)info->regs->rdi); fflush(stderr);
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -362,7 +360,6 @@ event_response_t linux_filetracer::write_file_cb(drakvuf_t drakvuf, drakvuf_trap
     // ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count)
     */
 
-    fprintf(stderr, "[FILETRACER-DEBUG] CALLBACK FIRED: %s at RIP=0x%lx arg1=0x%lx\n", info->trap->name, (unsigned long)info->regs->rip, (unsigned long)info->regs->rdi); fflush(stderr);
     PRINT_DEBUG("[FILETRACER] Callback : %s\n", info->trap->name);
 
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -1495,6 +1492,7 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output) : 
     // Fallback to legacy VFS hooks (older kernels)
     PRINT_DEBUG("[FILETRACER] x64_sys_call not available, using legacy VFS hooks\n");
 
+    // File operations hooks
     open_file_hook = createSyscallHook("do_filp_open", &linux_filetracer::open_file_cb);
     read_file_hook = createSyscallHook("vfs_read", &linux_filetracer::read_file_cb);
     write_file_hook = createSyscallHook("vfs_write", &linux_filetracer::write_file_cb);
@@ -1505,14 +1503,20 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output) : 
     rename_file_hook = createSyscallHook("vfs_rename", &linux_filetracer::rename_file_cb);
     truncate_file_hook = createSyscallHook("do_truncate", &linux_filetracer::truncate_file_cb);
     allocate_file_hook = createSyscallHook("vfs_allocate", &linux_filetracer::allocate_file_cb);
+
+    // File attributes change hooks
     chmod_file_hook = createSyscallHook("chmod_common", &linux_filetracer::chmod_file_cb);
     chown_file_hook = createSyscallHook("chown_common", &linux_filetracer::chown_file_cb);
     utimes_file_hook = createSyscallHook("vfs_utimes", &linux_filetracer::utimes_file_cb);
     access_file_hook = createSyscallHook("do_faccessat", &linux_filetracer::access_file_cb);
+
+    // Directory operations hooks
     mkdir_hook = createSyscallHook("vfs_mkdir", &linux_filetracer::mkdir_cb);
     rmdir_hook = createSyscallHook("vfs_rmdir", &linux_filetracer::rmdir_cb);
     chdir_hook = createSyscallHook("set_fs_pwd", &linux_filetracer::chdir_cb);
     chroot_hook = createSyscallHook("set_fs_root", &linux_filetracer::chroot_cb);
+
+    // Link operations hooks
     link_file_hook = createSyscallHook("vfs_link", &linux_filetracer::link_file_cb);
     unlink_file_hook = createSyscallHook("vfs_unlink", &linux_filetracer::unlink_file_cb);
     symbolic_link_file_hook = createSyscallHook("vfs_symlink", &linux_filetracer::symbolic_link_file_cb);

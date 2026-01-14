@@ -121,6 +121,7 @@ public:
     std::unique_ptr<libhook::SyscallHook> syscall_hook;
 
     // Legacy VFS hooks (older kernels)
+    // File operations hooks
     std::unique_ptr<libhook::SyscallHook> open_file_hook;
     std::unique_ptr<libhook::SyscallHook> read_file_hook;
     std::unique_ptr<libhook::SyscallHook> write_file_hook;
@@ -131,14 +132,17 @@ public:
     std::unique_ptr<libhook::SyscallHook> rename_file_hook;
     std::unique_ptr<libhook::SyscallHook> truncate_file_hook;
     std::unique_ptr<libhook::SyscallHook> allocate_file_hook;
+    // File attributes change hooks
     std::unique_ptr<libhook::SyscallHook> chmod_file_hook;
     std::unique_ptr<libhook::SyscallHook> chown_file_hook;
     std::unique_ptr<libhook::SyscallHook> utimes_file_hook;
     std::unique_ptr<libhook::SyscallHook> access_file_hook;
+    // Directory operations hooks
     std::unique_ptr<libhook::SyscallHook> mkdir_hook;
     std::unique_ptr<libhook::SyscallHook> rmdir_hook;
     std::unique_ptr<libhook::SyscallHook> chdir_hook;
     std::unique_ptr<libhook::SyscallHook> chroot_hook;
+    // Link operations hooks
     std::unique_ptr<libhook::SyscallHook> link_file_hook;
     std::unique_ptr<libhook::SyscallHook> unlink_file_hook;
     std::unique_ptr<libhook::SyscallHook> symbolic_link_file_hook;
