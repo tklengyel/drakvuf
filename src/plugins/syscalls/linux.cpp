@@ -146,7 +146,8 @@ bool linux_syscalls::get_pt_regs_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* in
         // (unsigned int nr) or full rsi for syscall_enter_from_user_mode (long).
         // Both are small values (< 0x1000), so just use the lower 32 bits.
         uint32_t nr_32 = (uint32_t)(info->regs->rsi & 0xFFFFFFFF);
-        if (nr_32 < 0x1000) {
+        if (nr_32 < 0x1000)
+        {
             *nr = nr_32;
             return true;
         }
@@ -469,7 +470,6 @@ bool linux_syscalls::trap_syscall_table_entries(drakvuf_t drakvuf)
                 return this->trap_syscall_table_entries_legacy(drakvuf);
             }
         }
-    }
     }
 
     // For 32-bit compatibility, also try to hook do_int80_syscall_32

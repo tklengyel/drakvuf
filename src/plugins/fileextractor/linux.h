@@ -115,8 +115,8 @@ private:
 
     /* Output */
     void print_extraction_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                               const std::string& filename, uint64_t size,
-                               const std::string& dump_path, const char* reason);
+        const std::string& filename, uint64_t size,
+        const std::string& dump_path, const char* reason);
 };
 
 #endif // FILEEXTRACTOR_LINUX_H
