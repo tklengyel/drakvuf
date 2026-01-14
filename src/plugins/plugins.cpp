@@ -164,15 +164,10 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
-        fprintf(stderr, "[PLUGINS-DEBUG] Starting plugin %d (%s), os=%d\n", plugin_id, drakvuf_plugin_names[plugin_id], this->os); fflush(stderr);
         PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
 
         if ( !drakvuf_plugin_os_support[plugin_id][this->os] )
-        {
-            fprintf(stderr, "[PLUGINS-DEBUG] Plugin %s does not support OS %d\n", drakvuf_plugin_names[plugin_id], this->os); fflush(stderr);
             return 0;
-        }
-        fprintf(stderr, "[PLUGINS-DEBUG] Plugin %s supports OS %d, continuing\n", drakvuf_plugin_names[plugin_id], this->os); fflush(stderr);
 
         try
         {

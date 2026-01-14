@@ -260,15 +260,8 @@ syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, o
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
     os_t os = drakvuf_get_os_type(drakvuf);
-    fprintf(stderr, "[SYSCALLS-DEBUG] syscalls() constructor - os=%d (WINDOWS=%d, LINUX=%d)\n", os, VMI_OS_WINDOWS, VMI_OS_LINUX); fflush(stderr);
     if (os == VMI_OS_WINDOWS)
-    {
-        fprintf(stderr, "[SYSCALLS-DEBUG] Creating win_syscalls\n"); fflush(stderr);
         this->_win_syscalls = std::make_unique<win_syscalls>(drakvuf, config, output);
-    }
     else
-    {
-        fprintf(stderr, "[SYSCALLS-DEBUG] Creating linux_syscalls\n"); fflush(stderr);
         this->_linux_syscalls = std::make_unique<linux_syscalls>(drakvuf, config, output);
-    }
 }
