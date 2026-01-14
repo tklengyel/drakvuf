@@ -102,15 +102,28 @@ linux_fileextractor::linux_fileextractor(drakvuf_t drakvuf, const fileextractor_
         PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Warning: Failed to get some Linux offsets, fd resolution may not work\n");
     }
 
-    /* Register x64_sys_call hook */
+    /* Register syscall hook - try x64_sys_call first, then fall back to do_syscall_64 */
+    PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Attempting to hook x64_sys_call...\n");
     syscall_hook = createSyscallHook("x64_sys_call", &linux_fileextractor::syscall_cb, "x64_sys_call");
-    if (!syscall_hook)
+    if (syscall_hook)
     {
-        PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Failed to hook x64_sys_call\n");
-        throw -1;
+        PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Successfully initialized with x64_sys_call hook\n");
     }
-
-    PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Successfully initialized with x64_sys_call hook\n");
+    else
+    {
+        /* Fallback to do_syscall_64 for older kernels (< 6.x) */
+        PRINT_DEBUG("[FILEEXTRACTOR-LINUX] x64_sys_call hook failed, trying do_syscall_64...\n");
+        syscall_hook = createSyscallHook("do_syscall_64", &linux_fileextractor::syscall_cb, "do_syscall_64");
+        if (syscall_hook)
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Successfully initialized with do_syscall_64 hook\n");
+        }
+        else
+        {
+            PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Failed to hook both x64_sys_call and do_syscall_64\n");
+            throw -1;
+        }
+    }
 }
 
 bool linux_fileextractor::stop_impl()
