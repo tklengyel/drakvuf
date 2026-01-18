@@ -41,30 +41,7 @@ static const char* linux_offset_names[][2] =
     {"path", "dentry"},
 };
 
-static const char* pt_regs_offset_names[][2] =
-{
-    {"pt_regs", "r15"},
-    {"pt_regs", "r14"},
-    {"pt_regs", "r13"},
-    {"pt_regs", "r12"},
-    {"pt_regs", "bp"},
-    {"pt_regs", "bx"},
-    {"pt_regs", "r11"},
-    {"pt_regs", "r10"},
-    {"pt_regs", "r9"},
-    {"pt_regs", "r8"},
-    {"pt_regs", "ax"},
-    {"pt_regs", "cx"},
-    {"pt_regs", "dx"},
-    {"pt_regs", "si"},
-    {"pt_regs", "di"},
-    {"pt_regs", "orig_ax"},
-    {"pt_regs", "ip"},
-    {"pt_regs", "cs"},
-    {"pt_regs", "flags"},
-    {"pt_regs", "sp"},
-    {"pt_regs", "ss"},
-};
+/* pt_regs offset names - reuse from filetracer_ns::linux_pt_regs_offsets_name */
 
 static inline bool is_write_syscall(uint64_t nr)
 {
@@ -89,8 +66,8 @@ linux_fileextractor::linux_fileextractor(drakvuf_t drakvuf, const fileextractor_
     /* Create dump folder if it doesn't exist */
     mkdir(dump_folder, 0755);
 
-    /* Get pt_regs offsets */
-    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, pt_regs_offset_names, this->regs.size(), this->regs.data()))
+    /* Get pt_regs offsets - reuse offset names from filetracer_ns */
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, filetracer_ns::linux_pt_regs_offsets_name, this->regs.size(), this->regs.data()))
     {
         PRINT_DEBUG("[FILEEXTRACTOR-LINUX] Failed to get pt_regs offsets\n");
         throw -1;
@@ -151,7 +128,7 @@ bool linux_fileextractor::get_pt_regs_and_nr(drakvuf_t drakvuf, drakvuf_trap_inf
 
         /* Fallback: read orig_rax from pt_regs */
         auto vmi = vmi_lock_guard(drakvuf);
-        return VMI_SUCCESS == vmi_read_addr_va(vmi, *pt_regs_addr + this->regs[PT_REGS_ORIG_RAX], 0, nr);
+        return VMI_SUCCESS == vmi_read_addr_va(vmi, *pt_regs_addr + this->regs[filetracer_ns::PT_REGS_ORIG_RAX], 0, nr);
     }
 
     /* Alternate style: do_syscall_64(unsigned long nr, struct pt_regs *regs) */
@@ -165,7 +142,8 @@ bool linux_fileextractor::read_pt_regs_arg(drakvuf_t drakvuf, addr_t pt_regs_add
     /* x64 syscall args in pt_regs: rdi, rsi, rdx, r10, r8, r9 */
     static const int arg_offsets[] =
     {
-        PT_REGS_RDI, PT_REGS_RSI, PT_REGS_RDX, PT_REGS_R10, PT_REGS_R8, PT_REGS_R9
+        filetracer_ns::PT_REGS_RDI, filetracer_ns::PT_REGS_RSI, filetracer_ns::PT_REGS_RDX,
+        filetracer_ns::PT_REGS_R10, filetracer_ns::PT_REGS_R8, filetracer_ns::PT_REGS_R9
     };
 
     if (arg_index < 0 || arg_index >= 6)
