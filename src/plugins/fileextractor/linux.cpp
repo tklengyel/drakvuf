@@ -167,17 +167,17 @@ std::string linux_fileextractor::get_filename_from_fd(drakvuf_t drakvuf, drakvuf
 
     /* task->files */
     addr_t files_struct;
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, task + this->offsets[LINUX_TASK_STRUCT_FILES], 0, &files_struct) || !files_struct)
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, task + this->offsets[FE_LINUX_TASK_STRUCT_FILES], 0, &files_struct) || !files_struct)
         return "";
 
     /* files->fdt */
     addr_t fdtable;
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, files_struct + this->offsets[LINUX_FILES_STRUCT_FDT], 0, &fdtable) || !fdtable)
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, files_struct + this->offsets[FE_LINUX_FILES_STRUCT_FDT], 0, &fdtable) || !fdtable)
         return "";
 
     /* fdt->fd (array of struct file*) */
     addr_t fd_array;
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, fdtable + this->offsets[LINUX_FDTABLE_FD], 0, &fd_array) || !fd_array)
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, fdtable + this->offsets[FE_LINUX_FDTABLE_FD], 0, &fd_array) || !fd_array)
         return "";
 
     /* fd_array[fd] -> struct file* */
@@ -187,7 +187,7 @@ std::string linux_fileextractor::get_filename_from_fd(drakvuf_t drakvuf, drakvuf
 
     /* file->f_path.dentry */
     addr_t dentry;
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, file_struct + this->offsets[LINUX_FILE_F_PATH] + this->offsets[LINUX_PATH_DENTRY], 0, &dentry) || !dentry)
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, file_struct + this->offsets[FE_LINUX_FILE_F_PATH] + this->offsets[FE_LINUX_PATH_DENTRY], 0, &dentry) || !dentry)
         return "";
 
     /* Use drakvuf helper to get full path from dentry */

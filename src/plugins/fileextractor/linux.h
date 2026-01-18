@@ -49,15 +49,15 @@ private:
     /* Linux struct offsets for fd-to-filename resolution */
     enum
     {
-        LINUX_TASK_STRUCT_FILES,
-        LINUX_FILES_STRUCT_FDT,
-        LINUX_FDTABLE_FD,
-        LINUX_FILE_F_PATH,
-        LINUX_PATH_DENTRY,
-        __LINUX_OFFSET_MAX
+        FE_LINUX_TASK_STRUCT_FILES,
+        FE_LINUX_FILES_STRUCT_FDT,
+        FE_LINUX_FDTABLE_FD,
+        FE_LINUX_FILE_F_PATH,
+        FE_LINUX_PATH_DENTRY,
+        __FE_LINUX_OFFSET_MAX
     };
 
-    std::array<size_t, __LINUX_OFFSET_MAX> offsets;
+    std::array<size_t, __FE_LINUX_OFFSET_MAX> offsets;
 
     /* Track files being written: key = (pid, fd), value = file info */
     struct file_info_t
