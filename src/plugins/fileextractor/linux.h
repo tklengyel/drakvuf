@@ -17,7 +17,6 @@
 
 #include "plugins/plugins_ex.h"
 #include "private.h"
-#include "plugins/filetracer/private.h"
 
 #include <map>
 #include <unordered_map>
@@ -43,8 +42,35 @@ private:
     /* Sequence number for unique file naming */
     int sequence_number{0};
 
-    /* pt_regs offsets - reuse definitions from filetracer_ns */
-    std::array<size_t, filetracer_ns::__PT_REGS_MAX> regs;
+    /* pt_regs offsets for reading syscall arguments
+     * Prefixed with FE_ to avoid conflict with filetracer_ns definitions */
+    enum
+    {
+        FE_PT_REGS_R15,
+        FE_PT_REGS_R14,
+        FE_PT_REGS_R13,
+        FE_PT_REGS_R12,
+        FE_PT_REGS_RBP,
+        FE_PT_REGS_RBX,
+        FE_PT_REGS_R11,
+        FE_PT_REGS_R10,
+        FE_PT_REGS_R9,
+        FE_PT_REGS_R8,
+        FE_PT_REGS_RAX,
+        FE_PT_REGS_RCX,
+        FE_PT_REGS_RDX,
+        FE_PT_REGS_RSI,
+        FE_PT_REGS_RDI,
+        FE_PT_REGS_ORIG_RAX,
+        FE_PT_REGS_RIP,
+        FE_PT_REGS_CS,
+        FE_PT_REGS_EFLAGS,
+        FE_PT_REGS_RSP,
+        FE_PT_REGS_SS,
+        __FE_PT_REGS_MAX
+    };
+
+    std::array<size_t, __FE_PT_REGS_MAX> regs;
 
     /* Linux struct offsets for fd-to-filename resolution */
     enum
