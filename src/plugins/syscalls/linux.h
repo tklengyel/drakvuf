@@ -120,7 +120,7 @@ public:
     bool register_hook(char* syscall_name, uint64_t syscall_number, const syscalls_ns::syscall_t* syscall_definition, bool is_x64);
 
     // Print information
-    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::vector<uint64_t> arguments);
+    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::syscall_t* sc, uint16_t syscall_num, const char* syscall_type, std::vector<uint64_t> arguments);
 
     // Callbacks
     event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

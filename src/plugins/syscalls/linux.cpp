@@ -271,20 +271,22 @@ std::vector<uint64_t> linux_syscalls::build_arguments_buffer(drakvuf_t drakvuf, 
     return arguments;
 }
 
-void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::vector<uint64_t> arguments)
+void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::syscall_t* sc, uint16_t syscall_num, const char* syscall_type, std::vector<uint64_t> arguments)
 {
-    auto params = libhook::GetTrapParams<linux_syscall_data>(info);
+    // Set trap name to syscall name so Method field shows the actual syscall
+    if (sc)
+        info->trap->name = sc->display_name;
 
     this->fmt_args.clear();
     for (size_t i = 0; i < arguments.size(); i++)
     {
-        auto str = this->parse_argument(drakvuf, info, params->sc->args[i], arguments[i]);
+        auto str = this->parse_argument(drakvuf, info, sc->args[i], arguments[i]);
         if (!str.empty())
-            this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Estr(str)));
+            this->fmt_args.push_back(keyval(sc->args[i].name, fmt::Estr(str)));
         else
         {
-            uint64_t value = this->transform_value(drakvuf, info, params->sc->args[i], arguments[i]);
-            this->fmt_args.push_back(keyval(params->sc->args[i].name, fmt::Xval(value)));
+            uint64_t value = this->transform_value(drakvuf, info, sc->args[i], arguments[i]);
+            this->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(value)));
         }
     }
 
@@ -297,9 +299,9 @@ void linux_syscalls::print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         keyval("Module", fmt::Qstr(std::move(info->trap->breakpoint.module))),
         keyval("vCPU", fmt::Nval(info->vcpu)),
         keyval("CR3", fmt::Xval(info->regs->cr3)),
-        keyval("Syscall", fmt::Nval((uint64_t)(params->num))),
-        keyval("NArgs", fmt::Nval(params->sc->num_args)),
-        keyval("Type", fmt::Estr(params->type)),
+        keyval("Syscall", fmt::Nval((uint64_t)syscall_num)),
+        keyval("NArgs", fmt::Nval(sc->num_args)),
+        keyval("Type", fmt::Rstr(syscall_type)),
         this->fmt_args
     );
 }
@@ -309,6 +311,10 @@ event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
     if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
+
+    // Set trap name to syscall name so Method field shows the actual syscall
+    if (params->sc)
+        info->trap->name = params->sc->display_name;
 
     this->print_sysret(drakvuf, info, (uint64_t)params->num);
 
@@ -329,14 +335,19 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    // When hooked at do_syscall_64, we need to look up the syscall definition dynamically
+    // When hooked at x64_sys_call/do_syscall_64, we need to look up the syscall definition dynamically
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
+
+    // Save original params->sc to detect dispatcher hooks (where sc is nullptr)
+    // We must preserve this because params persists across callback invocations
+    const syscall_t* original_sc = params->sc;
     const syscall_t* syscall_def = params->sc;
     const char* syscall_type = params->type.c_str();
     uint16_t syscall_num = params->num;
 
-    // Check if this is a do_syscall_64 entry point hook (sc will be null in this case)
-    if (!syscall_def)
+    // Check if this is a dispatcher hook (x64_sys_call/do_syscall_64) where sc is null
+    // For dispatcher hooks, we always need to do dynamic lookup based on the syscall number
+    if (!original_sc)
     {
         // Look up syscall definition dynamically from syscall number
         bool is_32bit_syscall = (info->trap->name && strstr(info->trap->name, "32") != nullptr);
@@ -366,14 +377,21 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
             return VMI_EVENT_RESPONSE_NONE;
         }
 
-        // Update params for use in build_arguments_buffer and print_syscall
+        // Temporarily update params for use in build_arguments_buffer
+        // These will be reset at the end to preserve dispatcher hook behavior
         params->num = syscall_num;
         params->type = syscall_type;
         params->sc = syscall_def;
     }
 
     auto arguments = build_arguments_buffer(drakvuf, info, pt_regs_addr, nr);
-    this->print_syscall(drakvuf, info, arguments);
+    this->print_syscall(drakvuf, info, syscall_def, syscall_num, syscall_type, arguments);
+
+    // Reset params->sc for dispatcher hooks to ensure dynamic lookup on next invocation
+    // This is critical: params persists across callback invocations, so without this reset,
+    // dispatcher hooks would only correctly identify the first syscall
+    if (!original_sc)
+        params->sc = nullptr;
 
     if (this->disable_sysret)
         return VMI_EVENT_RESPONSE_NONE;
