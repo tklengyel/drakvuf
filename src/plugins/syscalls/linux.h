@@ -895,7 +895,14 @@ SYSCALL(tkill, linux_int,
     "sig", "", DIR_IN, linux_int,
 );
 SYSCALL(time, linux_void);
-SYSCALL(futex, linux_void);
+SYSCALL(futex, linux_int,
+    "uaddr",     "", DIR_IN, linux_void_ptr,
+    "futex_op",  "", DIR_IN, linux_int,
+    "val",       "", DIR_IN, linux_unsigned_int,
+    "timeout",   "", DIR_IN, linux_void_ptr,
+    "uaddr2",    "", DIR_IN, linux_void_ptr,
+    "val3",      "", DIR_IN, linux_unsigned_int,
+);
 SYSCALL(sched_setaffinity, linux_int);
 SYSCALL(sched_getaffinity, linux_int);
 SYSCALL(set_thread_area, linux_int);
