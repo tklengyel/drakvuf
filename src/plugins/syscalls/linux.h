@@ -118,6 +118,7 @@ public:
     std::vector<uint64_t> build_arguments_buffer(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t pt_regs_addr, addr_t nr);
     bool get_pt_regs_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* pt_regs_addr, addr_t* nr);
     bool register_hook(char* syscall_name, uint64_t syscall_number, const syscalls_ns::syscall_t* syscall_definition, bool is_x64);
+    const syscalls_ns::syscall_t* lookup_syscall_for_dispatcher(drakvuf_trap_info_t* info, addr_t nr, const char** out_type, uint16_t* out_num);
 
     // Print information
     void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::syscall_t* sc, uint16_t syscall_num, const char* syscall_type, std::vector<uint64_t> arguments);
