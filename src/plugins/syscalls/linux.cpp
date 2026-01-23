@@ -324,6 +324,37 @@ event_response_t linux_syscalls::linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+// Helper to look up syscall definition for dispatcher hooks (x64_sys_call/do_syscall_64)
+// Returns nullptr if the syscall should be skipped (invalid, no definition, or filtered)
+const syscall_t* linux_syscalls::lookup_syscall_for_dispatcher(drakvuf_trap_info_t* info, addr_t nr, const char** out_type, uint16_t* out_num)
+{
+    bool is_32bit_syscall = (info->trap->name && strstr(info->trap->name, "32") != nullptr);
+    const syscall_t** syscall_table = is_32bit_syscall ? linuxsc::linux_syscalls_table_x32 : linuxsc::linux_syscalls_table_x64;
+    uint64_t num_syscalls = is_32bit_syscall ? NUM_SYSCALLS_LINUX_X32 : NUM_SYSCALLS_LINUX_X64;
+    *out_type = is_32bit_syscall ? SYSCALL_TYPE_LINUX_X32 : SYSCALL_TYPE_LINUX_X64;
+
+    if (nr >= num_syscalls)
+    {
+        PRINT_DEBUG("[SYSCALLS] Unknown syscall nr=%lu (max=%lu), skipping\n", nr, num_syscalls);
+        return nullptr;
+    }
+
+    const syscall_t* syscall_def = syscall_table[nr];
+    if (!syscall_def)
+    {
+        PRINT_DEBUG("[SYSCALLS] No definition for syscall nr=%lu, skipping\n", nr);
+        return nullptr;
+    }
+
+    *out_num = (uint16_t)nr;
+
+    // Apply filter if configured
+    if (!this->filter.empty() && (this->filter.find(syscall_def->display_name) == this->filter.end()))
+        return nullptr;
+
+    return syscall_def;
+}
+
 event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t pt_regs_addr = 0;
@@ -335,7 +366,6 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    // When hooked at x64_sys_call/do_syscall_64, we need to look up the syscall definition dynamically
     auto params = libhook::GetTrapParams<linux_syscall_data>(info);
 
     // Save original params->sc to detect dispatcher hooks (where sc is nullptr)
@@ -345,40 +375,14 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     const char* syscall_type = params->type.c_str();
     uint16_t syscall_num = params->num;
 
-    // Check if this is a dispatcher hook (x64_sys_call/do_syscall_64) where sc is null
-    // For dispatcher hooks, we always need to do dynamic lookup based on the syscall number
+    // For dispatcher hooks (x64_sys_call/do_syscall_64), look up syscall dynamically
     if (!original_sc)
     {
-        // Look up syscall definition dynamically from syscall number
-        bool is_32bit_syscall = (info->trap->name && strstr(info->trap->name, "32") != nullptr);
-        const syscall_t** syscall_table = is_32bit_syscall ? linuxsc::linux_syscalls_table_x32 : linuxsc::linux_syscalls_table_x64;
-        uint64_t num_syscalls = is_32bit_syscall ? NUM_SYSCALLS_LINUX_X32 : NUM_SYSCALLS_LINUX_X64;
-        syscall_type = is_32bit_syscall ? SYSCALL_TYPE_LINUX_X32 : SYSCALL_TYPE_LINUX_X64;
-
-        // Check if syscall number is valid
-        if (nr >= num_syscalls)
-        {
-            PRINT_DEBUG("[SYSCALLS] Unknown syscall nr=%lu (max=%lu), skipping\n", nr, num_syscalls);
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        syscall_def = syscall_table[nr];
+        syscall_def = lookup_syscall_for_dispatcher(info, nr, &syscall_type, &syscall_num);
         if (!syscall_def)
-        {
-            PRINT_DEBUG("[SYSCALLS] No definition for syscall nr=%lu, skipping\n", nr);
             return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        syscall_num = (uint16_t)nr;
-
-        // Apply filter if configured
-        if (!this->filter.empty() && (this->filter.find(syscall_def->display_name) == this->filter.end()))
-        {
-            return VMI_EVENT_RESPONSE_NONE;
-        }
 
         // Temporarily update params for use in build_arguments_buffer
-        // These will be reset at the end to preserve dispatcher hook behavior
         params->num = syscall_num;
         params->type = syscall_type;
         params->sc = syscall_def;
@@ -388,8 +392,6 @@ event_response_t linux_syscalls::linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     this->print_syscall(drakvuf, info, syscall_def, syscall_num, syscall_type, arguments);
 
     // Reset params->sc for dispatcher hooks to ensure dynamic lookup on next invocation
-    // This is critical: params persists across callback invocations, so without this reset,
-    // dispatcher hooks would only correctly identify the first syscall
     if (!original_sc)
         params->sc = nullptr;
 
