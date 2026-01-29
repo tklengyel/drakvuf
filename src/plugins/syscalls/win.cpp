@@ -129,6 +129,10 @@ static std::string whitelisted_libraries[] =
 
 static bool enum_modules_cb(drakvuf_t dravkuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* ctx)
 {
+    // Skip modules without a full_name (can be NULL for some kernel modules)
+    if (!module_info->full_name || !module_info->full_name->contents)
+        return true;
+
     auto plugin   = static_cast<win_syscalls*>(ctx);
     auto& modules = plugin->procs[module_info->pid];
     modules.push_back(
