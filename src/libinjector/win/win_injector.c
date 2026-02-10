@@ -635,79 +635,68 @@ file_methods_init:
     return injector->exec_func != 0;
 }
 
-injector_status_t injector_start_app_on_win(
+injector_t initialize_injector(
     drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid,
     const char* file,
     const char* cwd,
     injection_method_t method,
-    output_format_t format,
     const char* binary_path,
     const char* target_process,
     bool break_loop_on_detection,
-    injector_t* to_be_freed_later,
     bool global_search,
     bool wait_for_exit,
     int args_count,
     const char** args,
-    const char* shellexec_verb,
-    vmi_pid_t* injected_pid)
+    const char* shellexec_verb
+)
 {
-    injector_status_t rc = 0;
-    PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
-
     unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
+    unicode_string_t* cwd_us = NULL;
+    unicode_string_t* shellexec_verb_us = NULL;
+    unicode_string_t* shellexec_args_us = NULL;
+
     if (!target_file_us)
     {
         PRINT_DEBUG("Unable to convert file path from utf8 to utf16\n");
-        return 0;
+        goto error;
     }
 
-    unicode_string_t* cwd_us = NULL;
     if (cwd)
     {
         cwd_us = convert_utf8_to_utf16(cwd);
         if (!cwd_us)
         {
             PRINT_DEBUG("Unable to convert cwd from utf8 to utf16\n");
-            vmi_free_unicode_str(target_file_us);
-            return 0;
+            goto error;
         }
     }
 
-    unicode_string_t* shellexec_verb_us = NULL;
     if (shellexec_verb)
     {
         shellexec_verb_us = convert_utf8_to_utf16(shellexec_verb);
         if (!shellexec_verb_us)
         {
             PRINT_DEBUG("Unable to convert shellexecex verb from utf8 to utf16\n");
-            vmi_free_unicode_str(shellexec_verb_us);
-            return 0;
+            goto error;
         }
     }
 
-    unicode_string_t* shellexec_args_us = NULL;
     if (args_count > 0)
     {
         shellexec_args_us = convert_utf8_to_utf16(args[0]);
         if (!shellexec_args_us)
         {
             PRINT_DEBUG("Unable to convert shellexec args from utf8 to utf16\n");
-            vmi_free_unicode_str(shellexec_verb_us);
-            return 0;
+            goto error;
         }
     }
 
     injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
     if (!injector)
     {
-        vmi_free_unicode_str(target_file_us);
-        vmi_free_unicode_str(cwd_us);
-        vmi_free_unicode_str(shellexec_verb_us);
-        vmi_free_unicode_str(shellexec_args_us);
-        return 0;
+        goto error;
     }
 
     injector->drakvuf = drakvuf;
@@ -730,6 +719,58 @@ injector_status_t injector_start_app_on_win(
     injector->base_injector.step = STEP1;
     injector->base_injector.step_override = false;
     injector->base_injector.set_gprs_only = true;
+    return injector;
+
+error:
+    vmi_free_unicode_str(target_file_us);
+    vmi_free_unicode_str(cwd_us);
+    vmi_free_unicode_str(shellexec_verb_us);
+    vmi_free_unicode_str(shellexec_args_us);
+    return NULL;
+}
+
+injector_status_t injector_start_app_on_win(
+    drakvuf_t drakvuf,
+    vmi_pid_t pid,
+    uint32_t tid,
+    const char* file,
+    const char* cwd,
+    injection_method_t method,
+    output_format_t format,
+    const char* binary_path,
+    const char* target_process,
+    bool break_loop_on_detection,
+    injector_t* to_be_freed_later,
+    bool global_search,
+    bool wait_for_exit,
+    int args_count,
+    const char** args,
+    const char* shellexec_verb,
+    vmi_pid_t* injected_pid)
+{
+    injector_status_t rc = 0;
+    PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
+
+    injector_t injector = initialize_injector(
+            drakvuf,
+            pid,
+            tid,
+            file,
+            cwd,
+            method,
+            binary_path,
+            target_process,
+            break_loop_on_detection,
+            global_search,
+            wait_for_exit,
+            args_count,
+            args,
+            shellexec_verb);
+    if (!injector)
+    {
+        PRINT_DEBUG("Error during injector initialization\n");
+        return 0;
+    }
 
     if (!initialize_injector_functions(drakvuf, injector, file))
     {
