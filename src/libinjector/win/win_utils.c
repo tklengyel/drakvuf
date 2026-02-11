@@ -259,6 +259,8 @@ void free_injector(injector_t injector)
 
     vmi_free_unicode_str(injector->target_file_us);
     vmi_free_unicode_str(injector->cwd_us);
+    vmi_free_unicode_str(injector->shellexec_verb_us);
+    vmi_free_unicode_str(injector->shellexec_args_us);
     vmi_free_unicode_str(injector->expanded_target);
 
     g_free((void*)injector->binary);

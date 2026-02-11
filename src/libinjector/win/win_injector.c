@@ -575,7 +575,11 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
         }
         case INJECT_METHOD_SHELLEXEC:
         {
-            injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW", injector->global_search);
+            injector->close_handle = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CloseHandle", injector->global_search);
+            if (!injector->close_handle) return false;
+            injector->get_process_id = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "GetProcessId", injector->global_search);
+            if (!injector->get_process_id) return false;
+            injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteExW", injector->global_search);
             break;
         }
         case INJECT_METHOD_SHELLCODE:
@@ -631,6 +635,100 @@ file_methods_init:
     return injector->exec_func != 0;
 }
 
+injector_t initialize_injector(
+    drakvuf_t drakvuf,
+    vmi_pid_t pid,
+    uint32_t tid,
+    const char* file,
+    const char* cwd,
+    injection_method_t method,
+    const char* binary_path,
+    const char* target_process,
+    bool break_loop_on_detection,
+    bool global_search,
+    bool wait_for_exit,
+    int args_count,
+    const char** args,
+    const char* shellexec_verb
+)
+{
+    unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
+    unicode_string_t* cwd_us = NULL;
+    unicode_string_t* shellexec_verb_us = NULL;
+    unicode_string_t* shellexec_args_us = NULL;
+
+    if (!target_file_us)
+    {
+        PRINT_DEBUG("Unable to convert file path from utf8 to utf16\n");
+        goto error;
+    }
+
+    if (cwd)
+    {
+        cwd_us = convert_utf8_to_utf16(cwd);
+        if (!cwd_us)
+        {
+            PRINT_DEBUG("Unable to convert cwd from utf8 to utf16\n");
+            goto error;
+        }
+    }
+
+    if (shellexec_verb)
+    {
+        shellexec_verb_us = convert_utf8_to_utf16(shellexec_verb);
+        if (!shellexec_verb_us)
+        {
+            PRINT_DEBUG("Unable to convert shellexecex verb from utf8 to utf16\n");
+            goto error;
+        }
+    }
+
+    if (args_count > 0)
+    {
+        shellexec_args_us = convert_utf8_to_utf16(args[0]);
+        if (!shellexec_args_us)
+        {
+            PRINT_DEBUG("Unable to convert shellexec args from utf8 to utf16\n");
+            goto error;
+        }
+    }
+
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+    if (!injector)
+    {
+        goto error;
+    }
+
+    injector->drakvuf = drakvuf;
+    injector->target_pid = pid;
+    injector->target_tid = tid;
+    injector->target_file_us = target_file_us;
+    injector->cwd_us = cwd_us;
+    injector->shellexec_verb_us = shellexec_verb_us;
+    injector->shellexec_args_us = shellexec_args_us;
+    injector->method = method;
+    injector->global_search = global_search;
+    injector->wait_for_exit = wait_for_exit;
+    injector->binary_path = binary_path;
+    injector->target_process = target_process;
+    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    injector->break_loop_on_detection = break_loop_on_detection;
+    injector->error_code.valid = false;
+    injector->error_code.code = -1;
+    injector->error_code.string = "<UNKNOWN>";
+    injector->base_injector.step = STEP1;
+    injector->base_injector.step_override = false;
+    injector->base_injector.set_gprs_only = true;
+    return injector;
+
+error:
+    vmi_free_unicode_str(target_file_us);
+    vmi_free_unicode_str(cwd_us);
+    vmi_free_unicode_str(shellexec_verb_us);
+    vmi_free_unicode_str(shellexec_args_us);
+    return NULL;
+}
+
 injector_status_t injector_start_app_on_win(
     drakvuf_t drakvuf,
     vmi_pid_t pid,
@@ -645,56 +743,34 @@ injector_status_t injector_start_app_on_win(
     injector_t* to_be_freed_later,
     bool global_search,
     bool wait_for_exit,
+    int args_count,
+    const char** args,
+    const char* shellexec_verb,
     vmi_pid_t* injected_pid)
 {
     injector_status_t rc = 0;
     PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
 
-    unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
-    if (!target_file_us)
-    {
-        PRINT_DEBUG("Unable to convert file path from utf8 to utf16\n");
-        return 0;
-    }
-
-    unicode_string_t* cwd_us = NULL;
-    if (cwd)
-    {
-        cwd_us = convert_utf8_to_utf16(cwd);
-        if (!cwd_us)
-        {
-            PRINT_DEBUG("Unable to convert cwd from utf8 to utf16\n");
-            vmi_free_unicode_str(target_file_us);
-            return 0;
-        }
-    }
-
-    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+    injector_t injector = initialize_injector(
+            drakvuf,
+            pid,
+            tid,
+            file,
+            cwd,
+            method,
+            binary_path,
+            target_process,
+            break_loop_on_detection,
+            global_search,
+            wait_for_exit,
+            args_count,
+            args,
+            shellexec_verb);
     if (!injector)
     {
-        vmi_free_unicode_str(target_file_us);
-        vmi_free_unicode_str(cwd_us);
+        PRINT_DEBUG("Error during injector initialization\n");
         return 0;
     }
-
-    injector->drakvuf = drakvuf;
-    injector->target_pid = pid;
-    injector->target_tid = tid;
-    injector->target_file_us = target_file_us;
-    injector->cwd_us = cwd_us;
-    injector->method = method;
-    injector->global_search = global_search;
-    injector->wait_for_exit = wait_for_exit;
-    injector->binary_path = binary_path;
-    injector->target_process = target_process;
-    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    injector->break_loop_on_detection = break_loop_on_detection;
-    injector->error_code.valid = false;
-    injector->error_code.code = -1;
-    injector->error_code.string = "<UNKNOWN>";
-    injector->base_injector.step = STEP1;
-    injector->base_injector.step_override = false;
-    injector->base_injector.set_gprs_only = true;
 
     if (!initialize_injector_functions(drakvuf, injector, file))
     {

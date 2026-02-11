@@ -134,6 +134,8 @@
 #define MEM_PHYSICAL    0x00400000
 #define PAGE_EXECUTE_READWRITE  0x40
 #define CREATE_SUSPENDED 0x00000004
+#define SEE_MASK_NOCLOSEPROCESS 0x00000040
+#define SEE_MASK_NOASYNC 0x00000100
 
 struct injector
 {
@@ -144,6 +146,8 @@ struct injector
     vmi_pid_t target_pid;
     uint32_t target_tid;
     unicode_string_t* cwd_us;
+    unicode_string_t* shellexec_verb_us;
+    unicode_string_t* shellexec_args_us;
     bool break_loop_on_detection;
 
     // Internal:
@@ -167,6 +171,8 @@ struct injector
     addr_t payload, payload_addr, memset;
     // For readfile/writefile
     addr_t create_file, read_file, write_file, close_handle, expand_env;
+    // For shellexec operation
+    addr_t get_process_id;
     size_t binary_size, payload_size;
     uint32_t file_handle;
     FILE* host_file;
@@ -257,6 +263,44 @@ struct process_information_64
     addr_t hThread;
     uint32_t dwProcessId;
     uint32_t dwThreadId;
+} __attribute__ ((packed));
+
+struct shell_execute_info_32
+{
+    uint32_t cbSize;
+    uint32_t fMask;
+    uint32_t hwnd;
+    uint32_t lpVerb;
+    uint32_t lpFile;
+    uint32_t lpParameters;
+    uint32_t lpDirectory;
+    uint32_t nShow;
+    uint32_t hInstApp;
+    uint32_t lpIDList;
+    uint32_t lpClass;
+    uint32_t hkeyClass;
+    uint32_t dwHotKey;
+    uint32_t hIcon;
+    uint32_t hProcess;
+} __attribute__ ((packed));
+
+struct shell_execute_info_64
+{
+    uint32_t cbSize;
+    uint32_t fMask;
+    addr_t hwnd;
+    addr_t lpVerb;
+    addr_t lpFile;
+    addr_t lpParameters;
+    addr_t lpDirectory;
+    uint64_t nShow;
+    addr_t hInstApp;
+    addr_t lpIDList;
+    addr_t lpClass;
+    addr_t hkeyClass;
+    addr_t dwHotKey;
+    addr_t hIcon;
+    addr_t hProcess;
 } __attribute__ ((packed));
 
 unicode_string_t* convert_utf8_to_utf16(char const* str);

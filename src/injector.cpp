@@ -181,12 +181,14 @@ static inline void print_help(void)
         "\t                           [BOTH] (WIN - 32-bit untested and 64-bit, LINUX - 64-bit only)\n"
         "\t                             readfile - pull a file (specified by guest path -e) from the VM and store it on host path specified by -B\n"
         "\t                             writefile - push a file (specified by host path -B) to the VM and store it on guest path specified by -e\n"
-        "\t -f <args for execproc>    [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
+        "\t -f <args for execproc>    [BOTH] - Arguments specified for exec to include (requires -m execproc or -m shellexec)\n"
         "\t                           [LINUX] (execproc -> execve(const char *file, const char *argv[], const char* envp[]); 64bit only)\n"
+        "\t                           [WIN] (shellexec -> arguments for the program)\n"
         "\t [-B] <path>               The host path of the binary:\n"
         "\t                             for -m readfile: where to store the file read out from VM\n"
         "\t                             for -m writefile: to write into the guest VM\n"
         "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+        "\t -V <shellexec verb>       Verb for ShellExecute (e.g. runas for elevation into Administrator rights)\n"
         "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
         "\t -c <current_working_dir>  The current working directory for injected executable\n"
         "\t -w                        Inject process and wait until it terminates (requires -m createproc)\n"
@@ -211,6 +213,7 @@ int main(int argc, char** argv)
     bool injection_global_search = false;
     char* binary_path = NULL;
     char* target_process = NULL;
+    char* shellexec_verb = NULL;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     bool libvmi_conf = false;
     bool wait_for_exit = false;
@@ -239,7 +242,7 @@ int main(int argc, char** argv)
         {"timeout", required_argument, NULL, opt_timeout},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:B:P:f:k:vlgo:w";
+    const char* opts = "r:d:i:I:e:m:B:P:V:f:k:vlgo:w";
 
     int long_index = -1;
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
@@ -294,6 +297,9 @@ int main(int argc, char** argv)
             case 'P':
                 target_process = optarg;
                 break;
+            case 'V':
+                shellexec_verb = optarg;
+                break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
                 verbose = 1;
@@ -329,7 +335,7 @@ int main(int argc, char** argv)
         print_help();
         return 1;
     }
-    if (injection_method != INJECT_METHOD_EXECPROC && !args.empty())
+    if ((injection_method != INJECT_METHOD_EXECPROC && injection_method != INJECT_METHOD_SHELLEXEC) && !args.empty())
     {
         printf("Arguments not supported! \n");
         print_help();
@@ -384,7 +390,9 @@ int main(int argc, char** argv)
             wait_for_exit,
             args.size(),
             args.data(),
-            &injected_pid);
+            shellexec_verb,
+            &injected_pid
+        );
 
     cleanup_timer();
 

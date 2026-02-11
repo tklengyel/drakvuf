@@ -173,6 +173,7 @@ public:
         bool global_search,
         int args_count,
         const char* args[],
+        const char* shellexec_verb,
         vmi_pid_t* injected_pid);
     void exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid);
     void terminate(vmi_pid_t injection_pid, uint32_t injection_tid, vmi_pid_t pid, int termination_timeout, std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes);

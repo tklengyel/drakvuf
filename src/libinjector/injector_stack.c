@@ -208,6 +208,21 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     return addr;
 }
 
+addr_t place_string_on_stack(drakvuf_t drakvuf, vmi_instance_t vmi, x86_registers_t* regs, void const* str, size_t str_len)
+{
+    addr_t addr = regs->rsp;
+
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    addr_t next_addr = is32bit
+        ? place_string_on_stack_32(vmi, regs, addr, str, str_len)
+        : place_string_on_stack_64(vmi, regs, addr, str, str_len);
+
+    // grow the stack
+    regs->rsp = next_addr;
+    return next_addr;
+}
+
+
 static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, const void* data, size_t size)
 {
     const uint32_t stack_align = 64;

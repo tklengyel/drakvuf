@@ -116,6 +116,7 @@ bool setup_expand_env_stack(injector_t injector, x86_registers_t* regs);
 bool setup_create_file_stack(injector_t injector, x86_registers_t* regs);
 bool setup_read_file_stack(injector_t injector, x86_registers_t* regs);
 bool setup_write_file_stack(injector_t injector, x86_registers_t* regs, size_t amount);
-bool setup_close_handle_stack(injector_t injector, x86_registers_t* regs);
+bool setup_close_handle_stack(injector_t injector, x86_registers_t* regs, uint64_t handle);
+bool setup_get_process_id_stack(injector_t injector, x86_registers_t* regs);
 
 #endif

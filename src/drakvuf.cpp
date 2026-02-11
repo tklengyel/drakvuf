@@ -357,6 +357,7 @@ injector_status_t drakvuf_c::write_file(
             false,
             0,
             nullptr,
+            nullptr,
             nullptr);
 
     if (INJECTOR_SUCCEEDED != rc)
@@ -378,6 +379,7 @@ injector_status_t drakvuf_c::inject_cmd(
     bool global_search,
     int args_count,
     const char* args[],
+    const char* shellexec_verb,
     vmi_pid_t* injected_pid)
 {
     if ( !startup_timer(this, _timeout) )
@@ -398,6 +400,7 @@ injector_status_t drakvuf_c::inject_cmd(
             false,
             args_count,
             args,
+            shellexec_verb,
             injected_pid);
 
     if (INJECTOR_SUCCEEDED != rc)
