@@ -115,6 +115,8 @@ sources += syscalls/win.cpp
 sources += syscalls/win.h
 sources += syscalls/private.h
 sources += syscalls/private_2.h
+sources += syscalls/parsers_win.cpp
+sources += syscalls/parsers_linux.cpp
 endif
 
 if PLUGIN_POOLMON

@@ -116,6 +116,7 @@
 
 using namespace syscalls_ns;
 
+
 void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info)
 {
     fmt::print(this->m_output_format, "sysret", drakvuf, info,
@@ -128,55 +129,87 @@ void syscalls_base::print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
     );
 }
 
-std::string syscalls_base::parse_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+std::optional<uint64_t> syscalls_base::get_arg_value_by_name(
+    const syscall_t* sc, const std::vector<uint64_t>& all_args, const std::string& name)
 {
-    char* cstr = nullptr;
-
-    if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
+    for (size_t i = 0; i < sc->num_args; ++i)
     {
-        switch (arg.type)
+        if (strcmp(sc->args[i].name, name.c_str()) == 0)
         {
-            case PUNICODE_STRING:
+            if (i < all_args.size())
             {
-                unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-                if ( us )
-                {
-                    cstr = (char*)us->contents;
-                    us->contents = nullptr;
-                    vmi_free_unicode_str(us);
-                }
-                break;
+                return all_args[i];
             }
-            case PCHAR:
-            case linux_char_ptr:
-                cstr = drakvuf_read_ascii_str(drakvuf, info, val);
-                break;
-            case linux_intmask_prot_:
-                // PROT_NONE == 0, so incorrect for parsing flags
-                return val == 0 ? "PROT_NONE" : parse_flags(val, mmap_prot, m_output_format);
-            case linux_intopt_pr_:
-                return prctl_option.find(val) != prctl_option.end() ? prctl_option.at(val) : std::to_string(val);
-            case linux_intopt_arch_:
-                return arch_prctl_code.find(val) != arch_prctl_code.end() ? arch_prctl_code.at(val) : std::to_string(val);
-            default:
-                if (this->os == VMI_OS_WINDOWS)
-                    cstr = win_extract_string(drakvuf, info, arg, val);
-                break;
+            return std::nullopt;
         }
     }
-
-    if (cstr)
-    {
-        std::string str = std::string(cstr);
-        g_free(cstr);
-        return str;
-    }
-    return {};
+    return std::nullopt;
 }
 
-uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
+
+void syscalls_base::fill_fmt_args(
+    fmt_args_t& original_args, fmt_args_t& extra_args, const syscall_t* sc, drakvuf_trap_info_t* info,
+    const std::vector<uint64_t>& args, bool is_ret, bool ret_success)
 {
-    switch (arg_types.at(arg.type).size)
+    for (size_t i = 0; i < args.size(); ++i)
+    {
+        const auto& original_arg = sc->args[i];
+        uint64_t raw_value = this->value_from_uint64(original_arg.type, args[i]);
+
+        auto type_info = arg_types.at(original_arg.type);
+        if (original_arg.dir == DIR_OUT && !type_info.is_ptr && !is_ret)
+        {
+            original_args.push_back(keyval(std::string(original_arg.name), fmt::Estr("<out>")));
+            continue;
+        }
+
+        auto arg_to_parse = original_arg;
+        uint64_t value_to_parse = raw_value;
+        std::optional<uint64_t> dereferenced_value;
+
+        bool is_value_complete = (original_arg.dir != DIR_OUT) || is_ret;
+
+        if (this->dereference_args && raw_value && type_info.is_ptr && type_info.ptr_for_type != Void && is_value_complete && ret_success)
+        {
+            auto vmi = vmi_lock_guard(drakvuf);
+            ACCESS_CONTEXT(ctx, .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3, .addr = raw_value);
+
+            uint64_t temp_val;
+            if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &temp_val))
+            {
+                dereferenced_value = temp_val;
+                arg_to_parse.type = type_info.ptr_for_type;
+                value_to_parse = *dereferenced_value;
+            }
+            else
+            {
+                PRINT_DEBUG("VMI read failed for address 0x%lx\n", raw_value);
+            }
+        }
+
+        original_args.push_back(keyval(std::string(original_arg.name), fmt::Xval(raw_value)));
+
+        if (is_value_complete)
+        {
+            arg_parser_t parser = arg_to_parse.parser;
+
+            if (parser)
+            {
+                // Parser gets the dereferenced value and type
+                parser((void*)this, (void*)&original_args, (void*)&extra_args, sc, arg_to_parse, (void*)info, value_to_parse, (const void*)&args);
+            }
+            else if (dereferenced_value)
+            {
+                // No parser, show dereferenced hex value
+                extra_args.push_back(keyval(std::string("*") + std::string(original_arg.name), fmt::Xval(*dereferenced_value)));
+            }
+        }
+    }
+}
+
+uint64_t syscalls_base::value_from_uint64(arg_type_t type, uint64_t val)
+{
+    switch (arg_types.at(type).size)
     {
         case ARG_SIZE_8:
             return val & 0xff;
@@ -193,30 +226,6 @@ uint64_t syscalls_base::mask_value(const arg_t& arg, uint64_t val)
     }
 }
 
-uint64_t syscalls_base::transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
-{
-    if ((arg.type == PPVOID) && val)
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = val
-        );
-
-        uint64_t _val;
-
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &_val))
-        {
-            fprintf(stderr, "Failed to read address (%p)\n", (void*) val);
-            _val = 0;
-        }
-
-        val = _val;
-    }
-    return mask_value(arg, val);
-}
-
 static std::string rstrip(std::string s)
 {
     while (!s.empty() && isspace(s.back()))
@@ -224,9 +233,24 @@ static std::string rstrip(std::string s)
     return s;
 }
 
-bool syscalls_base::read_syscalls_filter(const char* filter_file)
+void syscalls_base::find_replace_arg(std::vector<std::pair<std::string, fmt::Aarg>>& vec, const std::string& key, const fmt::Aarg& newValue)
 {
-    std::ifstream file(filter_file);
+    auto it = std::find_if(vec.begin(), vec.end(),
+            [&key](const std::pair<std::string, fmt::Aarg>& element)
+    {
+        return element.first == key;
+    }
+        );
+
+    if (it != vec.end())
+    {
+        it->second = newValue;
+    }
+}
+
+bool syscalls_base::read_syscalls_list(const char* syscall_list_file)
+{
+    std::ifstream file(syscall_list_file);
     if (!file.is_open())
     {
         fprintf(stderr, "[SYSCALLS] failed to open syscalls file, does it exist?\n");
@@ -237,13 +261,25 @@ bool syscalls_base::read_syscalls_filter(const char* filter_file)
     while (std::getline(file, line))
     {
         line = rstrip(std::move(line));
-        if (!line.empty())
-            this->filter.insert(line);
+        if (line.empty())
+            continue;
+
+        size_t pos = line.find(',');
+        if (pos == std::string::npos)
+        {
+            this->syscall_list.emplace(line, false);
+            continue;
+        }
+
+        auto syscall = line.substr(0, pos);
+        auto param = line.substr(pos + 1);
+        bool is_ret = param == "retval";
+
+        this->syscall_list.emplace(syscall, is_ret);
     }
 
     return true;
 }
-
 
 syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output) : pluginex(drakvuf, output)
 {
@@ -252,8 +288,11 @@ syscalls_base::syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, o
     this->register_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
     this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     this->disable_sysret = config->disable_sysret;
+    this->dereference_args = config->syscalls_dereference_args;
+    this->nested_args = config->syscalls_nested_args;
 
-    if (config->syscalls_filter_file && !this->read_syscalls_filter(config->syscalls_filter_file))
+
+    if (config->syscalls_list_file && !this->read_syscalls_list(config->syscalls_list_file))
         throw -1;
 }
 

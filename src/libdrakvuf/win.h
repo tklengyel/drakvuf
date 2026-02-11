@@ -207,6 +207,7 @@ uint64_t win_mmvad_protection(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid);
+bool win_get_pid_from_thread_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
 addr_t win_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
 bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
