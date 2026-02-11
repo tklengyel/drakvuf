@@ -118,15 +118,17 @@ public:
     std::vector<uint64_t> build_arguments_buffer(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t pt_regs_addr, addr_t nr);
     bool get_pt_regs_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* pt_regs_addr, addr_t* nr);
     bool register_hook(char* syscall_name, uint64_t syscall_number, const syscalls_ns::syscall_t* syscall_definition, bool is_x64);
+    const syscalls_ns::syscall_t* lookup_syscall_for_dispatcher(drakvuf_trap_info_t* info, addr_t nr, const char** out_type, uint16_t* out_num);
 
     // Print information
-    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, std::vector<uint64_t> arguments);
+    void print_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscalls_ns::syscall_t* sc, uint16_t syscall_num, const char* syscall_type, std::vector<uint64_t> arguments);
 
     // Callbacks
     event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool trap_syscall_table_entries(drakvuf_t drakvuf);
+    bool trap_syscall_table_entries_legacy(drakvuf_t drakvuf);
 
     linux_syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
 };
@@ -894,7 +896,14 @@ SYSCALL(tkill, linux_int,
     "sig", "", DIR_IN, linux_int,
 );
 SYSCALL(time, linux_void);
-SYSCALL(futex, linux_void);
+SYSCALL(futex, linux_int,
+    "uaddr",     "", DIR_IN, linux_void_ptr,
+    "futex_op",  "", DIR_IN, linux_int,
+    "val",       "", DIR_IN, linux_unsigned_int,
+    "timeout",   "", DIR_IN, linux_void_ptr,
+    "uaddr2",    "", DIR_IN, linux_void_ptr,
+    "val3",      "", DIR_IN, linux_unsigned_int,
+);
 SYSCALL(sched_setaffinity, linux_int);
 SYSCALL(sched_getaffinity, linux_int);
 SYSCALL(set_thread_area, linux_int);
