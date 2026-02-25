@@ -240,6 +240,28 @@ static event_response_t setup_usermode_trap_x64(drakvuf_t drakvuf, drakvuf_trap_
      * the registers to the original values, thus the process continues to run.
      */
     injector_t injector = info->trap->data;
+
+    if ((info->regs->rsp & VMI_BIT_MASK(0, 62)) == info->regs->cr3)
+    {
+        /**
+         * CR3 update doesn't mean that our trap frame is valid.
+         * When KVAS (Windows KPTI implementation) is enabled for the process,
+         * CR3 is switched very early in the KiSystemCall64Shadow routine,
+         * even before kernel stack pointer is properly set. So if our target
+         * thread just switched from user mode to kernel mode, we will get an
+         * invalid trap frame.
+         *
+         * Prologue of KiSystemCall64Shadow uses RSP to set CR3 from
+         * GS:[KPRCB::KernelDirectoryTableBase]. It's an implementation detail,
+         * but that prologue is probably written in assembly and doesn't change
+         * across Windows kernel versions. We can use RSP==CR3 as an indicator
+         * that our target thread just made a system call and it's better to
+         * wait for another CR3 change.
+         */
+        PRINT_DEBUG("Early syscall CR3 change, trapframe not yet valid, waiting for another one.\n");
+        return 0;
+    }
+
     addr_t thread = drakvuf_get_current_thread(drakvuf, info);
     if (!thread)
     {
