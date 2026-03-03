@@ -534,8 +534,8 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
             addr_t entry{};
             if (!drakvuf_get_kernel_symbol_va(drakvuf, name, &entry))
             {
-                PRINT_DEBUG("[ETWMON] Failed to resolve %s\n", name);
-                throw -1;
+                PRINT_DEBUG("[ETWMON] Failed to resolve %s, skipping\n", name);
+                continue;
             }
             this->global_handles_va.push_back(entry);
         }
@@ -548,8 +548,8 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
             addr_t entry{};
             if (!drakvuf_get_kernel_symbol_va(drakvuf, name, &entry))
             {
-                PRINT_DEBUG("[ETWMON] Failed to resolve %s\n", name);
-                throw -1;
+                PRINT_DEBUG("[ETWMON] Failed to resolve %s, skipping\n", name);
+                continue;
             }
             for (size_t i = 0; i < size; i++)
             {
