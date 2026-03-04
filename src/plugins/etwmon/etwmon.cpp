@@ -147,6 +147,44 @@ static const std::vector<const char*> win10_global_handles =
     "PerfDiagGlobals",
 };
 
+static const std::vector<const char*> win11_global_handles =
+{
+    "EtwpEventTracingProvRegHandle",
+    "EtwKernelProvRegHandle",
+    "EtwpPsProvRegHandle",
+    "EtwpNetProvRegHandle",
+    "EtwpFileProvRegHandle",
+    "EtwpRegTraceHandle",
+    "EtwpMemoryProvRegHandle",
+    "EtwpDiskProvRegHandle",
+    "EtwAppCompatProvRegHandle",
+    "EtwApiCallsProvRegHandle",
+    "EtwCVEAuditProvRegHandle",
+    "EtwThreatIntProvRegHandle",
+    "EtwLpacProvRegHandle",
+    "EtwCpuPartitionProvRegHandle",
+    "EtwCpuStarvationProvRegHandle",
+    "EtwSecurityMitigationsRegHandle",
+    "KiIntSteerEtwHandle",
+    "HvlGlobalSystemEventsHandle",
+    "PopDiagSleepStudyHandle",
+    "WdipSemRegHandle",
+    "IoTraceHandle",
+    "IopDumpEtwRegHandle",
+    "KitEtwHandle",
+    "IopLiveDumpEtwRegHandle",
+    "KseEtwHandle",
+    "PnpEtwHandle",
+    "PnpRundownEtwHandle",
+    "PopDiagHandle",
+    "PopTriggerDiagHandle",
+    "PpmEtwHandle",
+    "PopBatteryEtwHandle",
+    "WheapEtwHandle",
+    "SshpTraceHandle",
+    "PerfDiagGlobals",
+};
+
 static const std::vector<const char*> win7_global_handles =
 {
     "EtwKernelProvRegHandle",
@@ -520,7 +558,14 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
             callbacks_names = &win7_global_callbacks;
             break;
         case VMI_OS_WINDOWS_10:
-            handles_names   = &win10_global_handles;
+            if (this->winver.buildnumber >= 22000)
+            {
+                handles_names = &win11_global_handles;
+            }
+            else
+            {
+                handles_names = &win10_global_handles;
+            }
             callbacks_names = &win10_global_callbacks;
             break;
         default:
@@ -534,8 +579,8 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
             addr_t entry{};
             if (!drakvuf_get_kernel_symbol_va(drakvuf, name, &entry))
             {
-                PRINT_DEBUG("[ETWMON] Failed to resolve %s, skipping\n", name);
-                continue;
+                PRINT_DEBUG("[ETWMON] Failed to resolve %s\n", name);
+                throw -1;
             }
             this->global_handles_va.push_back(entry);
         }
@@ -548,8 +593,8 @@ etwmon::etwmon(drakvuf_t drakvuf, output_format_t output)
             addr_t entry{};
             if (!drakvuf_get_kernel_symbol_va(drakvuf, name, &entry))
             {
-                PRINT_DEBUG("[ETWMON] Failed to resolve %s, skipping\n", name);
-                continue;
+                PRINT_DEBUG("[ETWMON] Failed to resolve %s\n", name);
+                throw -1;
             }
             for (size_t i = 0; i < size; i++)
             {
