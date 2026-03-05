@@ -663,6 +663,11 @@ enum
     _RENAMEDATA_OLD_DENTRY,
     _RENAMEDATA_NEW_DENTRY,
 
+    // Task file descriptor table traversal
+    _TASK_STRUCT_FILES,
+    _FILES_STRUCT_FDT,
+    _FDTABLE_FD,
+
     __LINUX_OFFSET_MAX,
 };
 
@@ -684,6 +689,11 @@ static const char* linux_offset_names[__LINUX_OFFSET_MAX][2] =
 
     [_RENAMEDATA_OLD_DENTRY] = {"renamedata", "old_dentry"},
     [_RENAMEDATA_NEW_DENTRY] = {"renamedata", "new_dentry"},
+
+    // Task file descriptor table traversal
+    [_TASK_STRUCT_FILES] = {"task_struct", "files"},
+    [_FILES_STRUCT_FDT] = {"files_struct", "fdt"},
+    [_FDTABLE_FD] = {"fdtable", "fd"},
 };
 
 // Linux Inode Flags

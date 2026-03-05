@@ -206,8 +206,9 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!call_open_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
 
+            // Use FILE_BUF_SIZE for the first read, not injector->buffer.len which is 0
             if (!setup_read_syscall(injector, info->regs, injector->fd,
-                    injector->virtual_memory_addr, injector->buffer.len))
+                    injector->virtual_memory_addr, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, true);
 
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -234,8 +235,9 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 if (!write_buffer_to_file(drakvuf, info, injector->buffer.len))
                     return cleanup(drakvuf, info, true);
 
+                // Always use FILE_BUF_SIZE for the read buffer size
                 if (!setup_read_syscall(injector, info->regs, injector->fd,
-                        injector->virtual_memory_addr, injector->buffer.len))
+                        injector->virtual_memory_addr, FILE_BUF_SIZE))
                     return cleanup(drakvuf, info, true);
 
                 return override_step(base_injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
@@ -252,6 +254,8 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             // restore regs
             copy_gprs(info->regs, &injector->saved_regs);
+
+            injector->rc = INJECTOR_SUCCEEDED;
 
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
