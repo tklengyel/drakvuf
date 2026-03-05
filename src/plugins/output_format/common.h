@@ -142,6 +142,12 @@ struct flagsval
 template<class Value>
 auto keyval(const char* key, Value&& value)
 {
+    return std::make_pair(std::string(key), std::forward<Value>(value));
+}
+
+template<class Value>
+auto keyval(std::string key, Value&& value)
+{
     return std::make_pair(key, std::forward<Value>(value));
 }
 

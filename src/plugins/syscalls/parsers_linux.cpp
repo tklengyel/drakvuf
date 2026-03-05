@@ -102,61 +102,141 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SYSCALLS_PRIVATE_2_H
-#define SYSCALLS_PRIVATE_2_H
 
-#include <unordered_map>
+#include "linux.h"
 
-#include "plugins/plugin_utils.h"
-#include "plugins/plugins_ex.h"
-#include "plugins/output_format.h"
+using namespace syscalls_ns;
 
-#include "private.h"
-
-struct syscalls_config
+namespace syscalls_ns
 {
-    const char* syscalls_list_file;
-    const char* win32k_profile;
-    bool disable_sysret;
-    bool syscalls_dereference_args;
-    bool syscalls_nested_args;
-};
 
-// internal syscalls class
-class syscalls_base : public pluginex
+static void parse_linux_char_ptr(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
 {
-public:
-    os_t os;
-    addr_t kernel_base;
-    addr_t register_size;
-    bool is32bit;
-    bool disable_sysret;
-    bool dereference_args;
-    bool nested_args;
+    if (value == 0) return;
 
-    std::unordered_map<std::string, bool> syscall_list; // name -> is_ret
+    auto* base = static_cast<syscalls_base*>(base_ptr);
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
+    auto* info = static_cast<drakvuf_trap_info_t*>(info_ptr);
 
-    typedef std::vector<std::pair<std::string, fmt::Aarg>> fmt_args_t;
-    void fill_fmt_args(
-        fmt_args_t& original_args, fmt_args_t& extra_args, const syscalls_ns::syscall_t* sc, drakvuf_trap_info_t* info,
-        const std::vector<uint64_t>& args, bool is_ret, bool ret_success
-    );
+    char* cstr = drakvuf_read_ascii_str(base->drakvuf, info, value);
+    if (cstr)
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Estr(std::string(cstr)));
+        g_free(cstr);
+    }
+}
 
-    void print_sysret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int nr, const char* extra_info = nullptr);
-    uint64_t value_from_uint64(syscalls_ns::arg_type_t type, uint64_t val);
-    bool read_syscalls_list(const char* syscall_list_file);
-    static void find_replace_arg(std::vector<std::pair<std::string, fmt::Aarg>>& vec, const std::string& key, const fmt::Aarg& newValue);
+static void parse_linux_prot_flags(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
+{
+    auto* base = static_cast<syscalls_base*>(base_ptr);
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
 
-    static std::optional<uint64_t> get_arg_value_by_name(
-        const syscalls_ns::syscall_t* sc,
-        const std::vector<uint64_t>& all_args,
-        const std::string& name
-    );
+    linux_syscalls* linux_base = dynamic_cast<linux_syscalls*>(base);
+    if (!linux_base) return;
 
+    if (value == 0)
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Qstr("PROT_NONE"));
+    }
+    else
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name),
+            fmt::Qstr(parse_flags(value, mmap_prot, linux_base->m_output_format)));
+    }
+}
 
-    syscalls_base(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
-    syscalls_base(const syscalls_base&) = delete;
-    syscalls_base& operator=(const syscalls_base&) = delete;
-};
+static void parse_linux_prctl_option(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
+{
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
 
-#endif
+    if (prctl_option.find(value) != prctl_option.end())
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Qstr(prctl_option.at(value)));
+    }
+}
+
+static void parse_linux_arch_prctl_code(
+    void* base_ptr,
+    void* original_args_ptr,
+    void* extra_args_ptr,
+    const syscall_t* sc,
+    const arg_t& arg,
+    void* info_ptr,
+    uint64_t value,
+    const void* all_args_ptr)
+{
+    auto& original_args = *static_cast<syscalls_base::fmt_args_t*>(original_args_ptr);
+
+    if (arch_prctl_code.find(value) != arch_prctl_code.end())
+    {
+        syscalls_base::find_replace_arg(original_args, std::string(arg.name), fmt::Qstr(arch_prctl_code.at(value)));
+    }
+}
+
+static void register_parsers_for_table(const syscall_t** syscalls, unsigned int count)
+{
+    for (unsigned int i = 0; i < count; i++)
+    {
+        const syscall_t* sc = syscalls[i];
+        if (!sc) continue;
+
+        arg_t* args = const_cast<arg_t*>(sc->args);
+
+        for (unsigned int j = 0; j < sc->num_args; j++)
+        {
+            // Type-based parsers
+            if (!args[j].parser)
+            {
+                switch (args[j].type)
+                {
+                    case linux_char_ptr:
+                        args[j].parser = parse_linux_char_ptr;
+                        break;
+                    case linux_intmask_prot_:
+                        args[j].parser = parse_linux_prot_flags;
+                        break;
+                    case linux_intopt_pr_:
+                        args[j].parser = parse_linux_prctl_option;
+                        break;
+                    case linux_intopt_arch_:
+                        args[j].parser = parse_linux_arch_prctl_code;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+}
+
+} // namespace syscalls_ns
+
+void linux_syscalls::register_parsers()
+{
+    register_parsers_for_table(linuxsc::linux_syscalls_table_x32, NUM_SYSCALLS_LINUX_X32);
+    register_parsers_for_table(linuxsc::linux_syscalls_table_x64, NUM_SYSCALLS_LINUX_X64);
+}
