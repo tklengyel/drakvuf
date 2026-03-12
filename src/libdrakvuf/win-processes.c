@@ -1963,7 +1963,7 @@ bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
     if (handle == 0 || handle == UINT64_MAX)
     {
         *pid = info->proc_data.pid;
-        return false;
+        return true;
     }
 
     if (!info->proc_data.base_addr)
@@ -1986,7 +1986,7 @@ bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
     if (handle == 0 || handle == UINT64_MAX)
     {
         *tid = info->proc_data.tid;
-        return false;
+        return true;
     }
 
     if (!info->proc_data.base_addr)
