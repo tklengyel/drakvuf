@@ -329,7 +329,7 @@ static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ct
 bool drakvuf_get_process_by_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t handle, addr_t* process, addr_t* dtb)
 {
     // Remote process
-    if (handle != ~0ULL)
+    if (handle != ~0ULL && handle != 0)
     {
         vmi_pid_t pid;
         if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
@@ -839,6 +839,20 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     {
         drakvuf_lock_and_get_vmi(drakvuf);
         ret = drakvuf->osi.get_function_argument( drakvuf, info, narg );
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
+addr_t drakvuf_get_function_argument_ex(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg, calling_convention_t conv)
+{
+    addr_t ret = 0;
+
+    if ( drakvuf->osi.get_function_argument_ex )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_function_argument_ex( drakvuf, info, narg, conv );
         drakvuf_release_vmi(drakvuf);
     }
 

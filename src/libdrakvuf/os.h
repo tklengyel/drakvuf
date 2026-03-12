@@ -231,6 +231,9 @@ typedef struct os_interface
     addr_t (*get_function_argument)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg);
 
+    addr_t (*get_function_argument_ex)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg, calling_convention_t conv);
+
     addr_t (*get_function_return_address)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 

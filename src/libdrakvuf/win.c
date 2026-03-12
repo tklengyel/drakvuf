@@ -589,11 +589,22 @@ bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
 {
-    g_assert(narg > 0);
+    return win_get_function_argument_ex(drakvuf, info, narg, CALLING_CONV_STDCALL);
+}
 
+addr_t win_get_function_argument_ex(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg, calling_convention_t x86_conv)
+{
+    if (narg == 0)
+    {
+        PRINT_DEBUG("Invalid argument number\n");
+        return 0;
+    }
+
+    addr_t ret;
     bool is32 = drakvuf_process_is32bit(drakvuf, info);
     if (!is32)
     {
+        // microsoft x64 calling convention
         switch (narg)
         {
             case 1:
@@ -605,18 +616,60 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
             case 4:
                 return info->regs->r9;
         }
+        // arguments 5+ are on the stack + 0x20 for shadow space
+        // for some syscall arguments which take 32bits, the upper half of the data might be garbage
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = info->regs->rsp + 0x20 + (narg - 4) * 8
+        );
+        
+        if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret))
+        {
+            PRINT_DEBUG("x64 argument lookup failed narg %d\n", (int32_t)narg);
+            return 0;
+        }
+        PRINT_DEBUG("x64 argument lookup narg %d, value %lx\n", (int32_t)narg, ret);
+        return ret;
     }
+    else
+    {
+        // x86 calling conventions
+        int32_t reg_args = 0;
+        switch (x86_conv)
+        {
+            case CALLING_CONV_FASTCALL:
+                reg_args = 2;
+                if (narg == 1)
+                    return (uint32_t)info->regs->rcx;
+                if (narg == 2)
+                    return (uint32_t)info->regs->rdx;
+                break;
+            case CALLING_CONV_THISCALL:
+                reg_args = 1;
+                if (narg == 1)
+                    return (uint32_t)info->regs->rcx;
+                break;
+            case CALLING_CONV_STDCALL:
+                break;
+            default:
+                PRINT_DEBUG("Unknown calling convention\n");
+                break;
+        }
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * (is32 ? 4 : 8)
-    );
-
-    addr_t ret;
-    if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret))
-        return 0;
-    return ret;
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = info->regs->rsp + (narg - reg_args) * 4
+        );
+        if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret))
+        {
+            PRINT_DEBUG("x86 function argument lookup failed narg %d \n", (int32_t)narg);
+            return 0;
+        }
+        PRINT_DEBUG("x86 argument lookup narg %d, value %lx \n", (int32_t)narg, ret);
+        return ret;
+    }
 }
 
 addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -764,6 +817,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_filename_from_object_attributes = win_get_filename_from_object_attributes;
     drakvuf->osi.is_wow64 = win_is_wow64;
     drakvuf->osi.get_function_argument = win_get_function_argument;
+    drakvuf->osi.get_function_argument_ex = win_get_function_argument_ex;
     drakvuf->osi.get_function_return_address = win_get_function_return_address;
     drakvuf->osi.enumerate_processes = win_enumerate_processes;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
