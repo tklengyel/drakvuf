@@ -156,6 +156,7 @@ static void copy_proc_data_from_priv(proc_data_t* proc_data, proc_data_priv_t* p
     proc_data->ppid      = proc_data_priv->ppid;
     proc_data->userid    = proc_data_priv->userid;
     proc_data->tid       = proc_data_priv->tid;
+    proc_data->bitness   = proc_data_priv->bitness;
 }
 
 /*
