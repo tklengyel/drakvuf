@@ -240,7 +240,8 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         .v.tid = proc_data.tid,
         .v.real_dll_base = vad_start,
         .v.mmvad = *mmvad,
-        .v.is_hooked = false
+        .v.is_hooked = false,
+        .v.is_32bit = proc_data.bitness == PROC_TYPE_32
     };
 
     auto dll_name = drakvuf_read_unicode(drakvuf, dll_meta.v.mmvad.file_name_ptr);
@@ -400,10 +401,11 @@ void trap_loaded_dll_targets(drakvuf_t drakvuf, dll_t* dll_meta, addr_t process_
 
             if (target.state == HOOK_OK || target.state == HOOK_FAILED)
             {
-                PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
+                PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, %s, result = %s)\n",
                     target.target_name.c_str(),
                     (unsigned long long)exec_func,
                     (unsigned long long)dll_meta->v.real_dll_base,
+                    dll_meta->v.is_32bit == 1 ? "32bit" : "64bit",
                     target.state == HOOK_OK ? "OK" : "FAIL");
             }
         }

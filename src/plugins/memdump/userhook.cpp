@@ -146,10 +146,20 @@ static void on_dll_discovered(drakvuf_t drakvuf, std::string const& dll_name, co
 {
     memdump* plugin = (memdump*)extra;
 
-    plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
+    if (dll->is_32bit)
     {
-        drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
-    });
+        plugin->wanted_hooks_32.visit_hooks_for(dll_name, [&](const auto& e)
+        {
+            drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
+        });
+    }
+    else
+    {
+        plugin->wanted_hooks_64.visit_hooks_for(dll_name, [&](const auto& e)
+        {
+            drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
+        });
+    }
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
@@ -171,7 +181,8 @@ void memdump::userhook_init(const memdump_config* c, output_format_t output)
         {
             return !entry.actions.stack;
         };
-        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, noStack, this->wanted_hooks);
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, noStack, this->wanted_hooks_32);
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, noStack, this->wanted_hooks_64);
     }
     catch (const std::runtime_error& exc)
     {
@@ -180,7 +191,7 @@ void memdump::userhook_init(const memdump_config* c, output_format_t output)
         throw -1;
     }
 
-    if (this->wanted_hooks.empty())
+    if (this->wanted_hooks_32.empty() && this->wanted_hooks_64.empty())
     {
         // don't load this part of plugin if there is nothing to do
         return;
@@ -195,7 +206,7 @@ void memdump::userhook_init(const memdump_config* c, output_format_t output)
     drakvuf_register_usermode_callback(drakvuf, &reg);
 }
 
-void memdump::setup_dotnet_hooks(const char* dll_name, const char* profile)
+void memdump::setup_dotnet_hooks(const char* dll_name, const char* profile, bool is32_bit)
 {
     PRINT_DEBUG("%s profile found, will setup usermode hooks for .NET\n", dll_name);
 
@@ -219,7 +230,16 @@ void memdump::setup_dotnet_hooks(const char* dll_name, const char* profile)
     }
 
     auto actions = HookActions::empty().set_log().set_stack();
-    this->wanted_hooks.add_hook(dll_name, "AssemblyNative::LoadImage", func_rva, actions, std::vector< std::unique_ptr< ArgumentPrinter > > {});
+    if (is32_bit)
+    {
+        PRINT_DEBUG("[MEMDUMP.NET] hooking 32bit LoadImage\n");
+        this->wanted_hooks_32.add_hook(dll_name, "AssemblyNative::LoadImage", func_rva, actions, std::vector< std::unique_ptr< ArgumentPrinter > > {});
+    }
+    else
+    {
+        PRINT_DEBUG("[MEMDUMP.NET] hooking 64bit LoadImage\n");
+        this->wanted_hooks_64.add_hook(dll_name, "AssemblyNative::LoadImage", func_rva, actions, std::vector< std::unique_ptr< ArgumentPrinter > > {});
+    }
 }
 
 void memdump::userhook_destroy()

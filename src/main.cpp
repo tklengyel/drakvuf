@@ -297,7 +297,9 @@ static void print_usage()
         "\t --memdump-dir <directory>\n"
         "\t                           Where to store memory dumps\n"
         "\t --json-clr <path to json>\n"
-        "\t                           The JSON profile for clr.dll\n"
+        "\t                           The JSON profile for 32 bit clr.dll\n"
+        "\t --json-clr-64 <path to json>\n"
+        "\t                           The JSON profile for 64 bit clr.dll\n"
         "\t --json-mscorwks <path to json>\n"
         "\t                           The JSON profile for mscorewks.dll\n"
         "\t --memdump-disable-free-vm\n"
@@ -507,6 +509,7 @@ int main(int argc, char** argv)
         opt_procdump_disable_kedelayexecutionthread_hook,
         opt_procdump_exclude_list,
         opt_json_clr,
+        opt_json_clr_64,
         opt_json_mscorwks,
         opt_disable_sysret,
         opt_userhook_no_addr,
@@ -594,6 +597,7 @@ int main(int argc, char** argv)
         {"procdump-disable-kedelayexecutionthread-hook", no_argument, NULL, opt_procdump_disable_kedelayexecutionthread_hook},
         {"procdump-exclude-list", required_argument, NULL, opt_procdump_exclude_list},
         {"json-clr", required_argument, NULL, opt_json_clr},
+        {"json-clr-64", required_argument, NULL, opt_json_clr_64},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
         {"procmon-envs-list", required_argument, NULL, 'q'},
@@ -893,6 +897,9 @@ int main(int argc, char** argv)
                 break;
             case opt_json_clr:
                 options.clr_profile = optarg;
+                break;
+            case opt_json_clr_64:
+                options.clr_profile_64 = optarg;
                 break;
             case opt_json_mscorwks:
                 options.mscorwks_profile = optarg;

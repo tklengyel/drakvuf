@@ -194,6 +194,7 @@ struct dll_view_t
     addr_t real_dll_base;
     mmvad_info_t mmvad;
     bool is_hooked;
+    bool is_32bit;
 };
 
 typedef void (*dll_pre_hook_cb)(drakvuf_t, const std::string&, const dll_view_t*, void*);

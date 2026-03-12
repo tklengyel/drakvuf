@@ -623,7 +623,7 @@ addr_t win_get_function_argument_ex(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             .dtb = info->regs->cr3,
             .addr = info->regs->rsp + 0x20 + (narg - 4) * 8
         );
-        
+
         if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret))
         {
             PRINT_DEBUG("x64 argument lookup failed narg %d\n", (int32_t)narg);

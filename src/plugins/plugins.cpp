@@ -420,6 +420,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .memdump_disable_shellcode_detect = options->memdump_disable_shellcode_detect,
                         .dll_hooks_list = options->dll_hooks_list,
                         .clr_profile = options->clr_profile,
+                        .clr_profile_64 = options->clr_profile_64,
                         .mscorwks_profile = options->mscorwks_profile,
                         .print_no_addr = options->userhook_no_addr,
                     };

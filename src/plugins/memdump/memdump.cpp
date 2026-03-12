@@ -527,7 +527,7 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
 
     if (process_handle != ~0ULL)
     {
-        PRINT_DEBUG("[MEMDUMP] Process handle not pointing to self, ignore\n");
+        PRINT_DEBUG("[MEMDUMP] Terminate process handle not pointing to self, ignore %lx\n", process_handle);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -549,7 +549,7 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     if (!drakvuf_get_process_by_handle(drakvuf, info, handle, &process, &dtb))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to get process by handle\n");
+        PRINT_DEBUG("[MEMDUMP] Shellcode cb: Failed to get process by handle %lx\n", handle);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -565,14 +565,14 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     addr_t base_address;
     if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &base_address))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to read base address in NtFreeVirtualMemory\n");
+        PRINT_DEBUG("[MEMDUMP] Shellcode cb: Failed to read base address in NtFreeVirtualMemory\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
     mmvad_info_t mmvad;
     if (!drakvuf_find_mmvad(drakvuf, process, base_address, &mmvad))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to find MMVAD for memory passed to NtFreeVirtualMemory\n");
+        PRINT_DEBUG("[MEMDUMP] Shellcode cb: failed to find MMVAD for memory passed to NtFreeVirtualMemory\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -583,7 +583,6 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         bool page_writeable  = (p_info.x86_ia32e.pte_value & (1UL << 1))  != 0;
         bool page_executable = (p_info.x86_ia32e.pte_value & (1UL << 63)) == 0;
         size_t len_bytes     = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
-
         if (pte_valid && page_writeable && page_executable && len_bytes >= 0x1000)
         {
             PRINT_DEBUG("[MEMDUMP] Dumping RWX vad\n");
@@ -594,6 +593,10 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                 PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
             }
         }
+    }
+    else
+    {
+        PRINT_DEBUG("[MEMDUMP] Shellcode cb: vmi pagetable lookup failed for addr %lx, process %lx, dtb %lx\n", base_address, process, dtb);
     }
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -607,7 +610,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     if (process_handle != ~0ULL)
     {
-        PRINT_DEBUG("[MEMDUMP] Process handle not pointing to self, ignore\n");
+        PRINT_DEBUG("[MEMDUMP] Free process handle not pointing to self, ignore %lx\n", process_handle);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -644,7 +647,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     if (VMI_SUCCESS != vmi_read_16(vmi, &ctx, &magic))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to access memory to be used with NtFreeVirtualMemory\n");
+        PRINT_DEBUG("[MEMDUMP] Failed to access memory to be used with NtFreeVirtualMemory %lx\n", ctx.addr);
         drakvuf_release_vmi(drakvuf);
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -693,7 +696,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     if (process_handle != ~0ULL)
     {
-        PRINT_DEBUG("[MEMDUMP] Process handle not pointing to self, ignore\n");
+        PRINT_DEBUG("[MEMDUMP] Protect process handle not pointing to self, ignore %lx\n", process_handle);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -730,7 +733,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     if (VMI_SUCCESS != vmi_read_16(vmi, &ctx, &magic))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to access memory to be used with NtProtectVirtualMemory\n");
+        PRINT_DEBUG("[MEMDUMP] Failed to access memory to be used with NtProtectVirtualMemory %lx\n", ctx.addr);
         drakvuf_release_vmi(drakvuf);
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -821,7 +824,7 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
     vmi_pid_t target_process_pid;
     if (!drakvuf_get_pid_from_handle(drakvuf, info, target_process_handle, &target_process_pid))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to retrieve target process pid\n");
+        PRINT_DEBUG("[MEMDUMP] Failed to retrieve target process pid for handle %lx\n", target_process_handle);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -934,7 +937,7 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     auto vmi = vmi_lock_guard(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
 
-    addr_t addr = drakvuf_get_function_argument(drakvuf, info, 1) + ptr_size;
+    addr_t addr = drakvuf_get_function_argument_ex(drakvuf, info, 1, CALLING_CONV_FASTCALL) + ptr_size;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -995,14 +998,19 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     }
 
     if (c->clr_profile)
-        this->setup_dotnet_hooks("clr.dll", c->clr_profile);
+        this->setup_dotnet_hooks("clr.dll", c->clr_profile, true);
     else
-        PRINT_DEBUG("clr.dll profile not found, memdump will proceed without .NET hooks\n");
+        PRINT_DEBUG("clr.dll 32 profile not found, memdump will proceed without some .NET hooks\n");
+
+    if (c->clr_profile_64)
+        this->setup_dotnet_hooks("clr.dll", c->clr_profile_64, false);
+    else
+        PRINT_DEBUG("clr.dll 64 profile not found, memdump will proceed without some .NET hooks\n");
 
     if (c->mscorwks_profile)
-        this->setup_dotnet_hooks("mscorwks.dll", c->mscorwks_profile);
+        this->setup_dotnet_hooks("mscorwks.dll", c->mscorwks_profile, true);
     else
-        PRINT_DEBUG("mscorwks.dll profile not found, memdump will proceed without .NET hooks\n");
+        PRINT_DEBUG("mscorwks.dll profile not found, memdump will proceed without some .NET hooks\n");
 
     breakpoint_in_system_process_searcher bp;
     if (!c->memdump_disable_free_vm)
