@@ -151,6 +151,7 @@ public:
 
     virtual bool stop_impl() override;
 
+    void setup_usermode_dotnet_hooks(const memdump_config* c);
     void userhook_init(const memdump_config* c, output_format_t output);
     void userhook_destroy();
     bool userhooks_stop();

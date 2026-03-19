@@ -594,10 +594,6 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             }
         }
     }
-    else
-    {
-        PRINT_DEBUG("[MEMDUMP] Shellcode cb: vmi pagetable lookup failed for addr %lx, process %lx, dtb %lx\n", base_address, process, dtb);
-    }
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -965,6 +961,24 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return true;
 }
 
+void memdump::setup_usermode_dotnet_hooks(const memdump_config* c)
+{
+    if (c->clr_profile)
+        this->setup_dotnet_hooks("clr.dll", c->clr_profile, true);
+    else
+        PRINT_DEBUG("clr.dll 32 profile not found, memdump will proceed without some .NET hooks\n");
+
+    if (c->clr_profile_64)
+        this->setup_dotnet_hooks("clr.dll", c->clr_profile_64, false);
+    else
+        PRINT_DEBUG("clr.dll 64 profile not found, memdump will proceed without some .NET hooks\n");
+
+    if (c->mscorwks_profile)
+        this->setup_dotnet_hooks("mscorwks.dll", c->mscorwks_profile, true);
+    else
+        PRINT_DEBUG("mscorwks.dll profile not found, memdump will proceed without some .NET hooks\n");
+}
+
 memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
     : pluginex(drakvuf, output)
     , dumps_count()
@@ -997,20 +1011,7 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
         }
     }
 
-    if (c->clr_profile)
-        this->setup_dotnet_hooks("clr.dll", c->clr_profile, true);
-    else
-        PRINT_DEBUG("clr.dll 32 profile not found, memdump will proceed without some .NET hooks\n");
-
-    if (c->clr_profile_64)
-        this->setup_dotnet_hooks("clr.dll", c->clr_profile_64, false);
-    else
-        PRINT_DEBUG("clr.dll 64 profile not found, memdump will proceed without some .NET hooks\n");
-
-    if (c->mscorwks_profile)
-        this->setup_dotnet_hooks("mscorwks.dll", c->mscorwks_profile, true);
-    else
-        PRINT_DEBUG("mscorwks.dll profile not found, memdump will proceed without some .NET hooks\n");
+    setup_usermode_dotnet_hooks(c);
 
     breakpoint_in_system_process_searcher bp;
     if (!c->memdump_disable_free_vm)
