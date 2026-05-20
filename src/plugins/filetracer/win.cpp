@@ -351,9 +351,9 @@ std::tuple<bool, file_disposition_information_ex_t> win_filetracer::file_disposi
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     uint32_t flags = 0;
     ctx.addr = disposition_info;
@@ -478,11 +478,11 @@ void win_filetracer::print_delete_file_info_ex(drakvuf_t drakvuf, drakvuf_trap_i
         return;
 
     fmt::print(this->m_output_format, "filetracer", drakvuf, info,
-               keyval("Operation", fmt::Rstr(operation_name)),
-               keyval("FileName", fmt::Qstr(file)),
-               keyval("FileHandle", fmt::Xval(handle)),
-               flagsval("Flags", fileinfo.flags)
-              );
+        keyval("Operation", fmt::Rstr(operation_name)),
+        keyval("FileName", fmt::Qstr(file)),
+        keyval("FileHandle", fmt::Xval(handle)),
+        flagsval("Flags", fileinfo.flags)
+    );
 
     g_free(file);
 }
@@ -1039,7 +1039,7 @@ event_response_t win_filetracer::set_information_file_cb(drakvuf_t drakvuf, drak
         case FILE_DISPOSITION_INFORMATION_EX:
         {
             auto [succ, file_info] = file_disposition_information_ex_read(drakvuf, info, fileinfo);
-            if (succ) 
+            if (succ)
             {
                 print_delete_file_info_ex(drakvuf, info, handle, file_info);
             }
