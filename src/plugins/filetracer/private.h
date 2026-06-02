@@ -134,6 +134,11 @@ struct file_basic_information_t
     std::string file_attributes;
 };
 
+struct file_disposition_information_ex_t
+{
+    std::string flags;
+};
+
 struct file_network_open_information_t
 {
     uint64_t creation_time;
@@ -317,6 +322,17 @@ enum
     FILE_ATTRIBUTE_NO_SCRUB_DATA = 0x00020000,
     FILE_ATTRIBUTE_RECALL_ON_OPEN = 0x00040000,
     FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x00400000,
+};
+
+// FILE_DISPOSITION_EX class flags
+enum
+{
+    FILE_DISPOSITION_DO_NOT_DELETE = 0x00000000,
+    FILE_DISPOSITION_DELETE = 0x00000001,
+    FILE_DISPOSITION_POSIX_SEMANTICS = 0x00000002,
+    FILE_DISPOSITION_FORCE_IMAGE_SECTION_CHECK = 0x00000004,
+    FILE_DISPOSITION_ON_CLOSE = 0x00000008,
+    FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE = 0x00000010,
 };
 
 // Flags
@@ -522,6 +538,15 @@ static const flags_str_t file_flags_and_attrs =
     REGISTER_FLAG(FILE_FLAG_NO_BUFFERING),
     REGISTER_FLAG(FILE_FLAG_OVERLAPPED),
     REGISTER_FLAG(FILE_FLAG_WRITE_THROUGH),
+};
+
+const flags_str_t file_disposition_flags =
+{
+    REGISTER_FLAG(FILE_DISPOSITION_DELETE),
+    REGISTER_FLAG(FILE_DISPOSITION_POSIX_SEMANTICS),
+    REGISTER_FLAG(FILE_DISPOSITION_FORCE_IMAGE_SECTION_CHECK),
+    REGISTER_FLAG(FILE_DISPOSITION_ON_CLOSE),
+    REGISTER_FLAG(FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE),
 };
 
 const flags_str_t generic_ar =

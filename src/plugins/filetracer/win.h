@@ -159,6 +159,7 @@ public:
     std::tuple<bool, win_objattrs_t> objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
     std::tuple<bool, file_basic_information_t> basic_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t basic_file_info);
     std::tuple<bool, file_network_open_information_t> net_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t net_file_info);
+    std::tuple<bool, file_disposition_information_ex_t> file_disposition_information_ex_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t disposition_info);
 
     /* Helper functions */
     void print_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs);
@@ -168,6 +169,7 @@ public:
     void print_file_query_full_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs, const file_network_open_information_t& file_info, uint64_t status);
     void print_file_query_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_objattrs_t& attrs, const file_basic_information_t& file_info, uint64_t status);
     void print_delete_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, addr_t fileinfo);
+    void print_delete_file_info_ex(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, file_disposition_information_ex_t& fileinfo);
     void print_basic_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, const file_basic_information_t& basic_file_info, uint64_t status);
     void print_file_net_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, const file_network_open_information_t& file_info, uint64_t status);
     void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo);

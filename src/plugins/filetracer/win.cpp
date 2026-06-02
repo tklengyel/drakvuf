@@ -341,6 +341,33 @@ std::tuple<bool, file_basic_information_t> win_filetracer::basic_file_info_read(
     return std::make_tuple(true, std::move(ret));
 }
 
+std::tuple<bool, file_disposition_information_ex_t> win_filetracer::file_disposition_information_ex_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t disposition_info)
+{
+    if (!disposition_info)
+    {
+        return {};
+    }
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
+
+    uint32_t flags = 0;
+    ctx.addr = disposition_info;
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &flags) )
+    {
+        PRINT_DEBUG("[FILETRACER] failed to read FILE_DISPOSITION_INFORMATION_EX\n");
+        return {};
+    }
+    auto str_disposition_flags = parse_flags(flags, file_disposition_flags, this->m_output_format, "flags=0");
+    file_disposition_information_ex_t ret {str_disposition_flags};
+
+    return std::make_tuple(true, std::move(ret));
+}
+
 std::tuple<bool, file_network_open_information_t> win_filetracer::net_file_info_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t net_file_info)
 {
     if (!net_file_info) return {};
@@ -438,6 +465,23 @@ void win_filetracer::print_delete_file_info(drakvuf_t drakvuf, drakvuf_trap_info
         keyval("Operation", fmt::Rstr(operation_name)),
         keyval("FileName", fmt::Qstr(file)),
         keyval("FileHandle", fmt::Xval(handle))
+    );
+
+    g_free(file);
+}
+
+void win_filetracer::print_delete_file_info_ex(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, file_disposition_information_ex_t& fileinfo)
+{
+    const char* operation_name = "FileDispositionInformationEx";
+    char* file = drakvuf_get_filename_from_handle(drakvuf, info, handle);
+    if ( !file )
+        return;
+
+    fmt::print(this->m_output_format, "filetracer", drakvuf, info,
+        keyval("Operation", fmt::Rstr(operation_name)),
+        keyval("FileName", fmt::Qstr(file)),
+        keyval("FileHandle", fmt::Xval(handle)),
+        flagsval("Flags", fileinfo.flags)
     );
 
     g_free(file);
@@ -958,6 +1002,7 @@ event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf
 #define FILE_BASIC_INFORMATION 4
 #define FILE_RENAME_INFORMATION 10
 #define FILE_DISPOSITION_INFORMATION 13
+#define FILE_DISPOSITION_INFORMATION_EX 64
 #define FILE_END_OF_FILE_INFORMATION 20
 
 event_response_t win_filetracer::set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -988,6 +1033,16 @@ event_response_t win_filetracer::set_information_file_cb(drakvuf_t drakvuf, drak
         case FILE_DISPOSITION_INFORMATION:
         {
             print_delete_file_info(drakvuf, info, handle, fileinfo);
+        }
+        break;
+
+        case FILE_DISPOSITION_INFORMATION_EX:
+        {
+            auto [succ, file_info] = file_disposition_information_ex_read(drakvuf, info, fileinfo);
+            if (succ)
+            {
+                print_delete_file_info_ex(drakvuf, info, handle, file_info);
+            }
         }
         break;
 
