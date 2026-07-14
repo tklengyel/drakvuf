@@ -187,6 +187,7 @@ bool dump_memory_region(
 
     const gchar* chk_str = nullptr;
 
+    addr_t dump_addr = ctx->addr;
     addr_t aligned_addr;
     addr_t intra_page_offset;
     size_t num_pages;
@@ -275,7 +276,7 @@ bool dump_memory_region(
     // * de-duplication - sometimes, different heuristics may want to dump the same piece of memory;
     //   unless there is a change in image base or contents, repeated memory dumps would get exactly
     //   the same file name
-    if (asprintf(&file, "%llx_%.16s", (unsigned long long) ctx->addr, chk_str) < 0)
+    if (asprintf(&file, "%llx_%.16s", (unsigned long long) dump_addr, chk_str) < 0)
         goto done;
 
     if (asprintf(&file_path, "%s/%s", plugin->memdump_dir, file) < 0)
@@ -289,7 +290,7 @@ bool dump_memory_region(
     if (asprintf(&metafile, "%s/memdump.%06d", plugin->memdump_dir, sequence_number) < 0)
         goto done;
 
-    save_file_metadata(info, metafile, file, len_bytes, ctx->addr, info->trap->name, reason, sequence_number, extras);
+    save_file_metadata(info, metafile, file, len_bytes, dump_addr, info->trap->name, reason, sequence_number, extras);
 
     ret = true;
 
@@ -300,7 +301,7 @@ printout:
         auto default_print = std::make_tuple(
                 keyval("DumpReason", fmt::Qstr(reason)),
                 keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
-                keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
+                keyval("DumpAddr", fmt::Xval(dump_addr, false)),
                 keyval("DumpSize", fmt::Xval(len_bytes)),
                 keyval("DumpFilename", fmt::Qstr(display_file)),
                 keyval("DumpsCount", fmt::Nval(sequence_number))
