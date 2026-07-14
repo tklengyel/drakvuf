@@ -189,8 +189,6 @@ bool dump_memory_region(
 
     addr_t aligned_addr;
     addr_t intra_page_offset;
-    size_t aligned_len;
-    size_t len_remainder;
     size_t num_pages;
 
     GChecksum* checksum = nullptr;
@@ -213,16 +211,9 @@ bool dump_memory_region(
     aligned_addr = ctx->addr & ~(VMI_PS_4KB - 1);
     intra_page_offset = ctx->addr & (VMI_PS_4KB - 1);
 
-    aligned_len = len_bytes & ~(VMI_PS_4KB - 1);
-    len_remainder = len_bytes & (VMI_PS_4KB - 1);
-
-    if (len_remainder)
-    {
-        aligned_len += VMI_PS_4KB;
-    }
+    num_pages = (intra_page_offset + len_bytes + VMI_PS_4KB - 1) / VMI_PS_4KB;
 
     ctx->addr = aligned_addr;
-    num_pages = aligned_len / VMI_PS_4KB;
 
     access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
 
