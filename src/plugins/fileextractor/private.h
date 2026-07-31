@@ -119,6 +119,7 @@ struct fileextractor_config
 namespace fileextractor_ns
 {
 #define FILE_DISPOSITION_INFORMATION 13
+#define FILE_DISPOSITION_INFORMATION_EX 64
 #define FILE_END_OF_FILE_INFORMATION 20
 #define FILE_DELETE_ON_CLOSE 0x1000
 #define FILE_WRITE_DATA 2
@@ -128,6 +129,15 @@ namespace fileextractor_ns
 #define WRITE_ACCESS ( FILE_WRITE_DATA | GENERIC_ALL | GENERIC_WRITE )
 #define FILE_WRITE_TO_END_OF_FILE 0xffffffff
 #define FILE_USE_FILE_POINTER_POSITION 0xfffffffe
+
+enum file_disposition_information_ex_flags : uint32_t
+{
+    FILE_DISPOSITION_DELETE = 0x00000001,
+    FILE_DISPOSITION_POSIX_SEMANTICS = 0x00000002,
+    FILE_DISPOSITION_FORCE_IMAGE_SECTION_CHECK = 0x00000004,
+    FILE_DISPOSITION_ON_CLOSE = 0x00000008,
+    FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE = 0x00000010,
+};
 
 using handle_t = uint64_t;
 using task_id = uint64_t;
