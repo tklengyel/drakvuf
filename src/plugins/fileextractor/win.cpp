@@ -206,7 +206,7 @@ event_response_t win_fileextractor::createfile_ret_cb(drakvuf_t,
     vmi_lock_guard vmi(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
         PRINT_DEBUG("[FILEEXTRACTOR] "
-                    "Failed to read pHandle at 0x%lx (PID %d, TID %d)\n",
+            "Failed to read pHandle at 0x%lx (PID %d, TID %d)\n",
             params_copy.handle,
             params_copy.target_pid,
             params_copy.target_tid);
@@ -721,13 +721,13 @@ win_fileextractor::error win_fileextractor::dispatch_queryvolumeinfo(
 
         struct FILE_FS_DEVICE_INFORMATION dev_info = {};
         if ((VMI_FAILURE == vmi_read(vmi,
-            &ctx,
-            sizeof(struct FILE_FS_DEVICE_INFORMATION),
-            &dev_info,
-            NULL)))
+                    &ctx,
+                    sizeof(struct FILE_FS_DEVICE_INFORMATION),
+                    &dev_info,
+                    NULL)))
         {
             PRINT_DEBUG("[FILEEXTRACTOR] [ZwQueryVolumeInformationFile] "
-                        "Failed to read FsDeviceInformation\n");
+                "Failed to read FsDeviceInformation\n");
             return error::error;
         }
 
@@ -773,13 +773,13 @@ win_fileextractor::error win_fileextractor::dispatch_queryinfo(
 
         struct FILE_STANDARD_INFORMATION dev_info = {};
         if ((VMI_FAILURE == vmi_read(vmi,
-            &ctx,
-            sizeof(dev_info),
-            &dev_info,
-            NULL)))
+                    &ctx,
+                    sizeof(dev_info),
+                    &dev_info,
+                    NULL)))
         {
             PRINT_DEBUG("[FILEEXTRACTOR] [ZwQueryInformationFile] "
-                        "Failed to read FsDeviceInformation\n");
+                "Failed to read FsDeviceInformation\n");
             return error::error;
         }
 
@@ -823,13 +823,13 @@ win_fileextractor::error win_fileextractor::dispatch_createsection(
         );
 
         if ((VMI_FAILURE == vmi_read(vmi,
-            &ctx,
-            sizeof(task.section_handle),
-            &task.section_handle,
-            NULL)))
+                    &ctx,
+                    sizeof(task.section_handle),
+                    &task.section_handle,
+                    NULL)))
         {
             PRINT_DEBUG("[FILEEXTRACTOR] [ZwCreateSection] "
-                        "Failed to read section handle\n");
+                "Failed to read section handle\n");
             return error::error;
         }
 
@@ -861,13 +861,13 @@ win_fileextractor::error win_fileextractor::dispatch_mapview(
         );
 
         if ((VMI_FAILURE == vmi_read(vmi,
-            &ctx,
-            sizeof(task.view_base),
-            &task.view_base,
-            NULL)))
+                    &ctx,
+                    sizeof(task.view_base),
+                    &task.view_base,
+                    NULL)))
         {
             PRINT_DEBUG("[FILEEXTRACTOR] [ZwMapViewOfSection] "
-                        "Failed to read view base\n");
+                "Failed to read view base\n");
             return error::error;
         }
 
@@ -875,13 +875,13 @@ win_fileextractor::error win_fileextractor::dispatch_mapview(
         ctx.addr = task.mapview.size;
         uint64_t view_size = 0;
         if ((VMI_FAILURE == vmi_read(vmi,
-            &ctx,
-            sizeof(view_size),
-            &view_size,
-            NULL)))
+                    &ctx,
+                    sizeof(view_size),
+                    &view_size,
+                    NULL)))
         {
             PRINT_DEBUG("[FILEEXTRACTOR] [ZwMapViewOfSection] "
-                        "Failed to read view size\n");
+                "Failed to read view size\n");
             return error::error;
         }
 
@@ -1236,8 +1236,8 @@ void win_fileextractor::check_stack_marker(
             stack_marker != task->stack_marker())
         {
             PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d] "
-                        "Stack marker check failed at %#lx: "
-                        "expected %#lx, result %#lx\n"
+                "Stack marker check failed at %#lx: "
+                "expected %#lx, result %#lx\n"
                 , info->event_uid
                 , info->attached_proc_data.pid, info->attached_proc_data.tid
                 , task->target.ret_pid, (int)task->stage()
@@ -1269,9 +1269,9 @@ bool win_fileextractor::get_file_object_handle_count(drakvuf_trap_info_t* info,
 
     uint64_t handles_value = 0;
     bool success = (VMI_SUCCESS == drakvuf_read_addr(drakvuf,
-        info,
-        &ctx,
-        &handles_value));
+                info,
+                &ctx,
+                &handles_value));
     if (success)
         *handle_count = handles_value;
 
@@ -1553,8 +1553,8 @@ void win_fileextractor::save_file_metadata(drakvuf_trap_info_t* info,
     json_object_object_add(jobj,
         "FileFlags",
         json_object_new_string_fmt("0x%lx (%s)",
-        task.fo_flags,
-        parse_flags(task.fo_flags, fo_flags_map, OUTPUT_DEFAULT, "0").c_str()));
+            task.fo_flags,
+            parse_flags(task.fo_flags, fo_flags_map, OUTPUT_DEFAULT, "0").c_str()));
 
     json_object_object_add(jobj,
         "SequenceNumber",
@@ -1834,10 +1834,10 @@ task_t* win_fileextractor::close_cb_get_task(drakvuf_trap_info_t* info)
     task_t* task = nullptr;
     for (auto& i: tasks)
         if (drakvuf_check_return_context(drakvuf,
-            info,
-            i.second->target.ret_pid,
-            i.second->target.ret_tid,
-            i.second->target.ret_rsp))
+                info,
+                i.second->target.ret_pid,
+                i.second->target.ret_tid,
+                i.second->target.ret_rsp))
         {
             task = i.second.get();
             break;
@@ -1875,7 +1875,7 @@ void win_fileextractor::close_cb_handle_unextracted(drakvuf_trap_info_t* info,
     if ( task->reason == task_t::task_reason::write)
     {
         PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
-                    "Skip 'write' task on close handle\n"
+            "Skip 'write' task on close handle\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , task->target.ret_pid, (int)task->stage()
@@ -1940,7 +1940,7 @@ void win_fileextractor::close_cb_handle_extracted(drakvuf_trap_info_t* info,
     if (handle != task->handle)
     {
         PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
-                    "Skip on input handle %#lx not equal task handle %#lx\n"
+            "Skip on input handle %#lx not equal task handle %#lx\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , handle, task->handle
@@ -1954,7 +1954,7 @@ void win_fileextractor::close_cb_handle_extracted(drakvuf_trap_info_t* info,
         handle_count > 1)
     {
         PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
-                    "Skip on handle count %lu\n"
+            "Skip on handle count %lu\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , handle_count
@@ -1965,7 +1965,7 @@ void win_fileextractor::close_cb_handle_extracted(drakvuf_trap_info_t* info,
     if (task->error)
     {
         PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
-                    "Skip on task error state\n"
+            "Skip on task error state\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , task->target.ret_pid, (int)task->stage()
@@ -1993,10 +1993,10 @@ task_t* win_fileextractor::setinformation_cb_get_task(drakvuf_trap_info_t* info)
     task_t* task = nullptr;
     for (auto& i: tasks)
         if (drakvuf_check_return_context(drakvuf,
-            info,
-            i.second->target.ret_pid,
-            i.second->target.ret_tid,
-            i.second->target.ret_rsp))
+                info,
+                i.second->target.ret_pid,
+                i.second->target.ret_tid,
+                i.second->target.ret_rsp))
         {
             task = i.second.get();
             break;
@@ -2123,10 +2123,10 @@ task_t* win_fileextractor::writefile_cb_get_task(drakvuf_trap_info_t* info)
     task_t* task = nullptr;
     for (auto& i: tasks)
         if (drakvuf_check_return_context(drakvuf,
-            info,
-            i.second->target.ret_pid,
-            i.second->target.ret_tid,
-            i.second->target.ret_rsp))
+                info,
+                i.second->target.ret_pid,
+                i.second->target.ret_tid,
+                i.second->target.ret_rsp))
         {
             task = i.second.get();
             break;
@@ -2156,7 +2156,7 @@ task_t* win_fileextractor::writefile_cb_get_task(drakvuf_trap_info_t* info)
             if (!file)
             {
                 PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] "
-                            "Skip on fail to get OBJECT_HEADER_BODY\n"
+                    "Skip on fail to get OBJECT_HEADER_BODY\n"
                     , info->event_uid
                     , info->attached_proc_data.pid, info->attached_proc_data.tid
                 );
@@ -2186,7 +2186,7 @@ task_t* win_fileextractor::writefile_cb_get_task(drakvuf_trap_info_t* info)
     if (task && task->error)
     {
         PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] [%d:%d]"
-                    "Skip on task error state\n"
+            "Skip on task error state\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , task->target.ret_pid, (int)task->stage()
@@ -2219,11 +2219,11 @@ win_fileextractor::win_fileextractor(drakvuf_t drakvuf,
     }
 
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
-        offset_names, this->offsets.size(), this->offsets.data()) )
+            offset_names, this->offsets.size(), this->offsets.data()) )
         throw -1;
 
     if ( !drakvuf_get_kernel_struct_size(drakvuf,
-        "_CONTROL_AREA", &this->control_area_size) )
+            "_CONTROL_AREA", &this->control_area_size) )
         throw -1;
 
     if ( VMI_PM_LEGACY == drakvuf_get_page_mode(drakvuf) )
