@@ -260,6 +260,10 @@ private:
     void print_extraction_exclusion(drakvuf_trap_info_t* info, const std::string& filename);
 
     task_t* close_cb_get_task(drakvuf_trap_info_t*);
+    task_t* get_task_for_delete(vmi_instance_t, drakvuf_trap_info_t*,
+        handle_t handle, addr_t fileinfo, uint32_t fileinfoclass);
+    task_t* get_task_for_eof(vmi_instance_t, drakvuf_trap_info_t*,
+        handle_t handle, addr_t fileinfo);
     task_t* setinformation_cb_get_task(drakvuf_trap_info_t*);
     task_t* writefile_cb_get_task(drakvuf_trap_info_t*);
 

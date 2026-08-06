@@ -273,8 +273,12 @@ static std::string get_metadata_filename(std::string dump_folder, int task_idx)
  * struct _FILE_DISPOSITION_INFORMATION {
  *  BOOLEAN DeleteFile;
  * }
+ * in case with FileDispositionInformationEx:
+ * typedef struct _FILE_DISPOSITION_INFORMATION_EX {
+ * ULONG Flags;
+ * }
+ *
  */
-
 event_response_t win_fileextractor::setinformation_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
 {
@@ -586,7 +590,17 @@ event_response_t win_fileextractor::createsection_cb(drakvuf_t,
 //
 event_response_t win_fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    if (drakvuf_lookup_injection(drakvuf, info))
+    void* injection = drakvuf_lookup_injection(drakvuf, info);
+    if (injection && injection != info->trap)
+    {
+        // We are inside an injection started by another trap (e.g. the
+        // ZwClose(section_handle) injected by setinformation_cb / writefile_cb
+        // at the end of the extraction pipeline reaches NtClose via
+        // KiSystemCall64). That trap owns the task and will finalize it on
+        // the injection return, so we must not touch the task here.
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+    if (injection)
         drakvuf_remove_injection(drakvuf, info);
 
     auto task = close_cb_get_task(info);
@@ -1912,6 +1926,7 @@ void win_fileextractor::close_cb_handle_unextracted(drakvuf_trap_info_t* info,
     if (task_t::stage_t::finished == task->stage())
     {
         calc_checksum(*task);
+        update_file_metadata(info, *task);
         print_file_information(info, *task);
         remove_task(info, *task);
     }
@@ -1968,6 +1983,109 @@ void win_fileextractor::close_cb_handle_extracted(drakvuf_trap_info_t* info,
     remove_task(info, *task, nullptr, false);
 }
 
+task_t* win_fileextractor::get_task_for_delete(vmi_instance_t vmi,
+    drakvuf_trap_info_t* info, handle_t handle, addr_t fileinfo,
+    uint32_t fileinfoclass)
+{
+    if (!is_handle_valid(handle))
+        return nullptr;
+
+    bool delete_requested = false;
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = fileinfo;
+
+    switch (fileinfoclass)
+    {
+        case FILE_DISPOSITION_INFORMATION:
+        {
+            uint8_t delete_file = 0;
+            delete_requested = VMI_SUCCESS == vmi_read_8(vmi, &ctx, &delete_file) &&
+                delete_file;
+            break;
+        }
+        case FILE_DISPOSITION_INFORMATION_EX:
+        {
+            uint32_t flags = 0;
+            delete_requested = VMI_SUCCESS == vmi_read_32(vmi, &ctx, &flags) &&
+                (flags & FILE_DISPOSITION_DELETE);
+            break;
+        }
+        default:
+            return nullptr;
+    }
+
+    if (!delete_requested)
+        return nullptr;
+
+    auto id = make_task_id(info->attached_proc_data.pid, handle);
+    if (tasks.find(id) == tasks.end())
+    {
+        addr_t file = 0;
+        auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+        if (exclude.match(filename))
+        {
+            print_extraction_exclusion(info, filename);
+            return nullptr;
+        }
+
+        tasks[id] = std::make_unique<task_t>(handle,
+                filename,
+                task_t::task_reason::del,
+                file);
+        // save some process info
+        tasks[id]->pid = info->attached_proc_data.pid;
+        tasks[id]->ppid = info->attached_proc_data.ppid;
+        tasks[id]->process_name = info->proc_data.name;
+    }
+
+    return tasks.find(id)->second.get();
+}
+
+task_t* win_fileextractor::get_task_for_eof(vmi_instance_t vmi,
+    drakvuf_trap_info_t* info, handle_t handle, addr_t fileinfo)
+{
+    if (!is_handle_valid(handle))
+        return nullptr;
+
+    uint64_t eof = 0;
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = fileinfo;
+
+    if ( VMI_SUCCESS != vmi_read_64(vmi, &ctx, &eof) )
+        return nullptr;
+
+    auto id = make_task_id(info->attached_proc_data.pid, handle);
+    if (tasks.find(id) == tasks.end())
+    {
+        addr_t file = 0;
+        auto filename = get_file_name(vmi, info, handle, &file, nullptr);
+
+        if (exclude.match(filename))
+        {
+            print_extraction_exclusion(info, filename);
+            return nullptr;
+        }
+
+        tasks[id] = std::make_unique<task_t>(handle,
+                filename,
+                task_t::task_reason::write,
+                file);
+        // save some process info
+        tasks[id]->pid = info->attached_proc_data.pid;
+        tasks[id]->ppid = info->attached_proc_data.ppid;
+        tasks[id]->process_name = info->proc_data.name;
+    }
+
+    task_t* task = tasks.find(id)->second.get();
+    task->new_eof = eof;
+    return task;
+}
+
 task_t* win_fileextractor::setinformation_cb_get_task(drakvuf_trap_info_t* info)
 {
     vmi_lock_guard vmi(drakvuf);
@@ -1987,94 +2105,33 @@ task_t* win_fileextractor::setinformation_cb_get_task(drakvuf_trap_info_t* info)
             break;
         }
 
-    if (!task)
+    if (task)
+        return task->extracted ? nullptr : task;
+
+    // Don't start new work on plugin begin stop
+    if (this->is_stopping())
     {
-        // Don't start new work on plugin begin stop
-        if (this->is_stopping())
-        {
-            PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] Skip on plugin stop\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-            );
-            return nullptr;
-        }
+        PRINT_DEBUG("[FILEEXTRACTOR] [%8zu] [%d:%d] Skip on plugin stop\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+        );
+        return nullptr;
+    }
 
-        addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-        addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
-        uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
 
-        if (fileinfoclass == FILE_DISPOSITION_INFORMATION && is_handle_valid(handle))
-        {
-            uint8_t del = 0;
-            ACCESS_CONTEXT(ctx);
-            ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-            ctx.dtb = info->regs->cr3;
-            ctx.addr = fileinfo;
+    switch (fileinfoclass)
+    {
+        case FILE_DISPOSITION_INFORMATION:
+        case FILE_DISPOSITION_INFORMATION_EX:
+            task = get_task_for_delete(vmi, info, handle, fileinfo, fileinfoclass);
+            break;
 
-            if ( VMI_SUCCESS == vmi_read_8(vmi, &ctx, &del) && del)
-            {
-                auto id = make_task_id(info->attached_proc_data.pid, handle);
-                if (tasks.find(id) == tasks.end())
-                {
-                    addr_t file = 0;
-                    auto filename = get_file_name(vmi, info, handle, &file, nullptr);
-
-                    if (exclude.match(filename))
-                    {
-                        print_extraction_exclusion(info, filename);
-                        return nullptr;
-                    }
-
-                    tasks[id] = std::make_unique<task_t>(handle,
-                            filename,
-                            task_t::task_reason::del,
-                            file);
-                    // save some process info
-                    tasks[id]->pid = info->attached_proc_data.pid;
-                    tasks[id]->ppid = info->attached_proc_data.ppid;
-                    tasks[id]->process_name = info->proc_data.name;
-                }
-                task = tasks.find(id)->second.get();
-            }
-        }
-
-        if (fileinfoclass == FILE_END_OF_FILE_INFORMATION && is_handle_valid(handle))
-        {
-
-            uint64_t eof = 0;
-            ACCESS_CONTEXT(ctx);
-            ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-            ctx.dtb = info->regs->cr3;
-            ctx.addr = fileinfo;
-
-            if ( VMI_SUCCESS == vmi_read_64(vmi, &ctx, &eof) )
-            {
-
-                auto id = make_task_id(info->attached_proc_data.pid, handle);
-                if (tasks.find(id) == tasks.end())
-                {
-                    addr_t file = 0;
-                    auto filename = get_file_name(vmi, info, handle, &file, nullptr);
-
-                    if (exclude.match(filename))
-                    {
-                        print_extraction_exclusion(info, filename);
-                        return nullptr;
-                    }
-
-                    tasks[id] = std::make_unique<task_t>(handle,
-                            filename,
-                            task_t::task_reason::write,
-                            file);
-                    // save some process info
-                    tasks[id]->pid = info->attached_proc_data.pid;
-                    tasks[id]->ppid = info->attached_proc_data.ppid;
-                    tasks[id]->process_name = info->proc_data.name;
-                }
-                task = tasks.find(id)->second.get();
-                task->new_eof = eof;
-            }
-        }
+        case FILE_END_OF_FILE_INFORMATION:
+            task = get_task_for_eof(vmi, info, handle, fileinfo);
+            break;
     }
 
     if (task && task->extracted)
