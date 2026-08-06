@@ -123,6 +123,7 @@ endif
 if get_option('plugin-fileextractor')
     plugin_sources += 'fileextractor/fileextractor.cpp'
     plugin_sources += 'fileextractor/win.cpp'
+    plugin_sources += 'fileextractor/linux.cpp'
 
     config_h.set('ENABLE_PLUGIN_FILEEXTRACTOR', 1)
 endif

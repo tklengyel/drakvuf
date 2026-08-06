@@ -148,6 +148,8 @@ sources += fileextractor/fileextractor.h
 sources += fileextractor/private.h
 sources += fileextractor/win.cpp
 sources += fileextractor/win.h
+sources += fileextractor/linux.cpp
+sources += fileextractor/linux.h
 endif
 
 if PLUGIN_OBJMON

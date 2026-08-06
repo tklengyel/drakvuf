@@ -107,6 +107,7 @@
 
 #include "plugins/plugins_ex.h"
 #include "win.h"
+#include "linux.h"
 
 #include <memory>
 
@@ -114,6 +115,7 @@ class fileextractor : public pluginex
 {
 public:
     std::unique_ptr<win_fileextractor> wf;
+    std::unique_ptr<linux_fileextractor> lf;
 
     fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output);
     ~fileextractor() = default;
