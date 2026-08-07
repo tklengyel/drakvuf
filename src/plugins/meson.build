@@ -12,6 +12,8 @@ if get_option('plugin-syscalls')
     plugin_sources += 'syscalls/syscalls.cpp'
     plugin_sources += 'syscalls/win.cpp'
     plugin_sources += 'syscalls/linux.cpp'
+    plugin_sources += 'syscalls/parsers_win.cpp'
+    plugin_sources += 'syscalls/parsers_linux.cpp'
 
     config_h.set('ENABLE_PLUGIN_SYSCALLS', 1)
 
