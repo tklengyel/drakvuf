@@ -344,6 +344,18 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
     {
         injector->rc = INJECTOR_SUCCEEDED;
         injector->detected = true;
+
+        // The target process was just detected reliably and immediately via
+        // this CR3 trap. Don't additionally wait for the hijacked thread to
+        // naturally re-execute the original breakpoint address (STEP4) to
+        // notice injector->detected -- that address is wherever the thread
+        // happened to be at hijack time, and there is no guarantee it will be
+        // re-executed promptly (or at all). This is the root cause of the
+        // intermittent/indefinite hangs reported in #1758: detection already
+        // succeeded here, so finish immediately instead of depending on a
+        // second, unrelated event that may never arrive in time.
+        drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
+        drakvuf_interrupt(drakvuf, SIGINT);
     }
 
     return 0;
