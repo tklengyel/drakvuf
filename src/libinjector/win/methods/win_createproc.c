@@ -299,6 +299,12 @@ static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     injector->detected = true;
 
+    // Same reasoning as wait_for_injected_process_cb(): this trap already
+    // gives a reliable, immediate signal, so finish now instead of waiting
+    // for the STEP4 loop to notice via the original hijack breakpoint.
+    drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
+    drakvuf_interrupt(drakvuf, SIGINT);
+
     return 0;
 }
 
