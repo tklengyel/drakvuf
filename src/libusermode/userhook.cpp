@@ -129,6 +129,7 @@
 #include <libvmi/peparse.h>
 #include <libdrakvuf/libdrakvuf.h>
 #include <assert.h>
+#include <algorithm>
 
 #include "userhook.hpp"
 #include "utils.hpp"
@@ -139,6 +140,69 @@ static bool g_injection_mode_enabled = false;
 void userhooks_set_injection_mode(bool enable)
 {
     g_injection_mode_enabled = enable;
+}
+
+static std::vector<std::string> g_target_processes;
+
+void userhooks_set_target_processes(const std::vector<std::string>& names)
+{
+    g_target_processes = names;
+}
+
+static bool is_target_image_name(const char* path)
+{
+    if (!path)
+        return false;
+
+    // proc_data.name may hold the full path
+    const char* base = path;
+    for (const char* c = path; *c; c++)
+        if (*c == 0x5c || *c == 0x2f)
+            base = c + 1;
+
+    return std::any_of(g_target_processes.begin(), g_target_processes.end(),
+            [base](const std::string& name)
+    {
+        return !g_ascii_strcasecmp(base, name.c_str());
+    });
+}
+
+bool userhook::is_target_process(drakvuf_t drakvuf, const proc_data_t& proc_data)
+{
+    if (g_target_processes.empty())
+        return true;
+
+    // Keyed by ppid as well so that a reused pid is evaluated again.
+    const std::pair<vmi_pid_t, vmi_pid_t> key{proc_data.pid, proc_data.ppid};
+    if (target_procs.count(key))
+        return true;
+    if (not_target_procs.count(key))
+        return false;
+
+    // The process is selected if it, or any of its ancestors, has one of the
+    // target image names. Ancestors are looked up in the live process list since they
+    // may have been running before we attached.
+    constexpr int max_depth = 32;
+    bool found = is_target_image_name(proc_data.name);
+    vmi_pid_t ppid = proc_data.ppid;
+
+    for (int depth = 0; !found && depth < max_depth && ppid > 0; depth++)
+    {
+        addr_t eprocess = 0;
+        vmi_pid_t next_ppid = 0;
+        if (!drakvuf_find_process(drakvuf, ppid, nullptr, &eprocess) ||
+            !drakvuf_get_process_ppid(drakvuf, eprocess, &next_ppid))
+            break;
+
+        char* name = drakvuf_get_process_name(drakvuf, eprocess, true);
+        found = is_target_image_name(name);
+        g_free(name);
+
+        ppid = next_ppid;
+    }
+
+    (found ? target_procs : not_target_procs).insert(key);
+    return found;
 }
 
 userhook& userhook::get_instance(drakvuf_t drakvuf)
@@ -414,6 +478,9 @@ void trap_loaded_dll_targets(drakvuf_t drakvuf, dll_t* dll_meta, addr_t process_
 
 static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
 {
+    if (!plugin->is_target_process(drakvuf, get_proc_data(drakvuf, info)))
+        return VMI_EVENT_RESPONSE_NONE;
+
     bool was_hooked = dll_meta->v.is_hooked;
 
     event_response_t ret;

@@ -160,6 +160,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 {
 
     userhooks_set_injection_mode(options->userhook_injection_mode);
+    userhooks_set_target_processes(options->userhook_target_processes);
 
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
