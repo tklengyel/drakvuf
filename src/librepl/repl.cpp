@@ -202,6 +202,11 @@ static void repl_init(drakvuf_t drakvuf)
 
 event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    // The trap fires on every CR3 write. Once an interrupt was requested do not
+    // open another prompt, so that the drakvuf loop can end.
+    if (drakvuf_is_interrupted(drakvuf))
+        return VMI_EVENT_RESPONSE_NONE;
+
     repl_init(drakvuf);
 
     std::cout << "=================================================================\n"
@@ -231,7 +236,8 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         "trap_info contains current trap info structure\n"
         "drakvuf contains drakvuf_t pointer\n"
         "retval contains event return code, which you can overwrite\n"
-        "to go back to drakvuf loop use exit(), to break loop use CTRL+C\"\"\")\n"
+        "to go back to drakvuf loop use exit()\n"
+        "to stop drakvuf use libdrakvuf.drakvuf_interrupt(drakvuf, 1) and then exit()\"\"\")\n"
     );
 
     return get_ret_val();
