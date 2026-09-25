@@ -230,15 +230,46 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PyRun_SimpleString(ss.str().c_str());
     }
 
-    PyRun_SimpleString(
-        "IPython.embed(colors='neutral', banner2=\"\"\""
-        "REPL ready to go, enjoy hacking!\n"
-        "trap_info contains current trap info structure\n"
-        "drakvuf contains drakvuf_t pointer\n"
-        "retval contains event return code, which you can overwrite\n"
-        "to go back to drakvuf loop use exit()\n"
-        "to stop drakvuf use libdrakvuf.drakvuf_interrupt(drakvuf, 1) and then exit()\"\"\")\n"
-    );
+    // Ctrl+C is a key at the prompt (the terminal is in raw mode), not a signal:
+    // IPython does not tell drakvuf about it. Bind it, on an empty line, to stop
+    // the REPL. If this IPython does not offer what we need, use plain embed().
+    PyRun_SimpleString(R"PY(
+__repl_banner = """REPL ready to go, enjoy hacking!
+trap_info contains current trap info structure
+drakvuf contains drakvuf_t pointer
+retval contains event return code, which you can overwrite
+to go back to drakvuf loop use exit()
+to stop drakvuf use libdrakvuf.drakvuf_interrupt(drakvuf, 1) and then exit()"""
+__repl_shell = None
+try:
+    from IPython.terminal.embed import InteractiveShellEmbed
+    from IPython.terminal.ipapp import load_default_config
+    from prompt_toolkit.application import get_app
+    from prompt_toolkit.filters import Condition, is_searching
+    __repl_config = load_default_config()
+    __repl_config.InteractiveShellEmbed = __repl_config.TerminalInteractiveShell
+    __repl_shell = InteractiveShellEmbed.instance(config=__repl_config, colors='neutral',
+        banner2=__repl_banner + "\nor press CTRL+C on an empty line")
+    __repl_keys = __repl_shell.pt_app.key_bindings
+
+    # Only on an empty line and outside a history search: everywhere else Ctrl+C
+    # keeps the behaviour IPython gives it (clear the line, cancel the search).
+    __repl_empty = Condition(lambda: not get_app().current_buffer.text)
+
+    @__repl_keys.add('c-c', filter=__repl_empty & ~is_searching)
+    def __repl_ctrl_c(event):
+        libdrakvuf.drakvuf_interrupt(drakvuf, 2)
+        __repl_shell.confirm_exit = False
+        event.app.exit(exception=EOFError)
+except Exception:
+    __repl_shell = None
+
+if __repl_shell is not None:
+    __repl_shell()
+    InteractiveShellEmbed.clear_instance()
+else:
+    IPython.embed(colors='neutral', banner2=__repl_banner)
+)PY");
 
     return get_ret_val();
 }
