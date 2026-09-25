@@ -143,25 +143,37 @@ static event_response_t get_ret_val()
     return static_cast<event_response_t>(retval);
 }
 
-static void repl_init(drakvuf_t drakvuf)
+// The build layout differs: libdrakvuf.py is next to the repl binary in
+// librepl/ (autotools) or in src/librepl/ (meson).
+static bool repl_python_init()
 {
+    static bool initialized = false;
+    if (initialized)
+        return true;
+
     // init python
     Py_Initialize();
 
     // get executable path
     auto exe_path = get_selfpath();
-    auto py_drakvuf_path = exe_path.substr(0, exe_path.find_last_of('/')) + "/librepl";
-    PRINT_DEBUG("PyDrakvuf path: %s\n", py_drakvuf_path.c_str());
+    auto exe_dir = exe_path.substr(0, exe_path.find_last_of('/'));
+    const std::string py_drakvuf_paths[] = { exe_dir + "/librepl", exe_dir + "/src/librepl" };
 
     // load libdrakvuf
     auto sysPath = PySys_GetObject("path");
-    PyList_Append(sysPath, PyUnicode_FromString(py_drakvuf_path.c_str()));
-    auto module = PyImport_ImportModule("libdrakvuf");
+    for (const auto& path : py_drakvuf_paths)
+    {
+        PRINT_DEBUG("PyDrakvuf path: %s\n", path.c_str());
+        PyList_Append(sysPath, PyUnicode_FromString(path.c_str()));
+    }
 
+    auto module = PyImport_ImportModule("libdrakvuf");
     if (module == NULL)
     {
-        std::cout << "No libdrakvuf.py found, please generate it before running REPL\n";
-        exit(1);
+        PyErr_Clear();
+        std::cout << "No libdrakvuf.py found in " << py_drakvuf_paths[0] << " or " << py_drakvuf_paths[1]
+            << ", please generate it before running REPL\n";
+        return false;
     }
 
     // import modules
@@ -169,9 +181,22 @@ static void repl_init(drakvuf_t drakvuf)
     {
         std::cout << "Failed to load one of dependencies\n";
         PyErr_Print();
-        exit(1);
+        return false;
     }
 
+    initialized = true;
+    return true;
+}
+
+bool repl_check_python(void)
+{
+    return repl_python_init();
+}
+
+static void repl_init(drakvuf_t drakvuf)
+{
+    // the python environment has been checked before attaching to the domain
+    auto module = PyImport_ImportModule("libdrakvuf");
     PyObject_SetAttrString(module, "drakvuf", PyLong_FromVoidPtr(static_cast<void*>(drakvuf)));
 }
 

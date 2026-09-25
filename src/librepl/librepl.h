@@ -114,6 +114,9 @@ extern "C" {
  * @param drakvuf - drakvuf instance
  * @param info - trap info
  */
+/* Set up the embedded python and import libdrakvuf. Call before attaching to a domain. */
+bool repl_check_python(void);
+
 event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #ifdef __cplusplus
