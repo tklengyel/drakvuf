@@ -177,8 +177,12 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     trap->type = BREAKPOINT;
     trap->ah_cb = nullptr;
     trap->ttl = ttl;
-    trap->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    trap->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info) -> event_response_t
     {
+        // The breakpoint sits on the return address, so it can also be hit by another thread or process
+        // returning to it, or by a recursive call: only call back for the call this hook was created for.
+        if (!GetTrapParams(info)->verifyResultCallParams(drakvuf, info))
+            return VMI_EVENT_RESPONSE_NONE;
         return GetTrapHook<ReturnHook>(info)->callback_(drakvuf, info);
     };
 
@@ -194,6 +198,7 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     hook->params_ = std::make_shared<Params>();
     hook->params_->hook_ = hook.get();
     hook->trap_->data = static_cast<void*>(hook->params_.get());
+    hook->params_->setResultCallParams(drakvuf, info);
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
