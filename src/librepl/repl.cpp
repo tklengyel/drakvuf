@@ -143,25 +143,37 @@ static event_response_t get_ret_val()
     return static_cast<event_response_t>(retval);
 }
 
-static void repl_init(drakvuf_t drakvuf)
+// The build layout differs: libdrakvuf.py is next to the repl binary in
+// librepl/ (autotools) or in src/librepl/ (meson).
+static bool repl_python_init()
 {
+    static bool initialized = false;
+    if (initialized)
+        return true;
+
     // init python
     Py_Initialize();
 
     // get executable path
     auto exe_path = get_selfpath();
-    auto py_drakvuf_path = exe_path.substr(0, exe_path.find_last_of('/')) + "/librepl";
-    PRINT_DEBUG("PyDrakvuf path: %s\n", py_drakvuf_path.c_str());
+    auto exe_dir = exe_path.substr(0, exe_path.find_last_of('/'));
+    const std::string py_drakvuf_paths[] = { exe_dir + "/librepl", exe_dir + "/src/librepl" };
 
     // load libdrakvuf
     auto sysPath = PySys_GetObject("path");
-    PyList_Append(sysPath, PyUnicode_FromString(py_drakvuf_path.c_str()));
-    auto module = PyImport_ImportModule("libdrakvuf");
+    for (const auto& path : py_drakvuf_paths)
+    {
+        PRINT_DEBUG("PyDrakvuf path: %s\n", path.c_str());
+        PyList_Append(sysPath, PyUnicode_FromString(path.c_str()));
+    }
 
+    auto module = PyImport_ImportModule("libdrakvuf");
     if (module == NULL)
     {
-        std::cout << "No libdrakvuf.py found, please generate it before running REPL\n";
-        exit(1);
+        PyErr_Clear();
+        std::cout << "No libdrakvuf.py found in " << py_drakvuf_paths[0] << " or " << py_drakvuf_paths[1]
+            << ", please generate it before running REPL\n";
+        return false;
     }
 
     // import modules
@@ -169,14 +181,32 @@ static void repl_init(drakvuf_t drakvuf)
     {
         std::cout << "Failed to load one of dependencies\n";
         PyErr_Print();
-        exit(1);
+        return false;
     }
 
+    initialized = true;
+    return true;
+}
+
+bool repl_check_python(void)
+{
+    return repl_python_init();
+}
+
+static void repl_init(drakvuf_t drakvuf)
+{
+    // the python environment has been checked before attaching to the domain
+    auto module = PyImport_ImportModule("libdrakvuf");
     PyObject_SetAttrString(module, "drakvuf", PyLong_FromVoidPtr(static_cast<void*>(drakvuf)));
 }
 
 event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    // The trap fires on every CR3 write. Once an interrupt was requested do not
+    // open another prompt, so that the drakvuf loop can end.
+    if (drakvuf_is_interrupted(drakvuf))
+        return VMI_EVENT_RESPONSE_NONE;
+
     repl_init(drakvuf);
 
     std::cout << "=================================================================\n"
@@ -200,14 +230,46 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PyRun_SimpleString(ss.str().c_str());
     }
 
-    PyRun_SimpleString(
-        "IPython.embed(colors='neutral', banner2=\"\"\""
-        "REPL ready to go, enjoy hacking!\n"
-        "trap_info contains current trap info structure\n"
-        "drakvuf contains drakvuf_t pointer\n"
-        "retval contains event return code, which you can overwrite\n"
-        "to go back to drakvuf loop use exit(), to break loop use CTRL+C\"\"\")\n"
-    );
+    // Ctrl+C is a key at the prompt (the terminal is in raw mode), not a signal:
+    // IPython does not tell drakvuf about it. Bind it, on an empty line, to stop
+    // the REPL. If this IPython does not offer what we need, use plain embed().
+    PyRun_SimpleString(R"PY(
+__repl_banner = """REPL ready to go, enjoy hacking!
+trap_info contains current trap info structure
+drakvuf contains drakvuf_t pointer
+retval contains event return code, which you can overwrite
+to go back to drakvuf loop use exit()
+to stop drakvuf use libdrakvuf.drakvuf_interrupt(drakvuf, 1) and then exit()"""
+__repl_shell = None
+try:
+    from IPython.terminal.embed import InteractiveShellEmbed
+    from IPython.terminal.ipapp import load_default_config
+    from prompt_toolkit.application import get_app
+    from prompt_toolkit.filters import Condition, is_searching
+    __repl_config = load_default_config()
+    __repl_config.InteractiveShellEmbed = __repl_config.TerminalInteractiveShell
+    __repl_shell = InteractiveShellEmbed.instance(config=__repl_config, colors='neutral',
+        banner2=__repl_banner + "\nor press CTRL+C on an empty line")
+    __repl_keys = __repl_shell.pt_app.key_bindings
+
+    # Only on an empty line and outside a history search: everywhere else Ctrl+C
+    # keeps the behaviour IPython gives it (clear the line, cancel the search).
+    __repl_empty = Condition(lambda: not get_app().current_buffer.text)
+
+    @__repl_keys.add('c-c', filter=__repl_empty & ~is_searching)
+    def __repl_ctrl_c(event):
+        libdrakvuf.drakvuf_interrupt(drakvuf, 2)
+        __repl_shell.confirm_exit = False
+        event.app.exit(exception=EOFError)
+except Exception:
+    __repl_shell = None
+
+if __repl_shell is not None:
+    __repl_shell()
+    InteractiveShellEmbed.clear_instance()
+else:
+    IPython.embed(colors='neutral', banner2=__repl_banner)
+)PY");
 
     return get_ret_val();
 }
