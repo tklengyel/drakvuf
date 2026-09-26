@@ -639,7 +639,7 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
     flush_vmi(drakvuf);
 
-#ifdef DEBUG
+#ifdef DRAKVUF_DEBUG
     reg_t cr3 = event->x86_regs->cr3;
     PRINT_DEBUG("INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
         event->vcpu_id, event->slat_id, cr3, pa,
@@ -939,7 +939,7 @@ static event_response_t _debug_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
     flush_vmi(drakvuf);
 
-#ifdef DEBUG
+#ifdef DRAKVUF_DEBUG
     addr_t pa = (event->debug_event.gfn << 12) + event->debug_event.offset;
     PRINT_DEBUG("Debug event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
         event->vcpu_id, event->slat_id, event->x86_regs->cr3, pa,
@@ -990,7 +990,7 @@ static event_response_t _msr_cb(drakvuf_t drakvuf, vmi_event_t* event)
     event_response_t rsp = 0;
 
     flush_vmi(drakvuf);
-#ifdef DEBUG
+#ifdef DRAKVUF_DEBUG
     PRINT_DEBUG("MSR event vCPU %u altp2m:%u MSR=0x%"PRIx32" Value=0x%"PRIx64"\n",
         event->vcpu_id, event->slat_id, event->reg_event.msr, event->reg_event.value);
 #endif
