@@ -193,6 +193,10 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
+    // Fail before attaching to the domain: leaving it half-attached would keep it paused.
+    if (!repl_check_python())
+        return 1;
+
     if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, libvmi_conf, kpgd, false, UNLIMITED_TTL, NULL, true, false))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
@@ -213,5 +217,6 @@ int main(int argc, char** argv)
     if (!drakvuf_is_interrupted(drakvuf))
         drakvuf_loop(drakvuf, is_interrupted, nullptr);
 
+    drakvuf_close(drakvuf, 0);
     return return_code;
 }
