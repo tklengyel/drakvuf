@@ -111,6 +111,8 @@
 
 #include <array>
 #include <memory>
+#include <string>
+#include <vector>
 #include <unordered_map>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -173,6 +175,7 @@ struct plugins_options
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_injection_mode;       // PLUGIN_MEMDUMP, PLUGIN_APIMON, PLUGIN_RPCMON
+    std::vector<std::string> userhook_target_processes; // PLUGIN_MEMDUMP, PLUGIN_APIMON, PLUGIN_RPCMON
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* clr_profile_64;         // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP

@@ -263,6 +263,12 @@ void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 void userhooks_set_injection_mode(bool enable);
 
 /**
+ * Restrict userhooks to the process(es) with one of the given image names and
+ * to their descendants. An empty list disables the restriction.
+ */
+void userhooks_set_target_processes(const std::vector<std::string>& names);
+
+/**
  * Requests to stop the userhooks subsystem.
  * @param[in] drakvuf drakvuf context
  * @return true if userhooks subsystem has been stopped, false otherwise.

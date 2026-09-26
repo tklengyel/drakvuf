@@ -261,6 +261,11 @@ public:
     std::map<vmi_pid_t, module_context_t> proc_ntdll;
 
     const bool injection_mode;
+
+    // Processes selected by userhooks_set_target_process() and their descendants.
+    std::set<std::pair<vmi_pid_t, vmi_pid_t>> target_procs;     // (pid, ppid)
+    std::set<std::pair<vmi_pid_t, vmi_pid_t>> not_target_procs; // (pid, ppid)
+    bool is_target_process(drakvuf_t drakvuf, const proc_data_t& proc_data);
     int injection_in_progress = 0;
     std::set<std::pair<vmi_pid_t, uint32_t /*tid*/>> pf_in_progress;
 
