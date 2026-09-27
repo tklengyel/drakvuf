@@ -332,8 +332,6 @@ event_response_t linux_procmon::do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info*
 event_response_t linux_procmon::send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<send_signal_data>(info);
-    if (!params->verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     auto signal_str = signal_to_string((signal_t)params->signal);
 
@@ -428,8 +426,6 @@ event_response_t linux_procmon::send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_i
 event_response_t linux_procmon::kernel_clone_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<kernel_clone_data>(info);
-    if (!params->verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     uint64_t new_pid = info->regs->rax;
 
@@ -540,8 +536,6 @@ void linux_procmon::print_info(
 event_response_t linux_procmon::execve_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<execve_data>(info);
-    if (!params->verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,

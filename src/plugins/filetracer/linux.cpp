@@ -264,8 +264,6 @@ char* linux_filetracer::read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 event_response_t linux_filetracer::open_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<linux_data>(info);
-    if (!params->verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     addr_t file_struct = info->regs->rax;
 
@@ -415,8 +413,6 @@ event_response_t linux_filetracer::llseek_file_cb(drakvuf_t drakvuf, drakvuf_tra
 event_response_t linux_filetracer::memfd_create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto params = libhook::GetTrapParams<linux_data>(info);
-    if (!params->verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     params->file_handle = info->regs->rax;
 
