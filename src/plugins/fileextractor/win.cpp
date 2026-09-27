@@ -186,8 +186,6 @@ event_response_t win_fileextractor::createfile_ret_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
 {
     auto params_copy = *libhook::GetTrapParams<createfile_result_t>(info);
-    if (!params_copy.verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     auto hook_id = make_hook_id(info, params_copy.target_rsp);
     createfile_ret_hooks.erase(hook_id);
@@ -516,8 +514,6 @@ event_response_t win_fileextractor::writefile_ret_cb(drakvuf_t drakvuf,
 {
     // get data from NtWriteFile Buffer and write it to a file with given offset
     auto params_copy = *libhook::GetTrapParams<writefile_result_t>(info);
-    if (!params_copy.verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     auto hook_id = make_hook_id(info, params_copy.target_rsp);
     writefile_ret_hooks.erase(hook_id);

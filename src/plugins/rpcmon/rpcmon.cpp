@@ -350,8 +350,6 @@ event_response_t rpcmon::usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap
 {
     auto params = libhook::GetTrapParams<RpcmonReturnHookData>(info);
 
-    if (!params->verifyResultCallParams(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     std::vector<std::pair<std::string, fmt::Rstr<std::string>>> fmt_extra{};
     std::vector<std::pair<std::string, fmt::Nval<uint64_t>>> fmt_extra_num;

@@ -870,8 +870,6 @@ event_response_t codemon::execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 event_response_t codemon::mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
     auto params = libhook::GetTrapParams<AccessFaultResult>(trap_info);
-    if (!params->verifyResultCallParams(drakvuf, trap_info))
-        return VMI_EVENT_RESPONSE_NONE;
 
     // Calculate the frame's starting virtual address from the page_va by clearing the lower 12 bits.
     addr_t page_va = ((params->page_va >> 12) << 12);
