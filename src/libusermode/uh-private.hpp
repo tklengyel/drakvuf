@@ -256,6 +256,14 @@ public:
     {
         std::optional<mmvad_info_t> mmvad;
         bool is_hooked;
+        // Number of times ntdll.dll's VAD was looked for and not found yet.
+        // A handful of retries covers the race where the very first
+        // NtMapViewOfSection/NtProtectVirtualMemory call this plugin observes
+        // for a brand new, short-lived process (e.g. an out-of-process COM
+        // server such as WmiPrvSE.exe) fires before ntdll.dll's VAD is
+        // actually visible, which used to make try_hook_ntdll() give up on
+        // that process for good.
+        unsigned int ntdll_lookup_retries = 0;
     };
 
     std::map<vmi_pid_t, module_context_t> proc_ntdll;
