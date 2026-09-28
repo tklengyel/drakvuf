@@ -535,6 +535,37 @@ static event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     return dll_meta ? perform_hooking(drakvuf, info, plugin, dll_meta) : VMI_EVENT_RESPONSE_NONE;
 }
 
+namespace
+{
+struct ntdll_mmvad_visitor_ctx_t
+{
+    std::string name;
+    mmvad_info_t mmvad;
+};
+} // namespace
+
+static bool find_ntdll_mmvad_visitor(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data)
+{
+    auto* vctx = reinterpret_cast<ntdll_mmvad_visitor_ctx_t*>(callback_data);
+
+    if (!mmvad->file_name_ptr)
+        return false;
+
+    if (drakvuf_mmvad_type(drakvuf, mmvad) != VAD_TYPE_DLL)
+        return false;
+
+    if (auto name = drakvuf_read_unicode(drakvuf, mmvad->file_name_ptr); !name.empty())
+    {
+        if (is_dll_name_matched(name, vctx->name))
+        {
+            vctx->mmvad = *mmvad;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void try_hook_ntdll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, userhook* plugin)
 {
     auto proc_data = get_proc_data(drakvuf, info);
@@ -558,37 +589,9 @@ static void try_hook_ntdll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, userhoo
     }
     else if (!plugin->is_stopping())
     {
-        struct visitor_context_t
-        {
-            std::string name;
-            mmvad_info_t mmvad;
-        };
-
-        auto visitor = [](drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data)
-        {
-            auto* vctx = reinterpret_cast<visitor_context_t*>(callback_data);
-
-            if (!mmvad->file_name_ptr)
-                return false;
-
-            if (drakvuf_mmvad_type(drakvuf, mmvad) != VAD_TYPE_DLL)
-                return false;
-
-            if (auto name = drakvuf_read_unicode(drakvuf, mmvad->file_name_ptr); !name.empty())
-            {
-                if (is_dll_name_matched(name, vctx->name))
-                {
-                    vctx->mmvad = *mmvad;
-                    return true;
-                }
-            }
-
-            return false;
-        };
-
-        visitor_context_t vctx{ "ntdll.dll", {} };
+        ntdll_mmvad_visitor_ctx_t vctx{ "ntdll.dll", {} };
         auto& entry = plugin->proc_ntdll[proc_data.pid];
-        if (drakvuf_traverse_mmvad(drakvuf, proc_data.base_addr, visitor, &vctx))
+        if (drakvuf_traverse_mmvad(drakvuf, proc_data.base_addr, find_ntdll_mmvad_visitor, &vctx))
         {
             entry.mmvad = vctx.mmvad;
         }
