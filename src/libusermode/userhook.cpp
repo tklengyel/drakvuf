@@ -535,55 +535,74 @@ static event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     return dll_meta ? perform_hooking(drakvuf, info, plugin, dll_meta) : VMI_EVENT_RESPONSE_NONE;
 }
 
+namespace
+{
+struct ntdll_mmvad_visitor_ctx_t
+{
+    std::string name;
+    mmvad_info_t mmvad;
+};
+} // namespace
+
+static bool find_ntdll_mmvad_visitor(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data)
+{
+    auto* vctx = reinterpret_cast<ntdll_mmvad_visitor_ctx_t*>(callback_data);
+
+    if (!mmvad->file_name_ptr)
+        return false;
+
+    if (drakvuf_mmvad_type(drakvuf, mmvad) != VAD_TYPE_DLL)
+        return false;
+
+    if (auto name = drakvuf_read_unicode(drakvuf, mmvad->file_name_ptr); !name.empty())
+    {
+        if (is_dll_name_matched(name, vctx->name))
+        {
+            vctx->mmvad = *mmvad;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void try_hook_ntdll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, userhook* plugin)
 {
     auto proc_data = get_proc_data(drakvuf, info);
 
+    // A bounded number of retries covers the race where ntdll.dll's VAD is
+    // not visible yet on the very first NtMapViewOfSection/
+    // NtProtectVirtualMemory call seen for a brand new process (see
+    // ntdll_lookup_retries in uh-private.hpp) instead of giving up on that
+    // process for good after a single failed lookup.
+    constexpr unsigned int max_ntdll_lookup_retries = 20;
+
     userhook::module_context_t* ctx = nullptr;
-    if (auto it = plugin->proc_ntdll.find(proc_data.pid); it != plugin->proc_ntdll.end())
+    auto it = plugin->proc_ntdll.find(proc_data.pid);
+    bool need_lookup = (it == plugin->proc_ntdll.end());
+    if (!need_lookup && !it->second.mmvad && it->second.ntdll_lookup_retries < max_ntdll_lookup_retries)
+        need_lookup = true;
+
+    if (!need_lookup)
     {
         ctx = &it->second;
     }
     else if (!plugin->is_stopping())
     {
-        struct visitor_context_t
+        ntdll_mmvad_visitor_ctx_t vctx{ "ntdll.dll", {} };
+        auto& entry = plugin->proc_ntdll[proc_data.pid];
+        if (drakvuf_traverse_mmvad(drakvuf, proc_data.base_addr, find_ntdll_mmvad_visitor, &vctx))
         {
-            std::string name;
-            mmvad_info_t mmvad;
-        };
-
-        auto visitor = [](drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data)
-        {
-            auto* vctx = reinterpret_cast<visitor_context_t*>(callback_data);
-
-            if (!mmvad->file_name_ptr)
-                return false;
-
-            if (drakvuf_mmvad_type(drakvuf, mmvad) != VAD_TYPE_DLL)
-                return false;
-
-            if (auto name = drakvuf_read_unicode(drakvuf, mmvad->file_name_ptr); !name.empty())
-            {
-                if (is_dll_name_matched(name, vctx->name))
-                {
-                    vctx->mmvad = *mmvad;
-                    return true;
-                }
-            }
-
-            return false;
-        };
-
-        visitor_context_t vctx{ "ntdll.dll", {} };
-        if (drakvuf_traverse_mmvad(drakvuf, proc_data.base_addr, visitor, &vctx))
-        {
-            ctx = &(plugin->proc_ntdll[proc_data.pid] = {vctx.mmvad, false});
+            entry.mmvad = vctx.mmvad;
         }
         else
         {
-            // add in map without mmvad to just skip the process later
-            ctx = &(plugin->proc_ntdll[proc_data.pid] = {std::nullopt, false});
+            // Not found yet: bump the retry count in place (do not reset an
+            // existing entry, or it would retry forever instead of a bounded
+            // number of times) and try again on a later call, up to the limit.
+            entry.ntdll_lookup_retries++;
         }
+        ctx = &entry;
     }
 
     if (ctx && !ctx->is_hooked && ctx->mmvad)
