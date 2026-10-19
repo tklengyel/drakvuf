@@ -206,6 +206,16 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
 {
     drakvuf_t drakvuf = pass->drakvuf;
 
+    /*
+     * The page may have got its first breakpoint, and so its shadow copy,
+     * only after the write was intercepted. That copy was taken after the
+     * write and is current; a page without one has nothing to refresh.
+     */
+    if (!pass->remapped_gfn)
+        pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(pass->gfn));
+    if (!pass->remapped_gfn)
+        return 1;
+
     PRINT_DEBUG("Re-copying remapped gfn\n");
 
     if (!drakvuf_pause(drakvuf))
@@ -227,12 +237,23 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
         return 0;
     }
 
-    GSList* loop = (GSList*)pass->traps;
+    /*
+     * pass->traps was looked up when the write was intercepted. Callbacks and
+     * process_free_requests() may have removed breakpoints on this page since,
+     * which frees nodes of that list, so walk the current list instead.
+     */
+    GSList* loop = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
     while (loop)
     {
         uint8_t test = 0;
         addr_t pa = GPOINTER_TO_SIZE(loop->data);
         struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, loop->data);
+
+        if (!s)
+        {
+            loop = loop->next;
+            continue;
+        }
 
         if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test) )
         {
@@ -340,9 +361,13 @@ static event_response_t _post_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
     /*
      * We need to copy the newly written page to the remapped gfn
-     * and reapply all traps
+     * and reapply all traps. pass->traps is set only for a write to a page
+     * that had breakpoints when the write was intercepted. Use it as that
+     * flag only: the list itself may have been freed since.
      */
-    if ( pass->traps && !refresh_shadow_copy(drakvuf->vmi, pass) )
+    if ( pass->traps &&
+        g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn)) &&
+        !refresh_shadow_copy(drakvuf->vmi, pass) )
     {
         fprintf(stderr, "Failed to refresh shadow copy\n");
         drakvuf->interrupted = 1;
