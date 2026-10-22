@@ -202,9 +202,62 @@ void process_free_requests(drakvuf_t drakvuf)
     drakvuf->remove_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
 }
 
+/* Re-arm a breakpoint in the refreshed shadow copy of its page */
+static bool reapply_breakpoint(vmi_instance_t vmi, struct memcb_pass* pass, addr_t pa, struct wrapper* s)
+{
+    drakvuf_t drakvuf = pass->drakvuf;
+    uint8_t test = 0;
+
+    if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test) )
+    {
+        fprintf(stderr, "Critical error in re-copying remapped gfn\n");
+        drakvuf->interrupted = -1;
+        return 0;
+    }
+
+    if ( test == bp )
+    {
+        PRINT_DEBUG("Double-trap at 0x%lx\n", pa);
+        s->breakpoint.doubletrap = 1;
+        return 1;
+    }
+
+    s->breakpoint.doubletrap = 0;
+
+    /*
+     * If a write was observed near or at a breakpoint we automatically
+     * fall back to memory access permission based monitoring.
+     */
+    if ( pass->pa < pa && pass->pa >= pa-14 )
+    {
+        PRINT_DEBUG("Write happened near a breakpoint at 0x%lx, switching to mem X-based monitoring\n", pa);
+        remove_trap(drakvuf, &s->breakpoint.guard);
+        s->breakpoint.guard.memaccess.access |= VMI_MEMACCESS_X;
+        if ( !inject_trap_mem(drakvuf, &s->breakpoint.guard, 0) )
+            drakvuf->interrupted = -1;
+    }
+    else if ( VMI_FAILURE == vmi_write_8_pa(vmi, (pass->remapped_gfn->r << 12) + (pa & VMI_BIT_MASK(0, 11)), &bp) )
+    {
+        fprintf(stderr, "Failed to set breakpoint in post_mem_cb!\n");
+        drakvuf->interrupted = -1;
+        return 0;
+    }
+
+    return 1;
+}
+
 static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
 {
     drakvuf_t drakvuf = pass->drakvuf;
+
+    /*
+     * The page may have got its first breakpoint, and so its shadow copy,
+     * only after the write was intercepted. That copy was taken after the
+     * write and is current; a page without one has nothing to refresh.
+     */
+    pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(pass->gfn));
+    if (!pass->remapped_gfn)
+        return 1;
 
     PRINT_DEBUG("Re-copying remapped gfn\n");
 
@@ -227,49 +280,19 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
         return 0;
     }
 
-    GSList* loop = (GSList*)pass->traps;
+    /*
+     * pass->traps was looked up when the write was intercepted. Callbacks and
+     * process_free_requests() may have removed breakpoints on this page since,
+     * which frees nodes of that list, so walk the current list instead.
+     */
+    GSList* loop = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
     while (loop)
     {
-        uint8_t test = 0;
         addr_t pa = GPOINTER_TO_SIZE(loop->data);
         struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, loop->data);
 
-        if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test) )
-        {
-            fprintf(stderr, "Critical error in re-copying remapped gfn\n");
-            drakvuf->interrupted = -1;
+        if ( s && !reapply_breakpoint(vmi, pass, pa, s) )
             return 0;
-        }
-
-        if ( test == bp )
-        {
-            PRINT_DEBUG("Double-trap at 0x%lx\n", pa);
-            s->breakpoint.doubletrap = 1;
-        }
-        else
-        {
-            s->breakpoint.doubletrap = 0;
-
-            /*
-             * If a write was observed near or at a breakpoint we automatically
-             * fall back to memory access permission based monitoring.
-             */
-            if ( pass->pa < pa && pass->pa >= pa-14 )
-            {
-                PRINT_DEBUG("Write happened near a breakpoint at 0x%lx, switching to mem X-based monitoring\n", pa);
-                remove_trap(drakvuf, &s->breakpoint.guard);
-                s->breakpoint.guard.memaccess.access |= VMI_MEMACCESS_X;
-                if ( !inject_trap_mem(drakvuf, &s->breakpoint.guard, 0) )
-                    drakvuf->interrupted = -1;
-
-            }
-            else if ( VMI_FAILURE == vmi_write_8_pa(vmi, (pass->remapped_gfn->r << 12) + (pa & VMI_BIT_MASK(0, 11)), &bp) )
-            {
-                fprintf(stderr, "Failed to set breakpoint in post_mem_cb!\n");
-                drakvuf->interrupted = -1;
-                return 0;
-            }
-        }
 
         loop = loop->next;
     }
@@ -340,9 +363,13 @@ static event_response_t _post_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
     /*
      * We need to copy the newly written page to the remapped gfn
-     * and reapply all traps
+     * and reapply all traps. pass->traps is set only for a write to a page
+     * that had breakpoints when the write was intercepted. Use it as that
+     * flag only: the list itself may have been freed since.
      */
-    if ( pass->traps && !refresh_shadow_copy(drakvuf->vmi, pass) )
+    if ( pass->traps &&
+        g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn)) &&
+        !refresh_shadow_copy(drakvuf->vmi, pass) )
     {
         fprintf(stderr, "Failed to refresh shadow copy\n");
         drakvuf->interrupted = 1;
