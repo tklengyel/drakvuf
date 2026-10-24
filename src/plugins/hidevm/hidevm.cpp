@@ -710,36 +710,53 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
 
 namespace
 {
-struct win11_offset_t
+struct fastprox_offset_t
 {
     uint32_t build;
     addr_t offset_x64;
     addr_t offset_async_x64;
+    addr_t offset_x32;
+    addr_t offset_async_x32;
 };
 
-// fastprox.dll is a different binary per Windows 11 build (unlike the
-// single Windows 10 offset used elsewhere, which does not apply to any of
-// them), so IWbemServices::ExecQuery needs its own offset per build.
+// fastprox.dll is a different binary in almost every Windows 10 and
+// Windows 11 build, so IWbemServices::ExecQuery needs its own offset per
+// build (the single offset used for all of Windows 10 before was only
+// right for 1803).
 // ExecQueryAsync is hooked too: PowerShell's Get-WmiObject/Get-CimInstance
 // calls it instead of the synchronous ExecQuery, so without it the spoofing
 // never triggers for that (very common) client. Both take strQuery as their
 // 3rd argument in this ABI, so they share the same handler. Extracted from
-// Microsoft's public symbol server (fastprox.pdb); x64 only, no WOW64 build
-// has been checked yet.
-const win11_offset_t win11_offsets[] =
+// Microsoft's public symbol server (fastprox.pdb) for the binaries shipped
+// on each release's installation media (System32 and SysWOW64).
+const fastprox_offset_t fastprox_offsets[] =
 {
-    { 22000, 0x26fb0, 0x26e20 }, // 21H2
-    { 22621, 0x1a6a0, 0x1a290 }, // 22H2
-    { 22631, 0x1a6a0, 0x1a290 }, // 23H2
-    { 26100, 0x363c0, 0x37000 }, // 24H2
-    { 26200, 0x36560, 0x371a0 }, // 25H2
-    { 28000, 0x3c020, 0x3b550 }, // 26H1 (Insider)
+    { 10240, 0x2f640, 0x2f500, 0x0a4b0, 0x0a3c0 }, // Windows 10 1507
+    { 10586, 0x305b0, 0x30470, 0x0a3c0, 0x0a2d0 }, // 1511
+    { 14393, 0x2d0f0, 0x2cfb0, 0x2dba0, 0x2dab0 }, // 1607
+    { 15063, 0x04040, 0x03f00, 0x30570, 0x30490 }, // 1703
+    { 16299, 0x2b140, 0x2b000, 0x2ff30, 0x2fe50 }, // 1709
+    { 17134, 0x2b280, 0x2b140, 0x30690, 0x305b0 }, // 1803
+    { 17763, 0x2aae0, 0x05fa0, 0x2c8d0, 0x2c7f0 }, // 1809
+    { 18362, 0x0c8f0, 0x07210, 0x2d3e0, 0x2d2a0 }, // 1903
+    { 18363, 0x0c8f0, 0x07210, 0x2d3e0, 0x2d2a0 }, // 1909
+    { 19041, 0x0d740, 0x0d8c0, 0x0c7e0, 0x09fb0 }, // 2004
+    { 19042, 0x0d740, 0x0d8c0, 0x0c7e0, 0x09fb0 }, // 20H2
+    { 19043, 0x0d740, 0x0d8c0, 0x0c7e0, 0x09fb0 }, // 21H1
+    { 19044, 0x0d740, 0x0d8c0, 0x0c7e0, 0x09fb0 }, // 21H2
+    { 19045, 0x0d740, 0x0d8c0, 0x0c7e0, 0x09fb0 }, // 22H2
+    { 22000, 0x26fb0, 0x26e20, 0x28ef0, 0x2bb90 }, // Windows 11 21H2
+    { 22621, 0x1a6a0, 0x1a290, 0x0d490, 0x0ab80 }, // 22H2
+    { 22631, 0x1a6a0, 0x1a290, 0x0d490, 0x0ab80 }, // 23H2
+    { 26100, 0x363c0, 0x37000, 0x0d570, 0x0ae10 }, // 24H2
+    { 26200, 0x36560, 0x371a0, 0x0d580, 0x0ae10 }, // 25H2
+    { 28000, 0x3c020, 0x3b550, 0x0d840, 0x0ab80 }, // 26H1 (Insider)
 };
 } // namespace
 
-static const win11_offset_t* find_win11_fastprox_offsets(uint32_t nt_build_number)
+static const fastprox_offset_t* find_fastprox_offsets(uint32_t nt_build_number)
 {
-    for (const auto& e : win11_offsets)
+    for (const auto& e : fastprox_offsets)
         if (e.build == nt_build_number)
             return &e;
 
@@ -747,9 +764,9 @@ static const win11_offset_t* find_win11_fastprox_offsets(uint32_t nt_build_numbe
 }
 
 // Windows 11 is reported as VMI_OS_WINDOWS_10 by LibVMI (same NT major/minor
-// version), so the exact build number is needed to tell it apart from
-// Windows 10. NtBuildNumber sits at a fixed offset in KUSER_SHARED_DATA
-// since Windows Vista.
+// version), and the fastprox.dll offsets differ per build on both, so the
+// exact build number is needed. NtBuildNumber sits at a fixed offset in
+// KUSER_SHARED_DATA since Windows Vista.
 static uint32_t read_nt_build_number(drakvuf_t drakvuf)
 {
     auto vmi = vmi_lock_guard(drakvuf);
@@ -766,30 +783,28 @@ static uint32_t read_nt_build_number(drakvuf_t drakvuf)
     return nt_build_number;
 }
 
-// Windows 7/10 each hook IWbemServices::ExecQuery at a single fixed offset.
-// Windows 11 is reported as VMI_OS_WINDOWS_10 by LibVMI too, but needs a
-// per-build offset (see find_win11_fastprox_offsets()) and also hooks
+// Windows 7 hooks IWbemServices::ExecQuery at a single fixed offset.
+// Windows 10 and Windows 11 (reported as VMI_OS_WINDOWS_10 by LibVMI too)
+// need a per-build offset (see find_fastprox_offsets()) and also hook
 // ExecQueryAsync. Early-return style to keep this decision out of the
 // caller's nesting.
-static void install_win10_or_win11_execquery_hooks(drakvuf_t drakvuf, wanted_hooks_t& wanted_hooks, const HookActions& log,
-    addr_t offset_win10_x64, addr_t offset_win10_x32)
+static void install_win10_or_win11_execquery_hooks(drakvuf_t drakvuf, wanted_hooks_t& wanted_hooks, const HookActions& log)
 {
     uint32_t nt_build_number = read_nt_build_number(drakvuf);
-    if (nt_build_number < 22000)
+    const auto* e = find_fastprox_offsets(nt_build_number);
+    if (!e)
     {
-        wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_win10_x64, log, IWbemServices__ExecQuery_args());
-        wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_win10_x32, log, IWbemServices__ExecQuery_args());
+        PRINT_DEBUG("[HIDEVM] Unrecognized Windows build %u, ExecQuery offset unknown, WQL spoofing disabled\n", nt_build_number);
         return;
     }
 
-    if (const auto* e = find_win11_fastprox_offsets(nt_build_number))
-    {
-        wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", e->offset_x64, log, IWbemServices__ExecQuery_args());
-        wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQueryAsync", e->offset_async_x64, log, IWbemServices__ExecQuery_args());
+    wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", e->offset_x64, log, IWbemServices__ExecQuery_args());
+    wanted_hooks.add_hook("System32\\wbem\\fastprox.dll", "IWbemServices::ExecQueryAsync", e->offset_async_x64, log, IWbemServices__ExecQuery_args());
+    if (!e->offset_x32)
         return;
-    }
 
-    PRINT_DEBUG("[HIDEVM] Unrecognized Windows 11 build %u, ExecQuery offset unknown, WQL spoofing disabled\n", nt_build_number);
+    wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", e->offset_x32, log, IWbemServices__ExecQuery_args());
+    wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQueryAsync", e->offset_async_x32, log, IWbemServices__ExecQuery_args());
 }
 
 hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t output): pluginex(drakvuf, output), drakvuf(drakvuf), format(output)
@@ -863,9 +878,6 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
         addr_t offset_IWbemServices__ExecQuery_win7_x64 = 0x7100;
         addr_t offset_IWbemServices__ExecQuery_win7_x32 = 0x1ebe0;
 
-        addr_t offset_IWbemServices__ExecQuery_win10_x64 = 0x2b280;
-        addr_t offset_IWbemServices__ExecQuery_win10_x32 = 0x30690;
-
         switch (win_ver)
         {
             case VMI_OS_WINDOWS_7:
@@ -873,7 +885,7 @@ hidevm::hidevm(drakvuf_t drakvuf, const hidevm_config* config, output_format_t o
                 wanted_hooks.add_hook("SysWOW64\\wbem\\fastprox.dll", "IWbemServices::ExecQuery", offset_IWbemServices__ExecQuery_win7_x32, log, IWbemServices__ExecQuery_args());
                 break;
             case VMI_OS_WINDOWS_10:
-                install_win10_or_win11_execquery_hooks(drakvuf, wanted_hooks, log, offset_IWbemServices__ExecQuery_win10_x64, offset_IWbemServices__ExecQuery_win10_x32);
+                install_win10_or_win11_execquery_hooks(drakvuf, wanted_hooks, log);
                 break;
             default:
                 break;
