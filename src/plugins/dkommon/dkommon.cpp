@@ -493,12 +493,13 @@ dkommon::dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete")) ||
-        !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")) ||
-        !register_trap(nullptr, load_unload_driver_cb, bp.for_syscall_name("MiProcessLoaderEntry")))
+        !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")))
     {
         PRINT_DEBUG("[DKOMMON] Failed to setup critical traps\n");
         throw -1;
     }
+    if (!register_trap(nullptr, load_unload_driver_cb, bp.for_syscall_name("MiProcessLoaderEntry")))
+        PRINT_DEBUG("[DKOMMON] MiProcessLoaderEntry not found, driver load/unload monitoring disabled\n");
 
     auto hook_usermode = [&](vmi_instance_t vmi, addr_t hook_addr, drakvuf_trap_t* trap, hook_cb_t cb) -> bool
     {
