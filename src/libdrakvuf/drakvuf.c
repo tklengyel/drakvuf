@@ -198,6 +198,7 @@ bool drakvuf_init(
 )
 {
     *out_drakvuf = NULL;
+    bool paused = false;
 
     if ( !domain )
         return 0;
@@ -239,12 +240,16 @@ bool drakvuf_init(
         goto err;
     }
 
-    xen_pause(drakvuf->xen, drakvuf->domID);
+    paused = xen_pause(drakvuf->xen, drakvuf->domID);
 
     if (!init_vmi(drakvuf, fast_singlestep))
         goto err;
 
-    drakvuf_init_os(drakvuf);
+    if ( !drakvuf_init_os(drakvuf) )
+    {
+        fprintf(stderr, "Failed to initialize the guest OS: unsupported OS, wrong profile, or the guest has not finished booting\n");
+        goto err;
+    }
 
     if ( drakvuf->pm == VMI_PM_UNKNOWN )
     {
@@ -258,6 +263,9 @@ bool drakvuf_init(
     return 1;
 
 err:
+    if ( paused )
+        xen_resume(drakvuf->xen, drakvuf->domID);
+
     g_slist_free(ignored_processes);
     drakvuf_close(drakvuf, 1);
 
