@@ -503,6 +503,8 @@ jobs:
           cov-build --dir cov-int meson compile -C build
 
       - name: Submit the result to Coverity Scan
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
         run: |
           tar czvf drakvuf.tgz cov-int
           curl \
