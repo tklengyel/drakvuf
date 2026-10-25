@@ -481,6 +481,14 @@ std::set<addr_t> dkommon::enumerate_services(vmi_instance_t vmi)
     return out;
 }
 
+/* ntoskrnl has no MiProcessLoaderEntry since Windows 11 24H2 (build 26100): dkommon still works without it,
+ * only the driver load/unload tracking is lost, so this trap is not critical. */
+static void register_driver_trap(dkommon* plugin, breakpoint_in_system_process_searcher& bp)
+{
+    if (!plugin->register_trap(nullptr, load_unload_driver_cb, bp.for_syscall_name("MiProcessLoaderEntry")))
+        PRINT_DEBUG("[DKOMMON] MiProcessLoaderEntry not found, driver load/unload monitoring disabled\n");
+}
+
 dkommon::dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_t output)
     : pluginex(drakvuf, output), format(output), offsets(new size_t[__OFFSET_MAX]), srv_pid(0), srv_module_base(0)
 {
@@ -493,12 +501,12 @@ dkommon::dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete")) ||
-        !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")) ||
-        !register_trap(nullptr, load_unload_driver_cb, bp.for_syscall_name("MiProcessLoaderEntry")))
+        !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")))
     {
         PRINT_DEBUG("[DKOMMON] Failed to setup critical traps\n");
         throw -1;
     }
+    register_driver_trap(this, bp);
 
     auto hook_usermode = [&](vmi_instance_t vmi, addr_t hook_addr, drakvuf_trap_t* trap, hook_cb_t cb) -> bool
     {
