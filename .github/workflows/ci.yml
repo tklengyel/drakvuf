@@ -21,7 +21,7 @@ jobs:
           - 'ubuntu-22.04'
           - 'ubuntu-24.04'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -37,7 +37,7 @@ jobs:
 
       - name: Cache Xen debball
         id: cache-xen
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: xen/dist
           key: xen-${{ matrix.os }}-${{ steps.get-hash.outputs.XEN_HASH }}
@@ -67,7 +67,7 @@ jobs:
 
       - name: Cache Libvmi files
         id: cache-libvmi
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: libvmi/dist
           key: libvmi-${{ matrix.os }}-${{ steps.get-hash.outputs.LIBVMI_HASH }}
@@ -113,7 +113,7 @@ jobs:
             - '-Dbuildtype=debug -Db_lto=false -Drepl=true'
             - '-Dbuildtype=debug -Db_lto=false -Dthreadsafety=true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -129,13 +129,13 @@ jobs:
           pip3 install ctypesgen
 
       - name: Cache Xen debball
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: xen/dist
           key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: libvmi/dist
           key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -175,7 +175,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -185,13 +185,13 @@ jobs:
             libjson-c-dev liblzo2-dev libglib2.0-dev
 
       - name: Cache Xen debball
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: xen/dist
           key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: libvmi/dist
           key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -242,7 +242,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
@@ -259,13 +259,13 @@ jobs:
             liblzo2-dev libglib2.0-dev meson ninja-build check
 
     - name: Cache Xen debball
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: xen/dist
         key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
 
     - name: Cache Libvmi files
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: libvmi/dist
         key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -296,7 +296,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           # Install packages
@@ -307,13 +307,13 @@ jobs:
             libglib2.0-dev
 
       - name: Cache Xen debball
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: xen/dist
           key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: libvmi/dist
           key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -343,7 +343,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install dependencies
         run: |
           # Install packages
@@ -354,13 +354,13 @@ jobs:
             libglib2.0-dev
 
       - name: Cache Xen debball
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: xen/dist
           key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: libvmi/dist
           key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -385,7 +385,7 @@ jobs:
           /tmp/complexity.sh
           mv complexity.log /tmp/complexity.log
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
 
@@ -415,3 +415,100 @@ jobs:
             diff complexity.log /tmp/complexity.log | egrep '>|<'
             exit 1
           fi
+
+  coverity-scan:
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - init
+    strategy:
+        matrix:
+          os:
+            - 'ubuntu-24.04'
+          flags:
+            - '-Dbuildtype=debug -Db_lto=false -Drepl=true'
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            clang llvm lld build-essential flex bison \
+            libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build check \
+            python3-ipython
+
+      - name: Setup python venv for REPL
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip3 install ctypesgen
+
+      - name: Cache Xen debball
+        uses: actions/cache@v6
+        with:
+          path: xen/dist
+          key: xen-${{ matrix.os }}-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v6
+        with:
+          path: libvmi/dist
+          key: libvmi-${{ matrix.os }}-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
+          sudo ldconfig
+          cd ../..
+
+      - name: Download Coverity hash
+        id: hash
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+        run: |
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
+          echo hash=$(cat coverity_tool.md5) >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v6
+        id: cache-coverity
+        with:
+          path: coverity_tool.tgz
+          key: ${{ steps.hash.outputs.hash }}
+
+      - name: Download Coverity Build Tool
+        if: steps.cache-coverity.outputs.cache-hit != 'true'
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+        run: |
+          wget -q https://scan.coverity.com/download/cxx/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf" -O coverity_tool.tgz
+
+      - name: Fixed world writable dirs and untar coverity
+        run: |
+          chmod go-w $HOME
+          sudo chmod -R go-w /usr/share
+          mkdir -p coverity
+          tar xzf coverity_tool.tgz --strip 1 -C coverity
+
+      - name: Build with cov-build
+        run: |
+          export PATH=`pwd`/coverity/bin:$PATH
+          source venv/bin/activate
+          meson setup build --native-file llvm.ini ${{ matrix.flags }}
+          cov-configure --clang
+          cov-build --dir cov-int meson compile -C build
+
+      - name: Submit the result to Coverity Scan
+        run: |
+          tar czvf drakvuf.tgz cov-int
+          curl \
+            --form token=$TOKEN \
+            --form email=tamas.k.lengyel@gmail.com \
+            --form file=@drakvuf.tgz \
+            --form version=main \
+            --form description="`git describe --always`" \
+            https://scan.coverity.com/builds?project=tklengyel%2Fdrakvuf
