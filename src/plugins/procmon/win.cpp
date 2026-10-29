@@ -365,6 +365,9 @@ static event_response_t create_user_process_hook(
             process_creation_return_hook,
             breakpoint_by_pid_searcher());
 
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
+
     auto params = get_trap_params<process_creation_result_t>(trap);
     params->set_result_call_params(info);
     params->new_process_handle_addr = process_handle_addr;
@@ -390,6 +393,9 @@ static event_response_t create_process_ex_hook(
             info,
             process_create_ex_return_hook,
             breakpoint_by_pid_searcher());
+
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
 
     auto params = get_trap_params<process_create_ex_result_t>(trap);
 
@@ -532,6 +538,9 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
             open_process_return_hook_cb,
             breakpoint_by_pid_searcher());
 
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
+
     auto params = get_trap_params<open_process_result_t>(trap);
 
     params->set_result_call_params(info);
@@ -614,6 +623,9 @@ static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info
             info,
             open_thread_return_hook_cb,
             breakpoint_by_pid_searcher());
+
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
 
     auto params = get_trap_params<open_thread_result_t>(trap);
 

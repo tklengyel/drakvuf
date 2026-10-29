@@ -333,6 +333,9 @@ static event_response_t delete_service_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if (plugin->winver == win_10_1803_ver)
     {
         auto trap = plugin->register_trap<srv_result_t>(info, delete_service_return_cb, breakpoint_by_pid_searcher());
+        if (!trap)
+            return VMI_EVENT_RESPONSE_NONE;
+
         auto params = get_trap_params<srv_result_t>(trap);
         params->set_result_call_params(info);
         params->srv_record = srv_record;
@@ -371,6 +374,9 @@ static event_response_t add_service_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     {
         auto srv_record_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
         auto trap = plugin->register_trap<srv_result_t>(info, add_service_return_cb, breakpoint_by_pid_searcher());
+        if (!trap)
+            return VMI_EVENT_RESPONSE_NONE;
+
         auto params = get_trap_params<srv_result_t>(trap);
         params->set_result_call_params(info);
         params->srv_record = srv_record_ptr;
