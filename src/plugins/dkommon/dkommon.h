@@ -130,7 +130,7 @@ public:
     vmi_pid_t srv_pid;
     addr_t srv_module_base;
     addr_t srv_db_va;
-    drakvuf_trap_t srv_trap[2];
+    drakvuf_trap_t srv_trap[2] = {};
     std::set<addr_t> loaded_services;
 
     dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_t output);
