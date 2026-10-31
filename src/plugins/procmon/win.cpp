@@ -680,6 +680,9 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+/* Windows defines 36 privileges (SE_MAX_WELL_KNOWN_PRIVILEGE); the count comes from guest memory and sizes an allocation. */
+static constexpr uint32_t MAX_TOKEN_PRIVILEGES = 64;
+
 static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     std::vector<std::pair<std::string, fmt::Aarg>> privileges;
@@ -703,25 +706,33 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
             .addr = newstate_va
         );
 
-        newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(sizeof(struct TOKEN_PRIVILEGES));
+        newstate = (struct TOKEN_PRIVILEGES*)g_try_malloc0(sizeof(struct TOKEN_PRIVILEGES));
         if (!newstate ||
             VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(struct TOKEN_PRIVILEGES), newstate, nullptr) ||
             !newstate->privilege_count)
             goto done;
 
         auto count = newstate->privilege_count;
-        auto size = sizeof(struct TOKEN_PRIVILEGES) + sizeof(struct LUID_AND_ATTRIBUTES) * count;
-        g_free(newstate);
-        newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(size);
+        if (count > MAX_TOKEN_PRIVILEGES)
+        {
+            // Keep the call visible with the raw count, nothing is allocated for it
+            privileges.push_back(keyval("PrivilegeCount", fmt::Nval(static_cast<uint64_t>(count))));
+        }
+        else
+        {
+            auto size = sizeof(struct TOKEN_PRIVILEGES) + sizeof(struct LUID_AND_ATTRIBUTES) * count;
+            g_free(newstate);
+            newstate = (struct TOKEN_PRIVILEGES*)g_try_malloc0(size);
 
-        if (!newstate || VMI_SUCCESS != vmi_read(vmi, &ctx, size, newstate, nullptr) )
-            goto done;
+            if (!newstate || VMI_SUCCESS != vmi_read(vmi, &ctx, size, newstate, nullptr) )
+                goto done;
 
-        if ( count != newstate->privilege_count )
-            fprintf(stderr, "[PROCMON] TOCTOU detected with TOKEN_PRIVILEGES privilege count!\n");
+            if ( count != newstate->privilege_count )
+                fprintf(stderr, "[PROCMON] TOCTOU detected with TOKEN_PRIVILEGES privilege count!\n");
 
-        for (size_t i = 0; i < count; ++i)
-            privileges.push_back(stringify_privilege(newstate->privileges[i]));
+            for (size_t i = 0; i < count; ++i)
+                privileges.push_back(stringify_privilege(newstate->privileges[i]));
+        }
     }
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
