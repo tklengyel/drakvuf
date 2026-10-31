@@ -140,6 +140,15 @@ int xen_get_evtchn_fd(xen_interface_t* xen);
 uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID);
 bool xen_set_maxmemkb(xen_interface_t* xen, domid_t domID, uint64_t mem);
 
+/* The domain as the toolstack sees it: running, shut down by the guest (reason = SHUTDOWN_* from xen/sched.h) or no longer there. */
+typedef enum
+{
+    XEN_DOMAIN_RUNNING,
+    XEN_DOMAIN_SHUTDOWN,
+    XEN_DOMAIN_GONE,
+} xen_domain_state_t;
+xen_domain_state_t xen_get_domain_state(xen_interface_t* xen, domid_t domID, int* shutdown_reason);
+
 bool xen_pause(xen_interface_t* xen, domid_t domID);
 void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
