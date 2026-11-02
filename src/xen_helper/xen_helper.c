@@ -300,6 +300,22 @@ bool xen_set_maxmemkb(xen_interface_t* xen, domid_t domID, uint64_t mem)
     return xen->xlw.xc_domain_setmaxmem(xen->xc, domID, mem) == 0;
 }
 
+xen_domain_state_t xen_get_domain_state(xen_interface_t* xen, domid_t domID, int* shutdown_reason)
+{
+    xc_domaininfo_t info = { 0 };
+
+    if (1 != xen->xlw.xc_domain_getinfolist(xen->xc, domID, 1, &info) || info.domain != domID || (info.flags & XEN_DOMINF_dying))
+        return XEN_DOMAIN_GONE;
+
+    if (info.flags & XEN_DOMINF_shutdown)
+    {
+        *shutdown_reason = (info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
+        return XEN_DOMAIN_SHUTDOWN;
+    }
+
+    return XEN_DOMAIN_RUNNING;
+}
+
 /* Increments Xen's pause count if paused */
 bool xen_pause(xen_interface_t* xen, domid_t domID)
 {

@@ -120,6 +120,7 @@
 
 #include "../xen_helper/xen_helper.h"
 
+#include <xenctrl.h>
 #include "private.h"
 #include "libdrakvuf.h"
 #include "vmi.h"
@@ -1145,6 +1146,23 @@ static event_response_t io_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
+// Put the original byte back in the guest. A domain that is gone has nothing left to restore,
+// only the bookkeeping remains to be dropped
+static bool restore_breakpoint_byte(drakvuf_t drakvuf, const struct wrapper* container, const struct remapped_gfn* remapped_gfn)
+{
+    uint8_t backup;
+
+    if (drakvuf->domain_gone)
+        return true;
+
+    if (VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, container->breakpoint.pa, &backup))
+        return false;
+
+    return VMI_SUCCESS == vmi_write_8_pa(drakvuf->vmi,
+            (remapped_gfn->r << 12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11)),
+            &backup);
+}
+
 void remove_trap(drakvuf_t drakvuf,
     const drakvuf_trap_t* trap)
 {
@@ -1188,18 +1206,7 @@ void remove_trap(drakvuf_t drakvuf,
                     drakvuf->interrupted = -1;
                     break;
                 }
-                uint8_t backup;
-
-                if ( VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, container->breakpoint.pa, &backup) )
-                {
-                    fprintf(stderr, "Critical error in removing int3\n");
-                    drakvuf->interrupted = -1;
-                    break;
-                }
-
-                if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi,
-                        (remapped_gfn->r << 12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11)),
-                        &backup) )
+                if ( !restore_breakpoint_byte(drakvuf, container, remapped_gfn) )
                 {
                     fprintf(stderr, "Critical error in removing int3\n");
                     drakvuf->interrupted = -1;
@@ -1211,7 +1218,7 @@ void remove_trap(drakvuf_t drakvuf,
 
                 /* In the idrx view the only memaccess traps are for guard3 and guard4, so if no breakpoint traps left on the gfn
                  * we can just remove the idrx settings directly */
-                if ( !traps_on_gfn )
+                if ( !traps_on_gfn && !drakvuf->domain_gone )
                 {
                     if ( VMI_FAILURE == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idrx, container->breakpoint.guard3.memaccess.gfn, ~(addr_t)0))
                     {
@@ -1243,7 +1250,7 @@ void remove_trap(drakvuf_t drakvuf,
 
             if (!container->traps)
             {
-                if ( VMI_SUCCESS == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idx, container->memaccess.gfn, ~(addr_t)0))
+                if ( drakvuf->domain_gone || VMI_SUCCESS == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idx, container->memaccess.gfn, ~(addr_t)0))
                 {
                     PRINT_DEBUG("Removed memtrap for GFN 0x%lx in altp2m view %u\n",
                         container->memaccess.gfn, drakvuf->altp2m_idx);
@@ -1854,12 +1861,43 @@ bool control_msr_trap_any(drakvuf_t drakvuf, bool toggle, uint32_t index)
     return 1;
 }
 
+/*
+ * Ask the toolstack whether the guest is still there, the same way xl learns about a guest-initiated reboot or
+ * power off. Returns true when it is not: the loop is interrupted with the matching exit reason and guest memory
+ * is not touched any more (the traps cannot be removed from a domain that no longer exists).
+ */
+static bool check_domain_gone(drakvuf_t drakvuf)
+{
+    static const char* reasons[] = { "poweroff", "reboot", "suspend", "crash", "watchdog", "soft reset" };
+    int reason = -1;
+
+    switch (xen_get_domain_state(drakvuf->xen, drakvuf->domID, &reason))
+    {
+        case XEN_DOMAIN_RUNNING:
+            return false;
+        case XEN_DOMAIN_SHUTDOWN:
+            // A suspended (xl save -c, migration) or soft-reset domain can run again: keep going, the traps still have to be removed
+            if (reason == SHUTDOWN_suspend || reason == SHUTDOWN_soft_reset)
+                return false;
+            fprintf(stderr, "Guest %s (domid %u) has shut down: %s\n", drakvuf->dom_name, drakvuf->domID,
+                (reason >= 0 && reason < 6) ? reasons[reason] : "unknown reason");
+            break;
+        case XEN_DOMAIN_GONE:
+            fprintf(stderr, "Guest %s (domid %u) is no longer running\n", drakvuf->dom_name, drakvuf->domID);
+            break;
+    }
+
+    drakvuf->domain_gone = true;
+    drakvuf->interrupted = (reason == SHUTDOWN_crash) ? SIGDRAKVUFKERNELPANIC : SIGDRAKVUFPOWEROFF;
+    return true;
+}
+
 void drakvuf_vmi_event_callback (int fd, void* data)
 {
     UNUSED(fd);
     drakvuf_t drakvuf = (drakvuf_t)data;
     status_t status = vmi_events_listen(drakvuf->vmi, drakvuf->poll_rc);
-    if (VMI_SUCCESS != status)
+    if (VMI_SUCCESS != status && !check_domain_gone(drakvuf))
     {
         PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
         drakvuf->interrupted = -1;
@@ -1872,7 +1910,11 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
     drakvuf->poll_rc = rc;
 
     if (!rc && timeout)
+    {
+        // Nothing happened for a whole poll period: a guest that shut itself down produces no event at all
+        check_domain_gone(drakvuf);
         return;
+    }
 
     else if (rc < 0)
     {
@@ -2138,11 +2180,26 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
 
 // -------------------------- closing
 
+/* Nothing to restore in a guest that is gone: drop the LibVMI instance without touching guest memory. */
+static void drop_vmi_of_gone_domain(drakvuf_t drakvuf)
+{
+    if (drakvuf->vmi && drakvuf->domain_gone)
+    {
+        // While a generic mem_event is registered, LibVMI resets the access rights of every guest page on destroy: seconds of
+        // hypercalls for a domain that is gone, so drop the event first
+        vmi_clear_event(drakvuf->vmi, &drakvuf->mem_event, NULL);
+        vmi_destroy(drakvuf->vmi);
+        drakvuf->vmi = NULL;
+    }
+}
+
 void close_vmi(drakvuf_t drakvuf)
 {
     PRINT_DEBUG("close_vmi starting\n");
 
     xen_pause(drakvuf->xen, drakvuf->domID);
+
+    drop_vmi_of_gone_domain(drakvuf);
 
     if (drakvuf->vmi)
     {
