@@ -191,6 +191,12 @@ struct injector
     drakvuf_trap_t bp;
     GSList* memtraps;
 
+    // The hijacked thread is registered in drakvuf's injection table (drakvuf_insert_injection)
+    // from the first hit of the injection breakpoint until inject() returns.
+    bool injection_registered;
+    vmi_pid_t injection_reg_pid;
+    uint32_t injection_reg_tid;
+
     // Used only on x64
     size_t offsets[OFFSET_MAX];
 
