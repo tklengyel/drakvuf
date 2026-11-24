@@ -17,7 +17,6 @@ jobs:
     strategy:
       matrix:
         os:
-          - 'ubuntu-latest'
           - 'ubuntu-22.04'
           - 'ubuntu-24.04'
     steps:
@@ -290,7 +289,7 @@ jobs:
       uses: github/codeql-action/analyze@v3
 
   scan-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - init
     if: ${{ github.event_name == 'pull_request' }}
@@ -310,13 +309,13 @@ jobs:
         uses: actions/cache@v6
         with:
           path: xen/dist
-          key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-ubuntu-24.04-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
         uses: actions/cache@v6
         with:
           path: libvmi/dist
-          key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-ubuntu-24.04-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
@@ -337,7 +336,7 @@ jobs:
             --disable-checker deadcode.DeadStores
 
   cognitive-complexity:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - init
     if: ${{ github.event_name == 'pull_request' }}
@@ -357,13 +356,13 @@ jobs:
         uses: actions/cache@v6
         with:
           path: xen/dist
-          key: xen-ubuntu-latest-${{ needs.init.outputs.XEN_HASH }}
+          key: xen-ubuntu-24.04-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
         uses: actions/cache@v6
         with:
           path: libvmi/dist
-          key: libvmi-ubuntu-latest-${{ needs.init.outputs.LIBVMI_HASH }}
+          key: libvmi-ubuntu-24.04-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
         run: |
