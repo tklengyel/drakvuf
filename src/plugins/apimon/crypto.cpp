@@ -123,6 +123,10 @@ static std::string make_hex_string(uint8_t const* data, size_t len)
     return ss.str();
 }
 
+/* The size comes from the calling process's own key structure. The largest key CryptGenKey can produce is a
+ * 16384-bit RSA key, whose private key blob is under 16 KiB. */
+static constexpr uint32_t MAX_KEY_BYTES = 16 * 1024;
+
 // TODO: only works for 32 bits, we should implement 64-bit version in future
 std::map < std::string, std::string > CryptGenKey_hook(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector <uint64_t> arguments)
 {
@@ -152,6 +156,12 @@ std::map < std::string, std::string > CryptGenKey_hook(drakvuf_t drakvuf, drakvu
 
     if (VMI_SUCCESS != vmi_read_va(vmi, magic.key_data, info->proc_data.pid, sizeof(key_data), &key_data, NULL))
         return ret;
+
+    if (key_data.key_size > MAX_KEY_BYTES)
+    {
+        PRINT_DEBUG("[APIMON] Implausible CryptGenKey key size %u, not dumping the key\n", key_data.key_size);
+        return ret;
+    }
 
     std::vector<uint8_t> key_bytes(key_data.key_size);
     if (VMI_SUCCESS != vmi_read_va(vmi, key_data.key_bytes, info->proc_data.pid, key_bytes.size(), key_bytes.data(), NULL))
