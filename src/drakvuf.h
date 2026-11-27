@@ -156,6 +156,7 @@ public:
     void pause();
     void resume();
     void toggle_context_interception(GSList* processes);
+    void set_lazy_disarm(uint32_t hits);
     injector_status_t write_file(vmi_pid_t injection_pid,
         uint32_t injection_tid,
         const char* src,

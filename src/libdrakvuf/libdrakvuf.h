@@ -365,6 +365,13 @@ typedef struct symbols
 
 uint64_t drakvuf_get_limited_traps_ttl(drakvuf_t drakvuf) NOEXCEPT;
 
+/*
+ * Lazy disarm of breakpoints: keep a breakpoint armed after its last trap is removed, until it gets
+ * `hits` hits without traps or its page is read or written as data. Saves the remove/re-add cost of
+ * breakpoints that get a new trap soon (return traps of hooked functions). 0 turns it off (default).
+ */
+void drakvuf_set_lazy_disarm(drakvuf_t drakvuf, uint32_t hits) NOEXCEPT;
+
 const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf) NOEXCEPT;
 json_object* drakvuf_get_json_wow(drakvuf_t drakvuf) NOEXCEPT;
 

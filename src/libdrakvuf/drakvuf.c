@@ -120,6 +120,11 @@ uint64_t drakvuf_get_limited_traps_ttl(drakvuf_t drakvuf)
     return drakvuf->limited_traps_ttl;
 }
 
+void drakvuf_set_lazy_disarm(drakvuf_t drakvuf, uint32_t hits)
+{
+    drakvuf->lazy_disarm_hits = hits;
+}
+
 void drakvuf_close(drakvuf_t drakvuf, const bool pause)
 {
     if (!drakvuf)
