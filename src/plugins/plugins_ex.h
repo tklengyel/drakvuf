@@ -346,29 +346,18 @@ struct breakpoint_by_dtb_searcher
 
 struct breakpoint_by_pid_searcher
 {
-    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
-    {
-        if (trap)
-        {
-            addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-            if (!ret_addr)
-                return nullptr;
+    /*
+     * syscall_user_return: a function entered straight from a user-mode syscall gets its return breakpoint
+     * on the user-mode return address. Only for return callbacks that do not depend on running in kernel
+     * context (they run after the syscall returned).
+     */
+    explicit breakpoint_by_pid_searcher(bool syscall_user_return = false)
+        : syscall_user_return(syscall_user_return)
+    {}
 
-            trap->type = BREAKPOINT;
-            trap->breakpoint.lookup_type = LOOKUP_PID;
-            trap->breakpoint.pid = info->trap->breakpoint.pid;
-            trap->breakpoint.addr_type = ADDR_VA;
-            trap->breakpoint.addr = ret_addr;
-            trap->breakpoint.module = info->trap->breakpoint.module;
+    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const;
 
-            if (!trap->name)
-                trap->name = info->trap->name;
-
-            if (!drakvuf_add_trap(drakvuf, trap))
-                return nullptr;
-        }
-        return trap;
-    }
+    bool syscall_user_return;
 };
 
 struct memaccess_trap
@@ -411,7 +400,7 @@ struct memaccess_trap
 struct call_result_t
 {
     call_result_t()
-        : target_pid(), target_tid(), target_rsp()
+        : target_pid(), target_tid(), target_rsp(), return_rsp()
     {}
 
     virtual ~call_result_t()
@@ -421,7 +410,8 @@ struct call_result_t
     {
         target_pid = info->attached_proc_data.pid;
         target_tid = info->attached_proc_data.tid;
-        target_rsp = info->regs->rsp;
+        // the return breakpoint is on the user-mode return address (breakpoint_by_pid_searcher)
+        target_rsp = return_rsp ? return_rsp : info->regs->rsp;
     }
 
     void set_result_call_params(const drakvuf_trap_info_t* info, addr_t stack_pointer)
@@ -439,6 +429,7 @@ struct call_result_t
     vmi_pid_t target_pid;
     uint32_t target_tid;
     addr_t target_rsp;
+    addr_t return_rsp; // set by breakpoint_by_pid_searcher when the return is on the user-mode address
 };
 
 struct plugin_data
@@ -455,6 +446,47 @@ struct plugin_data
         delete params;
     }
 };
+
+inline drakvuf_trap_t* breakpoint_by_pid_searcher::operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    drakvuf_trap_t* trap) const
+{
+    if (trap)
+    {
+        addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+        if (!ret_addr)
+            return nullptr;
+
+        addr_t user_rsp = 0;
+        bool user_mode = syscall_user_return && drakvuf_get_syscall_return_point(drakvuf, info, &ret_addr, &user_rsp);
+
+        trap->type = BREAKPOINT;
+        if (user_mode)
+        {
+            // a user-mode address: translate it in the calling process
+            trap->breakpoint.lookup_type = LOOKUP_DTB;
+            trap->breakpoint.dtb = info->regs->cr3;
+            auto data = static_cast<plugin_data*>(trap->data);
+            if (data && data->params)
+                data->params->return_rsp = user_rsp;
+        }
+        else
+        {
+            trap->breakpoint.lookup_type = LOOKUP_PID;
+            trap->breakpoint.pid = info->trap->breakpoint.pid;
+        }
+        trap->breakpoint.addr_type = ADDR_VA;
+        trap->breakpoint.addr = ret_addr;
+        trap->breakpoint.module = info->trap->breakpoint.module;
+
+        if (!trap->name)
+            trap->name = info->trap->name;
+
+        if (!drakvuf_add_trap(drakvuf, trap))
+            return nullptr;
+    }
+    return trap;
+}
+
 
 class pluginex : public plugin
 {
@@ -476,7 +508,8 @@ public:
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name = nullptr, int ttl = UNLIMITED_TTL);
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name = nullptr, int ttl = UNLIMITED_TTL,
+        bool syscall_user_return = false);
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
@@ -591,11 +624,12 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name, int ttl)
+std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, const char* display_name, int ttl,
+    bool syscall_user_return)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
 
-    auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, this->wrap_plugin_cb(cb), display_name, ttl);
+    auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, this->wrap_plugin_cb(cb), display_name, ttl, syscall_user_return);
     if (hook)
     {
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;

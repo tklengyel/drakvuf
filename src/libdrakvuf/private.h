@@ -278,6 +278,10 @@ struct drakvuf
     x86_registers_t regs_modified[MAX_DRAKVUF_VCPU];
     GHashTable* injections_in_progress; // key: <pid:tid>
     bool enable_active_callback_check;
+
+    /* range of the syscall dispatcher's return path (drakvuf_get_syscall_return_point), resolved at first use */
+    bool syscall_return_range_resolved;
+    addr_t syscall_return_lo, syscall_return_hi;
 };
 
 struct breakpoint

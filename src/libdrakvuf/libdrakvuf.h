@@ -741,6 +741,15 @@ bool drakvuf_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* 
 
 addr_t drakvuf_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode) NOEXCEPT;
 
+/*
+ * If the function at this hook was entered straight from a user-mode system call: the user-mode return
+ * address (after the syscall instruction in the ntdll stub) and the RSP there, to verify the return with.
+ * A return hook there is hit only by threads returning from the same stub, not by the syscall returns of
+ * every thread as the dispatcher's return path in the kernel is (see #1851 for the syscalls plugin).
+ * False otherwise: the classic kernel return address applies.
+ */
+bool drakvuf_get_syscall_return_point(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* ret_addr, addr_t* ret_rsp) NOEXCEPT;
+
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
     addr_t module_list_head,
     const char* module_name,

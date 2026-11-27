@@ -119,7 +119,8 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
+    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl,
+        bool syscall_user_return = false)
     -> std::unique_ptr<ReturnHook>;
 
     /**
@@ -154,7 +155,8 @@ protected:
 };
 
 template<typename Params>
-auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl)
+auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb, const char* display_name, int ttl,
+    bool syscall_user_return)
 -> std::unique_ptr<ReturnHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
@@ -165,6 +167,15 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
         PRINT_DEBUG("[LIBHOOK] Failed to receive return addr of function\n");
         return {};
     }
+
+    /*
+     * syscall_user_return: a function entered straight from a user-mode syscall gets its return hook on
+     * the user-mode return address. For callers whose return callback does not depend on running in
+     * kernel context (it runs after the syscall returned).
+     */
+    addr_t user_rsp = 0;
+    bool user_mode_return = syscall_user_return &&
+        drakvuf_get_syscall_return_point(drakvuf, info, &ret_addr, &user_rsp);
 
     auto trap = new drakvuf_trap_t();
     trap->breakpoint.lookup_type = LOOKUP_DTB;
@@ -199,6 +210,8 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     hook->params_->hook_ = hook.get();
     hook->trap_->data = static_cast<void*>(hook->params_.get());
     hook->params_->setResultCallParams(drakvuf, info);
+    if (user_mode_return)
+        hook->params_->target_rsp = user_rsp;
 
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
