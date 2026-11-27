@@ -140,6 +140,59 @@ static void clear_interrupt()
     close_handler(0); // clear
 }
 
+/* Start the plugins unless they have been started already (--start-plugins-before-injection); false on failure */
+static bool start_plugins_once(const bool* plugin_list, const plugins_options* options, bool& started)
+{
+    if (started)
+        return true;
+    started = true;
+    PRINT_DEBUG("Starting plugins\n");
+    return drakvuf->start_plugins(plugin_list, options) >= 0;
+}
+
+/* --start-plugins-before-injection: start the plugins before writing files and injecting; false on failure */
+static bool start_plugins_before_injection_if_requested(bool requested, const bool* plugin_list,
+    const plugins_options* options, bool& started, bool warn_procdump_on_finish)
+{
+    if (!requested)
+        return true;
+    // procdump2 copies options.procdump_on_finish when it starts; the injected pid is not known yet
+    if (warn_procdump_on_finish)
+        fprintf(stderr, "Warning: --start-plugins-before-injection: procdump2 will not dump the injected process on finish\n");
+    PRINT_DEBUG("Starting plugins before the injection\n");
+    return start_plugins_once(plugin_list, options, started);
+}
+
+/*
+ * The injector ends its loop with SIGINT when it is done. With plugins running during the injection, any
+ * other value means something else (e.g. a libdrakvuf error) stopped the loop: report it as a failed
+ * injection instead of clearing it later.
+ */
+static injector_status_t check_injection_loop_end(injector_status_t ret, bool plugins_running)
+{
+    if (ret != INJECTOR_SUCCEEDED || !plugins_running || is_interrupted)
+        return ret;
+    int injection_irq = drakvuf->is_interrupted();
+    if (!injection_irq || injection_irq == SIGINT)
+        return ret;
+    fprintf(stderr, "Injection loop was interrupted (%d)\n", injection_irq);
+    return INJECTOR_FAILED;
+}
+
+/* --exit-injection-thread: a timeout only means the helper thread did not exit in time, the analysis goes on */
+static void exit_injection_thread_if_requested(bool requested, vmi_pid_t injection_pid, uint32_t injection_thread,
+    int injection_timeout)
+{
+    if (!requested)
+        return;
+    drakvuf->exit_thread(injection_pid, injection_thread, injection_timeout);
+    if (is_interrupted == SIGDRAKVUFTIMEOUT)
+    {
+        fprintf(stderr, "Warning: exiting the injection thread timed out\n");
+        clear_interrupt();
+    }
+}
+
 static inline bool disable_plugin(char* _optarg, bool* plugin_list)
 {
     for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
@@ -192,6 +245,11 @@ static void print_usage()
         "\t -e <injection_cmd>        The executable to start with injection\n"
         "\t -c <current_working_dir>  The current working directory for injected executable\n"
         "\t --exit-injection-thread   Exit injection thread after process injection complete\n"
+        "\t --start-plugins-before-injection\n"
+        "\t                           Start the plugins before writing files and injecting the sample, so that\n"
+        "\t                           the sample is monitored from its first instruction (implies\n"
+        "\t                           --enable-active-callback-check; the injection thread is excluded from\n"
+        "\t                           breakpoint callbacks while the injector drives it)\n"
         "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
         "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
         "\t --write-file <src> <dst>  Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
@@ -425,6 +483,7 @@ int main(int argc, char** argv)
     char const* injection_cmd = nullptr;
     char const* injection_cwd = nullptr;
     bool exit_injection_thread = false;
+    bool start_plugins_before_injection = false;
     std::map<std::filesystem::path, std::filesystem::path> write_files;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
@@ -552,6 +611,7 @@ int main(int argc, char** argv)
         opt_crashdump_dir,
         opt_enable_active_callback_check,
         opt_exit_injection_thread,
+        opt_start_plugins_before_injection,
         opt_unixsocketmon_max_size,
         opt_rebootmon_abort_on_power_off,
     };
@@ -643,6 +703,7 @@ int main(int argc, char** argv)
         {"crashdump-dir", required_argument, NULL, opt_crashdump_dir},
         {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
         {"exit-injection-thread", no_argument, NULL, opt_exit_injection_thread},
+        {"start-plugins-before-injection", no_argument, NULL, opt_start_plugins_before_injection},
         {"unixsocketmon-max-size-print", required_argument, NULL, opt_unixsocketmon_max_size},
         {"rebootmon-abort-on-power-off", no_argument, NULL, opt_rebootmon_abort_on_power_off},
         {NULL, 0, NULL, 0}
@@ -673,6 +734,12 @@ int main(int argc, char** argv)
                 break;
             case opt_exit_injection_thread:
                 exit_injection_thread = true;
+                break;
+            case opt_start_plugins_before_injection:
+                start_plugins_before_injection = true;
+                // The injector registers the hijacked thread in the injection table; this check is what
+                // keeps the plugins' breakpoint callbacks out of that thread during the injection.
+                enable_active_callback_check = true;
                 break;
             case 'g':
                 injection_global_search = true;
@@ -1147,6 +1214,11 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("DRAKVUF initializated\n");
 
+    bool plugins_started = false;
+    if (!start_plugins_before_injection_if_requested(start_plugins_before_injection, plugin_list, &options,
+            plugins_started, injection_cmd && procdump_on_finish && plugin_list[PLUGIN_PROCDUMP2]))
+        return drakvuf_exit_code_t::FAIL;
+
     for (const auto&[src, dst] : write_files)
     {
         PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", src.c_str(), dst.c_str());
@@ -1187,6 +1259,7 @@ int main(int argc, char** argv)
                 shellexec_verb,
                 &injected_pid
             );
+        ret = check_injection_loop_end(ret, plugins_started);
         switch (ret)
         {
             case INJECTOR_FAILED_WITH_ERROR_CODE:
@@ -1199,8 +1272,7 @@ int main(int argc, char** argv)
                 return drakvuf_exit_code_t::INJECTION_TIMEOUT;
         }
 
-        if (exit_injection_thread)
-            drakvuf->exit_thread(injection_pid, injection_thread);
+        exit_injection_thread_if_requested(exit_injection_thread, injection_pid, injection_thread, injection_timeout);
 
         if (is_interrupted)
             return drakvuf_exit_code_t::SUCCESS;
@@ -1214,9 +1286,7 @@ int main(int argc, char** argv)
     if (context_based_interception)
         drakvuf->toggle_context_interception(context_processes);
 
-    PRINT_DEBUG("Starting plugins\n");
-
-    if (drakvuf->start_plugins(plugin_list, &options) < 0)
+    if (!start_plugins_once(plugin_list, &options, plugins_started))
         return drakvuf_exit_code_t::FAIL;
 
     PRINT_DEBUG("Beginning DRAKVUF main loop\n");

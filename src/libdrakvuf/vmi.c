@@ -471,6 +471,14 @@ static void fill_common_event_trap_info(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     copy_proc_data_from_priv(&trap_info->attached_proc_data, attached_proc_data);
 }
 
+/* Same rule as for a real INT3: while an injection owns this thread, only its trap runs */
+static event_response_t call_active_trap_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
+{
+    if ( !drakvuf_is_active_callback(drakvuf, trap_info) )
+        return 0;
+    return trap_info->trap->cb(drakvuf, trap_info);
+}
+
 /* This hits on the first access on a page, so not in singlestep yet */
 static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 {
@@ -570,7 +578,7 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
                     trap_info.trap = (drakvuf_trap_t*)loop->data;
 
                     loop = loop->next;
-                    rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+                    rsp |= call_active_trap_cb(drakvuf, &trap_info);
                 }
             }
         }

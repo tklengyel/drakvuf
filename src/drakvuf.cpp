@@ -410,9 +410,15 @@ injector_status_t drakvuf_c::inject_cmd(
     return rc;
 }
 
-void drakvuf_c::exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid)
+void drakvuf_c::exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid, int exit_timeout)
 {
+    // Same timer as for the injection itself; 0 disarms it (no timeout)
+    if (!startup_timer(this, exit_timeout))
+        return;
+
     injector_exitthread(drakvuf, injection_pid, injection_tid);
+
+    cleanup_timer();
 }
 
 struct termination_info

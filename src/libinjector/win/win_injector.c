@@ -440,8 +440,33 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!check_int3_trap(injector, info))
         return VMI_EVENT_RESPONSE_NONE;
 
+    /*
+     * Another injection (inject_function_call, e.g. a plugin injecting a call) owns this thread
+     * right now: do not hijack it in the middle of that, wait for a later hit.
+     */
+    if (!injector->injection_registered && drakvuf_lookup_injection(drakvuf, info))
+    {
+        PRINT_DEBUG("Thread %u is busy with another injection, waiting for a later hit\n",
+            info->attached_proc_data.tid);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
     if (!injector_set_hijacked(injector, info))
         return 0;
+
+    /*
+     * Own the hijacked thread for the whole injection. With the active callback check enabled
+     * (--enable-active-callback-check), breakpoint callbacks of other subscribers are not run in
+     * this thread while it is registered, and inject_function_call refuses to inject into it.
+     * Removed when inject() returns, whatever the outcome.
+     */
+    if (!injector->injection_registered && info->attached_proc_data.tid)
+    {
+        drakvuf_insert_injection(drakvuf, info);
+        injector->injection_registered = true;
+        injector->injection_reg_pid = info->attached_proc_data.pid;
+        injector->injection_reg_tid = info->attached_proc_data.tid;
+    }
 
     event_response_t event;
     switch (injector->method)
@@ -543,6 +568,16 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
         injector->rc = INJECTOR_TIMEOUTED;
+
+    if (injector->injection_registered)
+    {
+        drakvuf_trap_info_t reg_info = { 0 };
+        reg_info.attached_proc_data.pid = injector->injection_reg_pid;
+        reg_info.attached_proc_data.tid = injector->injection_reg_tid;
+        reg_info.trap = &injector->bp;
+        drakvuf_remove_injection(drakvuf, &reg_info);
+        injector->injection_registered = false;
+    }
 
     free_memtraps(injector);
 
