@@ -295,6 +295,11 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
+void drakvuf_c::set_lazy_disarm(uint32_t hits)
+{
+    drakvuf_set_lazy_disarm(drakvuf, hits);
+}
+
 void drakvuf_c::toggle_context_interception(GSList* processes)
 {
     GSList* process = processes;

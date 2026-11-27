@@ -278,6 +278,13 @@ struct drakvuf
     x86_registers_t regs_modified[MAX_DRAKVUF_VCPU];
     GHashTable* injections_in_progress; // key: <pid:tid>
     bool enable_active_callback_check;
+
+    /*
+     * Lazy disarm of breakpoints (0: off). A breakpoint whose last trap is removed stays armed until
+     * it gets this many hits without traps, or until its page is accessed as data; a new trap at the
+     * same address in the meantime reuses it (no remap, no write).
+     */
+    uint32_t lazy_disarm_hits;
 };
 
 struct breakpoint
@@ -298,6 +305,8 @@ struct wrapper
     trap_type_t type;
     drakvuf_t drakvuf;
     GSList* traps; /* List of DRAKVUF traps registered for this event */
+    bool lazy_armed; /* breakpoint without traps, kept armed by lazy disarm */
+    uint32_t lazy_empty_hits; /* hits on it since it became empty */
     union
     {
         struct memaccess memaccess;

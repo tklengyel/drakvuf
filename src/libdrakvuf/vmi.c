@@ -471,6 +471,39 @@ static void fill_common_event_trap_info(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     copy_proc_data_from_priv(&trap_info->attached_proc_data, attached_proc_data);
 }
 
+static void breakpoint_release_pa_entry(drakvuf_t drakvuf, struct wrapper* container);
+
+/*
+ * Lazy disarm: a read or write of a page whose breakpoints are all lazily armed (no traps) means the
+ * page is used as data, or rewritten. Every further access would cost a guard event while no int3 hit
+ * comes to disarm them, so disarm them now; the access is then retried without guards.
+ */
+static bool lazy_disarm_on_guard(drakvuf_t drakvuf, addr_t gfn)
+{
+    if (!drakvuf->lazy_disarm_hits)
+        return false;
+    GSList* pas = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(gfn));
+    if (!pas)
+        return false;
+    for (GSList* l = pas; l; l = l->next)
+    {
+        struct wrapper* c = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, l->data);
+        if (!c || c->traps || !c->lazy_armed)
+            return false;
+    }
+    flush_vmi(drakvuf);
+    GSList* copy = g_slist_copy(pas);
+    for (GSList* l = copy; l; l = l->next)
+    {
+        struct wrapper* c = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, l->data);
+        if (c)
+            breakpoint_release_pa_entry(drakvuf, c);
+    }
+    g_slist_free(copy);
+    process_free_requests(drakvuf);
+    return true;
+}
+
 /* This hits on the first access on a page, so not in singlestep yet */
 static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 {
@@ -654,9 +687,24 @@ static event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     UNUSED(vmi);
     drakvuf_t drakvuf = (drakvuf_t)event->data;
     drakvuf_lock_and_get_vmi(drakvuf);
-    event_response_t ret = _pre_mem_cb(drakvuf, event);
+    /*
+     * A lazily armed breakpoint page accessed as data: its guards and remap are gone, let the vCPU retry
+     * the access (another memaccess trap on the page, if any, then gets the event as usual)
+     */
+    event_response_t ret = lazy_disarm_on_guard(drakvuf, event->mem_event.gfn) ? 0 : _pre_mem_cb(drakvuf, event);
     drakvuf_release_vmi(drakvuf);
     return ret;
+}
+
+/* Lazily armed breakpoint hit with no traps: disarm it after enough such hits */
+static void lazy_disarm_on_empty_hit(drakvuf_t drakvuf, struct wrapper* s, addr_t pa)
+{
+    if (!s->lazy_armed || s->traps)
+        return;
+    if (g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa)) != s)
+        return;
+    if (++s->lazy_empty_hits >= drakvuf->lazy_disarm_hits)
+        breakpoint_release_pa_entry(drakvuf, s);
 }
 
 static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
@@ -798,6 +846,8 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
 
     process_free_requests(drakvuf);
+
+    lazy_disarm_on_empty_hit(drakvuf, s, pa);
 
     // Check if we have traps still active on this breakpoint
     if ( !avoid_singlestep && g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa)) )
@@ -1163,6 +1213,69 @@ static bool restore_breakpoint_byte(drakvuf_t drakvuf, const struct wrapper* con
             &backup);
 }
 
+/*
+ * Drop one PA entry of a breakpoint from its gfn list and, if the breakpoint has no traps left, tear it
+ * down (restore the byte, remove guards and remaps). Called when the last trap is removed, or later for
+ * a lazily armed breakpoint.
+ */
+static void breakpoint_release_pa_entry(drakvuf_t drakvuf, struct wrapper* container)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    xen_pfn_t current_gfn = container->breakpoint.pa >> 12;
+
+    /* Update list of traps on this gfn */
+    GSList* traps_on_gfn = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
+    traps_on_gfn = g_slist_remove(traps_on_gfn, GSIZE_TO_POINTER(container->breakpoint.pa));
+    g_hash_table_remove(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
+
+    if ( traps_on_gfn )
+    {
+        // the list head may change so we force a reinsert
+        g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn), traps_on_gfn);
+    }
+
+    if (!container->traps)
+    {
+        struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
+                GSIZE_TO_POINTER(current_gfn));
+        if ( !remapped_gfn )
+        {
+            fprintf(stderr, "Critical error in removing int3\n");
+            drakvuf->interrupted = -1;
+            return;
+        }
+        if ( !restore_breakpoint_byte(drakvuf, container, remapped_gfn) )
+        {
+            fprintf(stderr, "Critical error in removing int3\n");
+            drakvuf->interrupted = -1;
+            return;
+        }
+
+        remove_trap(drakvuf, &container->breakpoint.guard);
+        remove_trap(drakvuf, &container->breakpoint.guard2);
+
+        /* In the idrx view the only memaccess traps are for guard3 and guard4, so if no breakpoint traps left on the gfn
+         * we can just remove the idrx settings directly */
+        if ( !traps_on_gfn && !drakvuf->domain_gone )
+        {
+            if ( VMI_FAILURE == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idrx, container->breakpoint.guard3.memaccess.gfn, ~(addr_t)0))
+            {
+                fprintf(stderr, "Critical error in removing int3, guard3 wasn't removed\n");
+                drakvuf->interrupted = -1;
+                return;
+            }
+            if ( VMI_FAILURE == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idrx, container->breakpoint.guard4.memaccess.gfn, ~(addr_t)0))
+            {
+                fprintf(stderr, "Critical error in removing int3, guard4 wasn't removed\n");
+                drakvuf->interrupted = -1;
+                return;
+            }
+        }
+
+        g_hash_table_remove(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(container->breakpoint.pa));
+    }
+}
+
 void remove_trap(drakvuf_t drakvuf,
     const drakvuf_trap_t* trap)
 {
@@ -1177,65 +1290,26 @@ void remove_trap(drakvuf_t drakvuf,
             if ( !container )
                 return;
 
-            xen_pfn_t current_gfn = container->breakpoint.pa >> 12;
-
             PRINT_DEBUG("Removing breakpoint trap from 0x%lx.\n",
                 container->breakpoint.pa);
 
             g_hash_table_remove(drakvuf->breakpoint_lookup_trap, trap);
             container->traps = g_slist_remove(container->traps, trap);
 
-            /* Update list of traps on this gfn */
-            GSList* traps_on_gfn = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
-            traps_on_gfn = g_slist_remove(traps_on_gfn, GSIZE_TO_POINTER(container->breakpoint.pa));
-            g_hash_table_remove(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
-
-            if ( traps_on_gfn )
+            /*
+             * Lazy disarm: keep the last trap's breakpoint armed (0xCC, remap, guards and its gfn
+             * list entry stay). Not for breakpoints guarded through execute access (the X-based
+             * fallback), nor when the domain is gone.
+             */
+            if ( !container->traps && drakvuf->lazy_disarm_hits && !drakvuf->domain_gone &&
+                !(container->breakpoint.guard.memaccess.access & VMI_MEMACCESS_X) )
             {
-                // the list head may change so we force a reinsert
-                g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn), traps_on_gfn);
+                container->lazy_armed = true;
+                container->lazy_empty_hits = 0;
+                break;
             }
 
-            if (!container->traps)
-            {
-                struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
-                        GSIZE_TO_POINTER(current_gfn));
-                if ( !remapped_gfn )
-                {
-                    fprintf(stderr, "Critical error in removing int3\n");
-                    drakvuf->interrupted = -1;
-                    break;
-                }
-                if ( !restore_breakpoint_byte(drakvuf, container, remapped_gfn) )
-                {
-                    fprintf(stderr, "Critical error in removing int3\n");
-                    drakvuf->interrupted = -1;
-                    break;
-                }
-
-                remove_trap(drakvuf, &container->breakpoint.guard);
-                remove_trap(drakvuf, &container->breakpoint.guard2);
-
-                /* In the idrx view the only memaccess traps are for guard3 and guard4, so if no breakpoint traps left on the gfn
-                 * we can just remove the idrx settings directly */
-                if ( !traps_on_gfn && !drakvuf->domain_gone )
-                {
-                    if ( VMI_FAILURE == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idrx, container->breakpoint.guard3.memaccess.gfn, ~(addr_t)0))
-                    {
-                        fprintf(stderr, "Critical error in removing int3, guard3 wasn't removed\n");
-                        drakvuf->interrupted = -1;
-                        break;
-                    }
-                    if ( VMI_FAILURE == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idrx, container->breakpoint.guard4.memaccess.gfn, ~(addr_t)0))
-                    {
-                        fprintf(stderr, "Critical error in removing int3, guard4 wasn't removed\n");
-                        drakvuf->interrupted = -1;
-                        break;
-                    }
-                }
-
-                g_hash_table_remove(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(container->breakpoint.pa));
-            }
+            breakpoint_release_pa_entry(drakvuf, container);
 
             break;
         }
@@ -1424,6 +1498,30 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
     return 1;
 }
 
+/* Add a trap to a breakpoint that is already armed at its address */
+static void add_trap_to_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap, struct wrapper* container,
+    xen_pfn_t current_gfn)
+{
+    bool was_lazy_armed = container->lazy_armed && !container->traps;
+    container->lazy_armed = false;
+    g_hash_table_insert(drakvuf->breakpoint_lookup_trap,
+        trap,
+        container);
+    container->traps = g_slist_prepend(container->traps, trap);
+
+    /* A lazily armed breakpoint kept its gfn list entry: do not add a second one */
+    if (was_lazy_armed)
+        return;
+
+    GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
+    traps = g_slist_append(traps, GSIZE_TO_POINTER(container->breakpoint.pa));
+
+    /* this should never happen but at least it makes some static analyzers happy */
+    if ( 1 == g_slist_length(traps) )
+        g_hash_table_insert(drakvuf->breakpoint_lookup_gfn,
+            GSIZE_TO_POINTER(current_gfn), traps);
+}
+
 bool inject_trap_pa(drakvuf_t drakvuf,
     drakvuf_trap_t* trap,
     addr_t pa)
@@ -1438,19 +1536,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     if (container)
     {
-        g_hash_table_insert(drakvuf->breakpoint_lookup_trap,
-            trap,
-            container);
-        container->traps = g_slist_prepend(container->traps, trap);
-
-        GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
-        traps = g_slist_append(traps, GSIZE_TO_POINTER(container->breakpoint.pa));
-
-        /* this should never happen but at least it makes some static analyzers happy */
-        if ( 1 == g_slist_length(traps) )
-            g_hash_table_insert(drakvuf->breakpoint_lookup_gfn,
-                GSIZE_TO_POINTER(current_gfn), traps);
-
+        add_trap_to_breakpoint(drakvuf, trap, container, current_gfn);
         return 1;
     }
 

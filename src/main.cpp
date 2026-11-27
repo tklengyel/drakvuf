@@ -220,6 +220,10 @@ static void print_usage()
         "\t --ignore-pid <PID>        Ignore events from process with PID (can be repeated multiple times).\n"
         "\t --enable-active-callback-check\n"
         "\t                           The check prevents events processing until function call injection finish.\n"
+        "\t --lazy-disarm <hits>\n"
+        "\t                           Keep a breakpoint armed after its last trap is removed, until it gets <hits>\n"
+        "\t                           hits without traps or its page is accessed as data; saves re-arming\n"
+        "\t                           breakpoints that get a new trap soon (return traps). 0: off (default)\n"
 #if defined(ENABLE_PLUGIN_FILEDELETE) || defined(ENABLE_PLUGIN_FILEEXTRACTOR)
         "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
 #endif
@@ -458,6 +462,7 @@ int main(int argc, char** argv)
     bool libdrakvuf_get_userid = true;
     std::set<uint64_t> ignored_processes;
     bool enable_active_callback_check = false;
+    uint32_t lazy_disarm_hits = 0;
 
 #ifdef ENABLE_PLUGIN_BSODMON
     bool bsodmon_ignore_stop = false;
@@ -551,6 +556,7 @@ int main(int argc, char** argv)
         opt_bsodmon_ignore_stop,
         opt_crashdump_dir,
         opt_enable_active_callback_check,
+        opt_lazy_disarm,
         opt_exit_injection_thread,
         opt_unixsocketmon_max_size,
         opt_rebootmon_abort_on_power_off,
@@ -642,6 +648,7 @@ int main(int argc, char** argv)
         {"bsodmon-ignore-stop", no_argument, NULL, opt_bsodmon_ignore_stop},
         {"crashdump-dir", required_argument, NULL, opt_crashdump_dir},
         {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
+        {"lazy-disarm", required_argument, NULL, opt_lazy_disarm},
         {"exit-injection-thread", no_argument, NULL, opt_exit_injection_thread},
         {"unixsocketmon-max-size-print", required_argument, NULL, opt_unixsocketmon_max_size},
         {"rebootmon-abort-on-power-off", no_argument, NULL, opt_rebootmon_abort_on_power_off},
@@ -1077,6 +1084,9 @@ int main(int argc, char** argv)
             case opt_enable_active_callback_check:
                 enable_active_callback_check = true;
                 break;
+            case opt_lazy_disarm:
+                lazy_disarm_hits = strtoul(optarg, NULL, 0);
+                break;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -1146,6 +1156,8 @@ int main(int argc, char** argv)
     }
 
     PRINT_DEBUG("DRAKVUF initializated\n");
+
+    drakvuf->set_lazy_disarm(lazy_disarm_hits);
 
     for (const auto&[src, dst] : write_files)
     {
