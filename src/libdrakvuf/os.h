@@ -335,6 +335,9 @@ typedef struct os_interface
     addr_t (*get_syscall_retaddr)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode);
 
+    bool (*get_syscall_return_point)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* ret_addr, addr_t* ret_rsp);
+
 
 } os_interface_t;
 

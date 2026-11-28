@@ -1263,6 +1263,20 @@ bool drakvuf_get_user_rsp(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* 
     return ret;
 }
 
+bool drakvuf_get_syscall_return_point(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* ret_addr, addr_t* ret_rsp)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_syscall_return_point )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_syscall_return_point(drakvuf, info, ret_addr, ret_rsp);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 addr_t drakvuf_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t mode)
 {
     addr_t ret = 0;

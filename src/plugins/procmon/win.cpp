@@ -363,7 +363,7 @@ static event_response_t create_user_process_hook(
     auto trap = plugin->register_trap<process_creation_result_t>(
             info,
             process_creation_return_hook,
-            breakpoint_by_pid_searcher());
+            breakpoint_by_pid_searcher(true));
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
@@ -392,7 +392,7 @@ static event_response_t create_process_ex_hook(
     auto trap = plugin->register_trap<process_create_ex_result_t>(
             info,
             process_create_ex_return_hook,
-            breakpoint_by_pid_searcher());
+            breakpoint_by_pid_searcher(true));
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
@@ -536,7 +536,7 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     auto trap = plugin->register_trap<open_process_result_t>(
             info,
             open_process_return_hook_cb,
-            breakpoint_by_pid_searcher());
+            breakpoint_by_pid_searcher(true));
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
@@ -622,7 +622,7 @@ static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info
     auto trap = plugin->register_trap<open_thread_result_t>(
             info,
             open_thread_return_hook_cb,
-            breakpoint_by_pid_searcher());
+            breakpoint_by_pid_searcher(true));
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;

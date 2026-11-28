@@ -774,7 +774,8 @@ event_response_t win_filetracer::create_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     }
 
     // Create new trap for return callback
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::create_file_ret_cb, info->trap->name);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::create_file_ret_cb, info->trap->name,
+            UNLIMITED_TTL, true);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -862,7 +863,8 @@ event_response_t win_filetracer::open_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::open_file_ret_cb, info->trap->name);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::open_file_ret_cb, info->trap->name,
+            UNLIMITED_TTL, true);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -929,7 +931,8 @@ event_response_t win_filetracer::query_attributes_file_cb(drakvuf_t drakvuf, dra
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb, info->trap->name);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb, info->trap->name,
+            UNLIMITED_TTL, true);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -974,7 +977,8 @@ event_response_t win_filetracer::query_full_attributes_file_cb(drakvuf_t drakvuf
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
-    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb, info->trap->name);
+    auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_attributes_file_ret_cb, info->trap->name,
+            UNLIMITED_TTL, true);
     auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
     // Save data
@@ -1155,7 +1159,8 @@ event_response_t win_filetracer::query_information_file_cb(drakvuf_t drakvuf, dr
         addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
         // Create new trap for return callback
-        auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_information_file_ret_cb, info->trap->name);
+        auto hook = this->createReturnHook<win_data>(info, &win_filetracer::query_information_file_ret_cb, info->trap->name,
+                UNLIMITED_TTL, true);
         auto params = libhook::GetTrapParams<win_data>(hook->trap_);
 
         // Save data

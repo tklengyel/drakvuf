@@ -270,6 +270,76 @@ addr_t win_get_syscall_retaddr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pri
     return user_ret_addr;
 }
 
+/* [KiSystemServiceCopyEnd, KiSystemServiceExit): where a function called by the syscall dispatcher returns */
+static bool win_syscall_return_range(drakvuf_t drakvuf, addr_t* lo, addr_t* hi)
+{
+    if (!drakvuf->syscall_return_range_resolved)
+    {
+        drakvuf->syscall_return_range_resolved = true;
+        if (!win_get_kernel_symbol_va(drakvuf, "KiSystemServiceCopyEnd", &drakvuf->syscall_return_lo) ||
+            !win_get_kernel_symbol_va(drakvuf, "KiSystemServiceExit", &drakvuf->syscall_return_hi) ||
+            drakvuf->syscall_return_hi <= drakvuf->syscall_return_lo)
+        {
+            PRINT_DEBUG("win_syscall_return_range: dispatcher symbols not found\n");
+            drakvuf->syscall_return_lo = drakvuf->syscall_return_hi = 0;
+        }
+    }
+    *lo = drakvuf->syscall_return_lo;
+    *hi = drakvuf->syscall_return_hi;
+    return *hi > *lo;
+}
+
+/*
+ * A function entered straight from the syscall dispatcher by a user-mode caller: return the user-mode
+ * return address (after the syscall instruction in the ntdll stub) and the user RSP there.
+ *
+ * Its return address must be in the dispatcher's return path and PreviousMode must be UserMode: a Zw*
+ * call made by kernel code while it serves a user syscall goes through KiServiceInternal, which sets
+ * PreviousMode to KernelMode, and returns into the same path (the trap frame at the top of the stack still
+ * belongs to the outer user syscall, so its CS alone would say "user"). Such a nested call also runs
+ * deeper on the stack (RspBase - RSP is 0x198 or 0x208 for user-mode calls and at least 0x458 for nested
+ * ones on Windows 10 22H2), so the distance is checked first as a cheap filter. The trap frame (RIP, CS,
+ * RFLAGS, RSP, SS at RspBase - 0x28) gives the user RIP and RSP in one read.
+ */
+bool win_get_syscall_return_point(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* ret_addr, addr_t* ret_rsp)
+{
+    const addr_t max_user_frame_distance = 0x300;
+    addr_t lo, hi, kret = 0;
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    if (!win_syscall_return_range(drakvuf, &lo, &hi))
+        return false;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp
+    );
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &kret) || kret < lo || kret >= hi)
+        return false;
+
+    addr_t rspbase = win_get_rspbase(drakvuf, info);
+    if (!rspbase || rspbase < info->regs->rsp || rspbase - info->regs->rsp > max_user_frame_distance)
+        return false;
+
+    privilege_mode_t mode = MAXIMUM_MODE;
+    if (!win_get_current_thread_previous_mode(drakvuf, info, &mode) || mode != USER_MODE)
+        return false;
+
+    uint64_t frame[5] = { 0 }; // rip, cs, rflags, rsp, ss
+    size_t read = 0;
+    if (VMI_SUCCESS != vmi_read_va(vmi, rspbase - sizeof(frame), 0, sizeof(frame), frame, &read) ||
+        read != sizeof(frame))
+        return false;
+
+    if ((frame[1] & 3) != 3 || !frame[0] || !frame[3])
+        return false;
+
+    *ret_addr = frame[0];
+    *ret_rsp = frame[3];
+    return true;
+}
+
 bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql)
 {
     vmi_instance_t vmi = drakvuf->vmi;
